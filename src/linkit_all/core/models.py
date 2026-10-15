@@ -14,7 +14,11 @@ def utcnow() -> datetime:
 
 
 class Base(DeclarativeBase):
-    type_annotation_map: ClassVar[dict[Any, Any]] = {dict[str, Any]: JSON, list[str]: JSON}
+    type_annotation_map: ClassVar[dict[Any, Any]] = {
+        dict[str, Any]: JSON,
+        list[str]: JSON,
+        list[dict[str, Any]]: JSON,
+    }
 
 
 class JobState(StrEnum):
@@ -111,4 +115,41 @@ class LLMCache(Base):
     key: Mapped[str] = mapped_column(String(64), primary_key=True)  # sha256 of model+prompt
     model: Mapped[str] = mapped_column(String(128))
     response: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class Profile(Base):
+    """The user's profile. Single row (id=1) for now."""
+
+    __tablename__ = "profile"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    full_name: Mapped[str] = mapped_column(Text)
+    email: Mapped[str] = mapped_column(Text)
+    phone: Mapped[str] = mapped_column(Text, default="")
+    location: Mapped[str] = mapped_column(Text, default="")
+    skills: Mapped[list[str]] = mapped_column(default=list)  # the only skills tailoring may add
+    cv_path: Mapped[str] = mapped_column(Text)  # base DOCX copied into the data dir
+    updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)
+
+
+class LockedFact(Base):
+    """Exact text tailoring must never change (employers, titles, dates, degrees...)."""
+
+    __tablename__ = "locked_facts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    text: Mapped[str] = mapped_column(Text, unique=True)
+
+
+class TailoredCV(Base):
+    __tablename__ = "tailored_cvs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id", ondelete="CASCADE"), index=True)
+    docx_path: Mapped[str] = mapped_column(Text)
+    pdf_path: Mapped[str] = mapped_column(Text)
+    applied: Mapped[list[dict[str, Any]]] = mapped_column(default=list)  # patches, for red-line UI
+    rejected: Mapped[list[dict[str, Any]]] = mapped_column(default=list)  # patch + reason
+    verify: Mapped[dict[str, Any]] = mapped_column(default=dict)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)

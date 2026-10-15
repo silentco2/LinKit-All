@@ -1,0 +1,9 @@
+{
+  "full_name": "Jane Doe",
+  "email": "jane@example.com",
+  "phone": "+1 555 0100",
+  "location": "Cairo, Egypt",
+  "skills": ["Python", "FastAPI", "PostgreSQL", "Docker", "AWS"],
+  "cv_path": "C:/Users/you/Documents/cv.docx",
+  "locked_facts": ["Acme Corp", "Senior Software Engineer", "B.Sc. Computer Science, Cairo University"]
+}

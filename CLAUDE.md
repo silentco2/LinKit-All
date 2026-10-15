@@ -105,6 +105,8 @@ Tailoring happens just before applying, never for jobs that will not be applied 
 - Output: LibreOffice -> PDF (submitted file). Verify: same page count, pixel/SSIM diff vs
   original within tolerance, pdfplumber text extract succeeds. On failure roll back patches.
 - Store every tailored version + patch list per job; UI shows a red-line diff.
+- Until the wizard exists: `linkit profile import profile.json` (docs/profile.example.json),
+  then `linkit tailor jd.txt` prints the red-line. Numbers/dates/contacts are auto-locked.
 
 ### 5.5 Apply (`apply/`)
 - Order: per-ATS handler (Workday, Greenhouse, Lever, Ashby, iCIMS, Taleo, SmartRecruiters,
