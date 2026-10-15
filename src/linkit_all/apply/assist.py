@@ -31,12 +31,14 @@ MATCH_SENSITIVE = 0.97  # sensitive questions: near-identical wording, the user'
 
 
 class AnswerBank:
-    def __init__(self, db: sessionmaker[Session], embed: Embed) -> None:
+    def __init__(self, db: sessionmaker[Session], embed: Embed | None = None) -> None:
         self.db, self.embed = db, embed
         self._entries: list[AnswerEntry] | None = None
         self._vecs: np.ndarray[Any, np.dtype[np.float64]] | None = None
 
     def _load(self) -> list[AnswerEntry]:
+        if self.embed is None:
+            raise RuntimeError("AnswerBank needs an embedder for lookups")
         if self._entries is None:
             with self.db() as s:
                 self._entries = list(s.scalars(select(AnswerEntry)))
@@ -47,6 +49,7 @@ class AnswerBank:
         entries = self._load()
         if not entries or self._vecs is None:
             return None
+        assert self.embed is not None  # _load checked  # noqa: S101
         sims = self._vecs @ self.embed([q.label])[0]
         for i in np.argsort(-sims):
             if sims[i] < (MATCH_SENSITIVE if sensitive else MATCH):

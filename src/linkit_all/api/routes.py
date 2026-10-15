@@ -2,6 +2,7 @@
 
 import asyncio
 import shutil
+from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
@@ -12,8 +13,20 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from linkit_all.api.events import EventBus
 from linkit_all.api.runner import PipelineRunner, RunBusy
+from linkit_all.apply.answers import ApplicationAnswers
+from linkit_all.apply.assist import AnswerBank
 from linkit_all.core.config import Settings
-from linkit_all.core.models import Job, JobEvent, JobState, Run, Tier
+from linkit_all.core.models import (
+    ActionItem,
+    ActionStatus,
+    Job,
+    JobEvent,
+    JobState,
+    Profile,
+    Run,
+    Tier,
+    utcnow,
+)  # fmt: skip
 from linkit_all.core.profile import ProfileFields, load_fields, save_cv, save_fields
 from linkit_all.core.search import SearchConfig, load_search, save_search
 from linkit_all.core.state import InvalidTransition, transition
@@ -55,8 +68,15 @@ def status(request: Request) -> dict[str, Any]:
         "ai_ready": cfg is not None and cfg.ai.provider is not None,
         "libreoffice": soffice_path() is not None,
         "states": {str(k): v for k, v in states.items()},
+        "actions_open": _open_actions(db),
+        "apply_live": bool(cfg and cfg.apply.live),
         "run": _runner(request).state.as_dict(),
     }
+
+
+def _open_actions(db: sessionmaker[Session]) -> int:
+    with db() as s:
+        return s.scalar(select(func.count()).where(ActionItem.status == ActionStatus.open)) or 0
 
 
 # --- profile ------------------------------------------------------------------
@@ -106,7 +126,6 @@ def cv_segments(request: Request) -> list[dict[str, Any]]:
 
 @router.get("/profile/cv/pdf")
 async def cv_pdf(request: Request) -> FileResponse:
-    from pathlib import Path
 
     from linkit_all.tailor.pipeline import ensure_base_pdf
     from linkit_all.tailor.render.libreoffice import RenderError
@@ -338,3 +357,118 @@ async def events(ws: WebSocket) -> None:
         pass
     finally:
         bus.unsubscribe(q)
+
+
+# --- application answers and the Action Center ---------------------------------------
+
+
+@router.get("/profile/answers")
+def get_answers(request: Request) -> ApplicationAnswers:
+    with _db(request)() as s:
+        profile = s.get(Profile, 1)
+        return ApplicationAnswers.model_validate(profile.answers if profile else {})
+
+
+@router.put("/profile/answers")
+def put_answers(request: Request, answers: ApplicationAnswers) -> ApplicationAnswers:
+    with _db(request).begin() as s:
+        profile = s.get(Profile, 1)
+        if profile is None:
+            raise HTTPException(409, "Save your profile first")
+        profile.answers = answers.model_dump()
+    return answers
+
+
+def _action(item: ActionItem, job: Job) -> dict[str, Any]:
+    job_summary = {
+        "id": job.id,
+        "title": job.title,
+        "company": job.company,
+        "location": job.location,
+        "score": job.score,
+        "url": job.url,
+        "apply_url": job.data.get("apply_url") or job.url,
+    }
+    return {
+        "id": item.id,
+        "kind": item.kind,
+        "status": item.status,
+        "message": item.message,
+        "questions": item.questions,
+        "answers": item.answers,
+        "screenshots": len(item.artifacts),
+        "created_at": item.created_at.isoformat(),
+        "job": job_summary,
+    }
+
+
+@router.get("/actions")
+def list_actions(
+    request: Request, status: ActionStatus = ActionStatus.open
+) -> list[dict[str, Any]]:
+    with _db(request)() as s:
+        rows = s.execute(
+            select(ActionItem, Job).join(Job, Job.id == ActionItem.job_id)
+            .where(ActionItem.status == status).order_by(ActionItem.id.desc())
+        ).all()  # fmt: skip
+        return [_action(item, job) for item, job in rows]
+
+
+@router.get("/actions/{item_id}/screenshot/{n}")
+def action_screenshot(request: Request, item_id: int, n: int) -> FileResponse:
+    with _db(request)() as s:
+        item = s.get(ActionItem, item_id)
+        if item is None or not 0 <= n < len(item.artifacts):
+            raise HTTPException(404)
+        path = Path(item.artifacts[n]).resolve()
+    if not path.is_relative_to(_settings(request).data_dir.resolve()) or not path.is_file():
+        raise HTTPException(404)  # only files the app wrote into its own data dir
+    return FileResponse(path, media_type="image/png")
+
+
+class ActionAnswers(BaseModel):
+    answers: dict[str, Any]  # question label -> the user's answer
+
+
+class ActionDecision(BaseModel):
+    decision: Literal["answer", "confirm", "retry", "applied_by_hand", "skip"]
+    answers: dict[str, Any] = {}
+
+
+@router.post("/actions/{item_id}")
+def resolve_action(request: Request, item_id: int, body: ActionDecision) -> dict[str, Any]:
+    """answer: save to the answer bank and requeue; confirm: submit on the next apply run;
+    retry: requeue as is; applied_by_hand: you submitted it yourself; skip: drop the job."""
+    db = _db(request)
+    if body.decision == "answer":
+        with db() as s:
+            item = s.get(ActionItem, item_id)
+            questions = {q["label"]: q for q in (item.questions if item else [])}
+        missing = [
+            label
+            for label, q in questions.items()
+            if q.get("required") and body.answers.get(label) in (None, "", [])
+        ]
+        if missing:
+            raise HTTPException(422, f"Please answer: {missing[0]}")
+        bank = AnswerBank(db)
+        for label, value in body.answers.items():
+            if label in questions and value not in (None, "", []):
+                bank.save(label, value, "user", sensitive=bool(questions[label].get("sensitive")))
+    with db.begin() as s:
+        item = s.get(ActionItem, item_id)
+        if item is None or item.status != ActionStatus.open:
+            raise HTTPException(404, "No open item with that id")
+        job = s.get_one(Job, item.job_id)
+        if body.decision == "confirm":
+            job.data = {**job.data, "submit_confirmed": True}
+        if body.decision == "skip":
+            transition(s, job, JobState.skipped, "you skipped it in the Action Center")
+        elif body.decision == "applied_by_hand":
+            transition(s, job, JobState.applying, "you applied by hand")
+            transition(s, job, JobState.applied, "you applied by hand")
+        else:
+            transition(s, job, JobState.queued_apply, f"Action Center: {body.decision}")
+        item.status = ActionStatus.dismissed if body.decision == "skip" else ActionStatus.resolved
+        item.resolved_at = utcnow()
+        return {"job_state": job.state}

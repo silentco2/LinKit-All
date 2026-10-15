@@ -10,7 +10,7 @@ from test_tailor import make_cv
 from linkit_all.api import runner as runner_module
 from linkit_all.api.app import create_app
 from linkit_all.core.config import Settings
-from linkit_all.core.models import Job, JobState, Tier
+from linkit_all.core.models import ActionItem, ActionKind, AnswerEntry, Job, JobState, Tier
 from linkit_all.core.state import transition
 
 BASE = "http://127.0.0.1:8765"
@@ -155,3 +155,90 @@ def test_websocket_from_other_site_is_refused(client: TestClient) -> None:
         ) as ws,
     ):
         ws.receive_json()
+
+
+def park(
+    client: TestClient, kind: ActionKind, questions: list[dict[str, Any]], artifact: str = ""
+) -> tuple[int, int]:
+    db = client.app.state.db  # type: ignore[attr-defined]
+    with db.begin() as s:
+        n = s.query(Job).count()
+        job = Job(source="lever", url=f"https://x/{kind}/{n}", title="Dev", company="Acme", dedupe_hash=f"{kind}{n}",
+                  state=JobState.applying)  # fmt: skip
+        s.add(job)
+        s.flush()
+        transition(s, job, JobState.needs_user)
+        item = ActionItem(
+            job_id=job.id, kind=kind, questions=questions, artifacts=[artifact] if artifact else []
+        )
+        s.add(item)
+        s.flush()
+        return job.id, item.id
+
+
+def test_action_center_answer_confirm_skip(client: TestClient, tmp_path: Path) -> None:
+    q = {"label": "Have you ever been convicted of a felony?", "kind": "yesno", "options": ["Yes", "No"],
+         "required": True, "reason": "criminal question: only you can answer", "sensitive": True}  # fmt: skip
+    job_id, item_id = park(client, ActionKind.unknown_question, [q])
+    assert client.get("/api/status").json()["actions_open"] == 1
+    item = client.get("/api/actions").json()[0]
+    assert item["job"]["title"] == "Dev" and item["questions"][0]["sensitive"]
+
+    bad = client.post(
+        f"/api/actions/{item_id}", json={"decision": "answer", "answers": {}}, headers=SAME_ORIGIN
+    )
+    assert bad.status_code == 422
+    r = client.post(
+        f"/api/actions/{item_id}",
+        json={"decision": "answer", "answers": {q["label"]: "No"}},
+        headers=SAME_ORIGIN,
+    )
+    assert r.json() == {"job_state": "queued_apply"}
+    db = client.app.state.db  # type: ignore[attr-defined]
+    with db() as s:
+        entry = s.query(AnswerEntry).one()
+        assert (entry.answer, entry.source, entry.sensitive) == ("No", "user", True)
+    assert client.get("/api/actions").json() == []
+
+    job_id, item_id = park(client, ActionKind.confirm_submit, [])
+    client.post(f"/api/actions/{item_id}", json={"decision": "confirm"}, headers=SAME_ORIGIN)
+    with db() as s:
+        assert s.get_one(Job, job_id).data["submit_confirmed"] is True
+
+    job_id, item_id = park(client, ActionKind.captcha, [])
+    assert client.post(
+        f"/api/actions/{item_id}", json={"decision": "applied_by_hand"}, headers=SAME_ORIGIN
+    ).json() == {"job_state": "applied"}
+    job_id, item_id = park(client, ActionKind.validation_error, [])
+    assert client.post(
+        f"/api/actions/{item_id}", json={"decision": "skip"}, headers=SAME_ORIGIN
+    ).json() == {"job_state": "skipped"}
+    assert (
+        client.post(
+            f"/api/actions/{item_id}", json={"decision": "skip"}, headers=SAME_ORIGIN
+        ).status_code
+        == 404
+    )
+
+
+def test_action_screenshot_only_from_data_dir(client: TestClient, tmp_path: Path) -> None:
+    outside = tmp_path / "secret.png"
+    outside.write_bytes(b"png")
+    _, item_id = park(client, ActionKind.captcha, [], artifact=str(outside))
+    assert client.get(f"/api/actions/{item_id}/screenshot/0").status_code == 404
+    inside = client.app.state.settings.data_dir / "applications" / "shot.png"  # type: ignore[attr-defined]
+    inside.parent.mkdir(parents=True, exist_ok=True)
+    inside.write_bytes(b"png")
+    _, item_id = park(client, ActionKind.captcha, [], artifact=str(inside))
+    assert client.get(f"/api/actions/{item_id}/screenshot/0").status_code == 200
+
+
+def test_application_answers_roundtrip(client: TestClient) -> None:
+    assert (
+        client.put("/api/profile/answers", json={}, headers=SAME_ORIGIN).status_code == 409
+    )  # no profile yet
+    client.put("/api/profile", json={"full_name": "J", "email": "j@x.io"}, headers=SAME_ORIGIN)
+    body = {"authorized_countries": ["Egypt"], "eeo_gender": "decline", "acknowledge_privacy": True}
+    assert client.put("/api/profile/answers", json=body, headers=SAME_ORIGIN).status_code == 200
+    got = client.get("/api/profile/answers").json()
+    assert got["authorized_countries"] == ["Egypt"] and got["eeo_race"] is None
