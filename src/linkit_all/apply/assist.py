@@ -24,7 +24,7 @@ from linkit_all.apply.answers import (
 )  # fmt: skip
 from linkit_all.core.models import AnswerEntry
 from linkit_all.matching.rank import Embed
-from linkit_all.providers.base import LLMProvider, render
+from linkit_all.providers.base import LLMProvider, UsageLimitError, render
 
 MATCH = 0.93  # paraphrase similarity needed to reuse a saved answer
 MATCH_SENSITIVE = 0.97  # sensitive questions: near-identical wording, the user's own answers only
@@ -183,7 +183,9 @@ async def answer_questions(
     if provider is not None and for_ai:
         try:
             drafted = await ai_drafts(provider, for_ai, cv, profile, job)
-        except Exception as e:  # the AI being down must not lose the application
+        except UsageLimitError:
+            raise  # pause the run; the job is retried later instead of parked
+        except Exception as e:  # a bad AI answer must not lose the application
             logger.warning("AI drafts failed: {}", e)
             drafted = {}
         for q in for_ai:

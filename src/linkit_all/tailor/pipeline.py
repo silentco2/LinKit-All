@@ -150,18 +150,19 @@ async def tailor_job(
     settings: Settings,
     render: Renderer = render_pdf,
 ) -> TailoredCV:
-    """Pipeline stage queued_apply -> tailored. Idempotent: a tailored job is returned as is."""
+    """Pipeline stage queued_apply -> tailored. Idempotent: an existing tailored CV is reused
+    (a job coming back from the Action Center is not tailored, and paid for, twice)."""
     profile, facts = load_profile(db)
-    with db() as s:
+    with db.begin() as s:
         job = s.get(Job, job_id)
         if job is None:
             raise TailorError(f"job {job_id} not found")
-        if job.state == JobState.tailored:
-            latest = s.scalars(
-                select(TailoredCV).filter_by(job_id=job_id).order_by(TailoredCV.id.desc())
-            ).first()
-            if latest:
-                return latest
+        latest = s.scalars(
+            select(TailoredCV).filter_by(job_id=job_id).order_by(TailoredCV.id.desc())
+        ).first()
+        if latest is not None and Path(latest.pdf_path).exists():
+            transition(s, job, JobState.tailored, "reusing the tailored CV")
+            return latest
         title, company, description = job.title, job.company, job.description
 
     out_dir = settings.data_dir / "tailored" / f"job_{job_id}"

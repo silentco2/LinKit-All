@@ -12,7 +12,7 @@ from linkit_all.core.models import Run, RunStatus, utcnow
 from linkit_all.core.runs import record_stats
 from linkit_all.core.search import SearchConfig, load_search
 
-STAGES = ("discover", "enrich", "rank", "score")
+STAGES = ("discover", "enrich", "rank", "score", "apply")
 
 
 class PipelineError(RuntimeError):
@@ -31,6 +31,17 @@ def ai_settings(
 
 
 _embedder: Any = None  # the model takes seconds to load; keep it for the process
+
+
+async def _get_embedder(settings: Settings) -> Any:
+    global _embedder
+    if _embedder is None:
+        from linkit_all.matching.rank import Embedder
+
+        _embedder = await asyncio.to_thread(
+            Embedder, settings.embedding_model, settings.data_dir / "models"
+        )
+    return _embedder
 
 
 async def run_stage(
@@ -54,15 +65,11 @@ async def run_stage(
             else:
                 stats = {"enriched": await enrich(db, Http(client), registry())}
     elif stage == "rank":
-        global _embedder
-        from linkit_all.matching.rank import Embedder, rank_jobs
+        from linkit_all.matching.rank import rank_jobs
 
-        if _embedder is None:
-            _embedder = await asyncio.to_thread(
-                Embedder, settings.embedding_model, settings.data_dir / "models"
-            )
+        embedder = await _get_embedder(settings)
         try:
-            stats = await asyncio.to_thread(rank_jobs, db, cfg, _embedder)
+            stats = await asyncio.to_thread(rank_jobs, db, cfg, embedder)
         except ValueError as e:
             raise PipelineError(str(e)) from e
     elif stage == "score":
@@ -73,6 +80,15 @@ async def run_stage(
             provider = get_provider(ai_settings(settings, cfg, ai_override), cache=db)
             stats = await score_jobs(db, cfg, provider, run_id)
         except (ValueError, ProviderError) as e:
+            raise PipelineError(str(e)) from e
+    elif stage == "apply":
+        from linkit_all.apply.runner import ApplyBlocked, apply_jobs
+        from linkit_all.providers import ProviderError, get_provider
+
+        try:
+            provider = get_provider(ai_settings(settings, cfg, ai_override), cache=db)
+            stats = await apply_jobs(db, settings, cfg, provider, await _get_embedder(settings))
+        except (ApplyBlocked, ProviderError) as e:
             raise PipelineError(str(e)) from e
     else:
         raise PipelineError(f"unknown stage {stage!r}; stages: {', '.join(STAGES)}")

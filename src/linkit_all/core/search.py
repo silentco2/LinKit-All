@@ -45,6 +45,16 @@ class MatchingSection(BaseModel):
     batch_size: int = Field(15, ge=1, le=30)  # jobs per AI call
 
 
+class ApplySection(BaseModel):
+    live: bool = False  # off = dry run: fill forms and take screenshots, never submit
+    submit_without_asking: bool = False  # off = each live submission waits for your click
+    max_per_run: int = Field(10, ge=1, le=100)
+    daily_cap_per_site: int = Field(20, ge=1, le=200)  # live submissions per ATS per day
+    headless: bool = False  # True hides the browser window
+    min_pause_s: int = Field(20, ge=0)  # random wait between live applications
+    max_pause_s: int = Field(60, ge=0)
+
+
 class AISection(BaseModel):
     """Chosen in the setup wizard; LINKIT_PROVIDER / LINKIT_MODEL apply when unset."""
 
@@ -57,6 +67,7 @@ class SearchConfig(BaseModel):
     sources: SourcesSection = SourcesSection()
     filters: FiltersSection = FiltersSection()
     matching: MatchingSection = MatchingSection()
+    apply: ApplySection = ApplySection()
     ai: AISection = AISection()
 
 

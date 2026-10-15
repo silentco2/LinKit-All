@@ -28,7 +28,9 @@ Questions:
 {% for q in questions %}
 - key: {{ q.key }} | {{ q.kind }}{% if q.required %} | required{% endif %}
   question: {{ q.label }}{% if q.description %} ({{ q.description }}){% endif %}
-{%- if q.options %}
+{%- if q.options and q.options | length > 40 %}
+  options: a long list; answer with the exact name and it will be matched
+{%- elif q.options %}
   options: {{ q.options | join(" || ") }}
 {%- endif %}
 {% endfor %}

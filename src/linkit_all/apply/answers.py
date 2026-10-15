@@ -97,20 +97,27 @@ _SENSITIVE: list[tuple[str, re.Pattern[str]]] = [
         ("eeo_gender", r"\bgender\b|\bsex\b"),
         ("eeo_veteran", r"veteran|military service|armed forces"),
         ("eeo_disability", r"disabilit"),
-        ("eeo_other", r"sexual orientation|transgender|pronoun|lgbt|religio|marital|date of birth|\bage\b|how old"),
+        ("eeo_other", r"sexual orientation|transgender|\bpronouns?\b|lgbt|religio|marital|date of birth|\bage\b|how old"),
+        # Being recorded or transcribed (AI notetakers) is its own decision, never a default.
+        ("recording_consent", r"notetaker|\brecord(ing|ed)?\b.*\b(interview|call|conversation)|transcri"),
         ("acknowledge_legal", r"arbitration|\bcertify\b|attest|true and (complete|correct|accurate)|"
                               r"non-?compete|non-?solicit|legally binding"),
         ("acknowledge_privacy", r"privacy (notice|policy|statement)|data (privacy|protection|processing)|gdpr|"
-                                r"consent to (the )?(processing|collection|storage|use)|\backnowledge"),
+                                r"\bconsent\b|\backnowledge"),
     ]
 ]  # fmt: skip
 
 
 def sensitive_category(q: Question) -> str | None:
-    text = f"{q.label} {q.description}"
+    """The question text decides; the description (often a generic EEO paragraph) only if
+    the question alone says nothing."""
+    text = q.label
     if q.kind in ("multi", "checkbox"):  # "Please review:" [x] "I acknowledge the privacy notice"
         text += " " + " ".join(q.options)
-    return next((cat for cat, rx in _SENSITIVE if rx.search(text)), None)
+    for source in (text, q.description):
+        if found := next((cat for cat, rx in _SENSITIVE if rx.search(source)), None):
+            return found
+    return None
 
 
 _COUNTRIES = {
@@ -132,7 +139,7 @@ _ISO = {"us": "united states", "gb": "united kingdom", "uk": "united kingdom", "
         "ae": "united arab emirates", "sa": "saudi arabia", "ca": "canada", "ie": "ireland",
         "de": "germany", "in": "india", "qa": "qatar", "kw": "kuwait"}  # fmt: skip
 _THIS_COUNTRY = re.compile(r"country where (the|this) (job|role|position)|this (country|location)|"
-                           r"where the (job|role|position) is", re.I)  # fmt: skip
+                           r"where the (job|role|position) is|country (for|to) which you (are )?apply", re.I)  # fmt: skip
 
 
 def country_of(text: str) -> str | None:
@@ -249,7 +256,7 @@ def _standard_value(key: str, ctx: Context) -> Any:
         "portfolio": a.portfolio,
         "current_company": a.current_company,
         "current_title": a.current_title,
-        "country": a.country,
+        "country": a.country or (country_of(ctx.location) or "").title(),
         "city": a.city or ctx.location,
         "heard_about": a.heard_about or _SOURCE_NAMES.get(ctx.job_source, "Company website"),
         "notice_period": a.notice_period,
@@ -269,6 +276,8 @@ def standard_answer(q: Question, ctx: Context) -> Any:
             return None
         if isinstance(value, bool):
             return yes_no(q, value)
+        if q.kind == "combobox" and not q.options:
+            return value  # searchable list (country, city): typed, then the first match is picked
         if q.kind in CHOICE_KINDS or q.kind == "multi":
             if key == "years_experience":
                 return _pick_range(q.options, int(value))
@@ -373,6 +382,8 @@ def resolve_static(questions: list[Question], ctx: Context) -> Resolution:
                 r.missing.append(Missing(q, "file the app cannot provide"))
             continue
         if (category := sensitive_category(q)) is not None:
+            if category.startswith("acknowledge") and not q.required:
+                continue  # optional consents (marketing emails, ...) stay unticked
             value, why = sensitive_answer(q, category, ctx)
             if value is not None:
                 r.answers[q.key], r.sources[q.key] = value, "sensitive"
