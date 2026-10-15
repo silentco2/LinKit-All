@@ -16,6 +16,7 @@ class Settings(BaseSettings):
 
     data_dir: Path = Path(user_data_dir("linkit-all", appauthor=False))
     log_level: str = "INFO"
+    dev_origins: list[str] = []  # e.g. ["http://localhost:4200"] while running `ng serve`
 
     provider: ProviderName = "codex_cli"
     model: str | None = None  # None = the CLI's own default; required for litellm

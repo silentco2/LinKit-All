@@ -7,6 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, sessionmaker
 
+from linkit_all.core.config import ProviderName
 from linkit_all.core.models import SearchConfigRow
 
 Seniority = Literal["intern", "junior", "mid", "senior", "lead", "manager", "executive"]
@@ -44,17 +45,29 @@ class MatchingSection(BaseModel):
     batch_size: int = Field(15, ge=1, le=30)  # jobs per AI call
 
 
+class AISection(BaseModel):
+    """Chosen in the setup wizard; LINKIT_PROVIDER / LINKIT_MODEL apply when unset."""
+
+    provider: ProviderName | None = None
+    model: str | None = None
+
+
 class SearchConfig(BaseModel):
     search: SearchSection = SearchSection()
     sources: SourcesSection = SourcesSection()
     filters: FiltersSection = FiltersSection()
     matching: MatchingSection = MatchingSection()
+    ai: AISection = AISection()
+
+
+def save_search(db: sessionmaker[Session], cfg: SearchConfig) -> None:
+    with db.begin() as s:
+        s.merge(SearchConfigRow(id=1, data=cfg.model_dump()))
 
 
 def import_search(db: sessionmaker[Session], path: Path) -> SearchConfig:
     cfg = SearchConfig.model_validate(tomllib.loads(path.read_text("utf-8")))
-    with db.begin() as s:
-        s.merge(SearchConfigRow(id=1, data=cfg.model_dump()))
+    save_search(db, cfg)
     return cfg
 
 

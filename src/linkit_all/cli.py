@@ -5,11 +5,10 @@ import shutil
 import sys
 import tomllib
 import zipfile
-from dataclasses import asdict
 from datetime import datetime
 from importlib.metadata import version
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, NamedTuple
+from typing import TYPE_CHECKING, Annotated, Any, NamedTuple
 
 import typer
 from pydantic import ValidationError
@@ -20,17 +19,16 @@ from linkit_all.core.db import init_db
 from linkit_all.core.log import setup_logging
 from linkit_all.core.models import Job
 from linkit_all.core.profile import ProfileIn, import_profile
-from linkit_all.core.runs import current_run, record_stats
-from linkit_all.core.search import SearchConfig, import_search, load_search
+from linkit_all.core.runs import current_run
+from linkit_all.core.search import import_search
 from linkit_all.core.tools import bundled_libreoffice, chrome_path, soffice_path
 from linkit_all.providers import ProviderError, get_provider
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session, sessionmaker
 
-    from linkit_all.sources.runner import DiscoverStats
 
-app = typer.Typer(no_args_is_help=True, add_completion=False)
+app = typer.Typer(add_completion=False)
 profile_app = typer.Typer(no_args_is_help=True, help="Manage your profile.")
 app.add_typer(profile_app, name="profile")
 search_app = typer.Typer(no_args_is_help=True, help="Manage what to search for.")
@@ -76,13 +74,27 @@ def _show_version(value: bool) -> None:
         raise typer.Exit()
 
 
-@app.callback()
+@app.callback(invoke_without_command=True)
 def main(
+    ctx: typer.Context,
     _version: Annotated[
         bool, typer.Option("--version", callback=_show_version, is_eager=True, help="Show version.")
     ] = False,
 ) -> None:
-    """LinKit All: AI job search, CV tailoring and auto-apply."""
+    """LinKit All: AI job search, CV tailoring and auto-apply. No command: open the UI."""
+    if ctx.invoked_subcommand is None:
+        serve()
+
+
+@app.command()
+def serve(
+    port: Annotated[int, typer.Option(help="Local port.")] = 8765,
+    open_browser: Annotated[bool, typer.Option("--open/--no-open", help="Open a browser.")] = True,
+) -> None:
+    """Start the local web UI on 127.0.0.1."""
+    from linkit_all.api.app import serve as run_server
+
+    run_server(port=port, open_browser=open_browser)
 
 
 @app.command()
@@ -208,6 +220,19 @@ def search_import(path: Path) -> None:
     )
 
 
+def _run_stage(stage: str, new: bool = False, **ai: str | None) -> tuple[int, dict[str, Any]]:
+    from linkit_all.pipeline import PipelineError, run_stage
+
+    db = _stage_db()
+    run_id = current_run(db, new)
+    try:
+        override = {k: v for k, v in ai.items() if v}
+        return run_id, asyncio.run(run_stage(stage, db, get_settings(), run_id, override))
+    except PipelineError as e:
+        typer.echo(f"{stage} failed: {e}", err=True)
+        raise typer.Exit(1) from e
+
+
 @run_app.command("discover")
 def run_discover(
     new: Annotated[
@@ -215,47 +240,38 @@ def run_discover(
     ] = False,
 ) -> None:
     """Fetch jobs from every configured source (resumes an unfinished run)."""
-    from linkit_all.sources import registry
-    from linkit_all.sources.http import Http, make_client
-    from linkit_all.sources.runner import discover
-
-    db = _stage_db()
-    cfg = load_search(db)
-    if cfg is None:
-        typer.echo("Import a search first: linkit search import search.toml", err=True)
-        raise typer.Exit(1)
-    run_id = current_run(db, new)
-
-    async def go() -> "DiscoverStats":
-        async with make_client() as client:
-            return await discover(db, cfg, run_id, Http(client), registry())
-
-    stats = asyncio.run(go())
-    record_stats(db, run_id, "discover", asdict(stats))
+    run_id, stats = _run_stage("discover", new)
     typer.echo(
-        f"Run {run_id}: {stats.new} new jobs, {stats.duplicates} duplicates, "
-        f"{stats.tasks_done} tasks done"
+        f"Run {run_id}: {stats['new']} new jobs, {stats['duplicates']} duplicates, "
+        f"{stats['tasks_done']} tasks done"
     )
-    for key, err in stats.errors.items():
+    for key, err in stats["errors"].items():
         typer.secho(f"  error {key}: {err}", fg="yellow")
-    for entry in stats.unsupported:
+    for entry in stats["unsupported"]:
         typer.secho(f"  skipped {entry}", fg="yellow")
 
 
 @run_app.command("enrich")
 def run_enrich() -> None:
     """Fill in missing job descriptions (discovered -> enriched)."""
-    from linkit_all.sources import registry
-    from linkit_all.sources.http import Http, make_client
-    from linkit_all.sources.runner import enrich
+    typer.echo(f"{_run_stage('enrich')[1]['enriched']} jobs enriched")
 
-    db = _stage_db()
 
-    async def go() -> int:
-        async with make_client() as client:
-            return await enrich(db, Http(client), registry())
+@run_app.command("rank")
+def run_rank() -> None:
+    """Hard filters + free local ranking (enriched -> ranked | filtered_out)."""
+    counts = _run_stage("rank")[1]
+    typer.echo(f"{counts['ranked']} ranked, {counts['filtered_out']} filtered out")
 
-    typer.echo(f"{asyncio.run(go())} jobs enriched")
+
+@run_app.command("score")
+def run_score(provider: ProviderOpt = None, model: ModelOpt = None) -> None:
+    """AI-tier the best ranked jobs: high -> apply queue, mid -> review, low -> hidden."""
+    counts = _run_stage("score", provider=provider, model=model)[1]
+    typer.echo(
+        f"high {counts['high']} (auto-apply), mid {counts['mid']} (your review), "
+        f"low {counts['low']}, not scored {counts['not_scored']}"
+    )
 
 
 @app.command()
@@ -271,52 +287,6 @@ def status() -> None:
         typer.echo(f"{state:<16} {n}")
     if by_tier:
         typer.echo("tiers: " + ", ".join(f"{t} {n}" for t, n in by_tier))
-
-
-def _search_or_exit(db: "sessionmaker[Session]") -> SearchConfig:
-    cfg = load_search(db)
-    if cfg is None:
-        typer.echo("Import a search first: linkit search import search.toml", err=True)
-        raise typer.Exit(1)
-    return cfg
-
-
-@run_app.command("rank")
-def run_rank() -> None:
-    """Hard filters + free local ranking (enriched -> ranked | filtered_out)."""
-    from linkit_all.matching.rank import Embedder, rank_jobs
-
-    db = _stage_db()
-    cfg = _search_or_exit(db)
-    settings = get_settings()
-    try:
-        embed = Embedder(settings.embedding_model, settings.data_dir / "models")
-        counts = rank_jobs(db, cfg, embed)
-    except ValueError as e:
-        typer.echo(str(e), err=True)
-        raise typer.Exit(1) from e
-    typer.echo(f"{counts['ranked']} ranked, {counts['filtered_out']} filtered out")
-
-
-@run_app.command("score")
-def run_score(provider: ProviderOpt = None, model: ModelOpt = None) -> None:
-    """AI-tier the best ranked jobs: high -> apply queue, mid -> review, low -> hidden."""
-    from linkit_all.matching.score import score_jobs
-
-    db = _stage_db()
-    cfg = _search_or_exit(db)
-    settings = _settings(provider, model)
-    run_id = current_run(db)
-    try:
-        counts = asyncio.run(score_jobs(db, cfg, get_provider(settings, cache=db), run_id))
-    except (ValueError, ProviderError) as e:
-        typer.echo(f"Scoring failed: {e}", err=True)
-        raise typer.Exit(1) from e
-    record_stats(db, run_id, "score", counts)
-    typer.echo(
-        f"high {counts['high']} (auto-apply), mid {counts['mid']} (your review), "
-        f"low {counts['low']}, not scored {counts['not_scored']}"
-    )
 
 
 @app.command()

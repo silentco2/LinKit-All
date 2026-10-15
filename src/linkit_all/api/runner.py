@@ -1,0 +1,88 @@
+"""Runs pipeline stages in the server's event loop, one run at a time."""
+
+import asyncio
+from dataclasses import asdict, dataclass, field
+from typing import Any
+
+from loguru import logger
+from sqlalchemy.orm import Session, sessionmaker
+
+from linkit_all.api.events import EventBus
+from linkit_all.core.config import Settings
+from linkit_all.core.models import utcnow
+from linkit_all.core.runs import current_run
+from linkit_all.pipeline import STAGES, PipelineError, finish_run, run_stage
+
+
+class RunBusy(RuntimeError):
+    pass
+
+
+@dataclass
+class RunState:
+    running: bool = False
+    run_id: int | None = None
+    stages: list[str] = field(default_factory=list)
+    stage: str | None = None
+    started_at: str | None = None
+    error: str | None = None
+    results: dict[str, Any] = field(default_factory=dict)
+
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+class PipelineRunner:
+    def __init__(self, db: sessionmaker[Session], settings: Settings, bus: EventBus) -> None:
+        self.db, self.settings, self.bus = db, settings, bus
+        self.state = RunState()
+        self._task: asyncio.Task[None] | None = None
+
+    def start(self, stages: list[str], new: bool = False) -> RunState:
+        if self.state.running:
+            raise RunBusy("a run is already in progress")
+        unknown = set(stages) - set(STAGES)
+        if unknown or not stages:
+            raise ValueError(f"stages must be some of {', '.join(STAGES)}")
+        ordered = [s for s in STAGES if s in stages]  # always pipeline order
+        run_id = current_run(self.db, new)
+        self.state = RunState(running=True, run_id=run_id, stages=ordered,
+                              started_at=utcnow().isoformat(timespec="seconds") + "Z")  # fmt: skip
+        self.bus.publish({"type": "run", "status": "started", **self.state.as_dict()})
+        self._task = asyncio.create_task(self._run(run_id, ordered))
+        return self.state
+
+    def cancel(self) -> bool:
+        if self._task is None or self._task.done():
+            return False
+        self._task.cancel()  # the run stays resumable: checkpoints and job states are saved
+        return True
+
+    async def _run(self, run_id: int, stages: list[str]) -> None:
+        status = "finished"
+        try:
+            for stage in stages:
+                self.state.stage = stage
+                self.bus.publish({"type": "stage", "stage": stage, "status": "started"})
+                try:
+                    result = await run_stage(stage, self.db, self.settings, run_id)
+                except PipelineError as e:
+                    self.state.error, status = str(e), "failed"
+                    self.bus.publish(
+                        {"type": "stage", "stage": stage, "status": "failed", "error": str(e)}
+                    )
+                    break
+                self.state.results[stage] = result
+                self.bus.publish(
+                    {"type": "stage", "stage": stage, "status": "done", "result": result}
+                )
+            else:
+                finish_run(self.db, run_id)
+        except asyncio.CancelledError:
+            status = "cancelled"
+        except Exception as e:  # keep the server alive; show what broke
+            logger.exception("run {} crashed", run_id)
+            self.state.error, status = f"{type(e).__name__}: {e}", "failed"
+        finally:
+            self.state.running, self.state.stage = False, None
+            self.bus.publish({"type": "run", "status": status, **self.state.as_dict()})
