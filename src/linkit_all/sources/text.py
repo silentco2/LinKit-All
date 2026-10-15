@@ -13,8 +13,12 @@ _TRACKING = re.compile(
     r"lever-\w+|campaign|fbclid|gclid|mc_\w+|_hs\w+)$",
     re.I,
 )
+# Legal forms and group words that differ between sites for one employer
+# ("Merck Group" on LinkedIn, "Merck KGaA" on Indeed).
 _COMPANY_SUFFIX = re.compile(
-    r"\b(inc|llc|ltd|limited|gmbh|co|corp|corporation|plc|sa|ag|bv|s\.?a\.?e)\b\.?", re.I
+    r"\b(inc|llc|ltd|limited|gmbh|kgaa|co|corp|corporation|plc|sa|ag|bv|nv|se|"
+    r"s\.?a\.?e|group|holdings?)\b\.?",
+    re.I,
 )
 
 
@@ -44,7 +48,8 @@ def norm(text: str) -> str:
 
 
 def norm_company(name: str) -> str:
-    return norm(_COMPANY_SUFFIX.sub(" ", name))
+    # A name made only of suffix words ("Group Holdings SE") must not become "".
+    return norm(_COMPANY_SUFFIX.sub(" ", name)) or norm(name)
 
 
 def job_hash(title: str, company: str, location: str) -> str:

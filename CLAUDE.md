@@ -80,16 +80,19 @@ Tailoring happens just before applying, never for jobs that will not be applied 
 - Plugin per source with `search(query) -> JobStub[]` and `fetch_details(stub) -> Job`.
 - Priority: public ATS JSON APIs (Greenhouse, Lever, Ashby, SmartRecruiters, Recruitee,
   Workable, Workday cxs endpoint) > python-jobspy (LinkedIn, Indeed, Glassdoor,
-  ZipRecruiter, Google) > per-site scrapers (regional: Wuzzuf, Bayt, Naukrigulf, Forasna)
+  ZipRecruiter, Google, Bayt) > per-site plugins (Wuzzuf; later Naukrigulf, Forasna)
   > generic extractor (JSON-LD -> CSS heuristics -> AI extraction).
-- ATS detector routes any pasted URL to the right plugin.
+- Obey robots.txt; never defeat bot challenges. Use APIs/sitemaps instead (Wuzzuf: job
+  sitemaps + JSON-LD pages at its Crawl-delay 10; its search pages are disallowed).
+- ATS detector routes any pasted URL (or careers-page HTML) to the right plugin.
 - Per-domain rate limits, checkpoints every page, dedupe by normalized URL +
   hash(title, company, location) + rapidfuzz near-duplicate check.
 
 ### 5.3 Matching (`matching/`)
 1. Hard rules: titles include/exclude, location, remote mode, seniority, posted date,
    salary floor, company blacklist, one application per company (default on).
-2. Local rank: fastembed cosine(CV, JD) + skills overlap. Free, no AI calls.
+2. Local rank: 0.8 cosine(CV, JD) + 0.2 skills overlap; fastembed multilingual MiniLM-L12
+   (Arabic + English, chunked). Free, no AI calls.
 3. AI score only jobs that survive 1–2 (dropped ones become tier `low`), batched 10–20
    short job summaries per call: `{score 1-10, reasons, missing_skills, red_flags}` per job.
 
@@ -146,10 +149,9 @@ per run and over time; funnel (found -> filtered -> ranked -> scored -> applied)
 - IMAP: app passwords (Gmail first, Yahoo). Outlook needs an OAuth path (later).
 - External tools: LibreOffice required (DOCX->PDF), Chrome for applying, Tectonic for LaTeX.
   `linkit doctor` checks them. Install for end users: `uv tool install linkit-all`.
-- LibreOffice ships as a minimal portable bundle (Windows: 1.6 GB -> 439 MB, 152 MB zip) built by
-  `scripts/bundle_libreoffice.py`: each removal is kept only if renders stay pixel-identical.
-  `linkit install-libreoffice <zip>` puts it in the data dir; it wins over a system install.
-  Keep its license files (MPL-2.0). macOS/Linux bundles: later.
+- LibreOffice: minimal portable bundle (Win 1.6 GB -> 439 MB) from `scripts/bundle_libreoffice.py`
+  (removals kept only if renders stay identical); `linkit install-libreoffice <zip>` installs it
+  to the data dir, ahead of any system install. Keep its MPL-2.0 license files.
 - Profile, preferences, locked facts, answer bank stored in DB; JSON/YAML import/export.
 
 ## 7. UI screens
@@ -184,8 +186,8 @@ docs/
 
 ## 10. Build order
 1. Core: models, SQLite, state machine, provider layer (Claude CLI + Codex CLI + API keys), DOCX tailoring.
-2. Discovery: Greenhouse/Lever/Ashby APIs, python-jobspy, regional boards (Wuzzuf, Bayt,
-   Naukrigulf, Forasna; discovery only), dedupe, matching + batched AI tiering.
+2. Discovery: Greenhouse/Lever/Ashby APIs, python-jobspy (+Bayt), Wuzzuf, dedupe,
+   matching + batched AI tiering. Done; Naukrigulf/Forasna later.
 3. UI v1: setup wizard, jobs table, review queue, live run, basic report.
 4. Apply v1: Greenhouse, Lever, Ashby (no accounts), answer bank, Action Center.
 5. Apply v2: Workday, iCIMS, Taleo, SmartRecruiters, SuccessFactors with account creation,

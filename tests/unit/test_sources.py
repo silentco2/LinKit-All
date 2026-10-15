@@ -270,3 +270,11 @@ def test_wuzzuf_sitemap_filter_and_jsonld() -> None:
     assert stub.location == "Cairo, EG"
     assert "Job Requirements" in stub.description and "<" not in stub.description
     assert stub.posted_at is not None
+
+
+def test_company_variants_normalize_together() -> None:
+    from linkit_all.sources.text import norm_company
+
+    assert norm_company("Merck Group") == norm_company("Merck KGaA") == "merck"
+    assert norm_company("Nile Bits, LLC") == "nile bits"
+    assert norm_company("Group Holdings SE") == "group holdings se"

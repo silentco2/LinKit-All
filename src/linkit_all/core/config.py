@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     tailor_max_word_change: float = Field(0.15, ge=0, le=1)  # whole CV
     tailor_min_ssim: float = Field(0.85, ge=0, le=1)  # per page vs original PDF
 
+    # Multilingual (Arabic + English), 220 MB, downloaded once into data_dir/models.
+    embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+
     @property
     def db_path(self) -> Path:
         return self.data_dir / "linkit.db"

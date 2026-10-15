@@ -21,7 +21,7 @@ from linkit_all.core.log import setup_logging
 from linkit_all.core.models import Job
 from linkit_all.core.profile import ProfileIn, import_profile
 from linkit_all.core.runs import current_run, record_stats
-from linkit_all.core.search import import_search, load_search
+from linkit_all.core.search import SearchConfig, import_search, load_search
 from linkit_all.core.tools import bundled_libreoffice, chrome_path, soffice_path
 from linkit_all.providers import ProviderError, get_provider
 
@@ -271,3 +271,71 @@ def status() -> None:
         typer.echo(f"{state:<16} {n}")
     if by_tier:
         typer.echo("tiers: " + ", ".join(f"{t} {n}" for t, n in by_tier))
+
+
+def _search_or_exit(db: "sessionmaker[Session]") -> SearchConfig:
+    cfg = load_search(db)
+    if cfg is None:
+        typer.echo("Import a search first: linkit search import search.toml", err=True)
+        raise typer.Exit(1)
+    return cfg
+
+
+@run_app.command("rank")
+def run_rank() -> None:
+    """Hard filters + free local ranking (enriched -> ranked | filtered_out)."""
+    from linkit_all.matching.rank import Embedder, rank_jobs
+
+    db = _stage_db()
+    cfg = _search_or_exit(db)
+    settings = get_settings()
+    try:
+        embed = Embedder(settings.embedding_model, settings.data_dir / "models")
+        counts = rank_jobs(db, cfg, embed)
+    except ValueError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1) from e
+    typer.echo(f"{counts['ranked']} ranked, {counts['filtered_out']} filtered out")
+
+
+@run_app.command("score")
+def run_score(provider: ProviderOpt = None, model: ModelOpt = None) -> None:
+    """AI-tier the best ranked jobs: high -> apply queue, mid -> review, low -> hidden."""
+    from linkit_all.matching.score import score_jobs
+
+    db = _stage_db()
+    cfg = _search_or_exit(db)
+    settings = _settings(provider, model)
+    run_id = current_run(db)
+    try:
+        counts = asyncio.run(score_jobs(db, cfg, get_provider(settings, cache=db), run_id))
+    except (ValueError, ProviderError) as e:
+        typer.echo(f"Scoring failed: {e}", err=True)
+        raise typer.Exit(1) from e
+    record_stats(db, run_id, "score", counts)
+    typer.echo(
+        f"high {counts['high']} (auto-apply), mid {counts['mid']} (your review), "
+        f"low {counts['low']}, not scored {counts['not_scored']}"
+    )
+
+
+@app.command()
+def jobs(
+    tier: Annotated[str | None, typer.Option(help="high | mid | low")] = None,
+    state: Annotated[str | None, typer.Option(help="e.g. ranked, awaiting_review")] = None,
+    limit: Annotated[int, typer.Option(help="Rows to show.")] = 20,
+) -> None:
+    """List jobs, best first."""
+    db = init_db(get_settings().db_path)
+    query = select(Job)
+    if tier:
+        query = query.where(Job.tier == tier)
+    if state:
+        query = query.where(Job.state == state)
+    with db() as s:
+        rows = list(s.scalars(query))
+    rows.sort(key=lambda j: (-(j.score or 0), -j.data.get("rank", 0)))
+    for j in rows[:limit]:
+        score = f"{j.score:>2}" if j.score else " -"
+        head = f"{j.id:>6} {score} {j.data.get('rank', 0):.2f} {j.state:<15}"
+        typer.echo(f"{head} {j.title[:45]:<45} | {j.company[:25]} | {j.location[:30]}")
