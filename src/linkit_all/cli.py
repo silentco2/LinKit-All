@@ -309,3 +309,10 @@ def jobs(
         score = f"{j.score:>2}" if j.score else " -"
         head = f"{j.id:>6} {score} {j.data.get('rank', 0):.2f} {j.state:<15}"
         typer.echo(f"{head} {j.title[:45]:<45} | {j.company[:25]} | {j.location[:30]}")
+
+
+@run_app.command("apply")
+def run_apply() -> None:
+    """Tailor and fill applications: a dry run unless Live applying is on in settings."""
+    counts = _run_stage("apply")[1]
+    typer.echo(", ".join(f"{k} {v}" for k, v in counts.items()))
