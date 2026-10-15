@@ -23,6 +23,7 @@ dependencies = [
     "pdfplumber>=0.11.10",
     "pillow>=12.3.0",
     "platformdirs>=4.13.0",
+    "playwright>=1.64.0",
     "pydantic>=2.14.1",
     "pydantic-settings>=2.16.0",
     "pymupdf>=1.28.2",
@@ -53,6 +54,7 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF", "S"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "E501"]  # long fixture rows read better unwrapped
+"src/linkit_all/apply/answers.py" = ["E501"]  # regex and country tables
 
 [tool.mypy]
 python_version = "3.11"

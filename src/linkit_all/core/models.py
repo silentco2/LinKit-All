@@ -130,6 +130,9 @@ class Profile(Base):
     location: Mapped[str] = mapped_column(Text, default="")
     skills: Mapped[list[str]] = mapped_column(default=list)  # the only skills tailoring may add
     cv_path: Mapped[str] = mapped_column(Text)  # base DOCX copied into the data dir
+    answers: Mapped[dict[str, Any]] = mapped_column(
+        default=dict
+    )  # apply.answers.ApplicationAnswers
     updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)
 
 
@@ -177,3 +180,54 @@ class SourceCheckpoint(Base):
     next_page: Mapped[int] = mapped_column(default=0)
     done: Mapped[bool] = mapped_column(default=False)
     error: Mapped[str | None] = mapped_column(Text)
+
+
+class AnswerEntry(Base):
+    """Answer bank: questions answered before, reused when a new form asks the same thing."""
+
+    __tablename__ = "answer_bank"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    question: Mapped[str] = mapped_column(Text)
+    answer: Mapped[Any] = mapped_column(JSON)  # str, list[str] or bool
+    source: Mapped[str] = mapped_column(String(8))  # "user" or "ai"
+    sensitive: Mapped[bool] = mapped_column(default=False)
+    uses: Mapped[int] = mapped_column(default=0)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)
+
+
+class ActionKind(StrEnum):
+    unknown_question = "unknown_question"
+    confirm_submit = "confirm_submit"
+    captcha = "captcha"
+    validation_error = "validation_error"
+    login_issue = "login_issue"
+    two_factor = "two_factor"
+
+
+class ActionStatus(StrEnum):
+    open = "open"
+    resolved = "resolved"
+    dismissed = "dismissed"
+
+
+class ActionItem(Base):
+    """Action Center: a parked job waiting for the user (CLAUDE.md §5.7)."""
+
+    __tablename__ = "action_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[ActionKind] = mapped_column(_enum(ActionKind))
+    status: Mapped[ActionStatus] = mapped_column(
+        _enum(ActionStatus), default=ActionStatus.open, index=True
+    )
+    message: Mapped[str] = mapped_column(Text, default="")
+    questions: Mapped[list[dict[str, Any]]] = mapped_column(default=list)  # asked of the user
+    answers: Mapped[dict[str, Any]] = mapped_column(
+        default=dict
+    )  # the user's replies, or filled values
+    artifacts: Mapped[list[str]] = mapped_column(default=list)  # screenshots
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+    resolved_at: Mapped[datetime | None]
