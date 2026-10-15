@@ -13,6 +13,8 @@ from tenacity import (
 )
 
 USER_AGENT = "LinKitAll/0.1 (personal job search tool)"
+# Requests per second for hosts that throttle hard; others get default_rate.
+SLOW_HOSTS = {"www.linkedin.com": 0.5}
 
 
 class RetryableStatus(Exception):
@@ -30,14 +32,16 @@ class Http:
         attempts: int = 4,
     ) -> None:
         self.client = client
-        self._rates = per_host_rate or {}
+        self._rates = {**SLOW_HOSTS, **(per_host_rate or {})}
         self._default = default_rate
         self._attempts = attempts
         self._limiters: dict[str, AsyncLimiter] = {}
 
     def _limiter(self, host: str) -> AsyncLimiter:
         if host not in self._limiters:
-            self._limiters[host] = AsyncLimiter(self._rates.get(host, self._default), 1)
+            rate = self._rates.get(host, self._default)
+            burst = max(1.0, rate)  # 0.5/s must be "1 per 2 s"; capacity can't go below 1
+            self._limiters[host] = AsyncLimiter(burst, burst / rate)
         return self._limiters[host]
 
     async def get(self, url: str, **kwargs: Any) -> httpx.Response:

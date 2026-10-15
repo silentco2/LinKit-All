@@ -21,9 +21,9 @@ class SearchSection(BaseModel):
 
 class SourcesSection(BaseModel):
     companies: list[str] = []  # career-page URLs or "greenhouse:stripe" style shorthands
-    jobspy: list[str] = []  # linkedin, indeed, glassdoor, google, zip_recruiter
-    jobspy_country: str = "usa"  # Indeed/Glassdoor country, e.g. "egypt", "uae"
-    regional: list[str] = []  # wuzzuf, bayt
+    jobspy: list[Literal["linkedin", "indeed", "glassdoor", "google", "zip_recruiter"]] = []
+    jobspy_country: str = "usa"  # Indeed/Glassdoor country, e.g. "egypt", "united arab emirates"
+    regional: list[Literal["wuzzuf", "bayt"]] = []
 
 
 class FiltersSection(BaseModel):

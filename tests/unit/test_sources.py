@@ -13,7 +13,7 @@ from linkit_all.core.search import SearchConfig
 from linkit_all.sources import registry
 from linkit_all.sources.ashby import Ashby
 from linkit_all.sources.ats_detector import detect
-from linkit_all.sources.base import JobStub
+from linkit_all.sources.base import JobStub, Task
 from linkit_all.sources.greenhouse import Greenhouse
 from linkit_all.sources.http import Http
 from linkit_all.sources.lever import Lever
@@ -163,3 +163,65 @@ def test_discover_resume_and_enrich(tmp_path: Path) -> None:
     assert asyncio.run(run_enrich()) == 8
     with db() as s:
         assert {j.state for j in s.query(Job)} == {JobState.enriched}
+
+
+def test_jobspy_tasks_mapping_and_linkedin_details(tmp_path: Path) -> None:
+    from linkit_all.sources.jobspy_sites import JobSpySite
+
+    rows = load("jobspy/python_cairo.json")
+    seen: list[dict[str, object]] = []
+
+    def fake_scrape(**kwargs: object) -> list[dict[str, object]]:
+        seen.append(kwargs)
+        return [r for r in rows if r["site"] == kwargs["site_name"][0]]  # type: ignore[index, union-attr]
+
+    cfg = SearchConfig.model_validate(
+        {
+            "search": {"queries": ["python", "data"], "locations": ["Cairo", "Remote"]},
+            "sources": {"jobspy": ["indeed"], "jobspy_country": "egypt", "regional": ["bayt"]},
+        }
+    )
+    indeed, linkedin, bayt = (JobSpySite(s, fake_scrape) for s in ("indeed", "linkedin", "bayt"))
+    assert len(indeed.tasks(cfg)) == 4 and len(bayt.tasks(cfg)) == 4  # bayt via regional
+    assert linkedin.tasks(cfg) == []
+
+    async def pages(src: JobSpySite) -> list[JobStub]:
+        task = src.tasks(cfg)[0] if src.tasks(cfg) else Task(src.name, "k", query="python")
+        return [s async for page in src.search(Http(httpx.AsyncClient()), task, 0) for s in page]
+
+    stubs = asyncio.run(pages(indeed))
+    assert seen[0]["country_indeed"] == "egypt" and seen[0]["hours_old"] == 14 * 24
+    assert stubs and all(s.source == "indeed" for s in stubs)
+    workable = [s for s in stubs if s.apply_url and "workable" in s.apply_url]
+    assert workable and workable[0].ats == "workable"  # company ATS from job_url_direct
+
+    li = asyncio.run(pages(linkedin))
+    assert li and all(s.ats == "linkedin" for s in li)
+    empty = next(s for s in li if not s.description)
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        html = '<div class="show-more-less-html__markup"><p>Build APIs</p><ul><li>Python</li></ul></div>'
+        return httpx.Response(200, text=html)
+
+    async def details() -> JobStub:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as c:
+            return await linkedin.fetch_details(Http(c), empty)
+
+    assert asyncio.run(details()).description == "Build APIs\nPython"
+
+
+def test_jobspy_logged_error_with_no_rows_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    import logging
+
+    import jobspy
+    import pandas as pd
+
+    from linkit_all.sources.jobspy_sites import _scrape_jobs
+
+    def fake(**kwargs: object) -> pd.DataFrame:
+        logging.getLogger("JobSpy:LinkedIn").error("LinkedIn response status code 429")
+        return pd.DataFrame()
+
+    monkeypatch.setattr(jobspy, "scrape_jobs", fake)
+    with pytest.raises(RuntimeError, match="429"):  # so the task stays open for a resume
+        _scrape_jobs(site_name=["linkedin"])

@@ -41,6 +41,7 @@ class Task:
     location: str = ""
     limit: int = 200
     posted_within_days: int = 14
+    country: str = ""  # for sites with per-country domains (Indeed, Glassdoor)
 
 
 class Source(ABC):
