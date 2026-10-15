@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Segoe UI", system-ui, -apple-system, "Noto Sans", "Noto Sans Arabic", sans-serif;
+  --color-brand-50: oklch(0.97 0.02 250);
+  --color-brand-100: oklch(0.93 0.04 250);
+  --color-brand-500: oklch(0.58 0.17 255);
+  --color-brand-600: oklch(0.52 0.18 258);
+  --color-brand-700: oklch(0.45 0.17 260);
+}
+
+@layer base {
+  html { color-scheme: light dark; }
+  body { @apply bg-slate-50 text-slate-800 antialiased dark:bg-slate-950 dark:text-slate-200; }
+  h1 { @apply text-2xl font-semibold tracking-tight text-slate-900 dark:text-white; }
+  h2 { @apply text-lg font-semibold text-slate-900 dark:text-white; }
+  a { @apply text-brand-600 hover:underline dark:text-brand-500; }
+  :focus-visible { @apply outline-2 outline-offset-2 outline-brand-500; }
+}
+
+@layer components {
+  .card { @apply rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900; }
+  .label { @apply mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300; }
+  .hint { @apply mt-1 text-xs text-slate-500 dark:text-slate-400; }
+  .input {
+    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-xs
+      placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none
+      dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-brand-700;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 py-2
+      text-sm font-medium text-slate-700 shadow-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50
+      dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800;
+  }
+  .btn-primary {
+    @apply border-brand-600 bg-brand-600 text-white hover:bg-brand-700
+      dark:border-brand-600 dark:bg-brand-600 dark:text-white dark:hover:bg-brand-700;
+  }
+  .btn-danger {
+    @apply border-rose-300 text-rose-700 hover:bg-rose-50
+      dark:border-rose-900 dark:text-rose-300 dark:hover:bg-rose-950;
+  }
+  .badge { @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium; }
+  .tier-high { @apply bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300; }
+  .tier-mid { @apply bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300; }
+  .tier-low { @apply bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400; }
+  .alert { @apply rounded-lg border px-4 py-3 text-sm; }
+  .alert-error { @apply border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200; }
+  .alert-ok { @apply border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200; }
+  .alert-info { @apply border-brand-100 bg-brand-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300; }
+}

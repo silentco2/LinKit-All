@@ -171,7 +171,7 @@ src/linkit_all/
   apply/      handlers/<ats>.py, agent/, accounts/, vault/, email_verify/, answers/
   reports/
   cli.py      `linkit` (serve), `linkit doctor`, `linkit run <stage>`
-frontend/     Angular app (built into src/linkit_all/static; created in build step 3)
+frontend/     Angular 21 app -> src/linkit_all/static (Angular 22 needs Node >= 24.15)
 tests/        unit, fixtures/<ats>/*.html, e2e (dry-run only)
 docs/
 ```

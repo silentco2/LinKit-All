@@ -17,7 +17,11 @@ word-level edits, and apply — all from a local web UI. Bring your own AI
 uv sync
 uv run linkit doctor
 uv run pytest
+cd frontend && npm ci && npm run build   # builds the UI into src/linkit_all/static
+uv run linkit                            # opens the UI at http://127.0.0.1:8765
 ```
+UI hot reload: run `uv run linkit serve --no-open` with
+`LINKIT_DEV_ORIGINS='["http://localhost:4200"]'`, then `npm start` in `frontend/`.
 
 ## License
 AGPL-3.0-or-later. See [LICENSE](LICENSE) and [NOTICE](NOTICE).

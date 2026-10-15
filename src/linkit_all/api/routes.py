@@ -178,7 +178,7 @@ async def check_ai(request: Request, body: AICheck) -> dict[str, Any]:
 def _row(j: Job) -> dict[str, Any]:
     return {"id": j.id, "title": j.title, "company": j.company, "location": j.location,
             "source": j.source, "state": j.state, "tier": j.tier, "score": j.score,
-            "rank": j.data.get("rank"), "remote": j.data.get("remote"),
+            "rank": j.data.get("rank"), "remote": j.data.get("remote"), "ai": j.data.get("ai"),
             "posted_at": j.posted_at.isoformat() if j.posted_at else None}  # fmt: skip
 
 

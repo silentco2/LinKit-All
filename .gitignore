@@ -30,3 +30,6 @@ screenshots/
 Thumbs.db
 .idea/
 .vscode/
+
+# Local preview config (points at a developer's data dir)
+.claude/launch.json

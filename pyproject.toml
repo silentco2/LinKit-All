@@ -76,3 +76,7 @@ dev = [
 [[tool.mypy.overrides]]
 module = ["jobspy.*"]
 ignore_missing_imports = true
+
+[tool.hatch.build.targets.wheel]
+# The Angular build is gitignored but must ship inside the wheel (no Node for end users).
+artifacts = ["src/linkit_all/static/**"]
