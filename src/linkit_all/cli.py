@@ -3,25 +3,40 @@
 import asyncio
 import shutil
 import sys
+import tomllib
 import zipfile
+from dataclasses import asdict
 from datetime import datetime
 from importlib.metadata import version
 from pathlib import Path
-from typing import Annotated, NamedTuple
+from typing import TYPE_CHECKING, Annotated, NamedTuple
 
 import typer
 from pydantic import ValidationError
+from sqlalchemy import func, select
 
 from linkit_all.core.config import Settings, get_settings
 from linkit_all.core.db import init_db
 from linkit_all.core.log import setup_logging
+from linkit_all.core.models import Job
 from linkit_all.core.profile import ProfileIn, import_profile
+from linkit_all.core.runs import current_run, record_stats
+from linkit_all.core.search import import_search, load_search
 from linkit_all.core.tools import bundled_libreoffice, chrome_path, soffice_path
 from linkit_all.providers import ProviderError, get_provider
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session, sessionmaker
+
+    from linkit_all.sources.runner import DiscoverStats
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 profile_app = typer.Typer(no_args_is_help=True, help="Manage your profile.")
 app.add_typer(profile_app, name="profile")
+search_app = typer.Typer(no_args_is_help=True, help="Manage what to search for.")
+app.add_typer(search_app, name="search")
+run_app = typer.Typer(no_args_is_help=True, help="Run one pipeline stage.")
+app.add_typer(run_app, name="run")
 
 ProviderOpt = Annotated[str | None, typer.Option(help="codex_cli | claude_cli | litellm")]
 ModelOpt = Annotated[str | None, typer.Option(help="Model name; default = provider's own.")]
@@ -170,3 +185,89 @@ def tailor(
             f"Layout check: {'ok' if v.ok else 'FAILED'} (worst SSIM {v.min_ssim:.3f}) {v.reason}"
         )
     typer.echo(f"{len(result.applied)} applied, {len(result.rejected)} rejected -> {result.pdf}")
+
+
+def _stage_db() -> "sessionmaker[Session]":
+    settings = get_settings()
+    setup_logging(settings)
+    return init_db(settings.db_path)
+
+
+@search_app.command("import")
+def search_import(path: Path) -> None:
+    """Load search.toml: queries, locations, companies, sites, filters, tiers."""
+    try:
+        cfg = import_search(init_db(get_settings().db_path), path)
+    except (OSError, tomllib.TOMLDecodeError, ValidationError) as e:
+        typer.echo(f"Cannot import {path}: {e}", err=True)
+        raise typer.Exit(1) from e
+    sites = cfg.sources.jobspy + cfg.sources.regional
+    typer.echo(
+        f"Saved search: {len(cfg.search.queries)} queries x {len(cfg.search.locations)} "
+        f"locations, {len(cfg.sources.companies)} companies, sites: {', '.join(sites) or 'none'}"
+    )
+
+
+@run_app.command("discover")
+def run_discover(
+    new: Annotated[
+        bool, typer.Option("--new", help="Start a new run instead of resuming.")
+    ] = False,
+) -> None:
+    """Fetch jobs from every configured source (resumes an unfinished run)."""
+    from linkit_all.sources import registry
+    from linkit_all.sources.http import Http, make_client
+    from linkit_all.sources.runner import discover
+
+    db = _stage_db()
+    cfg = load_search(db)
+    if cfg is None:
+        typer.echo("Import a search first: linkit search import search.toml", err=True)
+        raise typer.Exit(1)
+    run_id = current_run(db, new)
+
+    async def go() -> "DiscoverStats":
+        async with make_client() as client:
+            return await discover(db, cfg, run_id, Http(client), registry())
+
+    stats = asyncio.run(go())
+    record_stats(db, run_id, "discover", asdict(stats))
+    typer.echo(
+        f"Run {run_id}: {stats.new} new jobs, {stats.duplicates} duplicates, "
+        f"{stats.tasks_done} tasks done"
+    )
+    for key, err in stats.errors.items():
+        typer.secho(f"  error {key}: {err}", fg="yellow")
+    for entry in stats.unsupported:
+        typer.secho(f"  skipped {entry}", fg="yellow")
+
+
+@run_app.command("enrich")
+def run_enrich() -> None:
+    """Fill in missing job descriptions (discovered -> enriched)."""
+    from linkit_all.sources import registry
+    from linkit_all.sources.http import Http, make_client
+    from linkit_all.sources.runner import enrich
+
+    db = _stage_db()
+
+    async def go() -> int:
+        async with make_client() as client:
+            return await enrich(db, Http(client), registry())
+
+    typer.echo(f"{asyncio.run(go())} jobs enriched")
+
+
+@app.command()
+def status() -> None:
+    """Job counts by pipeline state and tier."""
+    db = init_db(get_settings().db_path)
+    with db() as s:
+        by_state = s.execute(select(Job.state, func.count()).group_by(Job.state)).all()
+        by_tier = s.execute(
+            select(Job.tier, func.count()).where(Job.tier.is_not(None)).group_by(Job.tier)
+        ).all()
+    for state, n in sorted(by_state, key=lambda r: -r[1]):
+        typer.echo(f"{state:<16} {n}")
+    if by_tier:
+        typer.echo("tiers: " + ", ".join(f"{t} {n}" for t, n in by_tier))

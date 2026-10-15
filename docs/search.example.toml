@@ -1,0 +1,35 @@
+# LinKit All search settings. Import with:  linkit search import search.toml
+
+[search]
+queries = ["python developer", "backend engineer"]
+locations = ["Cairo, Egypt", "Remote"]   # "" means anywhere
+posted_within_days = 14
+max_results_per_query = 200              # per site, per query, per location
+
+[sources]
+# Company career pages: paste any URL; Greenhouse, Lever and Ashby are detected automatically.
+companies = [
+  "https://boards.greenhouse.io/stripe",
+  "https://jobs.lever.co/palantir",
+  "https://jobs.ashbyhq.com/openai",
+  "greenhouse:airbnb",
+]
+jobspy = ["linkedin", "indeed"]          # also: glassdoor, google, zip_recruiter
+jobspy_country = "egypt"                 # Indeed/Glassdoor country
+regional = ["wuzzuf", "bayt"]
+
+[filters]
+title_include = ["engineer", "developer"]
+title_exclude = ["intern", "principal", "director"]
+locations = ["egypt", "cairo", "remote", "dubai"]
+remote = "any"                           # any | remote | hybrid | onsite
+seniority = ["junior", "mid", "senior"]  # intern junior mid senior lead manager executive
+salary_floor = 0                         # yearly, in the posting's currency
+company_blacklist = []
+one_per_company = true
+
+[matching]
+ai_max_jobs = 300                        # best locally-ranked jobs sent to the AI per run
+tier_high = 8                            # score 8-10: auto-apply
+tier_mid = 5                             # score 5-7: needs your approval; below: hidden
+batch_size = 15                          # jobs per AI call

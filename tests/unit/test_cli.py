@@ -58,3 +58,21 @@ def test_install_libreoffice_zip_is_found_first(
         assert runner.invoke(cli.app, ["install-libreoffice", str(bundle)]).exit_code == 1
     finally:
         get_settings.cache_clear()
+
+
+def test_search_import_and_empty_discover(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LINKIT_DATA_DIR", str(tmp_path / "data"))
+    get_settings.cache_clear()
+    toml = tmp_path / "search.toml"
+    toml.write_text('[search]\nqueries = ["python developer"]\n', encoding="utf-8")
+    try:
+        assert runner.invoke(cli.app, ["run", "discover"]).exit_code == 1  # nothing imported
+        result = runner.invoke(cli.app, ["search", "import", str(toml)])
+        assert result.exit_code == 0, result.output
+        assert "1 queries" in result.output
+        result = runner.invoke(cli.app, ["run", "discover"])
+        assert result.exit_code == 0, result.output
+        assert "Run 1: 0 new jobs" in result.output
+        assert runner.invoke(cli.app, ["status"]).exit_code == 0
+    finally:
+        get_settings.cache_clear()

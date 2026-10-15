@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, ClassVar
 
-from sqlalchemy import JSON, Enum, ForeignKey, String, Text
+from sqlalchemy import JSON, Enum, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -153,3 +153,27 @@ class TailoredCV(Base):
     rejected: Mapped[list[dict[str, Any]]] = mapped_column(default=list)  # patch + reason
     verify: Mapped[dict[str, Any]] = mapped_column(default=dict)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class SearchConfigRow(Base):
+    """The imported search.toml (validated by core.search.SearchConfig). Single row."""
+
+    __tablename__ = "search_config"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    data: Mapped[dict[str, Any]] = mapped_column(default=dict)
+    updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)
+
+
+class SourceCheckpoint(Base):
+    """Discovery progress per run and task, saved with every page so runs resume."""
+
+    __tablename__ = "source_checkpoints"
+    __table_args__ = (UniqueConstraint("run_id", "key"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"))
+    key: Mapped[str] = mapped_column(Text)  # e.g. "greenhouse:stripe"
+    next_page: Mapped[int] = mapped_column(default=0)
+    done: Mapped[bool] = mapped_column(default=False)
+    error: Mapped[str | None] = mapped_column(Text)
