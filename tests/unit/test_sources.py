@@ -225,3 +225,48 @@ def test_jobspy_logged_error_with_no_rows_raises(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(jobspy, "scrape_jobs", fake)
     with pytest.raises(RuntimeError, match="429"):  # so the task stays open for a resume
         _scrape_jobs(site_name=["linkedin"])
+
+
+def test_wuzzuf_sitemap_filter_and_jsonld() -> None:
+    from datetime import timedelta
+
+    from linkit_all.core.models import utcnow
+    from linkit_all.sources.wuzzuf import Wuzzuf
+
+    recent = (utcnow() - timedelta(days=1)).isoformat() + "+00:00"
+    old = (utcnow() - timedelta(days=60)).isoformat() + "+00:00"
+    jobs = (FIX / "wuzzuf/sitemap-job-1.xml").read_text("utf-8").format(recent=recent, old=old)
+    fetched: list[str] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        fetched.append(req.url.path)
+        if req.url.path == "/sitemap.xml":
+            return httpx.Response(200, text=(FIX / "wuzzuf/sitemap.xml").read_text("utf-8"))
+        if req.url.path == "/sitemap-job-1.xml":
+            return httpx.Response(200, text=jobs)
+        if req.url.path.startswith("/jobs/p/"):
+            return httpx.Response(200, text=(FIX / "wuzzuf/job.html").read_text("utf-8"))
+        return httpx.Response(404)
+
+    cfg = SearchConfig.model_validate(
+        {"search": {"queries": ["python engineer", "nurse"]}, "sources": {"regional": ["wuzzuf"]}}
+    )
+    (task,) = Wuzzuf().tasks(cfg)
+
+    async def go() -> list[JobStub]:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as c:
+            http = Http(c, per_host_rate={"wuzzuf.net": 1000})
+            return [s async for page in Wuzzuf().search(http, task, 0) for s in page]
+
+    (stub,) = asyncio.run(go())
+    # Only the recent python+engineer slug is fetched: the developer one is too old,
+    # the nutrition one matches no query, and the template sitemap is never read.
+    assert [p for p in fetched if p.startswith("/jobs/p/")] == [
+        "/jobs/p/rcqxngwvzmck-senior-fullstack-python-engineer-vertex-technologies-cairo-egypt"
+    ]
+    assert "/sitemap-job-template-1.xml" not in fetched
+    assert stub.title == "Senior FullStack (Python) Engineer"
+    assert stub.company == "Vertex Technologies" and stub.ats == "wuzzuf"
+    assert stub.location == "Cairo, EG"
+    assert "Job Requirements" in stub.description and "<" not in stub.description
+    assert stub.posted_at is not None

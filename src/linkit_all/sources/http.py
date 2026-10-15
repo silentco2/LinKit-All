@@ -14,7 +14,7 @@ from tenacity import (
 
 USER_AGENT = "LinKitAll/0.1 (personal job search tool)"
 # Requests per second for hosts that throttle hard; others get default_rate.
-SLOW_HOSTS = {"www.linkedin.com": 0.5}
+SLOW_HOSTS = {"www.linkedin.com": 0.5, "wuzzuf.net": 0.1}  # wuzzuf: robots.txt Crawl-delay 10
 
 
 class RetryableStatus(Exception):
