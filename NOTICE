@@ -1,0 +1,15 @@
+LinKit All
+Copyright (C) 2026 LinKit All contributors
+
+This program is free software licensed under the GNU Affero General Public
+License v3.0 or later (see LICENSE).
+
+Portions of this project may be derived from the following AGPL-3.0 projects:
+  - ApplyPilot
+  - AIHawk (Jobs_Applier_AI_Agent_AIHawk)
+
+Every file containing reused code keeps its original copyright header and is
+listed below with its upstream source when it is added.
+
+Reused files:
+  (none yet)

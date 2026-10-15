@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+dist/
+build/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Frontend
+node_modules/
+frontend/dist/
+frontend/.angular/
+src/linkit_all/static/
+
+# Local user data / secrets (app data lives in platformdirs, never in repo)
+.env
+*.db
+*.db-wal
+*.db-shm
+traces/
+screenshots/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
