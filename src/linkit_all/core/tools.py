@@ -4,6 +4,8 @@ import os
 import shutil
 from pathlib import Path
 
+from linkit_all.core.config import get_settings
+
 
 def find_tool(names: list[str], fallbacks: list[Path]) -> str | None:
     for name in names:
@@ -17,7 +19,15 @@ def _program_dirs() -> list[Path]:
     return [Path(v) for k in keys if (v := os.environ.get(k))]
 
 
+def bundled_libreoffice() -> Path:
+    """Where `linkit install-libreoffice` puts the minimal portable LibreOffice."""
+    return get_settings().data_dir / "tools" / "libreoffice"
+
+
 def soffice_path() -> str | None:
+    bundled = bundled_libreoffice() / "program" / "soffice.exe"
+    if bundled.is_file():
+        return str(bundled)
     fallbacks = [d / "LibreOffice/program/soffice.exe" for d in _program_dirs()]
     fallbacks.append(Path("/Applications/LibreOffice.app/Contents/MacOS/soffice"))
     return find_tool(["soffice", "libreoffice"], fallbacks)

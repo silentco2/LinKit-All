@@ -146,6 +146,10 @@ per run and over time; funnel (found -> filtered -> ranked -> scored -> applied)
 - IMAP: app passwords (Gmail first, Yahoo). Outlook needs an OAuth path (later).
 - External tools: LibreOffice required (DOCX->PDF), Chrome for applying, Tectonic for LaTeX.
   `linkit doctor` checks them. Install for end users: `uv tool install linkit-all`.
+- LibreOffice ships as a minimal portable bundle (Windows: 1.6 GB -> 439 MB, 152 MB zip) built by
+  `scripts/bundle_libreoffice.py`: each removal is kept only if renders stay pixel-identical.
+  `linkit install-libreoffice <zip>` puts it in the data dir; it wins over a system install.
+  Keep its license files (MPL-2.0). macOS/Linux bundles: later.
 - Profile, preferences, locked facts, answer bank stored in DB; JSON/YAML import/export.
 
 ## 7. UI screens

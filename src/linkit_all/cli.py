@@ -3,6 +3,7 @@
 import asyncio
 import shutil
 import sys
+import zipfile
 from datetime import datetime
 from importlib.metadata import version
 from pathlib import Path
@@ -15,7 +16,7 @@ from linkit_all.core.config import Settings, get_settings
 from linkit_all.core.db import init_db
 from linkit_all.core.log import setup_logging
 from linkit_all.core.profile import ProfileIn, import_profile
-from linkit_all.core.tools import chrome_path, soffice_path
+from linkit_all.core.tools import bundled_libreoffice, chrome_path, soffice_path
 from linkit_all.providers import ProviderError, get_provider
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
@@ -78,6 +79,25 @@ def doctor() -> None:
         typer.echo(f"[{mark}] {c.name}: {c.path or c.hint}")
     if any(c.required and not c.path for c in checks):
         raise typer.Exit(1)
+
+
+@app.command("install-libreoffice")
+def install_libreoffice(
+    source: Annotated[Path, typer.Argument(help="Minimal LibreOffice zip or folder.")],
+) -> None:
+    """Install the minimal portable LibreOffice (from scripts/bundle_libreoffice.py)."""
+    dest = bundled_libreoffice()
+    shutil.rmtree(dest, ignore_errors=True)
+    if source.is_dir():
+        shutil.copytree(source, dest)
+    else:
+        with zipfile.ZipFile(source) as z:
+            z.extractall(dest)  # zipfile strips absolute paths and ".." parts
+    if not (dest / "program" / "soffice.exe").is_file():
+        shutil.rmtree(dest, ignore_errors=True)
+        typer.echo(f"{source} does not contain program/soffice.exe", err=True)
+        raise typer.Exit(1)
+    typer.echo(f"LibreOffice installed to {dest}")
 
 
 @app.command("ai-check")

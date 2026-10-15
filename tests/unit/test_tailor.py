@@ -20,16 +20,25 @@ from linkit_all.tailor.pipeline import tailor_docx, tailor_job
 NS = (
     'xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" '
     'xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" '
+    'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" '
+    'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" '
     'xmlns:v="urn:schemas-microsoft-com:vml"'
 )
+BOX = "<w:txbxContent><w:p><w:r><w:t>Skills: Python</w:t></w:r></w:p></w:txbxContent>"
+# A Word-style text box: DrawingML shape, plus the VML copy older readers use.
 TEXTBOX = (
     f"<w:r {nsdecls('w')} {NS}><mc:AlternateContent>"
-    "<mc:Choice Requires='wps'><w:drawing><wps:txbx><w:txbxContent>"
-    "<w:p><w:r><w:t>Skills: Python</w:t></w:r></w:p>"
-    "</w:txbxContent></wps:txbx></w:drawing></mc:Choice>"
-    "<mc:Fallback><w:pict><v:textbox><w:txbxContent>"
-    "<w:p><w:r><w:t>Skills: Python</w:t></w:r></w:p>"
-    "</w:txbxContent></v:textbox></w:pict></mc:Fallback>"
+    '<mc:Choice Requires="wps"><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">'
+    '<wp:extent cx="2540000" cy="508000"/><wp:docPr id="10" name="Text Box 10"/>'
+    "<a:graphic>"
+    '<a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape">'
+    '<wps:wsp><wps:cNvSpPr txBox="1"/><wps:spPr>'
+    '<a:xfrm><a:off x="0" y="0"/><a:ext cx="2540000" cy="508000"/></a:xfrm>'
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></wps:spPr>'
+    f"<wps:txbx>{BOX}</wps:txbx><wps:bodyPr/></wps:wsp>"
+    "</a:graphicData></a:graphic></wp:inline></w:drawing></mc:Choice>"
+    '<mc:Fallback><w:pict><v:shape style="width:200pt;height:40pt" type="#_x0000_t202">'
+    f"<v:textbox>{BOX}</v:textbox></v:shape></w:pict></mc:Fallback>"
     "</mc:AlternateContent></w:r>"
 )
 
