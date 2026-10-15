@@ -1,5 +1,6 @@
 """`linkit` command-line entry point."""
 
+import asyncio
 import os
 import shutil
 import sys
@@ -8,6 +9,10 @@ from pathlib import Path
 from typing import Annotated, NamedTuple
 
 import typer
+from pydantic import ValidationError
+
+from linkit_all.core.config import Settings, get_settings
+from linkit_all.providers import ProviderError, get_provider
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 
@@ -87,3 +92,20 @@ def doctor() -> None:
         typer.echo(f"[{mark}] {c.name}: {c.path or c.hint}")
     if any(c.required and not c.path for c in checks):
         raise typer.Exit(1)
+
+
+@app.command("ai-check")
+def ai_check(
+    provider: Annotated[str | None, typer.Option(help="codex_cli | claude_cli | litellm")] = None,
+    model: Annotated[str | None, typer.Option(help="Model name; default = provider's own.")] = None,
+) -> None:
+    """Send a tiny test prompt to the configured AI provider."""
+    overrides = {k: v for k, v in {"provider": provider, "model": model}.items() if v}
+    try:
+        settings = Settings.model_validate({**get_settings().model_dump(), **overrides})
+        if settings.provider.endswith("_cli"):
+            typer.echo("Note: CLI usage counts against your own plan limits.")
+        typer.echo(asyncio.run(get_provider(settings).check()))
+    except (ProviderError, ValidationError) as e:
+        typer.echo(f"AI check failed: {e}", err=True)
+        raise typer.Exit(1) from e

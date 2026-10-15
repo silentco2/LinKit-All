@@ -64,7 +64,8 @@ Tailoring happens just before applying, never for jobs that will not be applied 
 
 ### 5.1 AI provider layer (`providers/`)
 - One `LLMProvider` interface: `complete(prompt, schema) -> validated Pydantic object`.
-- Adapters: `codex_cli`, `claude_cli`, `litellm_api`, `local` (OpenAI-compatible).
+- Adapters: `codex_cli`, `claude_cli`, `litellm_api` (also local OpenAI-compatible servers
+  via `api_base`). Pick with `LINKIT_PROVIDER`; test with `linkit ai-check`.
 - CLI adapters (`codex_cli`, `claude_cli`): detect binary on PATH + version; verify sign-in with
   a tiny test prompt; run in an empty temp dir with the CLI's own tools disabled (check
   `--help` of the installed version for flags); prompt via stdin, parse JSON output; 1 call

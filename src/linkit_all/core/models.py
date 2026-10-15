@@ -1,0 +1,114 @@
+"""SQLAlchemy models. `jobs.state` is the single source of truth for the pipeline."""
+
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any, ClassVar
+
+from sqlalchemy import JSON, Enum, ForeignKey, String, Text
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+
+def utcnow() -> datetime:
+    # ponytail: naive UTC everywhere, SQLite has no timezone type.
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
+class Base(DeclarativeBase):
+    type_annotation_map: ClassVar[dict[Any, Any]] = {dict[str, Any]: JSON, list[str]: JSON}
+
+
+class JobState(StrEnum):
+    discovered = "discovered"
+    enriched = "enriched"
+    filtered_out = "filtered_out"
+    ranked = "ranked"
+    scored = "scored"
+    below_threshold = "below_threshold"
+    awaiting_review = "awaiting_review"
+    queued_apply = "queued_apply"
+    tailored = "tailored"
+    applying = "applying"
+    needs_user = "needs_user"
+    applied = "applied"
+    failed = "failed"
+    skipped = "skipped"
+
+
+class Tier(StrEnum):
+    high = "high"
+    mid = "mid"
+    low = "low"
+
+
+class RunStatus(StrEnum):
+    running = "running"
+    paused = "paused"
+    done = "done"
+    failed = "failed"
+
+
+def _enum(cls: type[StrEnum]) -> Enum:
+    # VARCHAR without CHECK constraint, so adding a member needs no migration.
+    return Enum(cls, native_enum=False, length=32)
+
+
+class Run(Base):
+    __tablename__ = "runs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    status: Mapped[RunStatus] = mapped_column(_enum(RunStatus), default=RunStatus.running)
+    pause_reason: Mapped[str | None] = mapped_column(Text)
+    started_at: Mapped[datetime] = mapped_column(default=utcnow)
+    finished_at: Mapped[datetime | None]
+    stats: Mapped[dict[str, Any]] = mapped_column(default=dict)
+
+
+class Job(Base):
+    __tablename__ = "jobs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[int | None] = mapped_column(ForeignKey("runs.id"), index=True)
+    source: Mapped[str] = mapped_column(String(64))
+    url: Mapped[str] = mapped_column(Text, unique=True)  # normalized
+    title: Mapped[str] = mapped_column(Text)
+    company: Mapped[str] = mapped_column(Text)
+    location: Mapped[str] = mapped_column(Text, default="")
+    description: Mapped[str] = mapped_column(Text, default="")
+    posted_at: Mapped[datetime | None]
+    ats: Mapped[str | None] = mapped_column(String(32))
+    dedupe_hash: Mapped[str] = mapped_column(String(64), index=True)
+    state: Mapped[JobState] = mapped_column(
+        _enum(JobState), default=JobState.discovered, index=True
+    )
+    tier: Mapped[Tier | None] = mapped_column(_enum(Tier))
+    score: Mapped[int | None]
+    data: Mapped[dict[str, Any]] = mapped_column(default=dict)  # source extras, AI reasons
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)
+
+    events: Mapped[list["JobEvent"]] = relationship(
+        back_populates="job", cascade="all, delete-orphan", order_by="JobEvent.id"
+    )
+
+
+class JobEvent(Base):
+    __tablename__ = "job_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id", ondelete="CASCADE"), index=True)
+    at: Mapped[datetime] = mapped_column(default=utcnow)
+    from_state: Mapped[JobState | None] = mapped_column(_enum(JobState))
+    to_state: Mapped[JobState] = mapped_column(_enum(JobState))
+    message: Mapped[str] = mapped_column(Text, default="")
+    artifacts: Mapped[list[str]] = mapped_column(default=list)
+
+    job: Mapped[Job] = relationship(back_populates="events")
+
+
+class LLMCache(Base):
+    __tablename__ = "llm_cache"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)  # sha256 of model+prompt
+    model: Mapped[str] = mapped_column(String(128))
+    response: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
