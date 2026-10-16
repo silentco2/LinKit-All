@@ -414,12 +414,19 @@ def test_jobspy_tasks_mapping_and_linkedin_details(tmp_path: Path) -> None:
     cfg = SearchConfig.model_validate(
         {
             "search": {"queries": ["python", "data"], "locations": ["Cairo", "Remote"]},
-            "sources": {"jobspy": ["indeed"], "jobspy_country": "egypt", "regional": ["bayt"]},
+            "sources": {
+                "jobspy": ["indeed", "glassdoor"],
+                "jobspy_country": "egypt",
+                "regional": ["bayt"],
+            },
         }
     )
     indeed, linkedin, bayt = (JobSpySite(s, fake_scrape) for s in ("indeed", "linkedin", "bayt"))
     assert len(indeed.tasks(cfg)) == 4 and len(bayt.tasks(cfg)) == 4  # bayt via regional
     assert linkedin.tasks(cfg) == []
+    glassdoor = JobSpySite("glassdoor", fake_scrape)
+    assert {t.country for t in glassdoor.tasks(cfg)} == {""}  # Glassdoor gets no country
+    assert {t.country for t in indeed.tasks(cfg)} == {"egypt"}
 
     async def pages(src: JobSpySite) -> list[JobStub]:
         task = src.tasks(cfg)[0] if src.tasks(cfg) else Task(src.name, "k", query="python")
@@ -427,6 +434,8 @@ def test_jobspy_tasks_mapping_and_linkedin_details(tmp_path: Path) -> None:
 
     stubs = asyncio.run(pages(indeed))
     assert seen[0]["country_indeed"] == "egypt" and seen[0]["hours_old"] == 14 * 24
+    asyncio.run(pages(glassdoor))
+    assert "country_indeed" not in seen[-1]  # jobspy's own default applies
     assert stubs and all(s.source == "indeed" for s in stubs)
     workable = [s for s in stubs if s.apply_url and "workable" in s.apply_url]
     assert workable and workable[0].ats == "workable"  # company ATS from job_url_direct

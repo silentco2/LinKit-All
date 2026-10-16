@@ -43,17 +43,19 @@ For an API key, set `LINKIT_API_KEY` in your environment. The wizard does not ta
 
 ## 3. Search
 
-- **Job searches**, one per line (for example `python developer`).
+- **Job searches**, one per line (for example `python developer`). A `/` between words makes
+  separate searches: `React/Next.JS Developer` becomes `React Developer` and `Next.JS Developer`.
 - **Locations**, one per line. Leave it empty for anywhere.
 - **Posted within (days)** and **Max results per search, per site**.
 - **Job sites**: LinkedIn, Indeed, Glassdoor, Google, ZipRecruiter, Wuzzuf, Bayt and Forasna.
-- **Country for Indeed / Glassdoor.**
+- **Country for Indeed.** Glassdoor is searched without a country.
 - **Company career pages**, one per line. Paste any careers page link. See [Sources](sources.md).
 
 ## 4. Filters
 
-Free rules that drop jobs before any AI is used: title words, locations, work mode,
-minimum yearly salary, seniority, companies to avoid, and "at most one job per company".
+Free rules that drop jobs before any AI is used: title words, locations, work mode
+(remote, hybrid and on-site are all checked by default), minimum monthly salary with its
+currency (only postings in that currency are compared), seniority, companies to avoid, and "at most one job per company".
 This step also holds the AI scoring settings: the score for auto-apply, the score for
 your review queue, how many jobs go to the AI per run, and jobs per AI call.
 See [Matching](matching.md).

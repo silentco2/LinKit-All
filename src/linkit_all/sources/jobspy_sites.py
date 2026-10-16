@@ -62,7 +62,7 @@ class JobSpySite(Source):
         return [
             Task(self.name, f"{self.name}:{q}@{loc}", query=q, location=loc,
                  limit=s.max_results_per_query, posted_within_days=s.posted_within_days,
-                 country=cfg.sources.jobspy_country)
+                 country=cfg.sources.jobspy_country if self.name == "indeed" else "")
             for q in s.queries
             for loc in s.locations
         ]  # fmt: skip
@@ -79,7 +79,7 @@ class JobSpySite(Source):
                 location=task.location or None,
                 results_wanted=task.limit,
                 hours_old=task.posted_within_days * 24,
-                country_indeed=task.country or "usa",
+                **({"country_indeed": task.country} if task.country else {}),  # else jobspy default
                 description_format="markdown",
                 fetch_description=True,
                 verbose=0,

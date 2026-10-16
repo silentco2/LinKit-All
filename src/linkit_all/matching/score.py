@@ -77,7 +77,8 @@ async def score_jobs(
         ]  # fmt: skip
     f = cfg.filters
     prefs = {"titles": ", ".join(f.title_include), "locations": ", ".join(f.locations),
-             "remote": f.remote, "seniority": ", ".join(f.seniority)}  # fmt: skip
+             "work_modes": ", ".join(f.work_modes),
+             "seniority": ", ".join(f.seniority)}  # fmt: skip
     cv = cv_text(profile)[:CV_CHARS]
 
     for n, batch in enumerate(batches, 1):

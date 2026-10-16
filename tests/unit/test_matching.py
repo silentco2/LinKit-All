@@ -46,7 +46,7 @@ CFG = SearchConfig.model_validate(
             "title_exclude": ["intern"],
             "locations": ["egypt", "remote"],
             "seniority": ["mid", "senior"],
-            "salary_floor": 30000,
+            "salary_floor_monthly": 2500,
             "company_blacklist": ["Globex Inc."],
         },
     }
@@ -63,8 +63,14 @@ CFG = SearchConfig.model_validate(
         ({"location": "Anywhere", "data": {"remote": "remote"}}, None),
         ({"title": "Lead Engineer"}, "seniority"),
         ({"posted_at": utcnow() - timedelta(days=30)}, "posted"),
-        ({"data": {"salary_max": 2000, "salary_interval": "month"}}, "salary"),
-        ({"data": {"salary_max": 3000, "salary_interval": "month"}}, None),
+        (
+            {"data": {"salary_max": 2000, "salary_interval": "month", "salary_currency": "egp"}},
+            "salary",
+        ),
+        (
+            {"data": {"salary_max": 3000, "salary_interval": "month", "salary_currency": "EGP"}},
+            None,
+        ),
         ({"company": "Globex"}, "blacklisted"),
     ],
 )
@@ -74,7 +80,7 @@ def test_rules(kw: dict[str, Any], reason: str | None) -> None:
 
 
 def test_remote_filter() -> None:
-    cfg = SearchConfig.model_validate({"filters": {"remote": "remote"}})
+    cfg = SearchConfig.model_validate({"filters": {"work_modes": ["remote"]}})
     assert rule_violation(job(data={"remote": "remote"}), cfg, utcnow()) is None
     assert "work mode onsite" in (
         rule_violation(job(data={"remote": "onsite"}), cfg, utcnow()) or ""
@@ -84,6 +90,71 @@ def test_remote_filter() -> None:
     )
     assert rule_violation(job(location="Remote, Egypt"), cfg, utcnow()) is None
     assert rule_violation(job(), cfg, utcnow()) is None  # unknown work mode is not a mismatch
+
+
+def test_work_modes_subset_and_default() -> None:
+    both = SearchConfig.model_validate({"filters": {"work_modes": ["remote", "hybrid", "remote"]}})
+    assert both.filters.work_modes == ["remote", "hybrid"]
+    assert rule_violation(job(data={"remote": "hybrid"}), both, utcnow()) is None
+    assert "not one you chose" in (
+        rule_violation(job(data={"remote": "onsite"}), both, utcnow()) or ""
+    )
+    assert rule_violation(job(), both, utcnow()) is None  # unknown passes
+    default = SearchConfig()
+    assert default.filters.work_modes == ["remote", "hybrid", "onsite"]
+    for mode in ("remote", "hybrid", "onsite"):
+        assert rule_violation(job(data={"remote": mode}), default, utcnow()) is None
+    with pytest.raises(ValueError, match="at least one work mode"):
+        SearchConfig.model_validate({"filters": {"work_modes": []}})
+
+
+def sal(cfg_floor: int, **data: Any) -> str | None:
+    cfg = SearchConfig.model_validate(
+        {"filters": {"salary_floor_monthly": cfg_floor, "salary_currency": "egp"}}
+    )
+    return rule_violation(job(data=data), cfg, utcnow())
+
+
+def test_monthly_salary_floor_currency_and_intervals() -> None:
+    assert SearchConfig().filters.salary_currency == "EGP"
+    low = {"salary_max": 12000, "salary_interval": "month", "salary_currency": "EGP"}
+    assert "12,000 EGP/month" in (sal(15000, **low) or "")
+    assert sal(15000, **{**low, "salary_currency": "egp"}) is not None  # case-insensitive
+    assert sal(15000, **{**low, "salary_currency": "USD"}) is None  # other currency passes
+    assert sal(15000, salary_max=12000, salary_interval="month") is None  # no currency passes
+    assert (
+        sal(15000, **{"salary_max": 100000, "salary_interval": "year", "salary_currency": "EGP"})
+        is not None
+    )
+    assert (
+        sal(15000, **{"salary_max": 200000, "salary_interval": "year", "salary_currency": "EGP"})
+        is None
+    )
+    hourly = {"salary_interval": "hour", "salary_currency": "EGP"}
+    assert sal(15000, salary_max=100, **hourly) is None  # 100 * 2080 / 12 = 17,333 a month
+    assert sal(15000, salary_max=50, **hourly) is not None  # 8,667 a month
+    assert sal(0, **low) is None  # floor unset
+
+
+def test_old_config_migrates() -> None:
+    cfg = SearchConfig.model_validate({"filters": {"remote": "remote", "salary_floor": 240000}})
+    assert cfg.filters.work_modes == ["remote"] and cfg.filters.salary_floor_monthly == 20000
+    assert cfg.filters.salary_currency == "EGP"
+    anyone = SearchConfig.model_validate({"filters": {"remote": "any"}})
+    assert anyone.filters.work_modes == ["remote", "hybrid", "onsite"]
+    again = SearchConfig.model_validate(cfg.model_dump())  # saved form loads back unchanged
+    assert again == cfg
+
+
+def test_query_expansion() -> None:
+    def q(*qs: str) -> list[str]:
+        return SearchConfig.model_validate({"search": {"queries": list(qs)}}).search.queries
+
+    assert q("React/Next.JS Developer") == ["React Developer", "Next.JS Developer"]
+    assert q("Frontend/Backend Engineer") == ["Frontend Engineer", "Backend Engineer"]
+    assert q(" python  developer ", "Python Developer", "", "A/B C/D") == [
+        "python developer", "A C", "A D", "B C", "B D"]  # fmt: skip
+    assert q("Sales/") == ["Sales"]
 
 
 def test_unstated_seniority_passes() -> None:

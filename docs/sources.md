@@ -63,8 +63,8 @@ It follows at most the careers page plus three "next page" links.
 | `jobspy` | `linkedin`, `indeed`, `glassdoor`, `google`, `zip_recruiter` |
 | `regional` | `wuzzuf`, `bayt`, `forasna` |
 
-`jobspy_country` sets the country for Indeed and Glassdoor (for example `egypt` or
-`united arab emirates`).
+`jobspy_country` sets the country for Indeed (for example `egypt` or `united arab emirates`).
+Glassdoor is searched without a country.
 
 - **LinkedIn, Indeed, Glassdoor, Google, ZipRecruiter and Bayt** are read through the
   [python-jobspy](https://github.com/speedyapply/JobSpy) library. LinKit All runs one

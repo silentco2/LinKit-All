@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Api } from '../api';
 import { I18n, TPipe } from '../i18n';
-import { ApplicationAnswers, EmailState, lines, Profile, Provider, SearchConfig, Segment, Status, unlines } from '../types';
+import { ApplicationAnswers, EmailState, expandQueries, lines, Profile, Provider, SearchConfig, Segment, Status, unlines, WorkMode } from '../types';
 
 type LocalServer = 'ollama' | 'lmstudio';
 type Step = 'profile' | 'ai' | 'search' | 'filters' | 'answers' | 'apply' | 'vault' | 'email' | 'finish';
@@ -172,7 +172,8 @@ type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_
               <div class="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label class="label" for="queries">{{ 'setup.search.queries' | t }}</label>
-                  <textarea id="queries" class="input h-28" [value]="unlines(cfg.search.queries)" (change)="cfg.search.queries = lines(val($event))" placeholder="python developer&#10;backend engineer"></textarea>
+                  <textarea id="queries" class="input h-28" [value]="unlines(cfg.search.queries)" (change)="setQueries($event)" placeholder="python developer&#10;backend engineer"></textarea>
+                  <p class="hint">{{ 'setup.search.queriesHint' | t }}</p>
                 </div>
                 <div>
                   <label class="label" for="locations">{{ 'setup.search.locations' | t }}</label>
@@ -232,13 +233,25 @@ type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_
                   <label class="label" for="black">{{ 'setup.filters.blacklist' | t }}</label>
                   <textarea id="black" class="input h-24" [value]="unlines(cfg.filters.company_blacklist)" (change)="cfg.filters.company_blacklist = lines(val($event))"></textarea>
                 </div>
+                <fieldset>
+                  <legend class="label">{{ 'setup.filters.mode' | t }}</legend>
+                  <div class="flex flex-wrap gap-4">
+                    @for (m of workModes; track m) {
+                      <label class="flex items-center gap-2 text-sm"><input type="checkbox" [checked]="cfg.filters.work_modes.includes(m)" (change)="toggleMode(m, $event)">{{ 'setup.filters.mode.' + m | t }}</label>
+                    }
+                  </div>
+                  <p class="hint">{{ 'setup.filters.modeHint' | t }}</p>
+                </fieldset>
                 <div>
-                  <label class="label" for="remote">{{ 'setup.filters.mode' | t }}</label>
-                  <select id="remote" class="input" [(ngModel)]="cfg.filters.remote">
-                    <option value="any">{{ 'setup.filters.mode.any' | t }}</option><option value="remote">{{ 'setup.filters.mode.remote' | t }}</option><option value="hybrid">{{ 'setup.filters.mode.hybrid' | t }}</option><option value="onsite">{{ 'setup.filters.mode.onsite' | t }}</option>
-                  </select>
+                  <label class="label" for="salary">{{ 'setup.filters.salary' | t }}</label>
+                  <div class="flex gap-2">
+                    <input id="salary" type="number" min="0" class="input" [(ngModel)]="cfg.filters.salary_floor_monthly">
+                    <select class="input w-28" dir="ltr" [attr.aria-label]="'setup.filters.currency' | t" [(ngModel)]="cfg.filters.salary_currency">
+                      @for (c of currencies; track c) { <option [value]="c">{{ c }}</option> }
+                    </select>
+                  </div>
+                  <p class="hint">{{ 'setup.filters.salaryHint' | t }}</p>
                 </div>
-                <div><label class="label" for="salary">{{ 'setup.filters.salary' | t }}</label><input id="salary" type="number" min="0" class="input" [(ngModel)]="cfg.filters.salary_floor"><p class="hint">{{ 'setup.filters.salaryHint' | t }}</p></div>
               </div>
               <fieldset>
                 <legend class="label">{{ 'setup.filters.seniority' | t }}</legend>
@@ -527,6 +540,8 @@ export class SetupPage implements OnInit {
     { id: 'bayt', label: 'Bayt' },
     { id: 'forasna', label: 'Forasna' },
   ];
+  protected readonly workModes: WorkMode[] = ['remote', 'hybrid', 'onsite'];
+  protected readonly currencies = ['EGP', 'SAR', 'AED', 'QAR', 'KWD', 'BHD', 'OMR', 'JOD', 'USD', 'EUR', 'GBP'];
   protected readonly seniorities = ['intern', 'junior', 'mid', 'senior', 'lead', 'manager', 'executive'];
 
   async ngOnInit(): Promise<void> {
@@ -553,6 +568,23 @@ export class SetupPage implements OnInit {
 
   val(event: Event): string {
     return (event.target as HTMLTextAreaElement).value;
+  }
+
+  setQueries(event: Event): void {
+    const box = event.target as HTMLTextAreaElement;
+    this.cfg!.search.queries = expandQueries(lines(box.value));
+    box.value = unlines(this.cfg!.search.queries); // show the split right away
+  }
+
+  /** The last work mode cannot be unchecked: the server needs at least one. */
+  toggleMode(mode: WorkMode, event: Event): void {
+    const modes = this.cfg!.filters.work_modes;
+    if (modes.length === 1 && modes[0] === mode) {
+      (event.target as HTMLInputElement).checked = true;
+      this.message.set({ ok: false, text: this.i18n.t('setup.filters.modeLast') });
+      return;
+    }
+    this.toggle(modes, mode);
   }
 
   toggle(list: string[], item: string): void {

@@ -51,6 +51,22 @@ export interface Segment {
   text: string;
 }
 
+export type WorkMode = 'remote' | 'hybrid' | 'onsite';
+
+/** One query per alternative: "React/Next.JS Developer" -> "React Developer", "Next.JS Developer". Mirrors the server. */
+export function expandQueries(queries: string[]): string[] {
+  const seen = new Map<string, string>();
+  for (const q of queries) {
+    let out = [''];
+    for (const word of q.split(/\s+/).filter(Boolean)) {
+      const alts = word.includes('/') ? word.split('/') : [word];
+      out = out.flatMap((prefix) => alts.map((a) => `${prefix} ${a}`.trim()));
+    }
+    for (const e of out) if (e && !seen.has(e.toLowerCase())) seen.set(e.toLowerCase(), e);
+  }
+  return [...seen.values()];
+}
+
 export interface SearchConfig {
   search: { queries: string[]; locations: string[]; posted_within_days: number; max_results_per_query: number };
   sources: { companies: string[]; jobspy: string[]; jobspy_country: string; regional: string[] };
@@ -58,9 +74,10 @@ export interface SearchConfig {
     title_include: string[];
     title_exclude: string[];
     locations: string[];
-    remote: 'any' | 'remote' | 'hybrid' | 'onsite';
+    work_modes: WorkMode[];
     seniority: string[];
-    salary_floor: number;
+    salary_floor_monthly: number;
+    salary_currency: string;
     company_blacklist: string[];
     one_per_company: boolean;
   };

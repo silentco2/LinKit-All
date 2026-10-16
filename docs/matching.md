@@ -17,11 +17,11 @@ in this order, and the first failure wins.
 |---|---|
 | `title_include` | The title must contain at least one of these words. Empty means any title. |
 | `title_exclude` | The title must contain none of these words. |
-| `remote` | `any`, `remote`, `hybrid` or `onsite`. If a posting does not say, it counts as on-site. |
+| `work_modes` | Any of `remote`, `hybrid`, `onsite`; all three by default, at least one required. A job is dropped only when its work mode is known (stated, or read from its location or title) and you did not choose it. A job that does not say is kept. |
 | `locations` | The job's location (or work mode) must contain one of these. Empty means anywhere. |
 | `seniority` | Taken from the title. Empty means any. |
 | posted date | Older than `posted_within_days` (default 14) is dropped. |
-| `salary_floor` | Yearly. Only checked when the posting states a salary. Hourly, daily, weekly and monthly pay is scaled to a year. |
+| `salary_floor_monthly` + `salary_currency` | Minimum monthly pay in one currency (default `EGP`). Only checked when the posting states a salary in that currency; postings in another currency, or with none, are kept (no currency conversion). Hourly, daily, weekly and yearly pay is converted to a month. |
 | `company_blacklist` | Companies you never want. |
 
 Seniority words are looked up in the title, in this order: intern or trainee; VP, chief or

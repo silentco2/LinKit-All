@@ -2,10 +2,11 @@
 
 import re
 import tomllib
+from itertools import product
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy.orm import Session, sessionmaker
 
 from linkit_all.core.config import ProviderName
@@ -14,17 +15,35 @@ from linkit_all.core.models import SearchConfigRow
 Seniority = Literal["intern", "junior", "mid", "senior", "lead", "manager", "executive"]
 
 
+WorkMode = Literal["remote", "hybrid", "onsite"]
+WORK_MODES: list[WorkMode] = ["remote", "hybrid", "onsite"]
+
+
+def expand_query(q: str) -> list[str]:
+    """ "React/Next.JS Developer" -> "React Developer", "Next.JS Developer"."""
+    alts = [w.split("/") if "/" in w else [w] for w in q.split()]
+    return [" ".join(" ".join(p).split()) for p in product(*alts)]
+
+
 class SearchSection(BaseModel):
     queries: list[str] = []
     locations: list[str] = [""]  # "" = anywhere
     posted_within_days: int = Field(14, ge=1)
     max_results_per_query: int = Field(200, ge=1, le=1000)
 
+    @field_validator("queries")
+    @classmethod
+    def _expand(cls, v: list[str]) -> list[str]:
+        out: dict[str, str] = {}
+        for e in (e for q in v for e in expand_query(q) if e):
+            out.setdefault(e.casefold(), e)  # dedupe case-insensitively, first spelling wins
+        return list(out.values())
+
 
 class SourcesSection(BaseModel):
     companies: list[str] = []  # career-page URLs or "greenhouse:stripe" style shorthands
     jobspy: list[Literal["linkedin", "indeed", "glassdoor", "google", "zip_recruiter"]] = []
-    jobspy_country: str = "usa"  # Indeed/Glassdoor country, e.g. "egypt", "united arab emirates"
+    jobspy_country: str = "usa"  # Indeed only (Glassdoor gets none); e.g. "egypt", "qatar"
     regional: list[Literal["wuzzuf", "bayt", "forasna"]] = []
 
 
@@ -32,11 +51,43 @@ class FiltersSection(BaseModel):
     title_include: list[str] = []  # any of these words must be in the title (empty = all)
     title_exclude: list[str] = []
     locations: list[str] = []  # any substring match (empty = anywhere)
-    remote: Literal["any", "remote", "hybrid", "onsite"] = "any"
+    work_modes: list[WorkMode] = Field(default_factory=lambda: list(WORK_MODES))
     seniority: list[Seniority] = []  # empty = any
-    salary_floor: int = 0  # yearly; only checked when the posting states a salary
+    salary_floor_monthly: int = Field(0, ge=0)  # only checked when the posting states a salary
+    salary_currency: str = "EGP"  # only postings in this currency are compared
     company_blacklist: list[str] = []
     one_per_company: bool = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate(cls, data: Any) -> Any:
+        """Configs saved before monthly pay / multi work mode: salary_floor (yearly), remote."""
+        if not isinstance(data, dict):
+            return data
+        data = dict(data)
+        if "salary_floor" in data:
+            old = data.pop("salary_floor")
+            if isinstance(old, int | float):
+                data.setdefault("salary_floor_monthly", round(old / 12))
+        if "remote" in data:
+            old = data.pop("remote")
+            data.setdefault("work_modes", list(WORK_MODES) if old == "any" else [old])
+        return data
+
+    @field_validator("work_modes")
+    @classmethod
+    def _modes(cls, v: list[WorkMode]) -> list[WorkMode]:
+        if not v:
+            raise ValueError("choose at least one work mode")
+        return list(dict.fromkeys(v))
+
+    @field_validator("salary_currency")
+    @classmethod
+    def _currency(cls, v: str) -> str:
+        v = v.strip().upper()
+        if not re.fullmatch(r"[A-Z]{3}", v):
+            raise ValueError("salary_currency must be a 3-letter code such as EGP")
+        return v
 
 
 class MatchingSection(BaseModel):

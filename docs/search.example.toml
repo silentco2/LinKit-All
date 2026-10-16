@@ -1,7 +1,7 @@
 # LinKit All search settings. Import with:  linkit search import search.toml
 
 [search]
-queries = ["python developer", "backend engineer"]
+queries = ["python developer", "backend engineer"]  # "React/Next.JS Developer" = two searches
 locations = ["Cairo, Egypt", "Remote"]   # "" means anywhere
 posted_within_days = 14
 max_results_per_query = 200              # per site, per query, per location
@@ -15,16 +15,17 @@ companies = [
   "greenhouse:airbnb",
 ]
 jobspy = ["linkedin", "indeed"]          # also: glassdoor, google, zip_recruiter
-jobspy_country = "egypt"                 # Indeed/Glassdoor country
+jobspy_country = "egypt"                 # Indeed country (Glassdoor gets none)
 regional = ["wuzzuf", "bayt"]            # also: forasna (use Arabic query words there)
 
 [filters]
 title_include = ["engineer", "developer"]
 title_exclude = ["intern", "principal", "director"]
 locations = ["egypt", "cairo", "remote", "dubai"]
-remote = "any"                           # any | remote | hybrid | onsite
+work_modes = ["remote", "hybrid", "onsite"]  # keep the ones you want; unknown mode always passes
 seniority = ["junior", "mid", "senior"]  # intern junior mid senior lead manager executive
-salary_floor = 0                         # yearly, in the posting's currency
+salary_floor_monthly = 0                 # per month; 0 = off
+salary_currency = "EGP"                  # only postings in this currency are compared
 company_blacklist = []
 one_per_company = true
 

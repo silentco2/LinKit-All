@@ -38,8 +38,8 @@ def rule_violation(job: Job, cfg: SearchConfig, now: datetime) -> str | None:
     # Hard rules reject only on a known mismatch: most job sites leave the work mode blank, and
     # treating blank as on-site dropped nearly every job under a "remote" filter.
     remote = job.data.get("remote") or remote_from_text(job.location, job.title)
-    if f.remote != "any" and remote and remote != f.remote:
-        return f"work mode {remote} is not {f.remote}"
+    if remote and remote not in f.work_modes:
+        return f"work mode {remote} is not one you chose"
     where = f"{job.location} {job.data.get('remote') or ''}".lower()
     if f.locations and not any(loc.lower() in where for loc in f.locations):
         return f"location {job.location!r} not in your locations"
@@ -48,8 +48,11 @@ def rule_violation(job: Job, cfg: SearchConfig, now: datetime) -> str | None:
     if job.posted_at and job.posted_at < now - timedelta(days=cfg.search.posted_within_days):
         return f"posted more than {cfg.search.posted_within_days} days ago"
     top, per = job.data.get("salary_max"), _PER_YEAR.get(job.data.get("salary_interval") or "year")
-    if f.salary_floor and top and per and top * per < f.salary_floor:
-        return f"salary up to {top * per:,.0f}/year is below your floor"
+    # ponytail: no FX conversion; a posting in another currency (or none) is never rejected.
+    # Upgrade path: a rates table, only if mixed-currency boards turn out common.
+    same = str(job.data.get("salary_currency") or "").upper() == f.salary_currency
+    if f.salary_floor_monthly and top and per and same and top * per / 12 < f.salary_floor_monthly:
+        return f"salary up to {top * per / 12:,.0f} {f.salary_currency}/month is below your floor"
     if norm_company(job.company) in {norm_company(c) for c in f.company_blacklist}:
         return "company is blacklisted"
     return None
