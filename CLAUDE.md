@@ -121,8 +121,8 @@ Tailoring happens just before applying, never for jobs that will not be applied 
   BEFORE submitting signup, then verify via IMAP (code/link by regex, AI fallback).
 - Screening questions: answer bank (embedding match) -> AI draft from profile ->
   Action Center. Sensitive categories (section 2) never go to the AI.
-- LinkedIn Easy Apply, Indeed Apply and CapSolver break those sites' ToS: off by default,
-  explicit opt-in with a ban-risk warning in UI + docs, low daily caps.
+- LinkedIn Easy Apply and Indeed Apply break those sites' ToS: off by default, explicit opt-in
+  with a ban-risk warning, low daily caps. No CAPTCHA solving: CAPTCHAs park for the user.
 - Cover letter only when the form has a cover-letter field.
 - Screenshot before submit and on confirmation; Playwright trace on failure.
 - Success = confirmation page text and/or confirmation email. Otherwise state = failed
@@ -134,7 +134,7 @@ Defaults, editable in settings: score 8+ = `high` -> auto-apply; 5–7 = `mid` -
 user may opt in to auto-apply low too.
 
 ### 5.7 Action Center
-Queue of parked jobs: 2fa, unknown_question, validation_error, login_issue.
+Parked jobs: unknown_question, confirm_submit, captcha, validation_error, login_issue, two_factor.
 Keep or restore the page so the user acts in one sitting; job resumes afterward.
 Notify via WebSocket + optional desktop notification.
 
@@ -191,7 +191,7 @@ docs/
 3. UI v1: setup wizard, jobs table, review queue, live run, basic report.
 4. Apply v1: Greenhouse, Lever, Ashby (no accounts), answer bank, Action Center.
 5. Apply v2: Workday, iCIMS, Taleo, SmartRecruiters, SuccessFactors with account creation,
-   vault, Gmail IMAP verification. Opt-in: LinkedIn/Indeed apply, CapSolver.
+   vault, Gmail IMAP verification. Opt-in: LinkedIn/Indeed apply.
 6. Generic career-page extractor; generic AI form agent.
 7. Later: local models, LaTeX/ODT/PDF input, scheduler, Outlook OAuth, docs, PyPI release.
 

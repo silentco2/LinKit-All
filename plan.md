@@ -38,12 +38,16 @@ later local models.
 | AI scale | hard rules + free local rank first; only the top `ai_max_jobs` go to the AI, batched 10-20 per call |
 | Tiers | score 8-10 high -> auto-apply; 5-7 mid -> user review; <5 or not AI-scored -> low (hidden, user may opt in) |
 | Tailoring | just before applying, never for jobs that won't be applied to; reused if a job is requeued |
-| ToS-risky features | LinkedIn Easy Apply, Indeed Apply, CapSolver: built later, off by default, ban-risk warning, low caps |
+| ToS-risky features | LinkedIn Easy Apply, Indeed Apply: built later, off by default, ban-risk warning, low caps |
 | Email verification | Gmail IMAP + app password first; Outlook OAuth later |
 | Live applying | dry run by default (fill + screenshot, never submit). "Live applying" switch; then each submission waits for the user's click unless "Submit without asking" is also on |
 | Demographic (EEO) questions | asked once in the setup wizard, each optional; if skipped and a form needs one, the job goes to the Action Center. The app never picks "decline" on its own |
 | AI-drafted answers | used automatically, from CV + non-sensitive profile facts only, saved to the answer bank marked "ai" so the user can edit them |
 | Cover letters | written whenever the form has a cover-letter field (text or file) |
+| Session scope (2026-10-16) | run Phases 4-7 continuously; stop only for blockers and outward-facing steps (GitHub repo, PyPI release, live submissions, real account creation) |
+| Commits | one small commit on main per reviewed task |
+| CAPTCHAs | CapSolver dropped (paid). Automated CAPTCHA solving is not built; CAPTCHAs park in the Action Center, the user solves them in the open headed browser, the job resumes |
+| Answer bank UI | its own page (`/answers`), edits set `source = "user"` |
 | Sensitive questions | never sent to the AI: work authorization, sponsorship, salary, demographics, criminal record, legal acknowledgements (arbitration, certify), privacy acknowledgements, recording consent (AI notetakers). Answered only from saved answers or the user's own answer-bank entries; optional consents (marketing) are never ticked |
 
 ## Pipeline and states
@@ -102,6 +106,13 @@ Done:
 - `linkit run apply`; `apply` is a pipeline stage.
 - Verified by dry runs on live Airbnb, Palantir and OpenAI forms; offline e2e on a saved
   Lever form.
+Execution tasks (status here, details in handoff.md "Next steps"):
+- ✅ T4.1 API: answer bank list/edit/delete; job detail `filled` + event screenshots; tests
+- ✅ T4.2 Setup wizard: "Application answers" + "Applying" steps; `apply` in STAGES
+- ✅ T4.3 Action Center page + nav badge + live/dry-run indicator in the shell
+- ✅ T4.4 Live run apply label/summary; job drawer filled answers + screenshots
+- ✅ T4.5 Answer bank page
+- ✅ T4.6 Browser check on smoke data, CLAUDE.md §5.5-5.7, handoff.md refresh
 Remaining:
 - UI: setup wizard steps "Application answers" (ApplicationAnswers incl. optional EEO and
   the two acknowledgement switches) and "Applying" (ApplySection: live, submit without
@@ -123,8 +134,21 @@ Remaining:
 - Handlers: Workday (cxs endpoint for discovery + per-tenant accounts), iCIMS, Taleo,
   SmartRecruiters, SuccessFactors; discovery plugins for SmartRecruiters, Recruitee,
   Workable, Workday.
-- Opt-in (off by default, warning + low caps): LinkedIn Easy Apply, Indeed Apply, CapSolver.
+- Opt-in (off by default, warning + low caps): LinkedIn Easy Apply, Indeed Apply.
 - Action Center kinds: login_issue, two_factor (keep/restore the page where possible).
+
+Execution tasks:
+- ⬜ T5.0 runner: check handler/job_info before tailoring (today a job is tailored, then skipped)
+- ⬜ T5.1 Vault core (`apply/vault/`): AES-GCM per secret, Argon2id key, keyring cache, lock/unlock, export; table + migration
+- ⬜ T5.2 Vault API + wizard "Vault" step + Vault screen
+- ⬜ T5.3 IMAP verification (`apply/email_verify/`): Gmail app password from the vault, code/link regex, AI fallback prompt; API test + wizard step
+- ⬜ T5.4 Accounts (`apply/accounts/`): password generator per site rules, save-to-vault before signup, login reuse; handler signup/login hooks; login_issue / two_factor parking
+- ⬜ T5.5a Discovery: SmartRecruiters + Recruitee sources (+ detector, fixtures, tests)
+- ⬜ T5.5b Discovery: Workable + Workday cxs sources
+- ⬜ T5.6 SmartRecruiters apply handler (public form, no account)
+- ⛔ T5.7 Workday / iCIMS / Taleo / SuccessFactors handlers: forms sit behind sign-up; need maintainer-saved pages or a supervised live session
+- ⛔ T5.8 Opt-in LinkedIn Easy Apply / Indeed Apply: need the maintainer's logged-in pages; off by default, ban-risk warning, low caps
+Decisions made by the orchestrator (override any): dry run never creates accounts (it fills the sign-up form, screenshots, stops); one vault entry per (ats, tenant); verification email matched by sender domain + time window, plain profile email (no plus-addressing).
 
 ### Phase 6 — Generic agent ⬜
 - Generic career-page extractor (JSON-LD -> CSS heuristics -> AI extraction) for any URL.
@@ -149,10 +173,10 @@ Remaining:
 - DOCX fidelity: SSIM tolerance (0.85) needs tuning on real CVs.
 - Anti-bot: LinkedIn rate-limits quickly; Lever uses hCaptcha and Greenhouse/Ashby reCAPTCHA
   (real Chrome with a persistent profile usually passes; visible challenges go to the
-  Action Center). Never bypass challenges outside the opt-in CapSolver feature.
+  Action Center). Never bypass challenges; they park in the Action Center.
 - ATS markup changes: handlers depend on container/label selectors; keep fixtures and
   re-check with the read-only inspection approach.
-- ToS / account bans for LinkedIn/Indeed/CapSolver: opt-in only.
+- ToS / account bans for LinkedIn/Indeed: opt-in only.
 - Windows: Claude desktop is MSIX-packaged, so tools installed from the agent's shell into
   %APPDATA% are invisible to the user's terminals (see handoff.md).
 
