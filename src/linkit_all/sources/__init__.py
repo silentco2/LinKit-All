@@ -2,6 +2,7 @@ from linkit_all.providers.base import LLMProvider
 from linkit_all.sources.ashby import Ashby
 from linkit_all.sources.base import Source
 from linkit_all.sources.careers import Careers
+from linkit_all.sources.forasna import Forasna
 from linkit_all.sources.greenhouse import Greenhouse
 from linkit_all.sources.jobspy_sites import jobspy_sources
 from linkit_all.sources.lever import Lever
@@ -23,6 +24,7 @@ def registry(provider: LLMProvider | None = None) -> dict[str, Source]:
         Workday(),
         *jobspy_sources(),
         Wuzzuf(),
+        Forasna(),
         Careers(provider),  # the AI fallback for pages without JSON-LD
     ]
     return {s.name: s for s in sources}

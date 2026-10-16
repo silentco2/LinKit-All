@@ -514,3 +514,112 @@ def test_company_variants_normalize_together() -> None:
     assert norm_company("Merck Group") == norm_company("Merck KGaA") == "merck"
     assert norm_company("Nile Bits, LLC") == "nile bits"
     assert norm_company("Group Holdings SE") == "group holdings se"
+
+
+def _forasna_run(
+    queries: list[str],
+    start_page: int = 0,
+    robots: tuple[int, str] | None = None,
+    extra_entries: str = "",
+) -> tuple[list[list[JobStub]], list[str]]:
+    from datetime import timedelta
+
+    from linkit_all.core.models import utcnow
+    from linkit_all.sources.forasna import Forasna
+
+    d = FIX / "forasna"
+    recent = (utcnow() - timedelta(days=1)).isoformat() + "+00:00"
+    old = (utcnow() - timedelta(days=60)).isoformat() + "+00:00"
+    jobs = (d / "sitemap5.xml").read_text("utf-8").format(recent=recent, old=old)
+    jobs = jobs.replace("</urlset>", extra_entries.format(recent=recent) + "</urlset>")
+    pages = {"444100": "job-purchasing.html", "444095": "job-data-entry.html"}
+    fetched: list[str] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        path = req.url.path
+        if path == "/robots.txt":
+            status, text = robots or (200, (d / "robots.txt").read_text("utf-8"))
+            return httpx.Response(status, text=text)
+        fetched.append(path)
+        if path == "/sitemap.xml":
+            return httpx.Response(200, text=(d / "sitemap.xml").read_text("utf-8"))
+        if path == "/sitemap1.xml":
+            return httpx.Response(200, text=(d / "sitemap1.xml").read_text("utf-8"))
+        if path == "/sitemap5.xml":
+            return httpx.Response(200, text=jobs)
+        page = pages.get(path.rsplit("-", 1)[-1])
+        if path.startswith("/job/p/") and page:
+            return httpx.Response(200, content=(d / page).read_bytes())
+        return httpx.Response(404)
+
+    cfg = SearchConfig.model_validate(
+        {"search": {"queries": queries}, "sources": {"regional": ["forasna"]}}
+    )
+    (task,) = Forasna().tasks(cfg)
+
+    async def go() -> list[list[JobStub]]:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as c:
+            http = Http(c, per_host_rate={"forasna.com": 1000})
+            return [p async for p in Forasna().search(http, task, start_page)]
+
+    return asyncio.run(go()), fetched
+
+
+def test_forasna_sitemap_match_and_jsonld_arabic() -> None:
+    # Matches by Arabic and English slug words; the old hr entry and the unmatched ones are
+    # skipped; 444098 (ERP) is in the sitemap but already gone (404): skipped, not an error.
+    pages, fetched = _forasna_run(["مشتريات", "إدخال بيانات", "erp odoo", "hr specialist"])
+    stubs = {s.title: s for page in pages for s in page}
+    assert sorted(p.rsplit("-", 1)[-1] for p in fetched if p.startswith("/job/p/")) == [
+        "444095", "444098", "444100"
+    ]  # fmt: skip
+    assert set(fetched) >= {"/sitemap.xml", "/sitemap1.xml", "/sitemap5.xml"}
+    assert "/careers/sitemap_index.xml" not in fetched  # their blog, not jobs
+    buy = stubs["مسئول مشتريات (مجال الاغذيه)"]
+    assert buy.company == "نباتات" and buy.ats == "forasna" and buy.source == "forasna"
+    assert buy.location == "مدينة العبور, القاهرة, EG"
+    assert buy.posted_at is not None and buy.apply_url == buy.url
+    assert buy.url.startswith("https://forasna.com/job/p/") and buy.url.endswith("-444100")
+    assert "مسئول مشتريات ميداني" in buy.description and "<" not in buy.description
+    assert (buy.salary_min, buy.salary_max, buy.salary_currency) == (15000, 20000, "EGP")
+    entry = stubs["موظف إدخال بيانات"]
+    assert entry.remote == "remote" and entry.location == "الرياض, SA"
+    assert len(stubs) == 2
+
+
+def test_forasna_no_query_no_tasks() -> None:
+    from linkit_all.sources.forasna import Forasna
+
+    off = SearchConfig.model_validate({"search": {"queries": ["x"]}})
+    assert Forasna().tasks(off) == []
+    on = SearchConfig.model_validate({"sources": {"regional": ["forasna"]}})
+    assert Forasna().tasks(on) == []
+    assert "forasna" in registry()
+
+
+def test_forasna_robots_honored() -> None:
+    # Wildcard Disallows (/*uat*) are not understood by urllib's parser, so the source applies
+    # them itself: the "evaluation" slug is never fetched even though robots.txt lets us in.
+    extra = (
+        "<url><loc>https://forasna.com/job/p/evaluation-manager-444999</loc>"
+        "<lastmod>{recent}</lastmod></url>"
+    )
+    _, fetched = _forasna_run(["evaluation manager", "مشتريات"], extra_entries=extra)
+    assert "/job/p/evaluation-manager-444999" not in fetched
+    assert any(p.endswith("-444100") for p in fetched)
+    # robots.txt that closes the job pages: sitemaps are read, pages are not.
+    pages, fetched = _forasna_run(["مشتريات"], robots=(200, "User-agent: *\nDisallow: /job/p/\n"))
+    assert pages == [] and not [p for p in fetched if p.startswith("/job/p/")]
+    # robots.txt that closes everything, or fails with a 5xx: nothing is fetched at all.
+    for robots in ((200, "User-agent: *\nDisallow: /\n"), (503, "")):
+        pages, fetched = _forasna_run(["مشتريات"], robots=robots)
+        assert pages == [] and fetched == []
+
+
+def test_forasna_resumes_from_checkpoint_page(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("linkit_all.sources.forasna.PAGE", 1)
+    full, _ = _forasna_run(["مشتريات", "إدخال بيانات"])
+    assert [len(p) for p in full] == [1, 1]
+    rest, fetched = _forasna_run(["مشتريات", "إدخال بيانات"], start_page=1)
+    assert [[s.url for s in p] for p in rest] == [[s.url for s in full[1]]]
+    assert len([p for p in fetched if p.startswith("/job/p/")]) == 1  # page 0 not fetched again

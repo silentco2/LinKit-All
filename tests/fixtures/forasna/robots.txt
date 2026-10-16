@@ -1,0 +1,21 @@
+# Cloudflare managed block
+User-agent: *
+Content-Signal: search=yes,ai-train=no,use=reference
+Allow: /
+
+User-agent: GPTBot
+Disallow: /
+
+User-agent: *
+Disallow: /cgi-bin/
+Disallow: /*?query=
+Disallow: /*filters
+Disallow: /*uat*
+Disallow: /*staging*
+Disallow: /*pre-prod*
+Disallow: /*preprod*
+
+User-agent: *
+Crawl-delay: 10
+
+Sitemap: https://forasna.com/sitemap.xml

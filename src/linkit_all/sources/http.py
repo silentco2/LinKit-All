@@ -20,6 +20,7 @@ ROBOTS_TOKEN = "LinKitAll"  # noqa: S105 - product token robots.txt groups are m
 SLOW_HOSTS = {
     "www.linkedin.com": 0.5,
     "wuzzuf.net": 0.1,  # robots.txt Crawl-delay 10
+    "forasna.com": 0.1,  # robots.txt Crawl-delay 10
     "apply.workable.com": 1.0,
 }
 SLOW_SUFFIXES = {".myworkdayjobs.com": 1.0}  # one host per Workday tenant
