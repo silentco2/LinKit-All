@@ -1,8 +1,9 @@
 """The user's profile: form fields, locked facts, and the base CV file.
 
-CVs arrive as DOCX, ODT or PDF. The base CV is always a DOCX in `cvs/`: ODT is converted by
+CVs arrive as DOCX, ODT, PDF or LaTeX. The base CV is a DOCX in `cvs/`: ODT is converted by
 LibreOffice, PDF by pdf2docx (lossy, so the user must approve it before tailoring uses it).
-The original upload is kept in `cvs/original/`.
+A single-file .tex is its own base (no conversion). The original upload is kept in
+`cvs/original/`.
 """
 
 import io
@@ -17,7 +18,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from linkit_all.core.models import LockedFact, Profile
 
 MAX_CV_BYTES = 10 * 1024 * 1024
-CV_FORMATS = (".docx", ".odt", ".pdf")
+CV_FORMATS = (".docx", ".odt", ".pdf", ".tex")
+_CV_KINDS = "DOCX, ODT, PDF and LaTeX (.tex)"
 _ODT_MIME = b"application/vnd.oasis.opendocument.text"
 
 
@@ -41,7 +43,7 @@ class ProfileIn(ProfileFields):
     @classmethod
     def _docx(cls, v: Path) -> Path:
         if v.suffix.lower() not in CV_FORMATS:
-            raise ValueError("only DOCX, ODT and PDF CVs are supported")
+            raise ValueError(f"only {_CV_KINDS} CVs are supported")
         if not v.is_file():
             raise ValueError(f"file not found: {v}")
         return v
@@ -86,6 +88,20 @@ def save_fields(db: sessionmaker[Session], fields: ProfileFields) -> None:
 
 
 def _check_cv(ext: str, content: bytes) -> None:
+    if ext == ".tex":
+        from linkit_all.tailor.latex import load_segments
+
+        try:
+            source = content.decode("utf-8")
+        except UnicodeDecodeError as e:
+            raise ValueError(
+                "this LaTeX file is not UTF-8; save it as UTF-8 and upload again"
+            ) from e
+        if "\\documentclass" not in source or "\\begin{document}" not in source:
+            raise ValueError("this is not a complete LaTeX document (needs \\documentclass)")
+        if not any(s.text.strip() for s in load_segments(source)):  # also rejects \\input
+            raise ValueError("no text found in this LaTeX file")
+        return
     if ext == ".pdf":
         if not content.startswith(b"%PDF-"):
             raise ValueError("this file is not a PDF")
@@ -132,19 +148,21 @@ def _convert_to_docx(src: Path, out_dir: Path) -> Path:
 
 
 def save_cv(db: sessionmaker[Session], data_dir: Path, filename: str, content: bytes) -> Path:
-    """Store an uploaded CV and return the base DOCX path. Raises ValueError for bad files.
+    """Store an uploaded CV and return the base path (a DOCX, or the .tex itself).
 
-    DOCX and ODT are approved at once; a converted PDF waits for `approve_cv`."""
+    Raises ValueError for bad files.
+
+    DOCX, ODT and LaTeX are approved at once; a converted PDF waits for `approve_cv`."""
     name = re.sub(r"[^\w.\- ]", "_", Path(filename).name)
     ext = Path(name).suffix.lower()
     if ext not in CV_FORMATS or len(name) <= len(ext) + 1:
-        raise ValueError("only DOCX, ODT and PDF CVs are supported")
+        raise ValueError(f"only {_CV_KINDS} CVs are supported")
     if len(content) > MAX_CV_BYTES:
         raise ValueError("CV file is larger than 10 MB")
     _check_cv(ext, content)
-    cv = data_dir / "cvs" / f"{Path(name).stem}.docx"
+    cv = data_dir / "cvs" / f"{Path(name).stem}{'.tex' if ext == '.tex' else '.docx'}"
     cv.parent.mkdir(parents=True, exist_ok=True)
-    if ext == ".docx":
+    if ext in (".docx", ".tex"):
         cv.write_bytes(content)  # fresh mtime, so the base PDF gets re-rendered
     else:
         original = cv.parent / "original" / name
@@ -160,7 +178,7 @@ def save_cv(db: sessionmaker[Session], data_dir: Path, filename: str, content: b
         row = _row(s)
         row.cv_path = str(cv)
         row.cv_source_format = ext[1:]
-        row.cv_approved = ext != ".pdf"
+        row.cv_approved = ext != ".pdf"  # LaTeX is used as uploaded
     return cv
 
 

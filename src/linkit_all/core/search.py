@@ -1,10 +1,11 @@
 """What to search and how to filter/rank it, imported from search.toml until the UI exists."""
 
+import re
 import tomllib
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session, sessionmaker
 
 from linkit_all.core.config import ProviderName
@@ -24,7 +25,7 @@ class SourcesSection(BaseModel):
     companies: list[str] = []  # career-page URLs or "greenhouse:stripe" style shorthands
     jobspy: list[Literal["linkedin", "indeed", "glassdoor", "google", "zip_recruiter"]] = []
     jobspy_country: str = "usa"  # Indeed/Glassdoor country, e.g. "egypt", "united arab emirates"
-    regional: list[Literal["wuzzuf", "bayt"]] = []
+    regional: list[Literal["wuzzuf", "bayt", "forasna"]] = []
 
 
 class FiltersSection(BaseModel):
@@ -53,6 +54,7 @@ class ApplySection(BaseModel):
     headless: bool = False  # True hides the browser window
     min_pause_s: int = Field(20, ge=0)  # random wait between live applications
     max_pause_s: int = Field(60, ge=0)
+    generic_agent: bool = True  # use the AI form agent for sites without a dedicated handler
 
 
 class AISection(BaseModel):
@@ -71,6 +73,29 @@ class EmailSection(BaseModel):
     poll_s: int = Field(10, ge=3, le=120)
 
 
+class ScheduleSection(BaseModel):
+    """Automatic runs while the app is open (the server must be running at that time)."""
+
+    enabled: bool = False
+    days: list[int] = Field([0, 1, 2, 3, 4, 5, 6], min_length=1)  # 0 = Monday .. 6 = Sunday
+    times: list[str] = Field(["09:00"], min_length=1, max_length=6)  # "HH:MM", 24 h, local time
+    new_run: bool = True  # start a new discovery run each time (else resume an unfinished one)
+
+    @field_validator("days")
+    @classmethod
+    def _days(cls, v: list[int]) -> list[int]:
+        if any(not 0 <= d <= 6 for d in v):
+            raise ValueError("days must be 0 (Monday) to 6 (Sunday)")
+        return sorted(set(v))
+
+    @field_validator("times")
+    @classmethod
+    def _times(cls, v: list[str]) -> list[str]:
+        if any(not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", t) for t in v):
+            raise ValueError("times must look like 09:30 (24-hour HH:MM)")
+        return sorted(set(v))
+
+
 class SearchConfig(BaseModel):
     search: SearchSection = SearchSection()
     sources: SourcesSection = SourcesSection()
@@ -79,6 +104,7 @@ class SearchConfig(BaseModel):
     apply: ApplySection = ApplySection()
     ai: AISection = AISection()
     email: EmailSection = EmailSection()
+    schedule: ScheduleSection = ScheduleSection()
 
 
 def save_search(db: sessionmaker[Session], cfg: SearchConfig) -> None:

@@ -57,15 +57,15 @@ type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_
 
             <section class="card space-y-4">
               <h2>Your CV</h2>
-              <p class="text-sm text-slate-600 dark:text-slate-400">Upload your CV as a Word (.docx), OpenDocument (.odt) or PDF file. Its layout and styling are never changed, only words. Word is the most reliable; a PDF is converted once and you approve the result.</p>
+              <p class="text-sm text-slate-600 dark:text-slate-400">Upload your CV as a Word (.docx), OpenDocument (.odt), PDF or single-file LaTeX (.tex) file. Its layout and styling are never changed, only words. Word and LaTeX are the most reliable; a PDF is converted once and you approve the result. LaTeX CVs must be one self-contained file (no &bsol;input) and need Tectonic installed.</p>
               <div class="flex flex-wrap items-center gap-3">
                 <label class="btn cursor-pointer">
                   {{ profile.cv_name ? 'Replace CV' : 'Upload CV' }}
-                  <input type="file" accept=".docx,.odt,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.oasis.opendocument.text,application/pdf" class="sr-only" (change)="upload($event)">
+                  <input type="file" accept=".docx,.odt,.pdf,.tex,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.oasis.opendocument.text,application/pdf,application/x-tex,text/x-tex" class="sr-only" (change)="upload($event)">
                 </label>
                 @if (profile.cv_name) {
                   <span class="text-sm">{{ profile.cv_name }}</span>
-                  @if (status()?.libreoffice) {
+                  @if (profile.cv_renderer_ok ?? status()?.libreoffice) {
                     <a class="btn" href="/api/profile/cv/pdf" target="_blank" rel="noopener">Preview PDF</a>
                   }
                 }
@@ -76,7 +76,11 @@ type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_
                   <button class="btn btn-primary mt-3" (click)="approveCv()" [disabled]="busy()">Approve this as my CV</button>
                 </div>
               }
-              @if (status() && !status()!.libreoffice) {
+              @if (profile.cv_source_format === 'tex') {
+                @if (profile.cv_renderer_ok === false) {
+                  <div class="alert alert-error">Install <a href="https://tectonic-typesetting.github.io" target="_blank" rel="noopener">Tectonic</a> to preview and tailor LaTeX CVs (<code>linkit doctor</code> checks it). Your .tex was saved.</div>
+                }
+              } @else if (status() && !status()!.libreoffice) {
                 <div class="alert alert-error">LibreOffice isn't installed, so PDF preview and tailoring won't work yet. Run <code>linkit doctor</code>.</div>
               }
               @if (segments().length) {
@@ -559,8 +563,9 @@ export class SetupPage implements OnInit {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return Promise.resolve();
     return this.run(async () => {
-      const r = await this.api.upload<{ cv_name: string; segments: Segment[]; cv_source_format: Profile['cv_source_format']; cv_approved: boolean }>('/profile/cv', file);
+      const r = await this.api.upload<{ cv_name: string; segments: Segment[]; cv_source_format: Profile['cv_source_format']; cv_approved: boolean; cv_renderer_ok: boolean }>('/profile/cv', file);
       this.profile!.cv_name = r.cv_name;
+      this.profile!.cv_renderer_ok = r.cv_renderer_ok;
       this.profile!.cv_source_format = r.cv_source_format;
       this.profile!.cv_approved = r.cv_approved;
       this.segments.set(r.segments);

@@ -17,6 +17,8 @@ from linkit_all.apply.vault import vault_for
 from linkit_all.core.config import Settings, get_settings
 from linkit_all.core.db import init_db
 from linkit_all.core.log import setup_logging
+from linkit_all.core.scheduler import apply_schedule, make_scheduler, register_runner
+from linkit_all.core.search import SearchConfig, load_search
 
 STATIC = Path(__file__).parent.parent / "static" / "browser"  # Angular build output
 
@@ -30,7 +32,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.vault.unlock_from_keyring()
         sink = logger.add(app.state.bus.log_sink, level="INFO",
                           filter=lambda r: (r["name"] or "").startswith("linkit_all"))  # fmt: skip
+        register_runner(app.state.runner)
+        app.state.scheduler.start()
+        apply_schedule(app.state.scheduler, load_search(app.state.db) or SearchConfig())
         yield
+        app.state.scheduler.shutdown(wait=False)
+        register_runner(None)
         app.state.runner.cancel()
         logger.remove(sink)
 
@@ -41,7 +48,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.db = init_db(settings.db_path)
     app.state.vault = vault_for(settings, app.state.db)
     app.state.bus = EventBus()
-    app.state.runner = PipelineRunner(app.state.db, settings, app.state.bus)
+    app.state.runner = PipelineRunner(app.state.db, settings, app.state.bus, app.state.vault)
+    app.state.scheduler = make_scheduler(app.state.db.kw["bind"])
     app.add_middleware(LocalOnly, extra_origins=settings.dev_origins)
     app.include_router(router)
 

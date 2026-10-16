@@ -24,6 +24,7 @@ export interface Status {
   actions_open: number;
   apply_live: boolean;
   run: RunState;
+  next_run: string | null;
 }
 
 export interface Profile {
@@ -34,7 +35,9 @@ export interface Profile {
   skills: string[];
   locked_facts: string[];
   cv_name?: string | null;
-  cv_source_format?: 'docx' | 'odt' | 'pdf';
+  cv_source_format?: 'docx' | 'odt' | 'pdf' | 'tex';
+  /** False when the program that renders this CV (LibreOffice, or Tectonic for LaTeX) is missing. */
+  cv_renderer_ok?: boolean;
   /** False for a converted PDF until the user approves it; tailoring refuses until then. */
   cv_approved?: boolean;
 }
@@ -61,6 +64,16 @@ export interface SearchConfig {
   ai: { provider: Provider | null; model: string | null };
   apply: ApplySection;
   email: { imap_host: string; imap_user: string; timeout_s: number; poll_s: number };
+  schedule: ScheduleSection;
+}
+
+export interface ScheduleSection {
+  enabled: boolean;
+  /** 0 = Monday .. 6 = Sunday */
+  days: number[];
+  /** "HH:MM", 24 h, local time */
+  times: string[];
+  new_run: boolean;
 }
 
 export interface ApplySection {

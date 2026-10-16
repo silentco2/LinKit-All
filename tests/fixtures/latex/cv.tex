@@ -1,0 +1,45 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[margin=0.8in]{geometry}
+\usepackage[hidelinks]{hyperref}
+\usepackage{enumitem}
+\newcommand{\role}[3]{\textbf{#1} \hfill #2\\ \textit{#3}}
+\pagestyle{empty}
+
+\begin{document}
+
+% Header -- the name and contact line
+\begin{center}
+  {\LARGE \textbf{Jane Doe}} \\[4pt]
+  Cairo, Egypt $\cdot$ \href{mailto:jane@example.com}{jane@example.com} $\cdot$
+  \href{https://example.com/jane}{example.com/jane}
+\end{center}
+
+\section*{Summary}
+Backend engineer who builds scalable services in Python and Go,
+with a focus on reliability.
+
+Second paragraph about mentoring junior developers.
+
+\section*{Experience}
+\role{Software Engineer, Acme Corp}{2019--2023}{Remote}
+\begin{itemize}[leftmargin=*, itemsep=2pt]
+  \item Built \textbf{scalable} backend services in Python and Go % keep this one short
+  \item Improved latency by 40\% for 2M users; cut R\&D costs
+  \item Mentored junior developers and ran the on-call rota
+  \item[--] Wrote internal docs for the platform team
+\end{itemize}
+
+\section*{Skills}
+\begin{tabular}{@{}ll@{}}
+  \textbf{Languages} & Python, Go, SQL \\
+  \textbf{Tools} & Docker, Git, PostgreSQL \\
+\end{tabular}
+
+\vspace{4pt}
+Complexity: runs in $O(n \log n)$ time on large inputs.
+
+\begin{verbatim}
+not text: code listing
+\end{verbatim}
+
+\end{document}

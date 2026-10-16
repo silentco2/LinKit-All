@@ -33,6 +33,11 @@ def soffice_path() -> str | None:
     return find_tool(["soffice", "libreoffice"], fallbacks)
 
 
+def tectonic_path() -> str | None:
+    cargo = Path.home() / ".cargo" / "bin"
+    return find_tool(["tectonic"], [cargo / "tectonic.exe", cargo / "tectonic"])
+
+
 def chrome_path() -> str | None:
     fallbacks = [d / "Google/Chrome/Application/chrome.exe" for d in _program_dirs()]
     fallbacks.append(Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"))

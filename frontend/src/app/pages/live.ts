@@ -2,7 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, computed, effect, ElementRef, inject, signal, viewChild } from '@angular/core';
 import { Api } from '../api';
 import { Live } from '../live';
-import { LiveEvent, Stage, STAGES } from '../types';
+import { LiveEvent, ScheduleSection, SearchConfig, Stage, STAGES } from '../types';
 
 const LABELS: Record<Stage, string> = {
   discover: 'Find jobs',
@@ -46,6 +46,54 @@ interface RecentRun {
       @if (error()) { <div class="alert alert-error">{{ error() }}</div> }
       @if (paused(); as p) {
         <div class="alert alert-info">Run {{ p.id }} is paused: {{ p.pause_reason }}. Start again later to continue scoring.</div>
+      }
+    </section>
+
+    <section class="card mt-6 space-y-4">
+      <h2>Schedule</h2>
+      @if (schedule(); as sc) {
+        <label class="flex items-center gap-2 text-sm font-medium">
+          <input type="checkbox" role="switch" [checked]="sc.enabled" (change)="edit({ enabled: !sc.enabled })">
+          Run automatically while LinKit All is open
+        </label>
+        <p class="text-xs text-slate-500">Scheduled runs use the same settings as manual ones: dry run unless you turned live applying on, with the same caps.</p>
+        <fieldset class="space-y-4" [disabled]="!sc.enabled">
+          <div>
+            <legend class="label">Days</legend>
+            <div class="flex flex-wrap gap-2">
+              @for (d of dayNames; track $index) {
+                <button type="button" class="rounded-full border px-3 py-1 text-sm disabled:opacity-50"
+                        [class]="sc.days.includes($index) ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-300 text-slate-600 dark:border-slate-600 dark:text-slate-300'"
+                        [attr.aria-pressed]="sc.days.includes($index)" (click)="toggleDay($index)">{{ d }}</button>
+              }
+            </div>
+          </div>
+          <div>
+            <legend class="label">Times (your local time)</legend>
+            <div class="flex flex-wrap items-center gap-3">
+              @for (t of sc.times; track $index) {
+                <span class="flex items-center gap-1">
+                  <input type="time" class="input w-32" [value]="t" [attr.aria-label]="'Run time ' + ($index + 1)" (change)="setTime($index, $event)">
+                  <button type="button" class="btn" (click)="removeTime($index)" [disabled]="sc.times.length < 2" [attr.aria-label]="'Remove time ' + t">Remove</button>
+                </span>
+              }
+              <button type="button" class="btn" (click)="addTime()" [disabled]="sc.times.length >= 6">Add time</button>
+            </div>
+          </div>
+          <label class="flex items-center gap-2 text-sm">
+            <input type="checkbox" [checked]="sc.new_run" (change)="edit({ new_run: !sc.new_run })"> Start a new run each time (otherwise an unfinished run resumes)
+          </label>
+        </fieldset>
+        <div class="flex flex-wrap items-center gap-4">
+          <button class="btn btn-primary" (click)="saveSchedule()" [disabled]="!scheduleDirty()">Save schedule</button>
+          @if (sc.enabled && !scheduleDirty() && nextRuns().length) {
+            <span class="text-sm text-slate-600 dark:text-slate-400">
+              Next:
+              @for (t of nextRuns(); track t; let last = $last) { {{ t | date: 'EEE d MMM, HH:mm' }}@if (!last) {; } }
+            </span>
+          }
+        </div>
+        @if (scheduleError()) { <div class="alert alert-error">{{ scheduleError() }}</div> }
       }
     </section>
 
@@ -96,11 +144,17 @@ export class LivePage {
   protected readonly busy = signal(false);
   protected readonly error = signal('');
   protected readonly paused = signal<RecentRun | null>(null);
+  protected readonly dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  protected readonly schedule = signal<ScheduleSection | null>(null);
+  protected readonly scheduleDirty = signal(false);
+  protected readonly scheduleError = signal('');
+  protected readonly nextRuns = signal<string[]>([]);
   protected readonly running = computed(() => !!this.live.run()?.running);
   private readonly log = viewChild<ElementRef<HTMLElement>>('log');
 
   constructor() {
     this.api.get<{ apply_live: boolean }>('/status').then((st) => this.applyLive.set(st.apply_live)).catch(() => undefined);
+    this.loadSchedule();
     effect(() => {
       this.live.events(); // keep the log scrolled to the newest line
       const el = this.log()?.nativeElement;
@@ -110,6 +164,59 @@ export class LivePage {
       this.live.changed();
       this.api.get<{ recent: RecentRun[] }>('/runs').then((r) => this.paused.set(r.recent.find((x) => x.status === 'paused') ?? null));
     });
+  }
+
+  private async loadSchedule(): Promise<void> {
+    try {
+      const [cfg, next] = await Promise.all([
+        this.api.get<SearchConfig>('/search'),
+        this.api.get<{ next_runs: string[] }>('/schedule'),
+      ]);
+      this.schedule.set(cfg.schedule);
+      this.nextRuns.set(next.next_runs);
+    } catch (e) {
+      this.scheduleError.set((e as Error).message);
+    }
+  }
+
+  edit(patch: Partial<ScheduleSection>): void {
+    this.schedule.update((s) => s && { ...s, ...patch });
+    this.scheduleDirty.set(true);
+  }
+
+  toggleDay(d: number): void {
+    const days = this.schedule()?.days ?? [];
+    this.edit({ days: days.includes(d) ? days.filter((x) => x !== d) : [...days, d].sort() });
+  }
+
+  setTime(i: number, ev: Event): void {
+    const value = (ev.target as HTMLInputElement).value;
+    if (value) this.edit({ times: (this.schedule()?.times ?? []).map((t, j) => (j === i ? value : t)) });
+  }
+
+  addTime(): void {
+    const times = this.schedule()?.times ?? [];
+    this.edit({ times: [...times, times.includes('18:00') ? '12:00' : '18:00'] });
+  }
+
+  removeTime(i: number): void {
+    this.edit({ times: (this.schedule()?.times ?? []).filter((_, j) => j !== i) });
+  }
+
+  async saveSchedule(): Promise<void> {
+    const schedule = this.schedule();
+    if (!schedule) return;
+    this.scheduleError.set('');
+    try {
+      // the whole config is one document: read it fresh so other pages' edits are not overwritten
+      const cfg = await this.api.get<SearchConfig>('/search');
+      const saved = await this.api.put<SearchConfig>('/search', { ...cfg, schedule });
+      this.schedule.set(saved.schedule);
+      this.scheduleDirty.set(false);
+      this.nextRuns.set((await this.api.get<{ next_runs: string[] }>('/schedule')).next_runs);
+    } catch (e) {
+      this.scheduleError.set((e as Error).message);
+    }
   }
 
   label(s: Stage): string {

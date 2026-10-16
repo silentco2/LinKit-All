@@ -2,7 +2,10 @@ import { Component, effect, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Api } from './api';
 import { Live } from './live';
-import { Status } from './types';
+import { LiveEvent, Status } from './types';
+
+const NOTIFY_KEY = 'linkit.notify';
+const FRESH_MS = 60_000; // a run that ended longer ago than this is replayed history, not news
 
 @Component({
   selector: 'app-root',
@@ -35,9 +38,17 @@ import { Status } from './types';
             }
           </a>
         }
-        <div class="mt-auto px-2 text-xs text-slate-400">
+        <div class="mt-auto space-y-2 px-2 text-xs text-slate-400">
+          @if (notifySupported) {
+            <label class="flex items-center gap-2" title="Get a desktop alert when a run finishes or pauses, or when something needs you">
+              <input type="checkbox" [checked]="notify()" (change)="toggleNotify()"> Desktop notifications
+            </label>
+            @if (notifyHint()) { <p class="text-amber-600">{{ notifyHint() }}</p> }
+          }
+          <div>
           <span class="mr-1 inline-block size-2 rounded-full" [class]="live.connected() ? 'bg-emerald-500' : 'bg-rose-500'"></span>
           {{ live.connected() ? 'Connected' : 'Reconnecting…' }}
+          </div>
         </div>
       </nav>
       <main class="min-w-0 flex-1 p-8">
@@ -57,6 +68,10 @@ export class App {
   protected readonly status = signal<Status | null>(null);
   protected readonly reviewCount = signal(0);
   protected readonly actionsCount = signal(0);
+  protected readonly notifySupported = typeof Notification !== 'undefined';
+  protected readonly notify = signal(this.notifySupported && readNotifyPref() && Notification.permission === 'granted');
+  protected readonly notifyHint = signal('');
+  private lastRunEnd = '';
   protected readonly nav = [
     { path: 'setup', label: 'Setup' },
     { path: 'jobs', label: 'Jobs' },
@@ -73,6 +88,58 @@ export class App {
       this.live.changed(); // reload counts whenever a stage finishes
       this.refresh();
     });
+    effect(() => {
+      // the newest run event; "started" means a run is going, anything else is its end
+      const end = [...this.live.events()].reverse().find((e) => e.type === 'run');
+      if (!end || end.status === 'started' || end.at === this.lastRunEnd) return;
+      this.lastRunEnd = end.at;
+      if (end.status !== 'cancelled' && Date.now() - Date.parse(end.at) < FRESH_MS) void this.runEnded(end);
+    });
+  }
+
+  async toggleNotify(): Promise<void> {
+    this.notifyHint.set('');
+    if (this.notify()) return this.setNotify(false);
+    if (Notification.permission === 'default') await Notification.requestPermission();
+    const granted = Notification.permission === 'granted';
+    if (!granted) this.notifyHint.set('Blocked: allow notifications for this site in your browser settings.');
+    this.setNotify(granted);
+  }
+
+  private setNotify(on: boolean): void {
+    this.notify.set(on);
+    try {
+      localStorage.setItem(NOTIFY_KEY, on ? '1' : '0');
+    } catch {
+      // storage can be blocked; the choice then lasts until the tab closes
+    }
+  }
+
+  private async runEnded(end: LiveEvent): Promise<void> {
+    if (!this.notify()) return;
+    if (end.error) return this.alert('Run failed', end.error, 'run');
+    let pause: string | null = null;
+    try {
+      const { recent } = await this.api.get<{ recent: { status: string; pause_reason: string | null }[] }>('/runs');
+      if (recent[0]?.status === 'paused') pause = recent[0].pause_reason ?? 'It will continue when you start it again.';
+    } catch {
+      // fall back to the plain message
+    }
+    if (pause) this.alert('Run paused', pause, 'run');
+    else this.alert('Run finished', 'Open LinKit All to see the results.', 'run');
+  }
+
+  private alert(title: string, body: string, tag: string): void {
+    if (!this.notify() || !this.notifySupported || Notification.permission !== 'granted') return;
+    try {
+      const n = new Notification(title, { body, tag }); // same tag replaces an older alert
+      n.onclick = () => {
+        window.focus();
+        n.close();
+      };
+    } catch {
+      // some browsers refuse the constructor; the in-app badges still show the news
+    }
   }
 
   ready(): boolean {
@@ -83,12 +150,24 @@ export class App {
   async refresh(): Promise<void> {
     try {
       const s = await this.api.get<Status>('/status');
+      const known = this.status() !== null; // the first load is not news
       this.status.set(s);
       this.reviewCount.set(s.states['awaiting_review'] ?? 0);
+      if (known && s.actions_open > this.actionsCount()) {
+        this.alert('Action needed', `${s.actions_open} job(s) are waiting for you in the Action Center.`, 'actions');
+      }
       this.actionsCount.set(s.actions_open);
       if (!this.live.run()) this.live.run.set(s.run);
     } catch {
       // the server may be restarting; the live socket reconnects and triggers a reload
     }
+  }
+}
+
+function readNotifyPref(): boolean {
+  try {
+    return localStorage.getItem(NOTIFY_KEY) === '1';
+  } catch {
+    return false;
   }
 }

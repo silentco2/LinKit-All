@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from docx import Document
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -15,7 +14,7 @@ from linkit_all.core.search import SearchConfig
 from linkit_all.core.state import transition
 from linkit_all.matching.rules import rule_violation
 from linkit_all.sources.text import norm_company
-from linkit_all.tailor.docx.segments import load_segments
+from linkit_all.tailor.pipeline import cv_segments
 
 Vectors = np.ndarray[Any, np.dtype[np.float64]]
 Embed = Callable[[list[str]], Vectors]  # texts -> L2-normalized rows
@@ -51,7 +50,7 @@ class Embedder:
 
 
 def cv_text(profile: Profile) -> str:
-    return "\n".join(s.text for s in load_segments(Document(profile.cv_path)) if s.text.strip())
+    return "\n".join(s.text for s in cv_segments(Path(profile.cv_path)))
 
 
 def skill_overlap(skills: list[str], text: str) -> float:

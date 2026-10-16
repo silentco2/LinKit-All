@@ -133,3 +133,17 @@ def test_migration_adds_columns(tmp_path: Path) -> None:
     with db() as s:
         row = s.get_one(Profile, 1)
         assert row.cv_source_format == "docx" and row.cv_approved is True
+
+
+def test_tex_upload_is_its_own_base_and_approved(client: TestClient, tmp_path: Path) -> None:
+    tex = Path(__file__).parent.parent / "fixtures" / "latex" / "cv.tex"
+    r = upload(client, "cv.tex", tex.read_bytes())
+    assert r["cv_source_format"] == "tex" and r["cv_approved"] is True
+    assert any(s["text"] == "Jane Doe" for s in r["segments"])  # type: ignore[attr-defined]
+    assert (tmp_path / "data" / "cvs" / "cv.tex").read_bytes() == tex.read_bytes()
+    assert client.get("/api/status").json()["cv_ready"] is True
+    assert client.get("/api/profile").json()["cv_source_format"] == "tex"
+    bad = client.post(
+        "/api/profile/cv", params={"filename": "x.tex"}, content=rb"\input{a}", headers=H
+    )
+    assert bad.status_code == 422

@@ -39,9 +39,10 @@ from linkit_all.core.profile import (
     save_cv,
     save_fields,
 )
+from linkit_all.core.scheduler import apply_schedule, next_runs
 from linkit_all.core.search import SearchConfig, load_search, save_search
 from linkit_all.core.state import InvalidTransition, transition
-from linkit_all.core.tools import soffice_path
+from linkit_all.core.tools import soffice_path, tectonic_path
 from linkit_all.pipeline import STAGES, PipelineError, ai_settings
 from linkit_all.reports import build_report, export_csv, export_pdf
 
@@ -98,6 +99,7 @@ def status(request: Request) -> dict[str, Any]:
         "actions_open": _open_actions(db),
         "apply_live": bool(cfg and cfg.apply.live),
         "run": _runner(request).state.as_dict(),
+        "next_run": next((t.isoformat() for t in next_runs(request.app.state.scheduler, 1)), None),
     }
 
 
@@ -110,11 +112,14 @@ def _open_actions(db: sessionmaker[Session]) -> int:
 
 
 def _segments(cv: str) -> list[dict[str, Any]]:
-    from docx import Document
+    from linkit_all.tailor.pipeline import cv_segments
 
-    from linkit_all.tailor.docx.segments import load_segments
+    return [{"id": s.id, "text": s.text} for s in cv_segments(Path(cv))]
 
-    return [{"id": s.id, "text": s.text} for s in load_segments(Document(cv)) if s.text.strip()]
+
+def _renderer_ok(fmt: str) -> bool:
+    """Whether the program that renders this CV exists (Tectonic for .tex, else LibreOffice)."""
+    return (tectonic_path() if fmt == "tex" else soffice_path()) is not None
 
 
 @router.get("/profile")
@@ -126,6 +131,7 @@ def get_profile(request: Request) -> dict[str, Any]:
         "cv_name": cv.replace("\\", "/").rsplit("/", 1)[-1] if cv else None,
         "cv_source_format": fmt,
         "cv_approved": approved,
+        "cv_renderer_ok": _renderer_ok(fmt),
     }
 
 
@@ -137,7 +143,7 @@ def put_profile(request: Request, fields: ProfileFields) -> dict[str, Any]:
 
 @router.post("/profile/cv")
 async def upload_cv(request: Request, filename: str) -> dict[str, Any]:
-    """Raw DOCX/ODT/PDF bytes in the body (no multipart dependency needed)."""
+    """Raw DOCX/ODT/PDF/TEX bytes in the body (no multipart dependency needed)."""
     body = await request.body()
     try:
         cv = await asyncio.to_thread(
@@ -152,6 +158,7 @@ async def upload_cv(request: Request, filename: str) -> dict[str, Any]:
         "segments": segments,
         "cv_source_format": fmt,
         "cv_approved": approved,
+        "cv_renderer_ok": _renderer_ok(fmt),
     }
 
 
@@ -198,7 +205,15 @@ def get_search(request: Request) -> SearchConfig:
 @router.put("/search")
 def put_search(request: Request, cfg: SearchConfig) -> SearchConfig:
     save_search(_db(request), cfg)
+    apply_schedule(request.app.state.scheduler, cfg)
     return cfg
+
+
+@router.get("/schedule")
+def get_schedule(request: Request) -> dict[str, Any]:
+    cfg = load_search(_db(request)) or SearchConfig()
+    runs = next_runs(request.app.state.scheduler) if cfg.schedule.enabled else []
+    return {"enabled": cfg.schedule.enabled, "next_runs": [t.isoformat() for t in runs]}
 
 
 @router.get("/ai")
