@@ -2,7 +2,7 @@
 
 import re
 
-SUPPORTED = {"greenhouse", "lever", "ashby"}
+SUPPORTED = {"greenhouse", "lever", "ashby", "smartrecruiters", "recruitee"}
 
 # Order matters: the Greenhouse embed form must win over the plain board form.
 _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
@@ -13,6 +13,10 @@ _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("lever", re.compile(r"api(?:\.eu)?\.lever\.co/v0/postings/([\w.-]+)", re.I)),
     ("ashby", re.compile(r"jobs\.ashbyhq\.com/([\w.%-]+)", re.I)),
     ("workday", re.compile(r"([\w-]+\.wd\d+\.myworkdayjobs\.com/(?:[a-z]{2}-[A-Z]{2}/)?[\w-]+)")),
+    (
+        "smartrecruiters",
+        re.compile(r"smartrecruiters\.com/(?:oneclick-ui/company|v1/companies)/([\w-]+)", re.I),
+    ),
     ("smartrecruiters", re.compile(r"(?:jobs|careers)\.smartrecruiters\.com/([\w-]+)", re.I)),
     ("workable", re.compile(r"apply\.workable\.com/([\w-]+)", re.I)),
     ("recruitee", re.compile(r"([\w-]+)\.recruitee\.com", re.I)),
@@ -20,7 +24,7 @@ _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
 _SHORTHAND = re.compile(
     r"^(greenhouse|lever|ashby|workday|smartrecruiters|workable|recruitee):(.+)$"
 )
-_NOT_SLUGS = {"embed", "v1", "jobs", "api"}
+_NOT_SLUGS = {"embed", "v1", "jobs", "api", "www", "oneclick-ui"}
 
 
 def detect(text: str) -> tuple[str, str] | None:

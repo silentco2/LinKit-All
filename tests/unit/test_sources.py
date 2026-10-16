@@ -17,7 +17,9 @@ from linkit_all.sources.base import JobStub, Task
 from linkit_all.sources.greenhouse import Greenhouse
 from linkit_all.sources.http import Http
 from linkit_all.sources.lever import Lever
+from linkit_all.sources.recruitee import Recruitee
 from linkit_all.sources.runner import discover, enrich
+from linkit_all.sources.smartrecruiters import SmartRecruiters
 from linkit_all.sources.store import Deduper
 from linkit_all.sources.text import normalize_url
 
@@ -51,6 +53,88 @@ def test_ashby_stub_reads_salary() -> None:
     assert stub.salary_interval == "year"
 
 
+def test_smartrecruiters_stub_and_details() -> None:
+    posting = load("smartrecruiters/bosch_postings.json")["content"][0]  # type: ignore[index]
+    stub = SmartRecruiters.stub(posting, "BoschGroup")
+    assert stub.ats == "smartrecruiters" and stub.company == "Bosch Group"
+    assert stub.url == "https://jobs.smartrecruiters.com/BoschGroup/744000155868389"
+    assert stub.extra["board"] == "BoschGroup" and stub.extra["id"] == "744000155868389"
+    assert stub.posted_at is not None and stub.posted_at.tzinfo is None
+    assert stub.description == ""  # the list carries no description
+
+    detail = load("smartrecruiters/bosch_posting_detail.json")
+    seen: list[str] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        seen.append(req.url.path)
+        return httpx.Response(200, json=detail)
+
+    async def go() -> JobStub:
+        # enrich passes a bare stub rebuilt from the DB, so ids come from the URL alone
+        bare = JobStub(source="smartrecruiters", url=stub.url, title="t", company="c")
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await SmartRecruiters().fetch_details(Http(client), bare)
+
+    full = asyncio.run(go())
+    assert seen == ["/v1/companies/BoschGroup/postings/744000155868389"]
+    assert "<" not in full.description and "&#" not in full.description
+    assert "Gestão de projetos" in full.description and "Qualificações" in full.description
+    assert full.apply_url and full.apply_url.startswith("https://jobs.smartrecruiters.com/")
+
+
+def test_smartrecruiters_paginates(monkeypatch: pytest.MonkeyPatch) -> None:
+    data = load("smartrecruiters/bosch_postings.json")
+    rows = data["content"]  # type: ignore[index]
+    monkeypatch.setattr("linkit_all.sources.smartrecruiters.PAGE", 2)
+    seen: list[tuple[str, str]] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        q = req.url.params
+        seen.append((q["limit"], q["offset"]))
+        off = int(q["offset"])
+        return httpx.Response(200, json={"totalFound": len(rows), "content": rows[off : off + 2]})
+
+    async def go(start: int) -> list[list[JobStub]]:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            task = Task("smartrecruiters", "k", board="BoschGroup")
+            src = SmartRecruiters()
+            return [p async for p in src.search(Http(client), task, start)]
+
+    pages = asyncio.run(go(0))
+    assert [len(p) for p in pages] == [2, 1]
+    assert seen == [("2", "0"), ("2", "2")]
+    seen.clear()
+    assert [len(p) for p in asyncio.run(go(1))] == [1]  # resume from the second page
+    assert seen == [("2", "2")]
+
+
+def test_recruitee_stub() -> None:
+    offers = load("recruitee/bunq_offers.json")["offers"]  # type: ignore[index]
+    stub = Recruitee.stub(offers[0], "bunq")
+    assert stub.ats == "recruitee" and stub.company == "bunq" and stub.remote == "hybrid"
+    assert stub.url == "https://careers.bunq.com/o/head-of-product-6"
+    assert stub.apply_url == "https://careers.bunq.com/o/head-of-product-6/c/new"
+    assert stub.extra["board"] == "bunq" and stub.extra["id"] == 2783543
+    assert stub.location.startswith("Amsterdam")
+    assert "<" not in stub.description and len(stub.description) > 200
+    assert stub.posted_at is not None and stub.posted_at.tzinfo is None
+
+
+def test_recruitee_search_reads_offers() -> None:
+    data = load("recruitee/bunq_offers.json")
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        assert req.url.host == "bunq.recruitee.com" and req.url.path == "/api/offers/"
+        return httpx.Response(200, json=data)
+
+    async def go() -> list[list[JobStub]]:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            task = Task("recruitee", "k", board="bunq")
+            return [p async for p in Recruitee().search(Http(client), task, 0)]
+
+    assert [len(p) for p in asyncio.run(go())] == [2]
+
+
 @pytest.mark.parametrize(
     ("text", "expected"),
     [
@@ -61,6 +145,14 @@ def test_ashby_stub_reads_salary() -> None:
         ("https://jobs.eu.lever.co/mistral", ("lever", "mistral")),
         ("https://jobs.ashbyhq.com/openai", ("ashby", "openai")),
         ("lever:netflix", ("lever", "netflix")),
+        ("https://jobs.smartrecruiters.com/BoschGroup/744000155868329-engenheiro", ("smartrecruiters", "BoschGroup")),
+        ("https://careers.smartrecruiters.com/Visa", ("smartrecruiters", "Visa")),
+        ("https://jobs.smartrecruiters.com/oneclick-ui/company/Visa/publication/abc", ("smartrecruiters", "Visa")),
+        ("https://api.smartrecruiters.com/v1/companies/BoschGroup/postings", ("smartrecruiters", "BoschGroup")),
+        ("smartrecruiters:Visa", ("smartrecruiters", "Visa")),
+        ("https://bunq.recruitee.com/o/head-of-product", ("recruitee", "bunq")),
+        ("https://bunq.recruitee.com", ("recruitee", "bunq")),
+        ("recruitee:bunq", ("recruitee", "bunq")),
         ("https://acme.wd5.myworkdayjobs.com/en-US/External", ("workday", "acme.wd5.myworkdayjobs.com/en-US/External")),
         ("https://example.com/careers", None),
     ],

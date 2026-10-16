@@ -1,0 +1,168 @@
+{
+ "id": "744000155868329",
+ "name": "ENGENHEIRO DE PROJETOS SR (35588)",
+ "uuid": "52d4b5b7-5f47-4c66-88dd-3e36e1585bf8",
+ "jobId": "fd83c9d2-22ea-4de0-bdec-e715cc43b0c1",
+ "jobAdId": "7debbe0c-5904-4fce-9c3f-06bb4ded31f6",
+ "defaultJobAd": true,
+ "refNumber": "REF294624M",
+ "company": {
+  "name": "Bosch Group",
+  "identifier": "BoschGroup"
+ },
+ "location": {
+  "city": "Campinas",
+  "region": "SP",
+  "country": "br",
+  "address": "Avenida Robert Bosch",
+  "postalCode": "13064-765",
+  "remote": false,
+  "hybrid": false,
+  "latitude": "-22.8992722",
+  "longitude": "-47.1170748",
+  "fullLocation": "Campinas, SP, Brazil"
+ },
+ "customField": [
+  {
+   "fieldId": "5abe2a4ab60a5e486a2d9b1d",
+   "fieldLabel": "Contract type",
+   "valueId": "1e46492b-d24f-460c-b095-38cf08a778d8",
+   "valueLabel": "Unlimited"
+  },
+  {
+   "fieldId": "5abe28e96d8bc56863dd9746",
+   "fieldLabel": "Tariff Area",
+   "valueId": "89e3308f-77ac-4db2-9957-49b221a76b0f",
+   "valueLabel": "Brazil Local Grades"
+  },
+  {
+   "fieldId": "586a997ee4b05fd937b86098",
+   "fieldLabel": "Legal Entity(acronym)",
+   "valueId": "8adcb306-e0ec-4495-965f-97ad717c3c61",
+   "valueLabel": "RBLA"
+  },
+  {
+   "fieldId": "586a99b5e4b0daa006ae1079",
+   "fieldLabel": "Working Location",
+   "valueId": "77146c8c-c6c2-467a-b9d9-8d536589b134",
+   "valueLabel": "Campinas"
+  },
+  {
+   "fieldId": "5abe295a6d8bc56863dd9747",
+   "fieldLabel": "Global Salary Level",
+   "valueId": "427b1359-5057-4375-a2ae-6c649782296d",
+   "valueLabel": "Experienced/ Middle Tariff"
+  },
+  {
+   "fieldId": "69ca83a2489188782a1e9f87",
+   "fieldLabel": "Direct Or Indirect",
+   "valueId": "1aefbf4c-c10a-422e-a975-a504a7117792",
+   "valueLabel": "Indirect"
+  },
+  {
+   "fieldId": "5abe29f9b60a5e486a2d9b1c",
+   "fieldLabel": "Working hours",
+   "valueId": "60756b3e-dbab-4353-ac3a-0064d2bb27d8",
+   "valueLabel": "Full-time"
+  },
+  {
+   "fieldId": "586a9995e4b0daa006ae1078",
+   "fieldLabel": "Legal Entity",
+   "valueId": "ac40ae51-3cf3-4683-9bdd-9e334dd485be",
+   "valueLabel": "Robert Bosch Ltda."
+  },
+  {
+   "fieldId": "691cf1c93001c782b9560ab7",
+   "fieldLabel": "Division full name",
+   "valueId": "dd08ef1e-5845-44d3-b660-4d753453afd6",
+   "valueLabel": "RBLA"
+  },
+  {
+   "fieldId": "5abe27936d8bc56863dd9745",
+   "fieldLabel": "Position type",
+   "valueId": "c7b4da31-6f38-405a-b2e8-08a76e3c3f2c",
+   "valueLabel": "Professional"
+  },
+  {
+   "fieldId": "COUNTRY",
+   "fieldLabel": "Country/Region",
+   "valueId": "br",
+   "valueLabel": "Brazil"
+  },
+  {
+   "fieldId": "586a971ee4b0daa006ae1077",
+   "fieldLabel": "Brands",
+   "valueId": "default",
+   "valueLabel": "Bosch Group"
+  },
+  {
+   "fieldId": "586a996ce4b05fd937b86097",
+   "fieldLabel": "Working Country",
+   "valueId": "38ffb1d7-cfdc-48e1-a641-1e66623f5afb",
+   "valueLabel": "Brazil"
+  },
+  {
+   "fieldId": "586a9b22e4b05fd937b8609a",
+   "fieldLabel": "Local Grade",
+   "valueId": "346fb6b3-0c79-4432-a690-bc1af0bf16a2",
+   "valueLabel": "BR_MN"
+  },
+  {
+   "fieldId": "586a99a5e4b05fd937b86099",
+   "fieldLabel": "Division",
+   "valueId": "698a4daf-aac7-4da0-87fb-d17a1ff292c7",
+   "valueLabel": "RBLA"
+  }
+ ],
+ "releasedDate": "2026-10-15T23:16:04.200Z",
+ "creator": {
+  "name": "RAQUEL VIRGINILLO THONI RUFFOLO DAL FABBRO (GS/HRS1-LA)",
+  "avatarUrl": "https://c.smartrecruiters.com/sr-employee-image-prod-aws-dc5/5b699ef9e4b03a0f6af05e5c?r=s3-eu-central-1&_1687354723024"
+ },
+ "postingUrl": "https://jobs.smartrecruiters.com/BoschGroup/744000155868329-engenheiro-de-projetos-sr-35588-",
+ "applyUrl": "https://jobs.smartrecruiters.com/BoschGroup/744000155868329-engenheiro-de-projetos-sr-35588-?oga=true",
+ "referralUrl": "https://jobs.smartrecruiters.com/external-referrals/company/BoschGroup/publication/52d4b5b7-5f47-4c66-88dd-3e36e1585bf8?dcr_ci=BoschGroup",
+ "jobAd": {
+  "sections": {
+   "companyDescription": {
+    "title": "Descrição da empresa",
+    "text": "<p><em>Na Bosch, moldamos o futuro por meio das inovações tecnológicas de alta qualidade e de serviços que despertam entusiasmo e melhoram a vida das pessoas. Temos uma promessa sólida para nossos colaboradores: crescemos juntos, gostamos do nosso trabalho e inspiramos uns aos outros. Junte-se a nós e sinta a diferença.</em></p>"
+   },
+   "jobDescription": {
+    "title": "Descrição da vaga",
+    "text": "<ul><li>Gestão de projetos com aplicação de metodologia PMI (foco em projetos de realocação/fábrica e clientes OEM chinesas);</li><li>Liderar times e comitês de projetos com interface internacional;</li><li>Disponibilidade para trabalhar em horários deslocados e para viagens nacionais e internacionais (eventualmente);</li><li>Gestão de KPIs de projeto (tempo, custo, qualidade);</li><li>Gerenciamento de Stakeholders, Riscos, Escopo, Cronogramas, Custos, Priorizações, Solução de&#xa0;problemas, Comunicação;</li><li>Liderança funcional de times;</li><li>Participação ativa&#xa0;&#xa0;de atividades da área com foco em inovação, digitalização, dados, melhoria&#xa0;contínua e eficiência operacional.</li></ul>"
+   },
+   "qualifications": {
+    "title": "Qualificações",
+    "text": "<p>&#xa0;</p><ul><li>Graduação em Engenharia&#xa0;(produção, mecânica, elétrica, afins)&#xa0;</li><li>Pós graduação ou MBA em Gestão de Projetos</li><li>Desejável certificação PMP;</li><li>Experiência em gestão de projetos no segmento automotivo (mín 5 anos);</li><li>Experiência no desenvolvimento de produtos automotivos (mín 3 anos);</li><li>Experiência em negociações técnicas junto a clientes (mín 5 anos);</li><li>Vivência na liderança funcional de times;</li><li>Liderança&#xa0;funcional, organizado, capacidade analítica, alta orientação para resultados e visão estratégica;</li><li>Perfil inovador para enxergar e propor soluções que atendam ao cliente;</li><li>Domínio de MS-Project para elaboração de cronogramas;</li><li>Conhecimentos avançados em MS-Office, especialmente excel;</li><li>Power BI;</li><li>Mandarim&#xa0;será um diferencial;</li><li>Inglês fluente;</li></ul><p>&#xa0; &#xa0; &#xa0; &#xa0;MODELO DE TRABALHO: <strong>PRESENCIAL</strong></p>"
+   },
+   "additionalInformation": {
+    "title": "Informações adicionais",
+    "text": "<p><strong><em>Benefícios da Bosch</em></strong></p><ul><li>Programas de Bem-Estar e Saúde: avaliação preventiva anual, ambulatório dentro da localidade para atendimento durante o horário de trabalho, programa antitabagismo, programa de saúde mental, fisioterapia e curso de gestante</li><li>Assistência médica e odontológica</li><li>Política de reembolso para algumas condições especiais de saúde</li><li>Subsídio para medicamentos através da Funcional Health</li><li>Jornadas de trabalho flexível com política de home office (não aplicado para horistas)</li><li>Short Friday&#xa0;para administrativo e horista do turno normal (apenas em Campinas)</li><li>Participação nos lucros e resultados (PLR)&#xa0;</li><li>Política de expatriação internacional e de transferências nacionais&#xa0;</li><li>Plano de previdência privada e empréstimos com taxas diferenciadas</li><li>Seguro de vida&#xa0;&#xa0;&#xa0;</li><li>Associação opcional ao Clube da Bosch dentro da planta com academia, piscinas, churrasqueiras, campos de futebol e society, espaço para eventos, ginásio de esportes, quadras de areia, quadra de tênis, lanchonete e calendário anual de eventos</li><li>Auxílio para mamães com creche na planta (verificar vagas disponíveis)</li><li>Licença maternidade e adoção estendida de 180 dias&#xa0;&#xa0;</li><li>Licença paternidade e adoção de 20 dias&#xa0;</li><li>Alimentação no local de trabalho e Vale Alimentação</li><li>Ônibus fretado (ou Vale Transporte)</li><li>Estacionamento gratuito (para quem vem presencial)&#xa0;&#xa0;</li><li>Benefícios de fim de ano com Cesta de Natal e ave congelada</li><li>Brinquedo para filhos menores de 12 anos</li><li>Material escolar para colaboradores (até nível universitário) e filhos&#xa0;(até final do ensino médio)</li><li>Política de subsídios para cursos técnicos, pós-graduação, MBA, especializações e idiomas</li><li>Treinamentos e capacitações através da nossa universidade corporativa</li><li>Premiação por tempo de casa (a partir de 10 anos e a cada 5 anos)&#xa0;&#xa0;</li><li>Participação opcional em várias ações de voluntariado via Instituto Robert Bosch&#xa0;&#xa0;</li><li>Descontos com parceiros do clube: locação de veículos, mensalidade em universidades, cursos de idioma, lojas e outros<br>\n&#xa0;</li></ul><p><strong><em>Informações adicionais&#xa0; </em></strong></p><p>- Vaga elegível para pessoas com deficiência ou reabilitadas</p><p>- Não contratamos menores de 16 anos e somos contra o trabalho infantil</p><p>- Modelo de trabalho:<strong>&#xa0;PRESENCIAL</strong></p><p>- Se esta vaga for elegível ao modelo Home Office, a avaliação do posto de trabalho será uma das etapas do processo seletivo</p><p><strong><em>Para colaboradores Bosch </em></strong><strong>&#xa0;</strong></p><p><strong>- Área :&#xa0;</strong>PS-CC/ENG1-LA</p><p>- Prazo: 25/10/2026</p><p>- Sua candidatura pode ser feita internamente pelo site SmartHub</p><p>- Após se candidatar, recomendamos informar a sua liderança</p><p>- Verifique a elegibilidade desta vaga em nosso Programa de Indicações “Indica Ai” (conforme RCD 12030-000)</p><p>&#xa0; Na Bosch, acreditamos que a diversidade é o motor da inovação, por isso, todas as vagas são elegíveis para pessoas com deficiência, em situação vulnerável e grupos minoritários.</p><p>Junte-se a nós e sinta a diferença.&#xa0;Work#LikeABosch.&#xa0;</p><p><a href=\"http://bosch.com.br/carreiras%C2%A0\" rel=\"noopener noreferrer\">bosch.com.br/carreiras</a></p>"
+   }
+  }
+ },
+ "active": true,
+ "visibility": "PUBLIC",
+ "industry": {
+  "id": "automotive",
+  "label": "Automotive"
+ },
+ "function": {
+  "id": "engineering",
+  "label": "Engineering"
+ },
+ "experienceLevel": {
+  "id": "executive",
+  "label": "Executive"
+ },
+ "typeOfEmployment": {
+  "id": "permanent",
+  "label": "Full-time"
+ },
+ "language": {
+  "code": "pt-BR",
+  "label": "Portuguese (Brazil)",
+  "labelNative": "português (Brasil)"
+ }
+}
