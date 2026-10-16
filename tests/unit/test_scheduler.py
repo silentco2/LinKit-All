@@ -117,6 +117,20 @@ def test_scheduled_run_starts_or_skips() -> None:
         register_runner(None)
 
 
+def test_scheduled_run_skips_while_app_browser_open() -> None:
+    class OpenBrowser:
+        is_open = True
+
+    runner = FakeRunner(busy=False)
+    try:
+        register_runner(runner, OpenBrowser())  # type: ignore[arg-type]
+        assert asyncio.run(scheduled_run(True)) is False and runner.calls == []
+        OpenBrowser.is_open = False
+        assert asyncio.run(scheduled_run(True)) is True
+    finally:
+        register_runner(None)
+
+
 @pytest.fixture
 def client(tmp_path: Path) -> Iterator[TestClient]:
     previous = keyring.get_keyring()

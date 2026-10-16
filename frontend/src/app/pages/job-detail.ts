@@ -1,9 +1,9 @@
-import { DatePipe } from '@angular/common';
+import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { Api } from '../api';
 import { I18n, TPipe } from '../i18n';
 import { fmtNum, labelOr, localeOf } from '../locale';
-import { JobDetail } from '../types';
+import { JobDetail, TailorPatch } from '../types';
 
 interface Filled { value: unknown; source: string }
 type Detail = Omit<JobDetail, 'events'> & {
@@ -11,12 +11,37 @@ type Detail = Omit<JobDetail, 'events'> & {
   events: { id: number; at: string; to: string; message: string; screenshots: number }[];
 };
 
+interface DiffOp { kind: 'same' | 'del' | 'ins'; word: string }
+
+/** Word-level diff by longest common subsequence; CV segments are short, so O(n*m) is fine. */
+function wordDiff(a: string, b: string): DiffOp[] {
+  const x = a.split(/\s+/).filter(Boolean);
+  const y = b.split(/\s+/).filter(Boolean);
+  const lcs = Array.from({ length: x.length + 1 }, () => new Array<number>(y.length + 1).fill(0));
+  for (let i = x.length - 1; i >= 0; i--) {
+    for (let j = y.length - 1; j >= 0; j--) {
+      lcs[i][j] = x[i] === y[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+    }
+  }
+  const ops: DiffOp[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < x.length || j < y.length) {
+    if (i < x.length && j < y.length && x[i] === y[j]) {
+      ops.push({ kind: 'same', word: x[i++] });
+      j++;
+    } else if (i < x.length && (j === y.length || lcs[i + 1][j] >= lcs[i][j + 1])) ops.push({ kind: 'del', word: x[i++] });
+    else ops.push({ kind: 'ins', word: y[j++] });  // deletions first, so a replaced word reads old-then-new
+  }
+  return ops;
+}
+
 const APPROVABLE = ['awaiting_review', 'below_threshold'];
 const FINAL = ['applied', 'skipped', 'filtered_out'];
 
 @Component({
   selector: 'app-job-detail',
-  imports: [DatePipe, TPipe],
+  imports: [DatePipe, NgTemplateOutlet, TPipe],
   template: `
     @if (error()) {
       <div class="alert alert-error" dir="auto">{{ error() }}</div>
@@ -75,6 +100,44 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
           <div class="mt-2 max-h-[50vh] overflow-auto text-sm leading-relaxed whitespace-pre-wrap" dir="auto">{{ j.description || ('detail.noDescription' | t) }}</div>
         </section>
 
+        @if (j.tailoring; as t) {
+          <section>
+            <h3 class="flex flex-wrap items-center gap-2 font-semibold">
+              {{ 'detail.tailor.title' | t }}
+              <span class="badge text-xs font-normal {{ tailorClass(t.status) }}">{{ 'detail.tailor.status.' + t.status | t }}</span>
+            </h3>
+            <p class="mt-1 text-xs text-slate-500">{{ t.created_at | date: 'medium' : undefined : loc() }}</p>
+            @if (t.status === 'rolled_back') { <div class="alert alert-error mt-2">{{ 'detail.tailor.rolledBack' | t }}</div> }
+            @if (t.status === 'unchanged') { <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">{{ 'detail.tailor.unchanged' | t }}</p> }
+            <ul class="mt-2 space-y-3">
+              @for (p of t.patches; track $index) {
+                <li><ng-container [ngTemplateOutlet]="patch" [ngTemplateOutletContext]="{ $implicit: p }" /></li>
+              }
+            </ul>
+            @if (t.rejected.length) {
+              <details class="mt-3">
+                <summary class="cursor-pointer text-sm font-medium">{{ 'detail.tailor.rejected' | t: { n: num(t.rejected.length) } }}</summary>
+                <ul class="mt-2 space-y-3">
+                  @for (p of t.rejected; track $index) {
+                    <li><ng-container [ngTemplateOutlet]="patch" [ngTemplateOutletContext]="{ $implicit: p }" /></li>
+                  }
+                </ul>
+              </details>
+            }
+            @if (t.verify; as v) {
+              <p class="mt-3 text-sm" [class.text-rose-700]="!v.ok" [class.dark:text-rose-300]="!v.ok">
+                <span class="font-medium">{{ (v.ok ? 'detail.tailor.verify.ok' : 'detail.tailor.verify.bad') | t }}</span>
+                {{ 'detail.tailor.verify.pages' | t: { from: num(v.pages[0]), to: num(v.pages[1]) } }} ·
+                {{ 'detail.tailor.verify.similarity' | t: { pct: num(v.min_ssim, { style: 'percent', maximumFractionDigits: 1 }) } }}
+                @if (v.reason) { · <span dir="auto">{{ v.reason }}</span> }
+              </p>
+            }
+            @if (t.status === 'tailored') {
+              <a class="btn mt-3 no-underline hover:no-underline" [href]="'/api/jobs/' + j.id + '/tailored.pdf'" target="_blank" rel="noopener noreferrer">{{ 'detail.tailor.download' | t }}</a>
+            }
+          </section>
+        }
+
         @if (filledRows(j); as rows) {
           <section>
             <h3 class="font-semibold">{{ 'detail.filled.title' | t }}</h3>
@@ -113,6 +176,21 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
         </section>
       </article>
     }
+
+    <ng-template #patch let-p>
+      <div class="rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-700">
+        <p class="leading-relaxed" dir="auto">
+          @for (op of diff(p); track $index) {
+            @switch (op.kind) {
+              @case ('del') { <del class="rounded line-through bg-rose-50 px-0.5 text-rose-700 dark:bg-rose-950 dark:text-rose-300">{{ op.word }}</del>{{ ' ' }} }
+              @case ('ins') { <ins class="rounded underline bg-emerald-50 px-0.5 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">{{ op.word }}</ins>{{ ' ' }} }
+              @default { {{ op.word + ' ' }} }
+            }
+          }
+        </p>
+        @if (p.reason) { <p class="mt-1 text-xs text-slate-500" dir="auto">{{ p.reason }}</p> }
+      </div>
+    </ng-template>
   `,
 })
 export class JobDetailPanel {
@@ -131,6 +209,14 @@ export class JobDetailPanel {
       this.load(id);
     });
   }
+
+  private readonly diffs = new WeakMap<TailorPatch, DiffOp[]>();
+  protected diff(p: TailorPatch): DiffOp[] {
+    let ops = this.diffs.get(p);
+    if (!ops) this.diffs.set(p, (ops = wordDiff(p.old_text ?? '', p.new_text ?? '')));
+    return ops;
+  }
+  protected tailorClass = (s: string): string => ({ tailored: 'tier-high', rolled_back: 'tier-mid' })[s] ?? 'tier-low';
 
   protected num = (n: number | null, o?: Intl.NumberFormatOptions): string => fmtNum(this.loc(), n, o);
   protected sourceLabel = (s: string): string => labelOr(this.i18n, 'common.answerSource.', s || 'unknown');

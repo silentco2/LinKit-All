@@ -15,6 +15,7 @@ from loguru import logger
 from sqlalchemy import Engine
 
 from linkit_all.api.runner import PipelineRunner, RunBusy
+from linkit_all.apply.browser import UserBrowser
 from linkit_all.core.search import SearchConfig
 from linkit_all.pipeline import STAGES
 
@@ -22,17 +23,21 @@ DAY_NAMES = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 MISFIRE_GRACE_S = 3600  # a run missed while the app was closed still fires if it is < 1 h late
 
 _runner: PipelineRunner | None = None
+_browser: UserBrowser | None = None
 
 
-def register_runner(runner: PipelineRunner | None) -> None:
-    global _runner
-    _runner = runner
+def register_runner(runner: PipelineRunner | None, browser: UserBrowser | None = None) -> None:
+    global _runner, _browser
+    _runner, _browser = runner, browser
 
 
 async def scheduled_run(new: bool) -> bool:
     """Cron target. Skips (never queues) when a run is already going. True if a run started."""
     if _runner is None:
         logger.warning("Scheduled run skipped: the app is not ready")
+        return False
+    if _browser is not None and _browser.is_open:  # same Chrome profile as the apply stage
+        logger.warning("Scheduled run skipped: the app browser is open")
         return False
     try:
         _runner.start(list(STAGES), new=new)

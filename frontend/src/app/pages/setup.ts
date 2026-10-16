@@ -258,6 +258,10 @@ type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_
                 <div><label class="label" for="aimax">{{ 'setup.scoring.aimax' | t }}</label><input id="aimax" type="number" min="0" class="input" [(ngModel)]="cfg.matching.ai_max_jobs"><p class="hint">{{ 'setup.scoring.aimaxHint' | t }}</p></div>
                 <div><label class="label" for="batch">{{ 'setup.scoring.batch' | t }}</label><input id="batch" type="number" min="1" max="30" class="input" [(ngModel)]="cfg.matching.batch_size"></div>
               </div>
+              <div>
+                <label class="flex items-center gap-2 text-sm font-medium"><input type="checkbox" role="switch" [(ngModel)]="cfg.matching.auto_apply_low">{{ 'setup.scoring.low' | t }}</label>
+                @if (cfg.matching.auto_apply_low) { <div class="alert alert-error mt-2" role="note">{{ 'setup.scoring.lowWarn' | t }}</div> }
+              </div>
               <button class="btn btn-primary" (click)="saveSearch('setup.filters.saved')" [disabled]="busy()">{{ 'setup.filters.save' | t }}</button>
             </section>
           }

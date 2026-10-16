@@ -3,7 +3,10 @@ import { Api } from '../api';
 import { I18n, TPipe } from '../i18n';
 import { Live } from '../live';
 import { fmtNum, labelOr, localeOf } from '../locale';
-import { ActionDecision, ActionItem, ActionKind, ActionQuestion, AnswerValue } from '../types';
+import { ActionDecision, ActionItem, ActionKind, ActionQuestion, AnswerValue, Status } from '../types';
+
+/** Kinds where signing in / solving it by hand in a real Chrome window can unblock the job. */
+const BROWSER_KINDS: ActionKind[] = ['captcha', 'login_issue', 'two_factor', 'validation_error', 'unknown_question'];
 
 const SOURCES: Record<string, string> = {
   profile: 'tier-high',
@@ -136,6 +139,20 @@ const SOURCES: Record<string, string> = {
             </div>
           }
 
+          @if (browserKind(a.kind)) {
+            <div class="mt-4">
+              @if (browser().open && browser().item_id === a.id) {
+                <div class="flex flex-wrap items-center gap-3">
+                  <span class="badge tier-high">{{ 'actions.browser.open' | t }}</span>
+                  <button type="button" class="btn" [disabled]="browserBusy()" (click)="closeBrowser(a)">{{ 'actions.browser.close' | t }}</button>
+                </div>
+              } @else {
+                <button type="button" class="btn" [disabled]="browserBusy() || browser().open" (click)="openBrowser(a)">{{ 'actions.browser.openBtn' | t }}</button>
+              }
+              <p class="hint mt-1">{{ 'actions.browser.hint' | t }}</p>
+            </div>
+          }
+
           @if (errors()[a.id]; as err) { <div class="alert alert-error mt-4" role="alert" dir="auto">{{ err }}</div> }
 
           <footer class="mt-5 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
@@ -161,6 +178,8 @@ export class ActionsPage {
   protected readonly items = signal<ActionItem[]>([]);
   protected readonly loaded = signal(false);
   protected readonly busy = signal(false);
+  protected readonly browserBusy = signal(false);
+  protected readonly browser = signal<Status['app_browser']>({ open: false, item_id: null });
   protected readonly errors = signal<Record<number, string>>({});
   /** Typed-in answers per action id, then question label. Survives reloads of the list. */
   protected readonly draft = signal<Record<number, Record<string, AnswerValue>>>({});
@@ -174,7 +193,12 @@ export class ActionsPage {
 
   async load(): Promise<void> {
     try {
-      this.items.set(await this.api.get<ActionItem[]>('/actions?status=open'));
+      const [items, status] = await Promise.all([
+        this.api.get<ActionItem[]>('/actions?status=open'),
+        this.api.get<Status>('/status'),
+      ]);
+      this.items.set(items);
+      this.browser.set(status.app_browser);
     } catch (e) {
       // keep what we have; the live socket triggers another load on reconnect
       console.error(e);
@@ -183,6 +207,7 @@ export class ActionsPage {
     }
   }
 
+  browserKind = (k: ActionKind): boolean => BROWSER_KINDS.includes(k);
   hasHelp = (k: ActionKind): boolean => k !== 'unknown_question' && k !== 'confirm_submit';
   num = (n: number | null): string => fmtNum(this.loc(), n);
   sourceLabel = (s: string): string => labelOr(this.i18n, 'common.answerSource.', s || 'unknown');
@@ -236,6 +261,23 @@ export class ActionsPage {
     const cur = Array.isArray(v) ? v : [];
     this.set(id, label, cur.includes(option) ? cur.filter((x) => x !== option) : [...cur, option]);
   }
+
+  /** Open or close the app's Chrome window for this item; server errors (409, 503) are shown as they come. */
+  async toggleBrowser(a: ActionItem, open: boolean): Promise<void> {
+    this.browserBusy.set(true);
+    this.errors.update(({ [a.id]: _drop, ...rest }) => rest);
+    try {
+      if (open) await this.api.post(`/actions/${a.id}/browser`);
+      else await this.api.delete(`/actions/${a.id}/browser`);
+    } catch (e) {
+      this.errors.update((m) => ({ ...m, [a.id]: e instanceof Error ? e.message : String(e) }));
+    } finally {
+      this.browserBusy.set(false);
+      await this.load();
+    }
+  }
+  openBrowser = (a: ActionItem): Promise<void> => this.toggleBrowser(a, true);
+  closeBrowser = (a: ActionItem): Promise<void> => this.toggleBrowser(a, false);
 
   async send(a: ActionItem, decision: ActionDecision): Promise<void> {
     this.busy.set(true);

@@ -168,6 +168,8 @@ export const ar: Record<string, string> = {
   'setup.scoring.aimax': 'عدد الوظائف المرسلة إلى الذكاء الاصطناعي في كل تشغيل',
   'setup.scoring.aimaxHint': 'أفضل المطابقات بعد الترتيب المحلي المجاني. وتُحسب البقية منخفضة.',
   'setup.scoring.batch': 'عدد الوظائف في كل استدعاء للذكاء الاصطناعي',
+  'setup.scoring.low': 'قدّم أيضًا على المطابقات منخفضة المستوى (الدرجة أقل من حد المستوى المتوسط، أو لم تُقيَّم بالذكاء الاصطناعي)',
+  'setup.scoring.lowWarn': 'قد يرسل هذا طلبات أكثر بكثير إلى وظائف تناسبك بدرجة أقل. فعّله فقط إن كنت تفضّل الكثرة على الملاءمة.',
 
   // Setup: application answers
   'setup.answers.title': 'إجابات التقديم',
@@ -367,6 +369,18 @@ export const ar: Record<string, string> = {
   'detail.history': 'السجل',
   'detail.screenshot': 'لقطة شاشة {n}',
   'detail.notPossible': 'غير ممكن في هذه الحالة',
+  'detail.tailor.title': 'السيرة الذاتية المخصّصة',
+  'detail.tailor.status.tailored': 'مخصّصة',
+  'detail.tailor.status.unchanged': 'بلا تغيير',
+  'detail.tailor.status.rolled_back': 'تم التراجع',
+  'detail.tailor.rolledBack': 'فشل فحص التنسيق، لذا تُستخدم السيرة الذاتية الأصلية لهذه الوظيفة.',
+  'detail.tailor.unchanged': 'لم تلزم أي تعديلات: تُستخدم السيرة الذاتية الأصلية.',
+  'detail.tailor.rejected': 'التعديلات المرفوضة ({n})',
+  'detail.tailor.verify.ok': 'نجح فحص التنسيق.',
+  'detail.tailor.verify.bad': 'فشل فحص التنسيق.',
+  'detail.tailor.verify.pages': 'الصفحات: {from} ← {to}',
+  'detail.tailor.verify.similarity': 'التشابه {pct}',
+  'detail.tailor.download': 'تنزيل ملف PDF المخصّص',
 
   // Review queue
   'review.title': 'قائمة المراجعة',
@@ -451,6 +465,10 @@ export const ar: Record<string, string> = {
   'live.event.runErr': 'التشغيل: {status}: {error}',
   'live.activity': 'النشاط',
   'live.empty': 'لا شيء بعد. ابدأ تشغيلًا لمشاهدة التقدم مباشرة.',
+  'live.view.title': 'عرض المتصفح',
+  'live.view.alt': 'العرض الحالي للمتصفح الذي يقدّم الطلبات',
+  'live.view.waiting': 'بانتظار أول صورة من المتصفح…',
+  'live.view.caption': 'عرض للقراءة فقط، يُحدَّث كل بضع ثوانٍ.',
 
   // Report
   'report.title': 'التقرير',
@@ -528,6 +546,10 @@ export const ar: Record<string, string> = {
   'actions.openPage': 'فتح صفحة التقديم',
   'actions.byHand': 'قدّمت بنفسي',
   'actions.empty': 'لا شيء يحتاج إلى انتباهك.',
+  'actions.browser.openBtn': 'فتح في متصفح التطبيق',
+  'actions.browser.open': 'النافذة مفتوحة',
+  'actions.browser.close': 'إغلاق النافذة',
+  'actions.browser.hint': 'يفتح Chrome بنفس الملف الشخصي الذي يستخدمه التطبيق. سجّل الدخول أو أنجز الخطوة هناك، ثم أغلق النافذة واضغط «إعادة المحاولة».',
 
   // Answer bank
   'answers.title': 'بنك الإجابات',

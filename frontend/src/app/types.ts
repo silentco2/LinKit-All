@@ -24,6 +24,10 @@ export interface Status {
   actions_open: number;
   apply_live: boolean;
   run: RunState;
+  /** The headed Chrome window opened from the Action Center, if any. */
+  app_browser: { open: boolean; item_id: number | null };
+  /** Modified time (epoch seconds) of the newest live screenshot, null when none is fresh. */
+  live_shot: number | null;
   next_run: string | null;
 }
 
@@ -60,7 +64,7 @@ export interface SearchConfig {
     company_blacklist: string[];
     one_per_company: boolean;
   };
-  matching: { ai_max_jobs: number; tier_high: number; tier_mid: number; batch_size: number };
+  matching: { ai_max_jobs: number; tier_high: number; tier_mid: number; batch_size: number; auto_apply_low: boolean };
   ai: { provider: Provider | null; model: string | null; api_base: string | null };
   apply: ApplySection;
   email: { imap_host: string; imap_user: string; timeout_s: number; poll_s: number };
@@ -137,7 +141,24 @@ export interface AIScore {
   red_flags: string[];
 }
 
+export interface TailorPatch {
+  segment_id: number;
+  old_text: string;
+  new_text: string;
+  /** Why it was made; for a rejected patch, why it was refused. */
+  reason: string;
+}
+
+export interface Tailoring {
+  created_at: string;
+  status: 'tailored' | 'unchanged' | 'rolled_back';
+  patches: TailorPatch[];
+  rejected: TailorPatch[];
+  verify: { ok: boolean; pages: [number, number]; min_ssim: number; reason: string } | null;
+}
+
 export interface JobDetail extends JobRow {
+  tailoring: Tailoring | null;
   url: string;
   description: string;
   ats: string | null;

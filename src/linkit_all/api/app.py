@@ -33,7 +33,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.vault.unlock_from_keyring()
         sink = logger.add(app.state.bus.log_sink, level="INFO",
                           filter=lambda r: (r["name"] or "").startswith("linkit_all"))  # fmt: skip
-        register_runner(app.state.runner)
+        register_runner(app.state.runner, app.state.user_browser)
         app.state.scheduler.start()
         apply_schedule(app.state.scheduler, load_search(app.state.db) or SearchConfig())
         yield

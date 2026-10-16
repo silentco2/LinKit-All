@@ -168,6 +168,8 @@ export const en: Record<string, string> = {
   'setup.scoring.aimax': 'Jobs sent to the AI per run',
   'setup.scoring.aimaxHint': 'The best matches after free local ranking. The rest count as low.',
   'setup.scoring.batch': 'Jobs per AI call',
+  'setup.scoring.low': 'Also apply to low-tier matches (score under the mid threshold, or not AI-scored)',
+  'setup.scoring.lowWarn': 'This can send many more applications, to jobs that match you less well. Turn it on only if you want volume over fit.',
 
   // Setup: application answers
   'setup.answers.title': 'Application answers',
@@ -367,6 +369,18 @@ export const en: Record<string, string> = {
   'detail.history': 'History',
   'detail.screenshot': 'Screenshot {n}',
   'detail.notPossible': 'Not possible in this state',
+  'detail.tailor.title': 'Tailored CV',
+  'detail.tailor.status.tailored': 'tailored',
+  'detail.tailor.status.unchanged': 'unchanged',
+  'detail.tailor.status.rolled_back': 'rolled back',
+  'detail.tailor.rolledBack': 'The layout check failed, so the original CV is used for this job.',
+  'detail.tailor.unchanged': 'No edits were needed: the original CV is used.',
+  'detail.tailor.rejected': 'Rejected changes ({n})',
+  'detail.tailor.verify.ok': 'Layout check passed.',
+  'detail.tailor.verify.bad': 'Layout check failed.',
+  'detail.tailor.verify.pages': 'Pages: {from} → {to}',
+  'detail.tailor.verify.similarity': 'similarity {pct}',
+  'detail.tailor.download': 'Download tailored PDF',
 
   // Review queue
   'review.title': 'Review queue',
@@ -451,6 +465,10 @@ export const en: Record<string, string> = {
   'live.event.runErr': 'Run {status}: {error}',
   'live.activity': 'Activity',
   'live.empty': 'Nothing yet. Start a run to see live progress.',
+  'live.view.title': 'Browser view',
+  'live.view.alt': 'Current view of the browser that is applying',
+  'live.view.waiting': 'Waiting for the first picture from the browser…',
+  'live.view.caption': 'Read-only view, refreshed every few seconds.',
 
   // Report
   'report.title': 'Report',
@@ -528,6 +546,10 @@ export const en: Record<string, string> = {
   'actions.openPage': 'Open application page',
   'actions.byHand': 'I applied by hand',
   'actions.empty': 'Nothing needs your attention.',
+  'actions.browser.openBtn': 'Open in app browser',
+  'actions.browser.open': 'Window open',
+  'actions.browser.close': 'Close window',
+  'actions.browser.hint': 'Opens Chrome with the same profile the app uses. Sign in / solve it there, close the window, then press Retry.',
 
   // Answer bank
   'answers.title': 'Answer bank',
