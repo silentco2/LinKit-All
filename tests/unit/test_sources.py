@@ -1,5 +1,6 @@
 import asyncio
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -22,6 +23,8 @@ from linkit_all.sources.runner import discover, enrich
 from linkit_all.sources.smartrecruiters import SmartRecruiters
 from linkit_all.sources.store import Deduper
 from linkit_all.sources.text import normalize_url
+from linkit_all.sources.workable import Workable
+from linkit_all.sources.workday import Workday, parse_posted
 
 FIX = Path(__file__).parent.parent / "fixtures"
 
@@ -135,6 +138,139 @@ def test_recruitee_search_reads_offers() -> None:
     assert [len(p) for p in asyncio.run(go())] == [2]
 
 
+def test_workable_widget_stub_and_details() -> None:
+    widget = load("workable/careers_widget.json")
+    job = widget["jobs"][0]  # type: ignore[index]
+    stub = Workable.stub(job, "careers", widget["name"])  # type: ignore[index]
+    assert stub.ats == "workable" and stub.company == "Workable"
+    assert stub.url == "https://apply.workable.com/careers/j/A3269A621A/"
+    assert stub.apply_url == "https://apply.workable.com/careers/j/A3269A621A/apply/"
+    assert stub.location == "Athens, Attica, Greece"
+    assert stub.extra["board"] == "careers" and stub.extra["id"] == "A3269A621A"
+    assert stub.posted_at is not None and stub.posted_at.tzinfo is None
+    assert "<" not in stub.description and len(stub.description) > 200
+
+    detail = load("workable/careers_job_detail.json")
+    seen: list[str] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        seen.append(req.url.path)
+        return httpx.Response(200, json=detail)
+
+    async def go() -> JobStub:
+        bare = JobStub(source="workable", url=stub.url, title="t", company="c")
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await Workable().fetch_details(Http(client), bare)
+
+    full = asyncio.run(go())
+    assert seen == ["/api/v2/accounts/careers/jobs/A3269A621A"]
+    assert "<" not in full.description and len(full.description) > 200
+
+
+def test_workable_search_is_one_page() -> None:
+    widget = load("workable/careers_widget.json")
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        assert req.url.path == "/api/v1/widget/accounts/careers"
+        return httpx.Response(200, json=widget)
+
+    async def go(start: int) -> list[list[JobStub]]:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            task = Task("workable", "k", board="careers")
+            return [p async for p in Workable().search(Http(client), task, start)]
+
+    pages = asyncio.run(go(0))
+    assert [len(p) for p in pages] == [2] and pages[0][0].company == "Workable"
+    assert asyncio.run(go(1)) == []  # a resumed task has nothing left
+
+
+BOARD = "nvidia/wd5/NVIDIAExternalCareerSite"
+
+
+def test_workday_stub() -> None:
+    posting = load("workday/nvidia_jobs.json")["jobPostings"][1]  # type: ignore[index]
+    stub = Workday.stub(posting, BOARD, "Nvidia")
+    assert stub.ats == "workday" and stub.company == "Nvidia"
+    assert stub.url == (
+        "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite"
+        "/job/US-CA-Santa-Clara/Senior-Algorithm-Engineer--Map-Perception-Fusion_JR2027508"
+    )
+    assert stub.extra["board"] == BOARD and stub.extra["req_id"] == "JR2027508"
+    assert stub.location == "3 Locations" and stub.description == ""
+    assert stub.posted_at is not None and stub.posted_at.tzinfo is None
+
+
+def test_workday_posted_on_is_relative() -> None:
+    now = datetime(2026, 10, 16, 15, 30, tzinfo=UTC)
+    assert parse_posted("Posted Today", now) == datetime(2026, 10, 16)
+    assert parse_posted("Posted Yesterday", now) == datetime(2026, 10, 15)
+    assert parse_posted("Posted 3 Days Ago", now) == datetime(2026, 10, 13)
+    assert parse_posted("Posted 30+ Days Ago", now) == datetime(2026, 9, 16)
+    assert parse_posted("Open until filled", now) is None and parse_posted(None, now) is None
+
+
+def test_workday_paginates(monkeypatch: pytest.MonkeyPatch) -> None:
+    data = load("workday/nvidia_jobs.json")
+    rows = data["jobPostings"]  # type: ignore[index]
+    monkeypatch.setattr("linkit_all.sources.workday.PAGE", 2)
+    seen: list[tuple[str, int, int]] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        body = json.loads(req.content)
+        seen.append((req.url.path, body["limit"], body["offset"]))
+        off = body["offset"]
+        # like the real API, only the first page reports a total
+        return httpx.Response(
+            200, json={"total": len(rows) if off == 0 else 0, "jobPostings": rows[off : off + 2]}
+        )
+
+    async def go(start: int) -> list[list[JobStub]]:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            task = Task("workday", "k", board=BOARD)
+            return [p async for p in Workday().search(Http(client), task, start)]
+
+    path = "/wday/cxs/nvidia/NVIDIAExternalCareerSite/jobs"
+    assert [len(p) for p in asyncio.run(go(0))] == [2, 1]
+    assert seen == [(path, 2, 0), (path, 2, 2)]
+    seen.clear()
+    assert [len(p) for p in asyncio.run(go(1))] == [1]  # resume: no total, stops on a short page
+    assert seen == [(path, 2, 2)]
+
+
+def test_workday_details_from_url_only() -> None:
+    detail = load("workday/nvidia_job_detail.json")
+    seen: list[str] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        seen.append(f"{req.url.host}{req.url.path}")
+        return httpx.Response(200, json=detail)
+
+    async def go() -> JobStub:
+        url = (
+            "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite"
+            "/job/US-CA-Santa-Clara/Senior-Engineer---Enterprise-Data-Governance_JR2024554"
+        )
+        bare = JobStub(source="workday", url=url, title="t", company="c")
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await Workday().fetch_details(Http(client), bare)
+
+    full = asyncio.run(go())
+    assert seen == [
+        "nvidia.wd5.myworkdayjobs.com/wday/cxs/nvidia/NVIDIAExternalCareerSite"
+        "/job/US-CA-Santa-Clara/Senior-Engineer---Enterprise-Data-Governance_JR2024554"
+    ]
+    assert "<" not in full.description and len(full.description) > 500
+    assert full.apply_url and full.apply_url.startswith("https://nvidia.wd5.myworkdayjobs.com/")
+
+
+def test_workday_tenants_are_rate_limited_to_one_per_second() -> None:
+    async def go() -> float:
+        async with httpx.AsyncClient() as client:
+            return Http(client)._limiter("acme.wd3.myworkdayjobs.com").max_rate
+
+    assert asyncio.run(go()) == 1.0
+
+
 @pytest.mark.parametrize(
     ("text", "expected"),
     [
@@ -153,7 +289,14 @@ def test_recruitee_search_reads_offers() -> None:
         ("https://bunq.recruitee.com/o/head-of-product", ("recruitee", "bunq")),
         ("https://bunq.recruitee.com", ("recruitee", "bunq")),
         ("recruitee:bunq", ("recruitee", "bunq")),
-        ("https://acme.wd5.myworkdayjobs.com/en-US/External", ("workday", "acme.wd5.myworkdayjobs.com/en-US/External")),
+        ("https://acme.wd5.myworkdayjobs.com/en-US/External", ("workday", "acme/wd5/External")),
+        ("https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite", ("workday", "nvidia/wd5/NVIDIAExternalCareerSite")),
+        ("https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/US-CA/Eng_JR1", ("workday", "nvidia/wd5/NVIDIAExternalCareerSite")),
+        ("https://nvidia.wd5.myworkdayjobs.com/wday/cxs/nvidia/NVIDIAExternalCareerSite/jobs", ("workday", "nvidia/wd5/NVIDIAExternalCareerSite")),
+        ("workday:nvidia/wd5/NVIDIAExternalCareerSite", ("workday", "nvidia/wd5/NVIDIAExternalCareerSite")),
+        ("https://apply.workable.com/careers/j/A3269A621A/", ("workable", "careers")),
+        ("https://apply.workable.com/api/v1/widget/accounts/careers", ("workable", "careers")),
+        ("workable:careers", ("workable", "careers")),
         ("https://example.com/careers", None),
     ],
 )  # fmt: skip
@@ -220,7 +363,7 @@ def test_discover_resume_and_enrich(tmp_path: Path) -> None:
                     "lever:palantir",
                     "https://jobs.ashbyhq.com/openai",
                     "lever:gone",  # 404 on both Lever instances
-                    "https://acme.wd1.myworkdayjobs.com/External",
+                    "https://nowhere.example/careers",  # no ATS found on the page
                 ]
             }
         }
@@ -236,7 +379,7 @@ def test_discover_resume_and_enrich(tmp_path: Path) -> None:
     # Stripe posts two identical Dublin reqs; they collapse into one job.
     assert (stats.new, stats.duplicates) == (8, 1)  # type: ignore[attr-defined]
     assert "lever:gone" in stats.errors  # type: ignore[attr-defined]
-    assert any("workday not supported" in u for u in stats.unsupported)  # type: ignore[attr-defined]
+    assert any("no known ATS found" in u for u in stats.unsupported)  # type: ignore[attr-defined]
     with db() as s:
         assert s.query(Job).count() == 8
         assert all(c.done for c in s.scalars(select(SourceCheckpoint)))

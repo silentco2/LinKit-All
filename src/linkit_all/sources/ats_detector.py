@@ -2,7 +2,7 @@
 
 import re
 
-SUPPORTED = {"greenhouse", "lever", "ashby", "smartrecruiters", "recruitee"}
+SUPPORTED = {"greenhouse", "lever", "ashby", "smartrecruiters", "recruitee", "workable", "workday"}
 
 # Order matters: the Greenhouse embed form must win over the plain board form.
 _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
@@ -12,12 +12,21 @@ _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("lever", re.compile(r"jobs(?:\.eu)?\.lever\.co/([\w.-]+)", re.I)),
     ("lever", re.compile(r"api(?:\.eu)?\.lever\.co/v0/postings/([\w.-]+)", re.I)),
     ("ashby", re.compile(r"jobs\.ashbyhq\.com/([\w.%-]+)", re.I)),
-    ("workday", re.compile(r"([\w-]+\.wd\d+\.myworkdayjobs\.com/(?:[a-z]{2}-[A-Z]{2}/)?[\w-]+)")),
+    # Workday slug is "tenant/wdN/site"; the locale segment (en-US) is not part of it.
+    (
+        "workday",
+        re.compile(r"([\w-]+)\.(wd\d+)\.myworkdayjobs\.com/wday/cxs/[\w-]+/([\w-]+)", re.I),
+    ),
+    (
+        "workday",
+        re.compile(r"([\w-]+)\.(wd\d+)\.myworkdayjobs\.com/(?:[a-z]{2}-[A-Z]{2}/)?([\w-]+)"),
+    ),
     (
         "smartrecruiters",
         re.compile(r"smartrecruiters\.com/(?:oneclick-ui/company|v1/companies)/([\w-]+)", re.I),
     ),
     ("smartrecruiters", re.compile(r"(?:jobs|careers)\.smartrecruiters\.com/([\w-]+)", re.I)),
+    ("workable", re.compile(r"apply\.workable\.com/api/v\d/(?:widget/)?accounts/([\w-]+)", re.I)),
     ("workable", re.compile(r"apply\.workable\.com/([\w-]+)", re.I)),
     ("recruitee", re.compile(r"([\w-]+)\.recruitee\.com", re.I)),
 ]
@@ -34,5 +43,5 @@ def detect(text: str) -> tuple[str, str] | None:
     for ats, pattern in _PATTERNS:
         for m in pattern.finditer(text):
             if m.group(1).lower() not in _NOT_SLUGS:
-                return ats, m.group(1)
+                return ats, "/".join(m.groups())
     return None

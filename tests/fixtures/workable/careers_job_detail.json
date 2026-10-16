@@ -1,0 +1,37 @@
+{
+ "id": 6182311,
+ "shortcode": "A3269A621A",
+ "title": "Product Manager",
+ "remote": false,
+ "location": {
+  "city": "Athens",
+  "country": "Greece",
+  "countryCode": "GR",
+  "region": "Attica"
+ },
+ "locations": [
+  {
+   "city": "Athens",
+   "country": "Greece",
+   "countryCode": "GR",
+   "hidden": false,
+   "region": "Attica"
+  }
+ ],
+ "state": "published",
+ "isInternal": false,
+ "code": "",
+ "published": "2026-10-08T00:00:00.000Z",
+ "type": "full",
+ "language": "en",
+ "department": [
+  "R&D",
+  "Product"
+ ],
+ "accountUid": "470ec0c3-a5b0-4980-a115-f64f81de9c3c",
+ "approvalStatus": "approved",
+ "workplace": "hybrid",
+ "description": "<p>Workable makes software to help companies find and hire great people. We <em>get</em> recruiting and its role in building healthy workplaces — which is why we’re proud more than 20,000 teams around the world use Workable to do exactly that.</p><p>And while we take recruiting seriously, we don’t take <em>ourselves</em> too seriously. At Workable, you’ll find smart people who have fun, learn and innovate, and help others do the same. We brainstorm, we laugh, and, occasionally, we party (there’s a lot to celebrate), but we also appreciate people’s need for quiet time and focused work. We respect everyone, we hire the best, and make sure every experience is special.</p><p>We’re growing fast, in both headcount and revenue, and we’re looking for a <strong>Product Manager</strong> to design, build and roll-out products that deliver Workable's vision and strategy.</p><p>As a <strong>Product Manager</strong> you will:</p><ul><li>Understand user needs and gather feature requests to incorporate them into product roadmap</li><li>Describe the user experience and product features</li><li>Collect and analyse data to validate goal</li><li>Collaborate with the development team</li><li>Track the project progress</li><li>Test and accept delivered product features according to user stories</li><li>Coordinate the product release launch</li><li>Translate user feedback and research results into recommendations to executive management</li><li>Work with key external partnerships to augment the value of the product</li></ul>",
+ "requirements": "<ul><li>What you’ll bring</li><ul><li>2-4 years of experience in technical product management.</li><li>A track record of managing products through the full lifecycle.</li><li>A solid technical foundation, with an understanding of software development and web technologies, and the ability to work effectively with software development teams.</li><li>Experience working in Agile product development environments and managing product integrations.</li><li>Experience using AI tools.</li><li>Strong presentation skills, including experience sharing recommendations with executive leadership.</li><li>A BSc degree in Computer Science, Engineering, or a related field.</li></ul><li>Nice to have</li><ul><li>An MSc degree in Computer Science, Engineering, or a related field.</li><li>Experience in HR tech.</li><li>Experience conducting direct customer discovery.</li><li>Experience managing external partners.</li></ul></ul>",
+ "benefits": "<p>Our employees enjoy benefits that make them more productive and contribute directly to the development of their professional skills. We want to be able to attract the best of the best and make sure they keep getting better. On top of an exciting, vibrant, and intellectually challenging workplace, we offer:</p><ul><li>Comprehensive health coverage for you and your dependents.</li><li>Competitive compensation and a performance-based bonus.</li><li>A hybrid working model, with two days working from home and three days in the office.</li><li>Apple equipment and the tools you need to do your best work.</li><li>A mobile data plan to help you stay connected.</li><li>Fresh food at the office.</li><li>A relocation bonus to support your move to Athens, if applicable.</li></ul><p>Workable is most decidedly an equal opportunity employer. We want applicants of diverse backgrounds and hire without regard to race, color, gender, religion, national origin, ancestry, disability, age, sexual orientation, or any other characteristic protected by law.</p>"
+}

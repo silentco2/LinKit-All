@@ -14,7 +14,12 @@ from tenacity import (
 
 USER_AGENT = "LinKitAll/0.1 (personal job search tool)"
 # Requests per second for hosts that throttle hard; others get default_rate.
-SLOW_HOSTS = {"www.linkedin.com": 0.5, "wuzzuf.net": 0.1}  # wuzzuf: robots.txt Crawl-delay 10
+SLOW_HOSTS = {
+    "www.linkedin.com": 0.5,
+    "wuzzuf.net": 0.1,  # robots.txt Crawl-delay 10
+    "apply.workable.com": 1.0,
+}
+SLOW_SUFFIXES = {".myworkdayjobs.com": 1.0}  # one host per Workday tenant
 
 
 class RetryableStatus(Exception):
@@ -39,13 +44,18 @@ class Http:
 
     def _limiter(self, host: str) -> AsyncLimiter:
         if host not in self._limiters:
-            rate = self._rates.get(host, self._default)
+            rate = self._rates.get(host) or next(
+                (r for suffix, r in SLOW_SUFFIXES.items() if host.endswith(suffix)), self._default
+            )
             burst = max(1.0, rate)  # 0.5/s must be "1 per 2 s"; capacity can't go below 1
             self._limiters[host] = AsyncLimiter(burst, burst / rate)
         return self._limiters[host]
 
     async def get(self, url: str, **kwargs: Any) -> httpx.Response:
         """GET with rate limit + retries. 4xx (except 429) is returned to the caller."""
+        return await self._send("GET", url, **kwargs)
+
+    async def _send(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
         limiter = self._limiter(urlsplit(url).hostname or "")
         retrying = AsyncRetrying(
             stop=stop_after_attempt(self._attempts),
@@ -56,7 +66,7 @@ class Http:
         async for attempt in retrying:
             with attempt:
                 async with limiter:
-                    resp = await self.client.get(url, **kwargs)
+                    resp = await self.client.request(method, url, **kwargs)
                 if resp.status_code == 429 or resp.status_code >= 500:
                     raise RetryableStatus(resp)
                 return resp
@@ -64,6 +74,11 @@ class Http:
 
     async def get_json(self, url: str, **kwargs: Any) -> Any:
         resp = await self.get(url, **kwargs)
+        resp.raise_for_status()
+        return resp.json()
+
+    async def post_json(self, url: str, body: Any, **kwargs: Any) -> Any:
+        resp = await self._send("POST", url, json=body, **kwargs)
         resp.raise_for_status()
         return resp.json()
 

@@ -5,6 +5,8 @@ from linkit_all.sources.jobspy_sites import jobspy_sources
 from linkit_all.sources.lever import Lever
 from linkit_all.sources.recruitee import Recruitee
 from linkit_all.sources.smartrecruiters import SmartRecruiters
+from linkit_all.sources.workable import Workable
+from linkit_all.sources.workday import Workday
 from linkit_all.sources.wuzzuf import Wuzzuf
 
 
@@ -15,6 +17,8 @@ def registry() -> dict[str, Source]:
         Ashby(),
         SmartRecruiters(),
         Recruitee(),
+        Workable(),
+        Workday(),
         *jobspy_sources(),
         Wuzzuf(),
     ]

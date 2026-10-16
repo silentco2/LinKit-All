@@ -1,0 +1,33 @@
+{
+ "total": 2000,
+ "jobPostings": [
+  {
+   "title": "Senior Software Engineer - Enterprise Data",
+   "externalPath": "/job/US-CA-Santa-Clara/Senior-Engineer---Enterprise-Data-Governance_JR2024554",
+   "locationsText": "US, CA, Santa Clara",
+   "postedOn": "Posted Today",
+   "bulletFields": [
+    "JR2024554"
+   ]
+  },
+  {
+   "title": "Senior Algorithm Engineer, Map-Perception Fusion",
+   "externalPath": "/job/US-CA-Santa-Clara/Senior-Algorithm-Engineer--Map-Perception-Fusion_JR2027508",
+   "locationsText": "3 Locations",
+   "postedOn": "Posted Today",
+   "bulletFields": [
+    "JR2027508"
+   ]
+  },
+  {
+   "title": "Senior AI Engineer",
+   "externalPath": "/job/Israel-Yokneam/Senior-AI-Engineer_JR2027194",
+   "locationsText": "Israel, Yokneam",
+   "postedOn": "Posted Today",
+   "bulletFields": [
+    "JR2027194"
+   ]
+  }
+ ],
+ "userAuthenticated": false
+}
