@@ -2,7 +2,7 @@
 
 import asyncio
 from dataclasses import asdict
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
 from sqlalchemy.orm import Session, sessionmaker
@@ -11,6 +11,9 @@ from linkit_all.core.config import Settings
 from linkit_all.core.models import Run, RunStatus, utcnow
 from linkit_all.core.runs import record_stats
 from linkit_all.core.search import SearchConfig, load_search
+
+if TYPE_CHECKING:
+    from linkit_all.apply.vault import Vault
 
 STAGES = ("discover", "enrich", "rank", "score", "apply")
 
@@ -50,6 +53,7 @@ async def run_stage(
     settings: Settings,
     run_id: int,
     ai_override: dict[str, Any] | None = None,  # CLI --provider/--model beat the wizard
+    vault: "Vault | None" = None,  # the server's unlocked vault; the CLI leaves it to the keyring
 ) -> dict[str, Any]:
     cfg = load_search(db)
     if cfg is None:
@@ -92,7 +96,9 @@ async def run_stage(
 
         try:
             provider = get_provider(ai_settings(settings, cfg, ai_override), cache=db)
-            stats = await apply_jobs(db, settings, cfg, provider, await _get_embedder(settings))
+            stats = await apply_jobs(
+                db, settings, cfg, provider, await _get_embedder(settings), vault
+            )
         except (ApplyBlocked, ProviderError) as e:
             raise PipelineError(str(e)) from e
     else:

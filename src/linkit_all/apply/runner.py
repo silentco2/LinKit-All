@@ -170,8 +170,10 @@ class Applier:
         cfg: SearchConfig,
         provider: LLMProvider,
         embed: Embed,
+        vault: Vault | None = None,  # the server's shared vault; the CLI passes none
     ) -> None:
         self.db, self.settings, self.cfg, self.provider = db, settings, cfg, provider
+        self._vault = vault
         self.bank = AnswerBank(db, embed)
         self._pw: Playwright | None = None
         self._contexts: dict[str, BrowserContext] = {}
@@ -283,7 +285,7 @@ class Applier:
             await page.close()
 
     def _unlocked_vault(self) -> Vault | None:
-        vault = vault_for(self.settings, self.db)
+        vault = self._vault if self._vault is not None else vault_for(self.settings, self.db)
         if not vault.unlocked() and vault.initialized():
             vault.unlock_from_keyring()
         return vault if vault.unlocked() else None
@@ -481,9 +483,10 @@ async def apply_jobs(
     cfg: SearchConfig,
     provider: LLMProvider,
     embed: Embed,
+    vault: Vault | None = None,
 ) -> dict[str, int]:
     counts = {"dry_run": 0, "applied": 0, "needs_user": 0, "failed": 0, "skipped": 0}
-    async with Applier(db, settings, cfg, provider, embed) as applier:
+    async with Applier(db, settings, cfg, provider, embed, vault) as applier:
         job_ids = applier.pick_jobs()
         logger.info("apply: {} jobs ({})", len(job_ids), "live" if cfg.apply.live else "dry run")
         for n, job_id in enumerate(job_ids):

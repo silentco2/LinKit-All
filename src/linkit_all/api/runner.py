@@ -8,6 +8,7 @@ from loguru import logger
 from sqlalchemy.orm import Session, sessionmaker
 
 from linkit_all.api.events import EventBus
+from linkit_all.apply.vault import Vault
 from linkit_all.core.config import Settings
 from linkit_all.core.models import utcnow
 from linkit_all.core.runs import current_run
@@ -33,8 +34,14 @@ class RunState:
 
 
 class PipelineRunner:
-    def __init__(self, db: sessionmaker[Session], settings: Settings, bus: EventBus) -> None:
-        self.db, self.settings, self.bus = db, settings, bus
+    def __init__(
+        self,
+        db: sessionmaker[Session],
+        settings: Settings,
+        bus: EventBus,
+        vault: Vault | None = None,
+    ) -> None:
+        self.db, self.settings, self.bus, self.vault = db, settings, bus, vault
         self.state = RunState()
         self._task: asyncio.Task[None] | None = None
 
@@ -65,7 +72,9 @@ class PipelineRunner:
                 self.state.stage = stage
                 self.bus.publish({"type": "stage", "stage": stage, "status": "started"})
                 try:
-                    result = await run_stage(stage, self.db, self.settings, run_id)
+                    result = await run_stage(
+                        stage, self.db, self.settings, run_id, None, self.vault
+                    )
                 except PipelineError as e:
                     self.state.error, status = str(e), "failed"
                     self.bus.publish(
