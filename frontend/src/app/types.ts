@@ -105,6 +105,7 @@ export interface ApplySection {
   headless: boolean;
   min_pause_s: number;
   max_pause_s: number;
+  parallel_sites: number;
   generic_agent: boolean;
 }
 

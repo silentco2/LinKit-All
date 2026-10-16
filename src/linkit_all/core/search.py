@@ -106,6 +106,7 @@ class ApplySection(BaseModel):
     headless: bool = False  # True hides the browser window
     min_pause_s: int = Field(20, ge=0)  # random wait between live applications
     max_pause_s: int = Field(60, ge=0)
+    parallel_sites: int = Field(3, ge=1, le=3)  # sites worked on at the same time
     generic_agent: bool = True  # use the AI form agent for sites without a dedicated handler
 
 

@@ -386,6 +386,7 @@ type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_
                 <div><label class="label" for="p-day">{{ 'setup.apply.daily' | t }}</label><input id="p-day" type="number" min="1" max="200" class="input" [(ngModel)]="cfg.apply.daily_cap_per_site"><p class="hint">{{ 'setup.apply.dailyHint' | t }}</p></div>
                 <div><label class="label" for="p-min">{{ 'setup.apply.minPause' | t }}</label><input id="p-min" type="number" min="0" class="input" [(ngModel)]="cfg.apply.min_pause_s"></div>
                 <div><label class="label" for="p-max">{{ 'setup.apply.maxPause' | t }}</label><input id="p-max" type="number" min="0" class="input" [(ngModel)]="cfg.apply.max_pause_s"><p class="hint">{{ 'setup.apply.pauseHint' | t }}</p></div>
+                <div><label class="label" for="p-par">{{ 'setup.apply.parallel' | t }}</label><input id="p-par" type="number" min="1" max="3" class="input" [(ngModel)]="cfg.apply.parallel_sites"><p class="hint">{{ 'setup.apply.parallelHint' | t }}</p></div>
               </div>
               @if (pauseInvalid()) {
                 <p class="text-sm text-rose-600" role="alert">{{ 'setup.apply.pauseInvalid' | t }}</p>

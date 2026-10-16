@@ -47,11 +47,18 @@ kept for failed jobs. If you submitted something yourself, press **I applied by 
 |---|---|---|
 | `max_per_run` | 10 | Jobs handled in one Apply run |
 | `daily_cap_per_site` | 20 | Live submissions per site per day |
-| `min_pause_s`, `max_pause_s` | 20, 60 | Random wait between live applications |
+| `min_pause_s`, `max_pause_s` | 20, 60 | Random wait between two live applications on the same site |
+| `parallel_sites` | 3 | Sites worked on at the same time (1 to 3) |
 | `headless` | off | Hide the browser window |
 
 - Jobs are taken best score first. Sites that reached their daily cap are skipped until tomorrow.
+- Different sites are worked on at the same time, up to `parallel_sites`. A "site" is the
+  ATS (all Greenhouse boards are one site, all Lever boards another) or, for the generic
+  agent, the host of the apply link. On one site, jobs go one at a time, best score first,
+  with the random pause between them. The pause never waits for another site. Set
+  `parallel_sites = 1` to work through sites one after the other.
 - A dry run uses a short pause of 2 to 5 seconds.
+- The Live Run picture shows the latest frame from whichever site is working.
 - Each site gets its own Chrome profile, so sessions last between runs. The window is visible
   by default so you can step in.
 - If your AI plan hits a limit, or LibreOffice is missing, the Apply stage stops with a clear

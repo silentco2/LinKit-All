@@ -251,6 +251,8 @@ export const en: Record<string, string> = {
   'setup.apply.minPause': 'Shortest pause between applications (seconds)',
   'setup.apply.maxPause': 'Longest pause between applications (seconds)',
   'setup.apply.pauseHint': 'A random wait in this range keeps the pace human.',
+  'setup.apply.parallel': 'Sites worked on at the same time (1-3)',
+  'setup.apply.parallelHint': 'Sites worked on at the same time; the pause only applies between applications on the same site.',
   'setup.apply.pauseInvalid': "The shortest pause can't be longer than the longest pause.",
   'setup.apply.headless': 'Hide the browser window (headless)',
   'setup.apply.agent': 'Use the AI form agent for sites without a dedicated handler',

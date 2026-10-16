@@ -36,10 +36,16 @@ def fresh_live_shot(settings: Settings) -> Path | None:
         return None
 
 
+_live_active: dict[Path, int] = {}  # pages currently writing each frame file
+
+
 async def live_frames(page: Page, path: Path, every: float = 3.0) -> None:
-    """Save a viewport JPEG every `every` seconds until cancelled; the file is removed then."""
+    """Save a viewport JPEG every `every` seconds until cancelled. Several pages may share
+    `path` (latest frame wins; ponytail: no per-page view); the file is removed when the last
+    one stops."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
+    tmp = path.with_suffix(f".{id(page)}.tmp")  # per page: writers never share a temp file
+    _live_active[path] = _live_active.get(path, 0) + 1
     try:
         while True:
             with contextlib.suppress(Exception):  # page mid-navigation, closed, or file in use
@@ -47,7 +53,11 @@ async def live_frames(page: Page, path: Path, every: float = 3.0) -> None:
                 tmp.replace(path)  # atomic: the endpoint never serves half a frame
             await asyncio.sleep(every)
     finally:
-        for f in (path, tmp):
+        _live_active[path] -= 1
+        last = _live_active[path] == 0
+        if last:
+            del _live_active[path]
+        for f in (path, tmp) if last else (tmp,):
             with contextlib.suppress(OSError):
                 f.unlink(missing_ok=True)
 

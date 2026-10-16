@@ -9,6 +9,7 @@ import asyncio
 import contextlib
 import random
 import re
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -151,6 +152,13 @@ def job_info(job: Job) -> JobInfo | None:
     )
 
 
+def site_key(job: Job) -> str:
+    """What "one site" means for pacing: a handler's ATS (all its boards), else the apply host."""
+    if job.ats in HANDLERS:
+        return str(job.ats)
+    return urlparse(job.data.get("apply_url") or job.url or "").netloc.lower() or "unknown"
+
+
 def _event(s: Session, job: Job, message: str, artifacts: list[str]) -> None:
     """History entry without a state change (e.g. a dry run)."""
     s.add(
@@ -225,6 +233,9 @@ class Applier:
         self.bank = AnswerBank(db, embed)
         self._pw: Playwright | None = None
         self._contexts: dict[str, BrowserContext] = {}
+        self._locks: dict[str, asyncio.Lock] = {}  # per context key: create / trace start+stop
+        self._tracing: dict[str, int] = {}  # jobs tracing on each context right now
+        self._keep_trace: dict[str, list[Path]] = {}  # out dirs that want the trace saved
 
     async def __aenter__(self) -> "Applier":
         self._pw = await async_playwright().start()
@@ -238,18 +249,45 @@ class Applier:
 
     async def _context(self, ats: str) -> BrowserContext:
         """One persistent Chrome profile per ATS, so cookies and sessions survive runs."""
-        if ats not in self._contexts:
-            if self._pw is None:
-                raise RuntimeError("use Applier as an async context manager")
-            profile = profile_dir(self.settings, ats)
-            profile.mkdir(parents=True, exist_ok=True)
-            self._contexts[ats] = await self._pw.chromium.launch_persistent_context(
-                str(profile),
-                channel="chrome",
-                headless=self.cfg.apply.headless,
-                viewport={"width": 1280, "height": 900},
-            )
-        return self._contexts[ats]
+        async with self._locks.setdefault(ats, asyncio.Lock()):  # two workers, one launch
+            if ats not in self._contexts:
+                if self._pw is None:
+                    raise RuntimeError("use Applier as an async context manager")
+                profile = profile_dir(self.settings, ats)
+                profile.mkdir(parents=True, exist_ok=True)
+                self._contexts[ats] = await self._pw.chromium.launch_persistent_context(
+                    str(profile),
+                    channel="chrome",
+                    headless=self.cfg.apply.headless,
+                    viewport={"width": 1280, "height": 900},
+                )
+            return self._contexts[ats]
+
+    async def _trace_start(self, key: str, browser: BrowserContext) -> None:
+        """Tracing is per context, and jobs on different hosts share the "generic" one: the
+        first job starts it, the last one stops it."""
+        async with self._locks.setdefault(key, asyncio.Lock()):
+            if not self._tracing.get(key):
+                await browser.tracing.start(screenshots=True, snapshots=True)
+            self._tracing[key] = self._tracing.get(key, 0) + 1
+
+    async def _trace_stop(self, key: str, browser: BrowserContext, keep: Path | None) -> None:
+        async with self._locks.setdefault(key, asyncio.Lock()):
+            if keep is not None:
+                self._keep_trace.setdefault(key, []).append(keep)
+            self._tracing[key] -= 1
+            if self._tracing[key]:
+                return
+            dirs = self._keep_trace.pop(key, [])
+            first = dirs[0] / "trace.zip" if dirs else None
+            await browser.tracing.stop(path=str(first) if first else None)
+            for d in dirs[1:]:  # ponytail: overlapping jobs share one trace, copied to each
+                if first is not None:
+                    shutil.copyfile(first, d / "trace.zip")
+
+    def site_of(self, job_id: int) -> str:
+        with self.db() as s:
+            return site_key(s.get_one(Job, job_id))
 
     def pick_jobs(self) -> list[int]:
         """Best-scored jobs ready to apply, within the per-site daily caps."""
@@ -315,9 +353,11 @@ class Applier:
             job_source=job.source,
             resume_path=cv.pdf_path,
         )
-        browser = await self._context(handler.ats if handler else "generic")
-        await browser.tracing.start(screenshots=True, snapshots=True)
+        key = handler.ats if handler else "generic"
+        browser = await self._context(key)
+        await self._trace_start(key, browser)
         page = await browser.new_page()
+        # ponytail: pages of parallel sites all write the one current.jpg, latest frame wins
         live = asyncio.create_task(live_frames(page, live_shot_path(self.settings)))
         keep_trace = False
         try:
@@ -338,11 +378,17 @@ class Applier:
                     transition(s, job, JobState.applying, "filling the application")
                 transition(s, job, JobState.failed, f"{type(e).__name__}: {e}")
             return Outcome("failed", str(e))
+        except asyncio.CancelledError:  # another site hit ApplyBlocked and stopped this run
+            keep_trace = True
+            with self.db.begin() as s:
+                job = s.get_one(Job, job_id)
+                if job.state == JobState.applying:  # may or may not have been submitted
+                    transition(s, job, JobState.failed, "run stopped mid-application: check site")
+            raise
         finally:
-            trace = out_dir / "trace.zip"
             live.cancel()
-            await asyncio.gather(live, return_exceptions=True)  # also removes the frame file
-            await browser.tracing.stop(path=str(trace) if keep_trace else None)
+            await asyncio.gather(live, return_exceptions=True)  # removes the frame file if last
+            await self._trace_stop(key, browser, out_dir if keep_trace else None)
             await page.close()
 
     async def _agent_apply(
@@ -665,17 +711,42 @@ async def apply_jobs(
     embed: Embed,
     vault: Vault | None = None,
 ) -> dict[str, int]:
+    """Different sites in parallel (up to `parallel_sites`); on one site, one job at a time with
+    a random pause between two of them (shorter when nothing is submitted)."""
     counts = {"dry_run": 0, "applied": 0, "needs_user": 0, "failed": 0, "skipped": 0}
+    live = cfg.apply.live
+    lo, hi = (cfg.apply.min_pause_s, cfg.apply.max_pause_s) if live else (2, 5)
     async with Applier(db, settings, cfg, provider, embed, vault) as applier:
-        job_ids = applier.pick_jobs()
-        logger.info("apply: {} jobs ({})", len(job_ids), "live" if cfg.apply.live else "dry run")
-        for n, job_id in enumerate(job_ids):
-            if n:  # pace between applications, shorter when nothing is submitted
-                lo, hi = (
-                    (cfg.apply.min_pause_s, cfg.apply.max_pause_s) if cfg.apply.live else (2, 5)
-                )
-                await asyncio.sleep(random.uniform(lo, max(lo, hi)))  # noqa: S311
-            outcome = await applier.apply(job_id)
-            counts[outcome.status] += 1
-            logger.info("job {}: {} ({})", job_id, outcome.status, outcome.message)
+        sites: dict[str, list[int]] = {}  # best-scored site first; jobs keep pick order
+        for job_id in applier.pick_jobs():
+            sites.setdefault(applier.site_of(job_id), []).append(job_id)
+        parallel = cfg.apply.parallel_sites
+        logger.info(
+            "apply: {} jobs on {} sites, {} at a time ({}) [{}]",
+            sum(map(len, sites.values())),
+            len(sites),
+            parallel,
+            "live" if live else "dry run",
+            ", ".join(f"{site}: {len(ids)}" for site, ids in sites.items()),
+        )
+        running = asyncio.Semaphore(parallel)
+
+        async def work(ids: list[int]) -> None:
+            async with running:
+                for n, job_id in enumerate(ids):
+                    if n:  # pace between two applications on the same site
+                        await asyncio.sleep(random.uniform(lo, max(lo, hi)))  # noqa: S311
+                    outcome = await applier.apply(job_id)
+                    counts[outcome.status] += 1  # no await in between: no race
+                    logger.info("job {}: {} ({})", job_id, outcome.status, outcome.message)
+
+        try:
+            async with asyncio.TaskGroup() as tg:
+                for ids in sites.values():
+                    tg.create_task(work(ids))
+        except BaseExceptionGroup as group:
+            blocked, _ = group.split(ApplyBlocked)
+            if blocked is not None:  # the run pauses, as with a single worker
+                raise blocked.exceptions[0] from None
+            raise group
     return counts
