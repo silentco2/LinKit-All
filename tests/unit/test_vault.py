@@ -96,6 +96,13 @@ def test_create_unlock_wrong_passphrase(db: sessionmaker[Session]) -> None:
     assert v.unlocked()
 
 
+def test_verify_checks_passphrase_without_changing_state(db: sessionmaker[Session]) -> None:
+    v = Vault(db, "k", kdf=CHEAP)
+    v.create(PASS)
+    assert v.verify(PASS) and not v.verify("not the passphrase")
+    assert not v.unlocked()
+
+
 def test_unlock_before_create_raises(db: sessionmaker[Session]) -> None:
     with pytest.raises(VaultError):
         Vault(db, "k", kdf=CHEAP).unlock(PASS)

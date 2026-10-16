@@ -3,12 +3,15 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
+import keyring
 import pytest
 from fastapi.testclient import TestClient
 from test_tailor import make_cv
+from test_vault import CHEAP, PASS, SECRET, MemoryKeyring
 
 from linkit_all.api import runner as runner_module
 from linkit_all.api.app import create_app
+from linkit_all.apply.vault import Vault
 from linkit_all.core.config import Settings
 from linkit_all.core.models import ActionItem, ActionKind, AnswerEntry, Job, JobState, Tier
 from linkit_all.core.state import transition
@@ -17,9 +20,20 @@ BASE = "http://127.0.0.1:8765"
 SAME_ORIGIN = {"origin": BASE}
 
 
+@pytest.fixture(autouse=True)
+def mem_keyring() -> Iterator[MemoryKeyring]:
+    """Never touch the real OS keyring."""
+    previous = keyring.get_keyring()
+    backend = MemoryKeyring()
+    keyring.set_keyring(backend)
+    yield backend
+    keyring.set_keyring(previous)
+
+
 @pytest.fixture
 def client(tmp_path: Path) -> Iterator[TestClient]:
     app = create_app(Settings(data_dir=tmp_path / "data"))
+    app.state.vault = Vault(app.state.db, "api-test", CHEAP)  # cheap Argon2 for speed
     with TestClient(app, base_url=BASE) as c:
         yield c
 
@@ -310,3 +324,75 @@ def test_application_answers_roundtrip(client: TestClient) -> None:
     assert client.put("/api/profile/answers", json=body, headers=SAME_ORIGIN).status_code == 200
     got = client.get("/api/profile/answers").json()
     assert got["authorized_countries"] == ["Egypt"] and got["eeo_race"] is None
+
+
+def test_vault_lifecycle_and_errors(client: TestClient, mem_keyring: MemoryKeyring) -> None:
+    def post(path: str, body: object = None) -> Any:
+        return client.post(f"/api/vault/{path}", json=body or {}, headers=SAME_ORIGIN)
+
+    fresh = {"initialized": False, "unlocked": False}
+    assert client.get("/api/status").json()["vault"] == fresh
+    assert client.get("/api/vault").json() == {**fresh, "entries": []}
+    assert post("unlock", {"passphrase": PASS}).status_code == 409  # nothing to unlock
+    assert post("create", {"passphrase": "short"}).status_code == 422
+    assert post("create", {}).status_code == 422  # missing field
+    assert post("create", {"passphrase": PASS}).status_code == 201
+    assert post("create", {"passphrase": PASS}).status_code == 409
+    assert client.get("/api/status").json()["vault"] == {"initialized": True, "unlocked": False}
+
+    wrong = post("unlock", {"passphrase": "not the passphrase"})
+    assert wrong.status_code == 401 and "not the passphrase" not in wrong.text
+    assert not mem_keyring.store
+    assert post("unlock", {"passphrase": PASS, "remember": False}).status_code == 200
+    assert not mem_keyring.store  # remember=false stays out of the keyring
+    assert client.get("/api/status").json()["vault"] == {"initialized": True, "unlocked": True}
+
+    vault: Vault = client.app.state.vault  # type: ignore[attr-defined]
+    eid = vault.put("account", "boards.greenhouse.io", "me@x.com", SECRET, {"note": "n"})
+    listed = client.get("/api/vault").json()
+    assert listed["unlocked"] and SECRET not in str(listed)
+    assert listed["entries"][0] == {
+        "id": eid,
+        "kind": "account",
+        "site": "boards.greenhouse.io",
+        "username": "me@x.com",
+        "meta": {"note": "n"},
+        "created_at": listed["entries"][0]["created_at"],
+        "updated_at": listed["entries"][0]["updated_at"],
+    }
+
+    reveal = f"entries/{eid}/reveal"
+    assert post(reveal, {"passphrase": "nope nope nope"}).status_code == 401
+    ok = post(reveal, {"passphrase": PASS})
+    assert ok.status_code == 200 and ok.json() == {"secret": SECRET}
+    assert post("entries/999/reveal", {"passphrase": PASS}).status_code == 404
+
+    bad = post("export", {"passphrase": "nope nope nope"})
+    assert bad.status_code == 401 and SECRET not in bad.text
+    out = post("export", {"passphrase": PASS})
+    assert out.status_code == 200
+    assert out.headers["content-disposition"] == "attachment; filename=linkit-vault-export.json"
+    assert out.json()[0]["secret"] == SECRET
+
+    assert post("lock").json() == {"initialized": True, "unlocked": False}
+    assert client.get("/api/vault").json()["entries"] == []
+    assert post(reveal, {"passphrase": PASS}).status_code == 423
+    assert client.delete(f"/api/vault/entries/{eid}", headers=SAME_ORIGIN).status_code == 423
+    post("unlock", {"passphrase": PASS})  # remember defaults to true
+    assert mem_keyring.store
+    assert client.delete(f"/api/vault/entries/{eid}", headers=SAME_ORIGIN).status_code == 204
+    assert client.get("/api/vault").json()["entries"] == []
+    post("lock")
+    assert not mem_keyring.store  # lock forgets the remembered key
+
+
+def test_vault_unlocks_from_keyring_on_startup(tmp_path: Path) -> None:
+    settings = Settings(data_dir=tmp_path / "data")
+    first = create_app(settings)
+    first.state.vault = Vault(first.state.db, "api-test", CHEAP)
+    first.state.vault.create(PASS)
+    first.state.vault.unlock(PASS)  # remembers the key
+    second = create_app(settings)
+    second.state.vault = Vault(second.state.db, "api-test", CHEAP)
+    with TestClient(second, base_url=BASE) as c:
+        assert c.get("/api/status").json()["vault"] == {"initialized": True, "unlocked": True}

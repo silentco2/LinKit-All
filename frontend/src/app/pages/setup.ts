@@ -4,7 +4,7 @@ import { Router } from '@angular/router';
 import { Api } from '../api';
 import { ApplicationAnswers, lines, Profile, Provider, SearchConfig, Segment, Status, unlines } from '../types';
 
-type Step = 'profile' | 'ai' | 'search' | 'filters' | 'answers' | 'apply' | 'finish';
+type Step = 'profile' | 'ai' | 'search' | 'filters' | 'answers' | 'apply' | 'vault' | 'finish';
 type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_disability';
 
 @Component({
@@ -330,6 +330,40 @@ type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_
             </section>
           }
 
+          @case ('vault') {
+            <section class="card space-y-4">
+              <h2>Vault</h2>
+              <p class="text-sm text-slate-600 dark:text-slate-300">
+                Some job sites need an account. The vault stores the passwords LinKit makes for them, and your email app password,
+                encrypted on this computer. It is optional: without it, applications that need an account wait in the Action Center.
+              </p>
+              <div class="alert alert-info"><strong>The passphrase can't be recovered.</strong> If you forget it, the vault can't be opened and you'll have to start a new one.</div>
+              @if (status()?.vault?.unlocked) {
+                <div class="alert alert-ok" role="status">The vault is unlocked. Manage it later on the Vault page in the left menu.</div>
+              } @else {
+                <form class="space-y-4" (ngSubmit)="vaultSubmit()">
+                  @if (!status()?.vault?.initialized) {
+                    <div class="grid gap-4 sm:grid-cols-2">
+                      <div><label class="label" for="v-pass">Passphrase</label><input id="v-pass" type="password" class="input" name="vpass" [(ngModel)]="vpass" autocomplete="new-password" minlength="8"><p class="hint">At least 8 characters. A few words work well.</p></div>
+                      <div><label class="label" for="v-conf">Repeat passphrase</label><input id="v-conf" type="password" class="input" name="vconf" [(ngModel)]="vconfirm" autocomplete="new-password"></div>
+                    </div>
+                    @if (vconfirm && vpass !== vconfirm) { <p class="text-sm text-rose-600" role="alert">The two passphrases don't match.</p> }
+                  } @else {
+                    <div class="max-w-sm"><label class="label" for="v-pass">Passphrase</label><input id="v-pass" type="password" class="input" name="vpass" [(ngModel)]="vpass" autocomplete="current-password"></div>
+                  }
+                  <label class="flex items-start gap-3 text-sm">
+                    <input type="checkbox" class="mt-1" name="vremember" [(ngModel)]="vremember">
+                    <span><span class="font-medium">Remember on this computer</span>
+                      <span class="block text-xs text-slate-500">Keeps the key in your system keyring so the vault opens by itself next time. Turn off on a shared computer.</span></span>
+                  </label>
+                  <button type="submit" class="btn btn-primary" [disabled]="busy() || vpass.length < 8 || (!status()?.vault?.initialized && vpass !== vconfirm)">
+                    {{ status()?.vault?.initialized ? 'Unlock vault' : 'Create vault' }}
+                  </button>
+                </form>
+              }
+            </section>
+          }
+
           @case ('finish') {
             <section class="card space-y-4">
               <h2>Ready?</h2>
@@ -385,6 +419,7 @@ export class SetupPage implements OnInit {
     { id: 'filters', label: 'Filters' },
     { id: 'answers', label: 'Application answers' },
     { id: 'apply', label: 'Applying' },
+    { id: 'vault', label: 'Vault' },
     { id: 'finish', label: 'Finish' },
   ];
   protected readonly providers: { id: Provider; label: string; hint: string }[] = [
@@ -426,7 +461,7 @@ export class SetupPage implements OnInit {
   done(step: Step): boolean {
     const s = this.status();
     if (!s) return false;
-    return { profile: s.profile_ready && s.cv_ready, ai: s.ai_ready, search: s.search_ready, filters: s.search_ready, answers: false, apply: false, finish: false }[step];
+    return { profile: s.profile_ready && s.cv_ready, ai: s.ai_ready, search: s.search_ready, filters: s.search_ready, answers: false, apply: false, vault: s.vault.unlocked, finish: false }[step];
   }
 
   setLive(live: boolean): void {
@@ -490,6 +525,21 @@ export class SetupPage implements OnInit {
     return this.run(async () => {
       this.cfg = await this.api.put<SearchConfig>('/search', this.cfg);
       return ok;
+    });
+  }
+
+  vpass = '';
+  vconfirm = '';
+  vremember = true;
+
+  vaultSubmit(): Promise<void> {
+    const create = !this.status()?.vault.initialized;
+    return this.run(async () => {
+      const pass = this.vpass;
+      if (create) await this.api.post('/vault/create', { passphrase: pass });
+      await this.api.post('/vault/unlock', { passphrase: pass, remember: this.vremember });
+      this.vpass = this.vconfirm = '';
+      return create ? 'Vault created and unlocked' : 'Vault unlocked';
     });
   }
 

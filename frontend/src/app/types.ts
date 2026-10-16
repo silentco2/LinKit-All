@@ -19,6 +19,7 @@ export interface Status {
   search_ready: boolean;
   ai_ready: boolean;
   libreoffice: boolean;
+  vault: { initialized: boolean; unlocked: boolean };
   states: Record<string, number>;
   actions_open: number;
   apply_live: boolean;
@@ -176,4 +177,20 @@ export interface ActionItem {
   screenshots: number;
   created_at: string;
   job: { id: number; title: string; company: string; location: string; score: number | null; url: string; apply_url: string };
+}
+
+export interface VaultEntry {
+  id: number;
+  kind: string;
+  site: string;
+  username: string;
+  meta: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VaultState {
+  initialized: boolean;
+  unlocked: boolean;
+  entries: VaultEntry[];
 }

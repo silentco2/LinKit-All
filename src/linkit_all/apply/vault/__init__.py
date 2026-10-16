@@ -185,6 +185,14 @@ class Vault:
         self._key = key
         return True
 
+    def verify(self, passphrase: str) -> bool:
+        """True if the passphrase is right. Does not change the locked state."""
+        try:
+            self._verified_key(passphrase)
+        except WrongPassphrase:
+            return False
+        return True
+
     def lock(self) -> None:
         self._key = None
         self._keyring_delete()

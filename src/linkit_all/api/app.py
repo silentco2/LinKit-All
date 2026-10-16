@@ -13,6 +13,7 @@ from linkit_all.api.events import EventBus
 from linkit_all.api.routes import router
 from linkit_all.api.runner import PipelineRunner
 from linkit_all.api.security import LocalOnly
+from linkit_all.apply.vault import vault_for
 from linkit_all.core.config import Settings, get_settings
 from linkit_all.core.db import init_db
 from linkit_all.core.log import setup_logging
@@ -26,6 +27,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.bus.bind(asyncio.get_running_loop())
+        app.state.vault.unlock_from_keyring()
         sink = logger.add(app.state.bus.log_sink, level="INFO",
                           filter=lambda r: (r["name"] or "").startswith("linkit_all"))  # fmt: skip
         yield
@@ -37,6 +39,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = settings
     app.state.db = init_db(settings.db_path)
+    app.state.vault = vault_for(settings, app.state.db)
     app.state.bus = EventBus()
     app.state.runner = PipelineRunner(app.state.db, settings, app.state.bus)
     app.add_middleware(LocalOnly, extra_origins=settings.dev_origins)

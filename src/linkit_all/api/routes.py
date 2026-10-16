@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
@@ -15,6 +15,7 @@ from linkit_all.api.events import EventBus
 from linkit_all.api.runner import PipelineRunner, RunBusy
 from linkit_all.apply.answers import ApplicationAnswers
 from linkit_all.apply.assist import AnswerBank
+from linkit_all.apply.vault import Vault, VaultError, VaultLocked, WrongPassphrase
 from linkit_all.core.config import Settings
 from linkit_all.core.models import (
     ActionItem,
@@ -52,6 +53,11 @@ def _runner(request: Request) -> PipelineRunner:
     return runner
 
 
+def _vault(request: Request) -> Vault:
+    vault: Vault = request.app.state.vault
+    return vault
+
+
 def _data_file(request: Request, path: Path) -> FileResponse:
     """Serve a PNG, but only a file the app wrote into its own data dir."""
     path = path.resolve()
@@ -68,6 +74,7 @@ def status(request: Request) -> dict[str, Any]:
     db = _db(request)
     fields, cv = load_fields(db)
     cfg = load_search(db)
+    vault = _vault(request)
     with db() as s:
         states = dict(s.execute(select(Job.state, func.count()).group_by(Job.state)).all())
     return {
@@ -76,6 +83,7 @@ def status(request: Request) -> dict[str, Any]:
         "search_ready": cfg is not None and bool(cfg.search.queries or cfg.sources.companies),
         "ai_ready": cfg is not None and cfg.ai.provider is not None,
         "libreoffice": soffice_path() is not None,
+        "vault": {"initialized": vault.initialized(), "unlocked": vault.unlocked()},
         "states": {str(k): v for k, v in states.items()},
         "actions_open": _open_actions(db),
         "apply_live": bool(cfg and cfg.apply.live),
@@ -558,3 +566,105 @@ def resolve_action(request: Request, item_id: int, body: ActionDecision) -> dict
         item.status = ActionStatus.dismissed if body.decision == "skip" else ActionStatus.resolved
         item.resolved_at = utcnow()
         return {"job_state": job.state}
+
+
+# --- vault --------------------------------------------------------------------
+# Passphrases and secrets travel in POST bodies only and never appear in an error message.
+
+
+class Passphrase(BaseModel):
+    passphrase: str
+
+
+class Unlock(Passphrase):
+    remember: bool = True
+
+
+def _vault_errors(fn: Any) -> Any:
+    """Run a vault call, mapping its errors to plain HTTP errors."""
+    try:
+        return fn()
+    except VaultLocked:
+        raise HTTPException(423, "The vault is locked") from None
+    except WrongPassphrase:
+        raise HTTPException(401, "Wrong passphrase") from None
+    except VaultError:
+        raise HTTPException(409, "The vault is not available for that") from None
+
+
+@router.get("/vault")
+def get_vault(request: Request) -> dict[str, Any]:
+    vault = _vault(request)
+    unlocked = vault.unlocked()
+    entries = [
+        {
+            **e.__dict__,
+            "created_at": e.created_at.isoformat(),
+            "updated_at": e.updated_at.isoformat(),
+        }
+        for e in (_vault_errors(vault.entries) if unlocked else [])
+    ]
+    return {"initialized": vault.initialized(), "unlocked": unlocked, "entries": entries}
+
+
+@router.post("/vault/create", status_code=201)
+def create_vault(request: Request, body: Passphrase) -> dict[str, bool]:
+    vault = _vault(request)
+    if vault.initialized():
+        raise HTTPException(409, "A vault already exists")
+    try:
+        vault.create(body.passphrase)
+    except ValueError:
+        raise HTTPException(422, "The passphrase must be at least 8 characters") from None
+    return {"initialized": True, "unlocked": vault.unlocked()}
+
+
+@router.post("/vault/unlock")
+def unlock_vault(request: Request, body: Unlock) -> dict[str, bool]:
+    vault = _vault(request)
+    if not vault.initialized():
+        raise HTTPException(409, "No vault yet: create one first")
+    _vault_errors(lambda: vault.unlock(body.passphrase, body.remember))
+    return {"initialized": True, "unlocked": True}
+
+
+@router.post("/vault/lock")
+def lock_vault(request: Request) -> dict[str, bool]:
+    vault = _vault(request)
+    vault.lock()
+    return {"initialized": vault.initialized(), "unlocked": False}
+
+
+@router.delete("/vault/entries/{entry_id}", status_code=204)
+def delete_vault_entry(request: Request, entry_id: int) -> None:
+    _vault_errors(lambda: _vault(request).delete(entry_id))
+
+
+@router.post("/vault/entries/{entry_id}/reveal")
+def reveal_vault_entry(request: Request, entry_id: int, body: Passphrase) -> dict[str, str]:
+    vault = _vault(request)
+
+    def reveal() -> str:
+        if not vault.unlocked():
+            raise VaultLocked
+        if not vault.verify(body.passphrase):
+            raise WrongPassphrase
+        return vault.get(entry_id)
+
+    try:
+        return {"secret": _vault_errors(reveal)}
+    except KeyError:
+        raise HTTPException(404, "Entry not found") from None
+
+
+@router.post("/vault/export")
+def export_vault(request: Request, body: Passphrase) -> JSONResponse:
+    """Every entry with its secret, as an unencrypted JSON download."""
+    entries = _vault_errors(lambda: _vault(request).export(body.passphrase))
+    return JSONResponse(
+        entries,
+        headers={
+            "Content-Disposition": "attachment; filename=linkit-vault-export.json",
+            "Cache-Control": "no-store",
+        },
+    )

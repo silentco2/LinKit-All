@@ -29,6 +29,16 @@ export class Api {
   delete<T = void>(path: string): Promise<T> {
     return this.request<T>('DELETE', path);
   }
+  /** POST a JSON body and get the response as a file (the body may hold a passphrase: never a URL). */
+  async postForBlob(path: string, body: unknown): Promise<Blob> {
+    const res = await fetch(`/api${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(await errorText(res));
+    return res.blob();
+  }
   upload<T>(path: string, file: File): Promise<T> {
     return this.request<T>('POST', `${path}?filename=${encodeURIComponent(file.name)}`, undefined, file);
   }
