@@ -13,6 +13,12 @@ import { Status } from './types';
         <div class="mb-6 px-2">
           <div class="text-lg font-bold text-slate-900 dark:text-white">LinKit <span class="text-brand-600">All</span></div>
           <div class="text-xs text-slate-500">Job search on autopilot</div>
+          @if (status(); as s) {
+            <span class="badge mt-2" [class]="s.apply_live ? 'tier-mid' : 'tier-low'"
+                  [title]="s.apply_live ? 'Real applications are submitted' : 'Nothing is submitted; forms are filled and checked only'">
+              {{ s.apply_live ? 'Live applying' : 'Dry run' }}
+            </span>
+          }
         </div>
         @for (item of nav; track item.path) {
           <a [routerLink]="item.path" routerLinkActive="!bg-brand-50 !text-brand-700 dark:!bg-slate-800 dark:!text-white"
@@ -20,6 +26,9 @@ import { Status } from './types';
             {{ item.label }}
             @if (item.path === 'review' && reviewCount() > 0) {
               <span class="badge tier-mid">{{ reviewCount() }}</span>
+            }
+            @if (item.path === 'actions' && actionsCount() > 0) {
+              <span class="badge tier-mid">{{ actionsCount() }}</span>
             }
             @if (item.path === 'live' && live.run()?.running) {
               <span class="size-2 animate-pulse rounded-full bg-emerald-500" aria-label="Run in progress"></span>
@@ -47,10 +56,12 @@ export class App {
   private readonly api = inject(Api);
   protected readonly status = signal<Status | null>(null);
   protected readonly reviewCount = signal(0);
+  protected readonly actionsCount = signal(0);
   protected readonly nav = [
     { path: 'setup', label: 'Setup' },
     { path: 'jobs', label: 'Jobs' },
     { path: 'review', label: 'Review queue' },
+    { path: 'actions', label: 'Action Center' },
     { path: 'live', label: 'Live run' },
     { path: 'report', label: 'Report' },
   ];
@@ -72,6 +83,7 @@ export class App {
       const s = await this.api.get<Status>('/status');
       this.status.set(s);
       this.reviewCount.set(s.states['awaiting_review'] ?? 0);
+      this.actionsCount.set(s.actions_open);
       if (!this.live.run()) this.live.run.set(s.run);
     } catch {
       // the server may be restarting; the live socket reconnects and triggers a reload

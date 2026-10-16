@@ -20,6 +20,8 @@ export interface Status {
   ai_ready: boolean;
   libreoffice: boolean;
   states: Record<string, number>;
+  actions_open: number;
+  apply_live: boolean;
   run: RunState;
 }
 
@@ -139,3 +141,29 @@ export interface LiveEvent {
 /** "a\nb" <-> ["a", "b"] for one-per-line list fields. */
 export const lines = (text: string): string[] => text.split('\n').map((l) => l.trim()).filter(Boolean);
 export const unlines = (list: string[]): string => list.join('\n');
+
+export type ActionKind = 'unknown_question' | 'confirm_submit' | 'captcha' | 'validation_error' | 'login_issue' | 'two_factor';
+export type ActionDecision = 'answer' | 'confirm' | 'retry' | 'applied_by_hand' | 'skip';
+export type AnswerValue = string | boolean | string[];
+
+export interface ActionQuestion {
+  label: string;
+  kind: string; // text, textarea, email, tel, number, url, date, select, radio, combobox, yesno, checkbox, multi, file
+  options: string[];
+  required: boolean;
+  reason: string;
+  sensitive: boolean;
+}
+
+export interface ActionItem {
+  id: number;
+  kind: ActionKind;
+  status: string;
+  message: string;
+  questions: ActionQuestion[];
+  /** What was filled: label -> value and where it came from (profile, sensitive, bank, ai, file). */
+  answers: Record<string, { value: unknown; source: string }>;
+  screenshots: number;
+  created_at: string;
+  job: { id: number; title: string; company: string; location: string; score: number | null; url: string; apply_url: string };
+}
