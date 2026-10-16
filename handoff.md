@@ -233,18 +233,16 @@ tests/unit, tests/e2e (apply flow on a saved Lever form), tests/fixtures/<ats>/
 6. **macOS/Linux LibreOffice bundles** (need those OSes or CI).
 7. **GitHub repo + PyPI release** (outward-facing: needs the maintainer's go-ahead).
 
-## Open question for the maintainer
+## Resolved: robots.txt scope
 
-CLAUDE.md §5.2 says "obey robots.txt". Careers pages, Wuzzuf and Forasna are robots-checked,
-but the public ATS JSON APIs (Greenhouse, Lever, Ashby, SmartRecruiters, Recruitee, Workable,
-Workday cxs) and the python-jobspy sites (LinkedIn, Indeed, ...) are **not** robots-checked
-today. Decide whether that is acceptable (official public APIs / user-chosen sites) or should
-change. Resolve this before the public release.
+Maintainer decision (2026-10-16): the public ATS JSON APIs (Greenhouse, Lever, Ashby,
+SmartRecruiters, Recruitee, Workable, Workday cxs) and the python-jobspy sites stay exempt
+from robots.txt checks; careers pages, Wuzzuf and Forasna are robots-checked. Recorded in
+CLAUDE.md §5.2 — don't add or remove checks without asking.
 
 ## Next steps
 
-1. Answer the robots.txt question above; change `sources/http.py` usage if the answer is "check
-   everything".
+1. (Done) robots.txt scope decided — see "Resolved: robots.txt scope".
 2. Run the first supervised live application with the maintainer (item 1 above), then
    real account creation + IMAP (item 3). Expect to fix handler details found live.
 3. As the maintainer supplies saved pages: write the Workday/iCIMS/Taleo/SuccessFactors/

@@ -33,7 +33,7 @@ later local models.
 | Company boards | user's list + pasted URLs; the ATS detector maps URLs or careers-page HTML to Greenhouse/Lever/Ashby |
 | Job sites | python-jobspy: LinkedIn, Indeed, Glassdoor, Google, ZipRecruiter, and Bayt (jobspy supports Bayt natively) |
 | Regional boards | Wuzzuf (own plugin via sitemaps), Bayt (jobspy); Naukrigulf, Forasna later |
-| Scraping ethics | obey robots.txt, never defeat bot challenges (Wuzzuf search is disallowed and Cloudflare-protected, so the plugin reads its job sitemaps at Crawl-delay 10) |
+| Scraping ethics | obey robots.txt (careers pages, site plugins; public ATS JSON APIs and jobspy sites exempt by maintainer decision 2026-10-16), never defeat bot challenges (Wuzzuf search is disallowed and Cloudflare-protected, so the plugin reads its job sitemaps at Crawl-delay 10) |
 | Embeddings | fastembed `paraphrase-multilingual-MiniLM-L12-v2` (220 MB, Arabic + English), chunked + mean-pooled; numpy cosine (sqlite-vec deferred) |
 | AI scale | hard rules + free local rank first; only the top `ai_max_jobs` go to the AI, batched 10-20 per call |
 | Tiers | score 8-10 high -> auto-apply; 5-7 mid -> user review; <5 or not AI-scored -> low (hidden, user may opt in) |

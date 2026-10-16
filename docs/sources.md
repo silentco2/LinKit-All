@@ -95,7 +95,8 @@ Naukrigulf is planned but not built.
 - **Where robots.txt is not checked.** The ATS feeds (Greenhouse, Lever and the others) are
   public JSON APIs meant for programs. Wuzzuf is built by hand around its published rules:
   it uses only sitemaps and job pages, never the disallowed search pages. The job-site
-  library (python-jobspy) makes its own requests.
+  library (python-jobspy) makes its own requests. Leaving these two out is a deliberate
+  project decision.
 - **Rate limits per host.** Normally 2 requests per second per host. Slower for some:
   LinkedIn 1 request per 2 seconds, Wuzzuf and Forasna 1 request per 10 seconds, Workable
   and Workday 1 per second.
