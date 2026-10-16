@@ -197,6 +197,7 @@ def test_login_page_parks_login_issue(env: dict[str, Any]) -> None:
     assert run(env)["needs_user"] == 1
     item = parked(env)
     assert item.kind == ActionKind.login_issue and "needs an account" in item.message
+    assert "Open in app browser" in item.message and "Retry" in item.message
 
 
 def test_captcha_parks_captcha(env: dict[str, Any]) -> None:

@@ -13,6 +13,7 @@ from linkit_all.api.events import EventBus
 from linkit_all.api.routes import router
 from linkit_all.api.runner import PipelineRunner
 from linkit_all.api.security import LocalOnly
+from linkit_all.apply.browser import UserBrowser
 from linkit_all.apply.vault import vault_for
 from linkit_all.core.config import Settings, get_settings
 from linkit_all.core.db import init_db
@@ -39,6 +40,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.scheduler.shutdown(wait=False)
         register_runner(None)
         app.state.runner.cancel()
+        await app.state.user_browser.close()
         logger.remove(sink)
 
     app = FastAPI(
@@ -48,6 +50,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.db = init_db(settings.db_path)
     app.state.vault = vault_for(settings, app.state.db)
     app.state.bus = EventBus()
+    app.state.user_browser = UserBrowser()
     app.state.runner = PipelineRunner(app.state.db, settings, app.state.bus, app.state.vault)
     app.state.scheduler = make_scheduler(app.state.db.kw["bind"])
     app.add_middleware(LocalOnly, extra_origins=settings.dev_origins)

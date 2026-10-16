@@ -1,3 +1,5 @@
+import asyncio
+import os
 import time
 import types
 from collections.abc import Iterator
@@ -13,10 +15,19 @@ from test_vault import CHEAP, PASS, SECRET, MemoryKeyring
 
 from linkit_all.api import runner as runner_module
 from linkit_all.api.app import create_app
+from linkit_all.apply import browser as browser_module
 from linkit_all.apply.email_verify import EmailLoginError
 from linkit_all.apply.vault import Vault
 from linkit_all.core.config import Settings
-from linkit_all.core.models import ActionItem, ActionKind, AnswerEntry, Job, JobState, Tier
+from linkit_all.core.models import (
+    ActionItem,
+    ActionKind,
+    AnswerEntry,
+    Job,
+    JobState,
+    TailoredCV,
+    Tier,
+)
 from linkit_all.core.state import transition
 
 BASE = "http://127.0.0.1:8765"
@@ -537,3 +548,200 @@ def test_ai_check_passes_local_server_to_litellm(
     r = client.post("/api/ai/check", json=body, headers=SAME_ORIGIN).json()
     assert r["ok"] and "openai/gemma-3" in r["message"]
     assert seen["api_base"] == "http://127.0.0.1:1234/v1" and seen["api_key"] == "local"
+
+
+# --- app browser, red-line, live screenshot ---------------------------------------
+
+
+class FakePage:
+    def __init__(self) -> None:
+        self.url = ""
+
+    async def goto(self, url: str, **_: Any) -> None:
+        self.url = url
+
+    async def screenshot(self, **_: Any) -> bytes:
+        return b"\xff\xd8jpeg"
+
+
+class FakeContext:
+    def __init__(self) -> None:
+        self.pages = [FakePage()]
+        self.closed = False
+        self.on_close: list[Any] = []
+
+    def on(self, event: str, fn: Any) -> None:
+        assert event == "close"
+        self.on_close.append(fn)
+
+    async def close(self) -> None:
+        self.closed = True
+        for fn in self.on_close:
+            fn(self)
+
+
+Launch = list[tuple[str, dict[str, Any], FakeContext]]
+
+
+class FakePlaywright:
+    def __init__(self, launched: Launch) -> None:
+        self.chromium = self
+        self._launched = launched
+
+    async def launch_persistent_context(self, profile: str, **kw: Any) -> FakeContext:
+        ctx = FakeContext()
+        self._launched.append((profile, kw, ctx))
+        return ctx
+
+    async def stop(self) -> None:
+        pass
+
+
+@pytest.fixture
+def launched(monkeypatch: pytest.MonkeyPatch) -> Launch:
+    calls: Launch = []
+
+    class Starter:
+        async def start(self) -> FakePlaywright:
+            return FakePlaywright(calls)
+
+    monkeypatch.setattr(browser_module, "async_playwright", lambda: Starter())
+    return calls
+
+
+def test_app_browser_opens_on_the_runner_profile(client: TestClient, launched: Launch) -> None:
+    assert client.post("/api/actions/999/browser", headers=SAME_ORIGIN).status_code == 404
+    job_id, item_id = park(client, ActionKind.login_issue, [])
+    db = client.app.state.db  # type: ignore[attr-defined]
+    with db.begin() as s:
+        job = s.get_one(Job, job_id)
+        job.ats, job.data = "lever", {"apply_url": "https://jobs.lever.co/acme/1/apply"}
+    url = f"/api/actions/{item_id}/browser"
+
+    runner = client.app.state.runner  # type: ignore[attr-defined]
+    runner.state.running = True  # a run owns the Chrome profile
+    assert client.post(url, headers=SAME_ORIGIN).status_code == 409
+    runner.state.running = False
+
+    assert client.post(url, headers=SAME_ORIGIN).status_code == 201
+    profile, kw, ctx = launched[0]
+    data_dir = client.app.state.settings.data_dir  # type: ignore[attr-defined]
+    assert Path(profile) == data_dir / "browser" / "lever"
+    assert kw["headless"] is False and kw["channel"] == "chrome"
+    assert ctx.pages[0].url == "https://jobs.lever.co/acme/1/apply"
+    assert client.get("/api/status").json()["app_browser"] == {"open": True, "item_id": item_id}
+    assert client.post(url, headers=SAME_ORIGIN).status_code == 409  # one at a time
+    assert client.post("/api/runs", json={}, headers=SAME_ORIGIN).status_code == 409
+
+    assert client.delete(url, headers=SAME_ORIGIN).status_code == 204
+    assert ctx.closed
+    assert client.get("/api/status").json()["app_browser"] == {"open": False, "item_id": None}
+
+    assert client.post(url, headers=SAME_ORIGIN).status_code == 201
+    launched[1][2].on_close[0](None)  # the user closed the window themselves
+    assert client.get("/api/status").json()["app_browser"]["open"] is False
+
+
+def test_app_browser_generic_profile_and_launch_failure(
+    client: TestClient, launched: Launch, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, item_id = park(client, ActionKind.captcha, [])
+    url = f"/api/actions/{item_id}/browser"
+    assert client.post(url, headers=SAME_ORIGIN).status_code == 201
+    assert Path(launched[0][0]).name == "generic"
+    client.delete(url, headers=SAME_ORIGIN)
+
+    async def boom(*_: Any, **__: Any) -> None:
+        raise RuntimeError("Chrome is not installed\nlong trace")
+
+    monkeypatch.setattr(FakePlaywright, "launch_persistent_context", boom)
+    r = client.post(url, headers=SAME_ORIGIN)
+    assert r.status_code == 503
+    assert r.json()["detail"] == "Could not open Chrome: Chrome is not installed"
+    assert client.get("/api/status").json()["app_browser"]["open"] is False
+
+
+def test_job_detail_tailoring_redline_and_pdf(client: TestClient, tmp_path: Path) -> None:
+    ids = seed_jobs(client)
+    job_id = ids["High job"]
+    assert client.get(f"/api/jobs/{job_id}").json()["tailoring"] is None
+    assert client.get(f"/api/jobs/{job_id}/tailored.pdf").status_code == 404
+
+    data_dir = client.app.state.settings.data_dir  # type: ignore[attr-defined]
+    pdf = data_dir / "tailored" / f"job_{job_id}" / "cv.pdf"
+    pdf.parent.mkdir(parents=True)
+    pdf.write_bytes(b"%PDF-1.4")
+    outside = tmp_path / "outside.pdf"
+    outside.write_bytes(b"%PDF-1.4")
+    patch = {
+        "segment_id": 3,
+        "old_text": "Built APIs",
+        "new_text": "Built Python APIs",
+        "reason": "JD",
+    }
+    rejected = {**patch, "segment_id": 4, "reason": "adds an unlisted skill"}
+    verify = {"ok": True, "pages": [1, 1], "min_ssim": 0.99, "reason": ""}
+    db = client.app.state.db  # type: ignore[attr-defined]
+    with db.begin() as s:
+        s.add(TailoredCV(job_id=job_id, docx_path="", pdf_path=str(outside), applied=[]))
+        s.add(
+            TailoredCV(
+                job_id=job_id,
+                docx_path="",
+                pdf_path=str(pdf),
+                applied=[patch],
+                rejected=[rejected],
+                verify=verify,
+            )
+        )
+    t = client.get(f"/api/jobs/{job_id}").json()["tailoring"]
+    assert t["status"] == "tailored" and t["patches"] == [patch] and t["rejected"] == [rejected]
+    assert t["verify"]["pages"] == [1, 1] and t["created_at"]
+    r = client.get(f"/api/jobs/{job_id}/tailored.pdf")
+    assert r.status_code == 200 and r.headers["content-type"] == "application/pdf"
+
+    with db.begin() as s:  # newest row points outside the data dir: refused
+        s.add(
+            TailoredCV(
+                job_id=job_id,
+                docx_path="",
+                pdf_path=str(outside),
+                applied=[],
+                verify={"ok": False, "reason": "page count changed"},
+            )
+        )
+    assert client.get(f"/api/jobs/{job_id}").json()["tailoring"]["status"] == "rolled_back"
+    assert client.get(f"/api/jobs/{job_id}/tailored.pdf").status_code == 404
+
+
+def test_live_screenshot_idle_fresh_and_stale(client: TestClient) -> None:
+    assert client.get("/api/live/screenshot").status_code == 404
+    assert client.get("/api/status").json()["live_shot"] is None
+    shot = browser_module.live_shot_path(client.app.state.settings)  # type: ignore[attr-defined]
+    shot.parent.mkdir(parents=True)
+    shot.write_bytes(b"jpeg")
+    r = client.get("/api/live/screenshot")
+    assert r.status_code == 200 and r.headers["cache-control"] == "no-store"
+    assert r.headers["content-type"] == "image/jpeg"
+    assert client.get("/api/status").json()["live_shot"] > 0
+    old = time.time() - 120  # left behind by a crashed run
+    os.utime(shot, (old, old))
+    assert client.get("/api/live/screenshot").status_code == 404
+
+
+def test_live_frames_writes_then_cleans_up(tmp_path: Path) -> None:
+    out = tmp_path / "live" / "current.jpg"
+
+    async def go() -> None:
+        page: Any = FakePage()
+        task = asyncio.create_task(browser_module.live_frames(page, out, every=0.01))
+        for _ in range(100):
+            if out.exists():
+                break
+            await asyncio.sleep(0.01)
+        assert out.read_bytes() == b"\xff\xd8jpeg"
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+
+    asyncio.run(go())
+    assert not out.exists() and not out.with_suffix(".tmp").exists()

@@ -305,7 +305,9 @@ def test_two_factor_prompt_is_parked(env: dict[str, Any]) -> None:
     seed_account(env)
     env["site"].two_factor = True
     assert run(env, live=True)["needs_user"] == 1
-    assert parked(env).kind == ActionKind.two_factor and env["site"].submits == []
+    item = parked(env)
+    assert item.kind == ActionKind.two_factor and env["site"].submits == []
+    assert "Open in app browser" in item.message
 
 
 def test_rejected_login_is_parked(env: dict[str, Any]) -> None:

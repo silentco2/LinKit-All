@@ -17,6 +17,7 @@ from linkit_all.api.events import EventBus
 from linkit_all.api.runner import PipelineRunner, RunBusy
 from linkit_all.apply.answers import ApplicationAnswers
 from linkit_all.apply.assist import AnswerBank
+from linkit_all.apply.browser import UserBrowser, fresh_live_shot, profile_dir
 from linkit_all.apply.email_verify import EmailLoginError, check_login, credentials
 from linkit_all.apply.vault import Vault, VaultError, VaultLocked, WrongPassphrase
 from linkit_all.core.config import Settings
@@ -29,6 +30,7 @@ from linkit_all.core.models import (
     JobState,
     Profile,
     Run,
+    TailoredCV,
     Tier,
     utcnow,
 )  # fmt: skip
@@ -70,12 +72,22 @@ def _vault(request: Request) -> Vault:
     return vault
 
 
-def _data_file(request: Request, path: Path) -> FileResponse:
-    """Serve a PNG, but only a file the app wrote into its own data dir."""
+def _user_browser(request: Request) -> UserBrowser:
+    browser: UserBrowser = request.app.state.user_browser
+    return browser
+
+
+def _data_file(
+    request: Request,
+    path: Path,
+    media_type: str = "image/png",
+    headers: dict[str, str] | None = None,
+) -> FileResponse:
+    """Serve a file, but only one the app wrote into its own data dir."""
     path = path.resolve()
     if not path.is_relative_to(_settings(request).data_dir.resolve()) or not path.is_file():
         raise HTTPException(404)
-    return FileResponse(path, media_type="image/png")
+    return FileResponse(path, media_type=media_type, headers=headers)
 
 
 # --- status -------------------------------------------------------------------
@@ -100,6 +112,11 @@ def status(request: Request) -> dict[str, Any]:
         "actions_open": _open_actions(db),
         "apply_live": bool(cfg and cfg.apply.live),
         "run": _runner(request).state.as_dict(),
+        "app_browser": {
+            "open": _user_browser(request).is_open,
+            "item_id": _user_browser(request).item_id,
+        },
+        "live_shot": (p.stat().st_mtime if (p := fresh_live_shot(_settings(request))) else None),
         "next_run": next((t.isoformat() for t in next_runs(request.app.state.scheduler, 1)), None),
     }
 
@@ -320,6 +337,24 @@ def list_jobs(
     return [_row(j) for j in jobs]
 
 
+def _tailoring(cv: TailoredCV | None) -> dict[str, Any] | None:
+    """The newest tailored CV as a red-line: what changed, what was refused, the layout check."""
+    if cv is None:
+        return None
+    if cv.verify and not cv.verify.get("ok", True):
+        status = "rolled_back"  # the layout check failed: the original CV was kept
+    else:
+        status = "tailored" if cv.applied else "unchanged"
+    keys = ("segment_id", "old_text", "new_text", "reason")
+    return {
+        "created_at": cv.created_at.isoformat(),
+        "status": status,
+        "patches": [{k: p.get(k) for k in keys} for p in cv.applied],
+        "rejected": cv.rejected,
+        "verify": cv.verify or None,
+    }
+
+
 @router.get("/jobs/{job_id}")
 def job_detail(request: Request, job_id: int) -> dict[str, Any]:
     with _db(request)() as s:
@@ -333,9 +368,33 @@ def job_detail(request: Request, job_id: int) -> dict[str, Any]:
              "message": e.message, "screenshots": len(e.artifacts)}
             for e in events
         ]  # fmt: skip
-        return {**_row(job), "url": job.url, "description": job.description, "ats": job.ats,
-                "apply_url": job.data.get("apply_url"), "ai": job.data.get("ai"),
-                "filled": job.data.get("filled"), "salary": salary, "events": history}  # fmt: skip
+        tailored = s.scalars(
+            select(TailoredCV).filter_by(job_id=job_id).order_by(TailoredCV.id.desc())
+        ).first()
+        return {
+            **_row(job),
+            "tailoring": _tailoring(tailored),
+            "url": job.url,
+            "description": job.description,
+            "ats": job.ats,
+            "apply_url": job.data.get("apply_url"),
+            "ai": job.data.get("ai"),
+            "filled": job.data.get("filled"),
+            "salary": salary,
+            "events": history,
+        }
+
+
+@router.get("/jobs/{job_id}/tailored.pdf")
+def tailored_pdf(request: Request, job_id: int) -> FileResponse:
+    with _db(request)() as s:
+        cv = s.scalars(
+            select(TailoredCV).filter_by(job_id=job_id).order_by(TailoredCV.id.desc())
+        ).first()
+        if cv is None:
+            raise HTTPException(404, "No tailored CV for this job")
+        path = Path(cv.pdf_path)
+    return _data_file(request, path, "application/pdf")
 
 
 @router.get("/jobs/{job_id}/events/{event_id}/screenshot/{n}")
@@ -392,6 +451,8 @@ class RunRequest(BaseModel):
 
 @router.post("/runs", status_code=202)
 async def start_run(request: Request, body: RunRequest) -> dict[str, Any]:
+    if _user_browser(request).is_open:  # same Chrome profile: close the window first
+        raise HTTPException(409, "Close the app browser window before starting a run")
     try:
         return _runner(request).start(body.stages, body.new).as_dict()
     except RunBusy as e:
@@ -514,6 +575,33 @@ def action_screenshot(request: Request, item_id: int, n: int) -> FileResponse:
     return _data_file(request, path)
 
 
+@router.post("/actions/{item_id}/browser", status_code=201)
+async def open_app_browser(request: Request, item_id: int) -> dict[str, Any]:
+    """Open the job's apply page in a headed Chrome window on the profile the apply stage used,
+    so the user can sign in / solve a CAPTCHA / enter a 2FA code themselves. Nothing is typed."""
+    with _db(request)() as s:
+        item = s.get(ActionItem, item_id)
+        job = s.get(Job, item.job_id) if item else None
+        if item is None or job is None:
+            raise HTTPException(404, "Action item not found")
+        url, ats = job.data.get("apply_url") or job.url, job.ats
+    browser = _user_browser(request)
+    if _runner(request).state.running:  # a run owns the Chrome profile
+        raise HTTPException(409, "A run is in progress: wait for it, or cancel it")
+    if browser.is_open:
+        raise HTTPException(409, "The app browser is already open: close its window first")
+    try:
+        await browser.open(profile_dir(_settings(request), ats), url, item_id)
+    except Exception as e:
+        raise HTTPException(503, f"Could not open Chrome: {str(e).splitlines()[0][:200]}") from e
+    return {"open": True, "item_id": item_id}
+
+
+@router.delete("/actions/{item_id}/browser", status_code=204)
+async def close_app_browser(request: Request, item_id: int) -> None:
+    await _user_browser(request).close()
+
+
 def _entry(e: AnswerEntry) -> dict[str, Any]:
     return {
         "id": e.id,
@@ -628,6 +716,15 @@ def resolve_action(request: Request, item_id: int, body: ActionDecision) -> dict
         item.status = ActionStatus.dismissed if body.decision == "skip" else ActionStatus.resolved
         item.resolved_at = utcnow()
         return {"job_state": job.state}
+
+
+@router.get("/live/screenshot")
+def live_screenshot(request: Request) -> FileResponse:
+    """The page the apply stage is working on right now (a JPEG every ~3 s)."""
+    path = fresh_live_shot(_settings(request))
+    if path is None:
+        raise HTTPException(404)
+    return _data_file(request, path, "image/jpeg", {"Cache-Control": "no-store"})
 
 
 # --- vault --------------------------------------------------------------------

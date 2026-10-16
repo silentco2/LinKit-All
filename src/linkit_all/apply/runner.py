@@ -42,6 +42,7 @@ from linkit_all.apply.agent import (
 )
 from linkit_all.apply.answers import ApplicationAnswers, Context, Missing, Question
 from linkit_all.apply.assist import AnswerBank, answer_questions, profile_summary
+from linkit_all.apply.browser import live_frames, live_shot_path, profile_dir
 from linkit_all.apply.email_verify import EmailLoginError, credentials, wait_for_verification
 from linkit_all.apply.form import FillError, fill, lost_values
 from linkit_all.apply.handlers import HANDLERS, Handler, JobInfo
@@ -76,6 +77,17 @@ class ApplyBlocked(RuntimeError):
 
 
 MAX_AGENT_PAGES = 8
+
+
+def hand_off(what: str) -> str:
+    """Park-message tail: the page is closed after a park, so the user works in the app browser."""
+    return (
+        f'press "Open in app browser" in the Action Center, {what} there, '
+        "close the window, then press Retry"
+    )
+
+
+CAPTCHA_MSG = f"a CAPTCHA appeared: {hand_off('solve it')}"
 
 
 async def click_submit(page: Page, target: Handler | Locator, dry_run: bool) -> None:
@@ -229,7 +241,7 @@ class Applier:
         if ats not in self._contexts:
             if self._pw is None:
                 raise RuntimeError("use Applier as an async context manager")
-            profile = self.settings.data_dir / "browser" / ats
+            profile = profile_dir(self.settings, ats)
             profile.mkdir(parents=True, exist_ok=True)
             self._contexts[ats] = await self._pw.chromium.launch_persistent_context(
                 str(profile),
@@ -306,6 +318,7 @@ class Applier:
         browser = await self._context(handler.ats if handler else "generic")
         await browser.tracing.start(screenshots=True, snapshots=True)
         page = await browser.new_page()
+        live = asyncio.create_task(live_frames(page, live_shot_path(self.settings)))
         keep_trace = False
         try:
             if handler is not None:
@@ -327,6 +340,8 @@ class Applier:
             return Outcome("failed", str(e))
         finally:
             trace = out_dir / "trace.zip"
+            live.cancel()
+            await asyncio.gather(live, return_exceptions=True)  # also removes the frame file
             await browser.tracing.stop(path=str(trace) if keep_trace else None)
             await page.close()
 
@@ -372,11 +387,11 @@ class Applier:
             await page.screenshot(path=shots[-1], full_page=True)
             filled.update(_summary(r.questions, r.answers, r.sources))
             if await captcha_shown(page):
-                return park(ActionKind.captcha, "a CAPTCHA appeared: finish this one by hand")
+                return park(ActionKind.captcha, CAPTCHA_MSG)
             if r.page_kind in ("login", "signup"):
                 return park(
                     ActionKind.login_issue,
-                    "This site needs an account; sign in in the open browser, then Retry",
+                    f"This site needs an account: {hand_off('sign in')}",
                 )
             if r.missing:
                 return park(
@@ -427,7 +442,7 @@ class Applier:
             if await captcha_shown(page):
                 return park(
                     ActionKind.captcha,
-                    "a CAPTCHA appeared: finish this one by hand",
+                    CAPTCHA_MSG,
                     answers=filled,
                 )
             if errors := await page_errors(page):
@@ -511,10 +526,11 @@ class Applier:
         if not await handler.signed_in(page):
             await handler.login(page, info, account)
             if await handler.two_factor_shown(page):
-                msg = f"{site} wants a sign-in code: finish it in the open browser, then retry"
+                msg = f"{site} wants a sign-in code: {hand_off('enter the code')}"
                 return await park(ActionKind.two_factor, msg)
             if not await handler.signed_in(page):
-                return await park(ActionKind.login_issue, f"{site} rejected the saved login")
+                msg = f"{site} rejected the saved login: {hand_off('sign in')}"
+                return await park(ActionKind.login_issue, msg)
             if account.status != "active":  # e.g. verified by hand after an earlier timeout
                 mark_active(vault, account, handler.ats, tenant)
         await handler.open(page, info)  # back to the application form
@@ -624,7 +640,7 @@ class Applier:
                     s,
                     job,
                     ActionKind.captcha,
-                    "a CAPTCHA appeared: finish this one by hand",
+                    CAPTCHA_MSG,
                     [],
                     filled,
                     [done],
