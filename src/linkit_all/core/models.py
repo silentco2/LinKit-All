@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, ClassVar
 
-from sqlalchemy import JSON, Enum, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Enum, ForeignKey, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -231,3 +231,33 @@ class ActionItem(Base):
     artifacts: Mapped[list[str]] = mapped_column(default=list)  # screenshots
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     resolved_at: Mapped[datetime | None]
+
+
+class VaultMeta(Base):
+    """The vault's single row: KDF salt and params plus an encrypted check value (CLAUDE.md §6)."""
+
+    __tablename__ = "vault_meta"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    salt: Mapped[bytes] = mapped_column(LargeBinary)
+    kdf: Mapped[dict[str, Any]] = mapped_column(default=dict)  # time_cost, memory_cost, parallelism
+    check_nonce: Mapped[bytes] = mapped_column(LargeBinary)
+    check_ciphertext: Mapped[bytes] = mapped_column(LargeBinary)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class VaultRow(Base):
+    """One AES-GCM encrypted secret. `meta` is plaintext: never put secrets in it."""
+
+    __tablename__ = "vault_entries"
+    __table_args__ = (UniqueConstraint("kind", "site", "username"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(32))  # e.g. "account", "imap"
+    site: Mapped[str] = mapped_column(String(255))
+    username: Mapped[str] = mapped_column(String(255))
+    nonce: Mapped[bytes] = mapped_column(LargeBinary)
+    ciphertext: Mapped[bytes] = mapped_column(LargeBinary)
+    meta: Mapped[dict[str, Any]] = mapped_column(default=dict)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)
