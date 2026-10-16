@@ -7,7 +7,7 @@ from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -19,6 +19,7 @@ from linkit_all.core.config import Settings
 from linkit_all.core.models import (
     ActionItem,
     ActionStatus,
+    AnswerEntry,
     Job,
     JobEvent,
     JobState,
@@ -49,6 +50,14 @@ def _settings(request: Request) -> Settings:
 def _runner(request: Request) -> PipelineRunner:
     runner: PipelineRunner = request.app.state.runner
     return runner
+
+
+def _data_file(request: Request, path: Path) -> FileResponse:
+    """Serve a PNG, but only a file the app wrote into its own data dir."""
+    path = path.resolve()
+    if not path.is_relative_to(_settings(request).data_dir.resolve()) or not path.is_file():
+        raise HTTPException(404)
+    return FileResponse(path, media_type="image/png")
 
 
 # --- status -------------------------------------------------------------------
@@ -236,12 +245,23 @@ def job_detail(request: Request, job_id: int) -> dict[str, Any]:
         events = s.scalars(select(JobEvent).filter_by(job_id=job_id).order_by(JobEvent.id))
         salary = {k: job.data.get(f"salary_{k}") for k in ("min", "max", "currency", "interval")}
         history = [
-            {"at": e.at.isoformat(), "from": e.from_state, "to": e.to_state, "message": e.message}
+            {"id": e.id, "at": e.at.isoformat(), "from": e.from_state, "to": e.to_state,
+             "message": e.message, "screenshots": len(e.artifacts)}
             for e in events
-        ]
+        ]  # fmt: skip
         return {**_row(job), "url": job.url, "description": job.description, "ats": job.ats,
                 "apply_url": job.data.get("apply_url"), "ai": job.data.get("ai"),
-                "salary": salary, "events": history}  # fmt: skip
+                "filled": job.data.get("filled"), "salary": salary, "events": history}  # fmt: skip
+
+
+@router.get("/jobs/{job_id}/events/{event_id}/screenshot/{n}")
+def event_screenshot(request: Request, job_id: int, event_id: int, n: int) -> FileResponse:
+    with _db(request)() as s:
+        event = s.get(JobEvent, event_id)
+        if event is None or event.job_id != job_id or not 0 <= n < len(event.artifacts):
+            raise HTTPException(404)
+        path = Path(event.artifacts[n])
+    return _data_file(request, path)
 
 
 class JobAction(BaseModel):
@@ -420,10 +440,76 @@ def action_screenshot(request: Request, item_id: int, n: int) -> FileResponse:
         item = s.get(ActionItem, item_id)
         if item is None or not 0 <= n < len(item.artifacts):
             raise HTTPException(404)
-        path = Path(item.artifacts[n]).resolve()
-    if not path.is_relative_to(_settings(request).data_dir.resolve()) or not path.is_file():
-        raise HTTPException(404)  # only files the app wrote into its own data dir
-    return FileResponse(path, media_type="image/png")
+        path = Path(item.artifacts[n])
+    return _data_file(request, path)
+
+
+def _entry(e: AnswerEntry) -> dict[str, Any]:
+    return {
+        "id": e.id,
+        "question": e.question,
+        "answer": e.answer,
+        "source": e.source,
+        "sensitive": e.sensitive,
+        "uses": e.uses,
+        "updated_at": e.updated_at.isoformat(),
+    }
+
+
+class AnswerEdit(BaseModel):
+    question: str | None = None
+    answer: str | list[str] | bool
+
+    @field_validator("question")
+    @classmethod
+    def _question(cls, v: str | None) -> str | None:
+        if v is not None and not v.strip():
+            raise ValueError("question cannot be empty")
+        return v and v.strip()
+
+    @field_validator("answer")
+    @classmethod
+    def _answer(cls, v: str | list[str] | bool) -> str | list[str] | bool:
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, str):
+            v = v.strip()
+        if not v or (isinstance(v, list) and not any(x.strip() for x in v)):
+            raise ValueError("answer cannot be empty")
+        return v
+
+
+@router.get("/answers")
+def list_answers(request: Request) -> list[dict[str, Any]]:
+    with _db(request)() as s:
+        rows = s.scalars(
+            select(AnswerEntry).order_by(AnswerEntry.updated_at.desc(), AnswerEntry.id.desc())
+        )
+        return [_entry(e) for e in rows]
+
+
+@router.put("/answers/{answer_id}")
+def edit_answer(request: Request, answer_id: int, body: AnswerEdit) -> dict[str, Any]:
+    with _db(request).begin() as s:
+        entry = s.get(AnswerEntry, answer_id)
+        if entry is None:
+            raise HTTPException(404, "Answer not found")
+        if body.question is not None:
+            entry.question = body.question
+        entry.answer = body.answer
+        entry.source = "user"  # a hand edit makes it the user's own answer
+        entry.updated_at = utcnow()
+        s.flush()
+        return _entry(entry)
+
+
+@router.delete("/answers/{answer_id}", status_code=204)
+def delete_answer(request: Request, answer_id: int) -> None:
+    with _db(request).begin() as s:
+        entry = s.get(AnswerEntry, answer_id)
+        if entry is None:
+            raise HTTPException(404, "Answer not found")
+        s.delete(entry)
 
 
 class ActionAnswers(BaseModel):

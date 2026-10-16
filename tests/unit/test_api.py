@@ -233,6 +233,74 @@ def test_action_screenshot_only_from_data_dir(client: TestClient, tmp_path: Path
     assert client.get(f"/api/actions/{item_id}/screenshot/0").status_code == 200
 
 
+def test_answer_bank_list_edit_delete(client: TestClient) -> None:
+    db = client.app.state.db  # type: ignore[attr-defined]
+    with db.begin() as s:
+        s.add_all([AnswerEntry(question="Years of Python?", answer="5", source="ai"),
+                   AnswerEntry(question="Willing to relocate?", answer=True, source="ai",
+                               sensitive=True, uses=2)])  # fmt: skip
+    rows = client.get("/api/answers").json()
+    assert {r["question"] for r in rows} == {"Years of Python?", "Willing to relocate?"}
+    assert set(rows[0]) == {"id", "question", "answer", "source", "sensitive", "uses", "updated_at"}
+    py = next(r for r in rows if r["question"].startswith("Years"))
+
+    r = client.put(f"/api/answers/{py['id']}", json={"answer": "6"}, headers=SAME_ORIGIN)
+    assert (r.json()["answer"], r.json()["source"], r.json()["question"]) == (
+        "6",
+        "user",
+        py["question"],
+    )
+    assert client.get("/api/answers").json()[0]["id"] == py["id"]  # newest edit first
+    r = client.put(
+        f"/api/answers/{py['id']}",
+        json={"question": "Python years?", "answer": False},
+        headers=SAME_ORIGIN,
+    )
+    assert (r.json()["question"], r.json()["answer"]) == ("Python years?", False)
+
+    assert (
+        client.put("/api/answers/999", json={"answer": "x"}, headers=SAME_ORIGIN).status_code == 404
+    )
+    for bad in ({"answer": ""}, {"answer": "  "}, {"answer": []}, {"answer": "x", "question": " "}):
+        assert (
+            client.put(f"/api/answers/{py['id']}", json=bad, headers=SAME_ORIGIN).status_code == 422
+        )
+
+    assert client.delete(f"/api/answers/{py['id']}", headers=SAME_ORIGIN).status_code == 204
+    assert client.delete(f"/api/answers/{py['id']}", headers=SAME_ORIGIN).status_code == 404
+    assert len(client.get("/api/answers").json()) == 1
+
+
+def test_job_detail_filled_and_event_screenshots(client: TestClient, tmp_path: Path) -> None:
+    ids = seed_jobs(client)
+    job_id = ids["High job"]
+    inside = client.app.state.settings.data_dir / "applications" / "dry.png"  # type: ignore[attr-defined]
+    inside.parent.mkdir(parents=True, exist_ok=True)
+    inside.write_bytes(b"png")
+    outside = tmp_path / "secret.png"
+    outside.write_bytes(b"png")
+    db = client.app.state.db  # type: ignore[attr-defined]
+    filled = [{"label": "Email", "value": "j@x.io"}]
+    with db.begin() as s:
+        job = s.get_one(Job, job_id)
+        job.data = {**job.data, "filled": filled}
+        transition(s, job, JobState.tailored, "tailored", [str(inside), str(outside)])
+
+    detail = client.get(f"/api/jobs/{job_id}").json()
+    assert detail["filled"] == filled
+    assert client.get(f"/api/jobs/{ids['Mid job']}").json()["filled"] is None
+    assert [e["screenshots"] for e in detail["events"]][-1] == 2
+    event_id = detail["events"][-1]["id"]
+
+    base = f"/api/jobs/{job_id}/events/{event_id}/screenshot"
+    assert client.get(f"{base}/0").status_code == 200
+    assert client.get(f"{base}/1").status_code == 404  # file outside the data dir
+    assert client.get(f"{base}/2").status_code == 404  # no such artifact
+    assert (
+        client.get(f"/api/jobs/{ids['Mid job']}/events/{event_id}/screenshot/0").status_code == 404
+    )
+
+
 def test_application_answers_roundtrip(client: TestClient) -> None:
     assert (
         client.put("/api/profile/answers", json={}, headers=SAME_ORIGIN).status_code == 409
