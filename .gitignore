@@ -33,3 +33,6 @@ Thumbs.db
 
 # Local preview config (points at a developer's data dir)
 .claude/launch.json
+
+# Built docs
+site/

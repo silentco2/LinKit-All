@@ -16,7 +16,7 @@ companies = [
 ]
 jobspy = ["linkedin", "indeed"]          # also: glassdoor, google, zip_recruiter
 jobspy_country = "egypt"                 # Indeed/Glassdoor country
-regional = ["wuzzuf", "bayt"]
+regional = ["wuzzuf", "bayt"]            # also: forasna (use Arabic query words there)
 
 [filters]
 title_include = ["engineer", "developer"]
@@ -33,3 +33,33 @@ ai_max_jobs = 300                        # best locally-ranked jobs sent to the 
 tier_high = 8                            # score 8-10: auto-apply
 tier_mid = 5                             # score 5-7: needs your approval; below: hidden
 batch_size = 15                          # jobs per AI call
+
+[apply]
+live = false                             # false = dry run: fill forms and screenshot, never submit
+submit_without_asking = false            # live only: false = each submission waits for your click
+max_per_run = 10
+daily_cap_per_site = 20                  # live submissions per site per day
+headless = false                         # true hides the browser window
+min_pause_s = 20                         # random wait between live applications
+max_pause_s = 60
+generic_agent = true                     # AI form agent for sites without a dedicated handler
+
+[ai]
+# Usually chosen in the setup wizard. Uncomment to set it here.
+# provider = "litellm"                   # codex_cli | claude_cli | litellm
+# model = "ollama/llama3.1"
+# api_base = "http://127.0.0.1:11434"    # local OpenAI-compatible server; keys stay in env
+
+[email]
+# Mailbox that receives sign-up verification emails. The app password lives in the vault.
+imap_host = "imap.gmail.com"
+imap_user = ""                           # empty = your profile email
+timeout_s = 300                          # how long to wait for a verification email
+poll_s = 10
+
+[schedule]
+# Automatic runs while LinKit All is open.
+enabled = false
+days = [0, 1, 2, 3, 4, 5, 6]             # 0 = Monday ... 6 = Sunday
+times = ["09:00"]                        # 24-hour HH:MM, local time
+new_run = true                           # false = resume an unfinished run instead

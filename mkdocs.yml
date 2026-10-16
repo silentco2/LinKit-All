@@ -1,0 +1,69 @@
+site_name: LinKit All
+site_description: Local, open-source AI job search, CV tailoring and auto-apply.
+docs_dir: docs
+site_dir: site
+strict: true
+
+theme:
+  name: material
+  font: false # system fonts only: no requests to Google Fonts
+  language: en
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.highlight
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+plugins:
+  - search # built in and fully local
+
+extra:
+  generator: false
+  # No analytics, no feedback widgets, no social cards.
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Install: install.md
+      - Setup wizard: setup.md
+  - Using LinKit All:
+      - Sources: sources.md
+      - Matching: matching.md
+      - Tailoring your CV: tailoring.md
+      - Applying: applying.md
+      - Action Center: action-center.md
+      - Scheduling and reports: scheduling-reports.md
+  - Reference:
+      - Privacy and security: privacy.md
+      - Command line: cli.md
+      - Troubleshooting: troubleshooting.md
+  - Development: development.md
