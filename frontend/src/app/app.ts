@@ -62,6 +62,7 @@ export class App {
     { path: 'jobs', label: 'Jobs' },
     { path: 'review', label: 'Review queue' },
     { path: 'actions', label: 'Action Center' },
+    { path: 'answers', label: 'Answer bank' },
     { path: 'live', label: 'Live run' },
     { path: 'report', label: 'Report' },
   ];

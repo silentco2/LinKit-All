@@ -146,6 +146,16 @@ export type ActionKind = 'unknown_question' | 'confirm_submit' | 'captcha' | 'va
 export type ActionDecision = 'answer' | 'confirm' | 'retry' | 'applied_by_hand' | 'skip';
 export type AnswerValue = string | boolean | string[];
 
+export interface AnswerEntry {
+  id: number;
+  question: string;
+  answer: AnswerValue;
+  source: 'user' | 'ai';
+  sensitive: boolean;
+  uses: number;
+  updated_at: string;
+}
+
 export interface ActionQuestion {
   label: string;
   kind: string; // text, textarea, email, tel, number, url, date, select, radio, combobox, yesno, checkbox, multi, file

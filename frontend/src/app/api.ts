@@ -13,6 +13,7 @@ export class Api {
       body: file ?? (body !== undefined ? JSON.stringify(body) : undefined),
     });
     if (!res.ok) throw new Error(await errorText(res));
+    if (res.status === 204) return undefined as T;
     return res.json() as Promise<T>;
   }
 
@@ -24,6 +25,9 @@ export class Api {
   }
   post<T>(path: string, body: unknown = {}): Promise<T> {
     return this.request<T>('POST', path, body);
+  }
+  delete<T = void>(path: string): Promise<T> {
+    return this.request<T>('DELETE', path);
   }
   upload<T>(path: string, file: File): Promise<T> {
     return this.request<T>('POST', `${path}?filename=${encodeURIComponent(file.name)}`, undefined, file);
