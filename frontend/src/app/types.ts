@@ -34,6 +34,9 @@ export interface Profile {
   skills: string[];
   locked_facts: string[];
   cv_name?: string | null;
+  cv_source_format?: 'docx' | 'odt' | 'pdf';
+  /** False for a converted PDF until the user approves it; tailoring refuses until then. */
+  cv_approved?: boolean;
 }
 
 export interface Segment {
@@ -201,4 +204,25 @@ export interface EmailState {
   imap_user: string;
   connected: boolean;
   vault: { initialized: boolean; unlocked: boolean };
+}
+
+export interface OutcomeRow {
+  name: string;
+  found: number;
+  applied: number;
+  failed: number;
+  skipped: number;
+  needs_user: number;
+}
+
+export interface Report {
+  funnel: { step: string; count: number }[];
+  tiers: Record<string, number>;
+  states: Record<string, number>;
+  sources: Record<string, Partial<Record<string, number>>>;
+  per_platform: { source: OutcomeRow[]; ats: OutcomeRow[] };
+  per_board: OutcomeRow[];
+  per_run: (Omit<OutcomeRow, 'name'> & { run_id: number; status: string; started_at: string })[];
+  over_time: { date: string; applied: number; failed: number; skipped: number; needs_user: number }[];
+  filter: { run_id: number | null; since: string | null };
 }

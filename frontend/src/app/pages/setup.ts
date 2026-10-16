@@ -57,11 +57,11 @@ type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_
 
             <section class="card space-y-4">
               <h2>Your CV</h2>
-              <p class="text-sm text-slate-600 dark:text-slate-400">Upload your CV as a Word file (.docx). Its layout and styling are never changed, only words.</p>
+              <p class="text-sm text-slate-600 dark:text-slate-400">Upload your CV as a Word (.docx), OpenDocument (.odt) or PDF file. Its layout and styling are never changed, only words. Word is the most reliable; a PDF is converted once and you approve the result.</p>
               <div class="flex flex-wrap items-center gap-3">
                 <label class="btn cursor-pointer">
                   {{ profile.cv_name ? 'Replace CV' : 'Upload CV' }}
-                  <input type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" class="sr-only" (change)="upload($event)">
+                  <input type="file" accept=".docx,.odt,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.oasis.opendocument.text,application/pdf" class="sr-only" (change)="upload($event)">
                 </label>
                 @if (profile.cv_name) {
                   <span class="text-sm">{{ profile.cv_name }}</span>
@@ -70,6 +70,12 @@ type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_
                   }
                 }
               </div>
+              @if (profile.cv_name && profile.cv_approved === false) {
+                <div class="alert alert-error" role="alert">
+                  <p><strong>Check the converted CV.</strong> Your PDF was converted to an editable Word file. Conversion can garble layout or text, so open the preview and compare it with your original before approving. LinKit will not tailor or apply with this CV until you approve it.</p>
+                  <button class="btn btn-primary mt-3" (click)="approveCv()" [disabled]="busy()">Approve this as my CV</button>
+                </div>
+              }
               @if (status() && !status()!.libreoffice) {
                 <div class="alert alert-error">LibreOffice isn't installed, so PDF preview and tailoring won't work yet. Run <code>linkit doctor</code>.</div>
               }
@@ -553,10 +559,21 @@ export class SetupPage implements OnInit {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return Promise.resolve();
     return this.run(async () => {
-      const r = await this.api.upload<{ cv_name: string; segments: Segment[] }>('/profile/cv', file);
+      const r = await this.api.upload<{ cv_name: string; segments: Segment[]; cv_source_format: Profile['cv_source_format']; cv_approved: boolean }>('/profile/cv', file);
       this.profile!.cv_name = r.cv_name;
+      this.profile!.cv_source_format = r.cv_source_format;
+      this.profile!.cv_approved = r.cv_approved;
       this.segments.set(r.segments);
-      return `CV uploaded: ${r.segments.length} text parts found`;
+      this.status.set(await this.api.get<Status>('/status'));
+      return r.cv_approved ? `CV uploaded: ${r.segments.length} text parts found` : `PDF converted: ${r.segments.length} text parts found. Check the preview, then approve it.`;
+    });
+  }
+
+  approveCv(): Promise<void> {
+    return this.run(async () => {
+      this.profile = { ...(await this.api.post<Profile>('/profile/cv/approve', {})) };
+      this.status.set(await this.api.get<Status>('/status'));
+      return 'CV approved';
     });
   }
 

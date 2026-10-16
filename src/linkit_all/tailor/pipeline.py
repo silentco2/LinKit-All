@@ -140,6 +140,8 @@ def load_profile(db: sessionmaker[Session]) -> tuple[Profile, list[str]]:
         profile = s.get(Profile, 1)
         if profile is None:
             raise TailorError("No profile yet: run `linkit profile import profile.json`")
+        if not profile.cv_approved:
+            raise TailorError("Approve the converted CV in Setup first")
         return profile, list(s.scalars(select(LockedFact.text)))
 
 

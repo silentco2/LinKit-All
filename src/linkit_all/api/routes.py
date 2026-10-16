@@ -2,11 +2,12 @@
 
 import asyncio
 import shutil
+from datetime import date
 from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
@@ -30,11 +31,19 @@ from linkit_all.core.models import (
     Tier,
     utcnow,
 )  # fmt: skip
-from linkit_all.core.profile import ProfileFields, load_fields, save_cv, save_fields
+from linkit_all.core.profile import (
+    ProfileFields,
+    approve_cv,
+    cv_state,
+    load_fields,
+    save_cv,
+    save_fields,
+)
 from linkit_all.core.search import SearchConfig, load_search, save_search
 from linkit_all.core.state import InvalidTransition, transition
 from linkit_all.core.tools import soffice_path
 from linkit_all.pipeline import STAGES, PipelineError, ai_settings
+from linkit_all.reports import build_report, export_csv, export_pdf
 
 router = APIRouter(prefix="/api")
 
@@ -80,7 +89,7 @@ def status(request: Request) -> dict[str, Any]:
         states = dict(s.execute(select(Job.state, func.count()).group_by(Job.state)).all())
     return {
         "profile_ready": bool(fields.full_name and fields.email),
-        "cv_ready": bool(cv),
+        "cv_ready": bool(cv) and cv_state(db)[1],  # a converted PDF counts once approved
         "search_ready": cfg is not None and bool(cfg.search.queries or cfg.sources.companies),
         "ai_ready": cfg is not None and cfg.ai.provider is not None,
         "libreoffice": soffice_path() is not None,
@@ -111,9 +120,12 @@ def _segments(cv: str) -> list[dict[str, Any]]:
 @router.get("/profile")
 def get_profile(request: Request) -> dict[str, Any]:
     fields, cv = load_fields(_db(request))
+    fmt, approved = cv_state(_db(request))
     return {
         **fields.model_dump(),
         "cv_name": cv.replace("\\", "/").rsplit("/", 1)[-1] if cv else None,
+        "cv_source_format": fmt,
+        "cv_approved": approved,
     }
 
 
@@ -125,13 +137,30 @@ def put_profile(request: Request, fields: ProfileFields) -> dict[str, Any]:
 
 @router.post("/profile/cv")
 async def upload_cv(request: Request, filename: str) -> dict[str, Any]:
-    """Raw DOCX bytes in the body (no multipart dependency needed)."""
+    """Raw DOCX/ODT/PDF bytes in the body (no multipart dependency needed)."""
+    body = await request.body()
     try:
-        cv = save_cv(_db(request), _settings(request).data_dir, filename, await request.body())
+        cv = await asyncio.to_thread(
+            save_cv, _db(request), _settings(request).data_dir, filename, body
+        )
         segments = await asyncio.to_thread(_segments, str(cv))
     except ValueError as e:
         raise HTTPException(422, str(e)) from e
-    return {"cv_name": cv.name, "segments": segments}
+    fmt, approved = cv_state(_db(request))
+    return {
+        "cv_name": cv.name,
+        "segments": segments,
+        "cv_source_format": fmt,
+        "cv_approved": approved,
+    }
+
+
+@router.post("/profile/cv/approve")
+def approve_cv_route(request: Request) -> dict[str, Any]:
+    """The user checked the converted PDF base; tailoring may now use it."""
+    if not approve_cv(_db(request)):
+        raise HTTPException(404, "No CV uploaded yet")
+    return get_profile(request)
 
 
 @router.get("/profile/cv/segments")
@@ -330,46 +359,32 @@ async def cancel_run(request: Request) -> dict[str, bool]:
     return {"cancelled": _runner(request).cancel()}
 
 
-# Job states at or past each funnel step.
-_RANKED = {JobState.ranked, JobState.scored, JobState.below_threshold, JobState.awaiting_review,
-           JobState.queued_apply, JobState.tailored, JobState.applying, JobState.needs_user,
-           JobState.applied, JobState.failed, JobState.skipped}  # fmt: skip
-_TO_APPLY = {JobState.queued_apply, JobState.tailored, JobState.applying, JobState.needs_user,
-             JobState.applied, JobState.failed}  # fmt: skip
-
-
 @router.get("/report")
-def report(request: Request) -> dict[str, Any]:
+def report(
+    request: Request, run_id: int | None = None, since: date | None = None
+) -> dict[str, Any]:
     with _db(request)() as s:
-        states = dict(s.execute(select(Job.state, func.count()).group_by(Job.state)).all())
-        tiers = dict(
-            s.execute(
-                select(Job.tier, func.count()).where(Job.tier.is_not(None)).group_by(Job.tier)
-            ).all()
-        )
-        scored = s.scalar(select(func.count()).where(Job.score.is_not(None))) or 0
-        by_source = s.execute(
-            select(Job.source, Job.state, func.count()).group_by(Job.source, Job.state)
-        ).all()
-    total = sum(states.values())
-    ranked = sum(states.get(x, 0) for x in _RANKED)
-    sources: dict[str, dict[str, int]] = {}
-    for source, state, count in by_source:
-        row = sources.setdefault(source, {"total": 0})
-        row["total"] += count
-        row[str(state)] = count
-    return {
-        "funnel": [
-            {"step": "Found", "count": total},
-            {"step": "Passed filters", "count": ranked},
-            {"step": "AI scored", "count": scored},
-            {"step": "Queued to apply", "count": sum(states.get(x, 0) for x in _TO_APPLY)},
-            {"step": "Applied", "count": states.get(JobState.applied, 0)},
-        ],
-        "tiers": {str(k): v for k, v in tiers.items()},
-        "states": {str(k): v for k, v in states.items()},
-        "sources": sources,
-    }
+        return build_report(s, run_id, since)
+
+
+def _attachment(body: str | bytes, media_type: str, filename: str) -> Response:
+    return Response(
+        body,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/report/export.csv")
+def report_csv(request: Request, run_id: int | None = None, since: date | None = None) -> Response:
+    with _db(request)() as s:
+        return _attachment(export_csv(s, run_id, since), "text/csv", "linkit-report.csv")
+
+
+@router.get("/report/export.pdf")
+def report_pdf(request: Request, run_id: int | None = None, since: date | None = None) -> Response:
+    with _db(request)() as s:
+        return _attachment(export_pdf(s, run_id, since), "application/pdf", "linkit-report.pdf")
 
 
 @router.websocket("/events")

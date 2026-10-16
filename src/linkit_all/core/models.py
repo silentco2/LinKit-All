@@ -130,6 +130,8 @@ class Profile(Base):
     location: Mapped[str] = mapped_column(Text, default="")
     skills: Mapped[list[str]] = mapped_column(default=list)  # the only skills tailoring may add
     cv_path: Mapped[str] = mapped_column(Text)  # base DOCX copied into the data dir
+    cv_source_format: Mapped[str] = mapped_column(Text, default="docx")  # docx | odt | pdf
+    cv_approved: Mapped[bool] = mapped_column(default=True)  # converted PDF bases start False
     answers: Mapped[dict[str, Any]] = mapped_column(
         default=dict
     )  # apply.answers.ApplicationAnswers
