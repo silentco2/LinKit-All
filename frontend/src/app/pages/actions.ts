@@ -1,23 +1,9 @@
-import { Component, effect, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { Api } from '../api';
+import { I18n, TPipe } from '../i18n';
 import { Live } from '../live';
+import { fmtNum, labelOr, localeOf } from '../locale';
 import { ActionDecision, ActionItem, ActionKind, ActionQuestion, AnswerValue } from '../types';
-
-const TITLES: Record<ActionKind, string> = {
-  unknown_question: 'Needs your answer',
-  confirm_submit: 'Confirm before submitting',
-  captcha: 'CAPTCHA',
-  validation_error: 'Form rejected the answers',
-  login_issue: 'Sign-in problem',
-  two_factor: 'Verification code needed',
-};
-
-const HELP: Partial<Record<ActionKind, string>> = {
-  captcha: 'Solve the CAPTCHA yourself in the Chrome window that is still open, then press Retry.',
-  validation_error: 'The site rejected the form. Fix it in the open Chrome window or apply by hand, then press Retry.',
-  login_issue: 'Sign in to the site in the open Chrome window, then press Retry.',
-  two_factor: 'Enter the verification code in the open Chrome window, then press Retry.',
-};
 
 const SOURCES: Record<string, string> = {
   profile: 'tier-high',
@@ -29,9 +15,10 @@ const SOURCES: Record<string, string> = {
 
 @Component({
   selector: 'app-actions',
+  imports: [TPipe],
   template: `
-    <h1>Action Center</h1>
-    <p class="mt-1 text-sm text-slate-500">Applications that stopped and need you. Resolve one in a single sitting and the job continues.</p>
+    <h1>{{ 'actions.title' | t }}</h1>
+    <p class="mt-1 text-sm text-slate-500">{{ 'actions.intro' | t }}</p>
 
     <div class="mt-5 max-w-4xl space-y-5">
       @for (a of items(); track a.id) {
@@ -39,23 +26,23 @@ const SOURCES: Record<string, string> = {
           <header class="flex items-start justify-between gap-3">
             <div class="min-w-0">
               <div class="truncate text-lg font-semibold text-slate-900 dark:text-white" dir="auto">{{ a.job.title }}</div>
-              <div class="truncate text-sm text-slate-500" dir="auto">{{ a.job.company }} · {{ a.job.location }}</div>
+              <div class="truncate text-sm text-slate-500" dir="auto"><bdi>{{ a.job.company }}</bdi> · <bdi>{{ a.job.location }}</bdi></div>
             </div>
             <div class="flex shrink-0 flex-col items-end gap-1">
-              <span class="badge tier-mid">{{ title(a.kind) }}</span>
-              @if (a.job.score) { <span class="text-xs text-slate-500">Score {{ a.job.score }}/10</span> }
+              <span class="badge tier-mid">{{ 'actions.kind.' + a.kind | t }}</span>
+              @if (a.job.score) { <span class="text-xs text-slate-500">{{ 'actions.score' | t: { n: num(a.job.score) } }}</span> }
               <span class="text-xs text-slate-400">{{ when(a.created_at) }}</span>
             </div>
           </header>
 
-          @if (a.message) { <p class="mt-3 text-sm text-slate-700 dark:text-slate-300">{{ a.message }}</p> }
-          @if (help(a.kind); as h) { <div class="alert alert-info mt-3">{{ h }}</div> }
+          @if (a.message) { <p class="mt-3 text-sm text-slate-700 dark:text-slate-300" dir="auto">{{ a.message }}</p> }
+          @if (hasHelp(a.kind)) { <div class="alert alert-info mt-3">{{ 'actions.help.' + a.kind | t }}</div> }
 
           @if (a.screenshots) {
             <div class="mt-4 flex flex-wrap gap-3">
               @for (n of range(a.screenshots); track n) {
                 <a [href]="shot(a.id, n)" target="_blank" rel="noopener">
-                  <img [src]="shot(a.id, n)" alt="Screenshot {{ n + 1 }} of the application form"
+                  <img [src]="shot(a.id, n)" [alt]="'actions.screenshot' | t: { n: n + 1 }"
                        class="max-h-64 rounded-lg border border-slate-200 dark:border-slate-700">
                 </a>
               }
@@ -63,15 +50,12 @@ const SOURCES: Record<string, string> = {
           }
 
           @if (a.kind === 'unknown_question') {
-            <div class="alert alert-info mt-4">
-              The form asked something we could not answer for you. Your answers are saved to the answer bank as
-              yours, then the job is retried.
-            </div>
+            <div class="alert alert-info mt-4">{{ 'actions.unknown.info' | t }}</div>
             <div class="mt-4 space-y-5">
               @for (q of a.questions; track q.label; let i = $index) {
                 <div>
                   <label class="label" [attr.for]="'q' + a.id + '-' + i" dir="auto">
-                    {{ q.label }} @if (q.required) { <span class="text-rose-600" title="Required">*</span> }
+                    {{ q.label }} @if (q.required) { <span class="text-rose-600" [title]="'actions.required' | t">*</span> }
                   </label>
                   @switch (widget(q)) {
                     @case ('textarea') {
@@ -82,7 +66,7 @@ const SOURCES: Record<string, string> = {
                       <div class="space-y-1" role="group" [attr.aria-label]="q.label">
                         @for (o of q.options; track o) {
                           <label class="flex items-center gap-2 text-sm">
-                            <input type="checkbox" [checked]="isOn(a.id, q.label, o)" (change)="toggle(a.id, q.label, o)"> {{ o }}
+                            <input type="checkbox" [checked]="isOn(a.id, q.label, o)" (change)="toggle(a.id, q.label, o)"> <span dir="auto">{{ o }}</span>
                           </label>
                         }
                       </div>
@@ -92,7 +76,7 @@ const SOURCES: Record<string, string> = {
                         @for (o of choices(q); track o) {
                           <label class="flex items-center gap-2 text-sm">
                             <input type="radio" [name]="'q' + a.id + '-' + i" [checked]="draft()[a.id]?.[q.label] === o"
-                                   (change)="set(a.id, q.label, o)"> {{ o }}
+                                   (change)="set(a.id, q.label, o)"> <span dir="auto">{{ optLabel(q, o) }}</span>
                           </label>
                         }
                       </div>
@@ -100,14 +84,14 @@ const SOURCES: Record<string, string> = {
                     @case ('checkbox') {
                       <!-- never pre-ticked: the user picks Yes or No explicitly -->
                       <select class="input" [id]="'q' + a.id + '-' + i" (change)="setBool(a.id, q.label, val($event))">
-                        <option value="" [selected]="draft()[a.id]?.[q.label] === undefined">Choose…</option>
-                        <option value="yes" [selected]="draft()[a.id]?.[q.label] === true">Yes</option>
-                        <option value="no" [selected]="draft()[a.id]?.[q.label] === false">No</option>
+                        <option value="" [selected]="draft()[a.id]?.[q.label] === undefined">{{ 'actions.choose' | t }}</option>
+                        <option value="yes" [selected]="draft()[a.id]?.[q.label] === true">{{ 'common.yes' | t }}</option>
+                        <option value="no" [selected]="draft()[a.id]?.[q.label] === false">{{ 'common.no' | t }}</option>
                       </select>
                     }
                     @case ('select') {
                       <select class="input" [id]="'q' + a.id + '-' + i" (change)="set(a.id, q.label, val($event))">
-                        <option value="" [selected]="!text(a.id, q.label)">Choose…</option>
+                        <option value="" [selected]="!text(a.id, q.label)">{{ 'actions.choose' | t }}</option>
                         @for (o of q.options; track o) { <option [value]="o" [selected]="text(a.id, q.label) === o">{{ o }}</option> }
                       </select>
                     }
@@ -116,53 +100,55 @@ const SOURCES: Record<string, string> = {
                              (input)="set(a.id, q.label, val($event))">
                     }
                   }
-                  @if (q.reason) { <p class="hint">{{ q.reason }}</p> }
+                  @if (q.reason) { <p class="hint" dir="auto">{{ q.reason }}</p> }
                   @if (q.sensitive) {
-                    <p class="hint !text-amber-700 dark:!text-amber-400">Sensitive: this was never sent to the AI. Your answer is stored locally.</p>
+                    <p class="hint !text-amber-700 dark:!text-amber-400">{{ 'actions.sensitive' | t }}</p>
                   }
                 </div>
               }
             </div>
             <div class="mt-4">
-              <button type="button" class="btn btn-primary" [disabled]="busy()" (click)="send(a, 'answer')">Save answers and retry</button>
+              <button type="button" class="btn btn-primary" [disabled]="busy()" (click)="send(a, 'answer')">{{ 'actions.saveRetry' | t }}</button>
             </div>
           }
 
           @if (a.kind === 'confirm_submit') {
-            <h2 class="mt-5">What was filled in</h2>
-            <table class="mt-2 w-full text-sm">
-              <tbody>
-                @for (row of entries(a); track row.label) {
-                  <tr class="border-t border-slate-100 align-top dark:border-slate-800">
-                    <th scope="row" class="w-2/5 py-2 pr-3 text-left font-medium text-slate-600 dark:text-slate-400" dir="auto">{{ row.label }}</th>
-                    <td class="py-2 pr-3 break-words" dir="auto">{{ show(row.value) }}</td>
-                    <td class="py-2 text-right"><span class="badge {{ sourceClass(row.source) }}">{{ row.source || 'unknown' }}</span></td>
-                  </tr>
-                } @empty {
-                  <tr><td class="py-2 text-slate-500">No filled answers were recorded. Check the screenshot.</td></tr>
-                }
-              </tbody>
-            </table>
+            <h2 class="mt-5">{{ 'actions.filled.title' | t }}</h2>
+            <div class="overflow-x-auto">
+              <table class="mt-2 w-full text-sm">
+                <tbody>
+                  @for (row of entries(a); track row.label) {
+                    <tr class="border-t border-slate-100 align-top dark:border-slate-800">
+                      <th scope="row" class="w-2/5 py-2 pe-3 text-start font-medium text-slate-600 dark:text-slate-400" dir="auto">{{ row.label }}</th>
+                      <td class="py-2 pe-3 break-words" dir="auto">{{ show(row.value) }}</td>
+                      <td class="py-2 text-end"><span class="badge {{ sourceClass(row.source) }}">{{ sourceLabel(row.source) }}</span></td>
+                    </tr>
+                  } @empty {
+                    <tr><td class="py-2 text-slate-500">{{ 'actions.filled.empty' | t }}</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
             <div class="mt-4 flex flex-wrap gap-3">
               <button type="button" class="btn !border-emerald-700 !bg-emerald-600 !font-semibold !text-white hover:!bg-emerald-700"
-                      [disabled]="busy()" (click)="send(a, 'confirm')">Submit application</button>
-              <button type="button" class="btn btn-danger" [disabled]="busy()" (click)="send(a, 'skip')">Skip</button>
+                      [disabled]="busy()" (click)="send(a, 'confirm')">{{ 'actions.submit' | t }}</button>
+              <button type="button" class="btn btn-danger" [disabled]="busy()" (click)="send(a, 'skip')">{{ 'actions.skip' | t }}</button>
             </div>
           }
 
-          @if (errors()[a.id]; as err) { <div class="alert alert-error mt-4" role="alert">{{ err }}</div> }
+          @if (errors()[a.id]; as err) { <div class="alert alert-error mt-4" role="alert" dir="auto">{{ err }}</div> }
 
           <footer class="mt-5 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
-            <button type="button" class="btn" [disabled]="busy()" (click)="send(a, 'retry')">Retry</button>
-            <a class="btn no-underline hover:no-underline" [href]="a.job.apply_url" target="_blank" rel="noopener">Open application page</a>
-            <button type="button" class="btn" [disabled]="busy()" (click)="send(a, 'applied_by_hand')">I applied by hand</button>
+            <button type="button" class="btn" [disabled]="busy()" (click)="send(a, 'retry')">{{ 'actions.retry' | t }}</button>
+            <a class="btn no-underline hover:no-underline" [href]="a.job.apply_url" target="_blank" rel="noopener">{{ 'actions.openPage' | t }}</a>
+            <button type="button" class="btn" [disabled]="busy()" (click)="send(a, 'applied_by_hand')">{{ 'actions.byHand' | t }}</button>
             @if (a.kind !== 'confirm_submit') {
-              <button type="button" class="btn btn-danger" [disabled]="busy()" (click)="send(a, 'skip')">Skip</button>
+              <button type="button" class="btn btn-danger" [disabled]="busy()" (click)="send(a, 'skip')">{{ 'actions.skip' | t }}</button>
             }
           </footer>
         </section>
       } @empty {
-        <div class="card text-center text-sm text-slate-500">{{ loaded() ? 'Nothing needs your attention.' : 'Loading…' }}</div>
+        <div class="card text-center text-sm text-slate-500">{{ (loaded() ? 'actions.empty' : 'common.loading') | t }}</div>
       }
     </div>
   `,
@@ -170,6 +156,8 @@ const SOURCES: Record<string, string> = {
 export class ActionsPage {
   private readonly api = inject(Api);
   private readonly live = inject(Live);
+  private readonly i18n = inject(I18n);
+  private readonly loc = computed(() => localeOf(this.i18n.lang()));
   protected readonly items = signal<ActionItem[]>([]);
   protected readonly loaded = signal(false);
   protected readonly busy = signal(false);
@@ -195,11 +183,12 @@ export class ActionsPage {
     }
   }
 
-  title = (k: ActionKind): string => TITLES[k] ?? k;
-  help = (k: ActionKind): string => HELP[k] ?? '';
+  hasHelp = (k: ActionKind): boolean => k !== 'unknown_question' && k !== 'confirm_submit';
+  num = (n: number | null): string => fmtNum(this.loc(), n);
+  sourceLabel = (s: string): string => labelOr(this.i18n, 'common.answerSource.', s || 'unknown');
   range = (n: number): number[] => Array.from({ length: n }, (_, i) => i);
   shot = (id: number, n: number): string => `/api/actions/${id}/screenshot/${n}`;
-  when = (iso: string): string => new Date(iso).toLocaleString();
+  when = (iso: string): string => new Date(iso).toLocaleString(this.loc());
   sourceClass = (s: string): string => SOURCES[s] ?? 'tier-low';
   val = (e: Event): string => (e.target as HTMLInputElement).value;
   /** Which control to draw: radios and yes/no -> radio, dropdowns with options -> select, the rest as typed. */
@@ -209,11 +198,14 @@ export class ActionsPage {
     return q.kind === 'textarea' || q.kind === 'multi' || q.kind === 'checkbox' ? q.kind : 'text';
   }
   inputType = (kind: string): string => (['email', 'tel', 'number', 'url', 'date'].includes(kind) ? kind : 'text');
+  // 'Yes' / 'No' are the values sent to the server; only their labels are translated.
   choices = (q: ActionQuestion): string[] => (q.options.length ? q.options : q.kind === 'yesno' ? ['Yes', 'No'] : []);
+  optLabel = (q: ActionQuestion, o: string): string =>
+    q.options.length ? o : o === 'Yes' ? this.i18n.t('common.yes') : o === 'No' ? this.i18n.t('common.no') : o;
   entries = (a: ActionItem) => Object.entries(a.answers).map(([label, v]) => ({ label, ...v }));
 
   show(v: unknown): string {
-    if (typeof v === 'boolean') return v ? 'Yes' : 'No';
+    if (typeof v === 'boolean') return this.i18n.t(v ? 'common.yes' : 'common.no');
     if (Array.isArray(v)) return v.join(', ');
     return v == null ? '' : String(v);
   }

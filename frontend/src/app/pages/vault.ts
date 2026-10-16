@@ -1,61 +1,61 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Api } from '../api';
+import { I18n, TPipe } from '../i18n';
+import { fmtNum, labelOr, localeOf } from '../locale';
 import { VaultEntry, VaultState } from '../types';
 
 @Component({
   selector: 'app-vault',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, TPipe],
   template: `
-    <h1>Vault</h1>
-    <p class="mt-1 max-w-3xl text-sm text-slate-500">
-      Site passwords and your email app password, encrypted on this computer. The passphrase can't be recovered.
-    </p>
+    <h1>{{ 'vault.title' | t }}</h1>
+    <p class="mt-1 max-w-3xl text-sm text-slate-500">{{ 'vault.intro' | t }}</p>
 
-    @if (error(); as err) { <div class="alert alert-error mt-4 max-w-4xl" role="alert">{{ err }}</div> }
-    @if (notice(); as n) { <div class="alert alert-ok mt-4 max-w-4xl" role="status">{{ n }}</div> }
+    @if (error(); as err) { <div class="alert alert-error mt-4 max-w-4xl" role="alert" dir="auto">{{ err }}</div> }
+    @if (notice(); as n) { <div class="alert alert-ok mt-4 max-w-4xl" role="status">{{ n | t }}</div> }
 
     @if (!state()) {
-      <p class="mt-6 text-sm text-slate-500">Loading…</p>
+      <p class="mt-6 text-sm text-slate-500">{{ 'common.loading' | t }}</p>
     } @else if (!state()!.initialized) {
       <div class="card mt-5 max-w-3xl text-sm">
-        No vault yet. Create one in the <a routerLink="/setup">setup wizard</a> (Vault step).
+        {{ 'vault.none.a' | t }}<a routerLink="/setup">{{ 'vault.none.link' | t }}</a>{{ 'vault.none.b' | t }}
       </div>
     } @else if (!state()!.unlocked) {
       <form class="card mt-5 max-w-md space-y-4" (ngSubmit)="unlock()">
-        <h2>Locked</h2>
+        <h2>{{ 'vault.locked' | t }}</h2>
         <div>
-          <label class="label" for="unlock-pass">Passphrase</label>
+          <label class="label" for="unlock-pass">{{ 'vault.passphrase' | t }}</label>
           <input id="unlock-pass" type="password" class="input" name="pass" [(ngModel)]="pass" autocomplete="current-password">
         </div>
         <label class="flex items-start gap-3 text-sm">
           <input type="checkbox" class="mt-1" name="remember" [(ngModel)]="remember">
-          <span><span class="font-medium">Remember on this computer</span>
-            <span class="block text-xs text-slate-500">Opens by itself next time. Turn off on a shared computer.</span></span>
+          <span><span class="font-medium">{{ 'vault.remember' | t }}</span>
+            <span class="block text-xs text-slate-500">{{ 'vault.rememberHint' | t }}</span></span>
         </label>
-        <button type="submit" class="btn btn-primary" [disabled]="busy() || !pass">Unlock</button>
+        <button type="submit" class="btn btn-primary" [disabled]="busy() || !pass">{{ 'vault.unlock' | t }}</button>
       </form>
     } @else {
       <div class="mt-5 flex max-w-4xl flex-wrap items-center gap-3">
-        <span class="badge tier-high">Unlocked</span>
-        <span class="text-sm text-slate-500">{{ state()!.entries.length }} {{ state()!.entries.length === 1 ? 'entry' : 'entries' }}</span>
-        <span class="ml-auto flex gap-2">
-          <button type="button" class="btn" [disabled]="busy()" (click)="toggleExport()" [attr.aria-expanded]="exporting()">Export</button>
-          <button type="button" class="btn" [disabled]="busy()" (click)="lock()">Lock</button>
+        <span class="badge tier-high">{{ 'vault.unlocked' | t }}</span>
+        <span class="text-sm text-slate-500">{{ (state()!.entries.length === 1 ? 'vault.entries.one' : 'vault.entries.other') | t: { n: num(state()!.entries.length) } }}</span>
+        <span class="ms-auto flex gap-2">
+          <button type="button" class="btn" [disabled]="busy()" (click)="toggleExport()" [attr.aria-expanded]="exporting()">{{ 'vault.export' | t }}</button>
+          <button type="button" class="btn" [disabled]="busy()" (click)="lock()">{{ 'vault.lock' | t }}</button>
         </span>
       </div>
 
       @if (exporting()) {
         <form class="card mt-4 max-w-4xl space-y-3" (ngSubmit)="exportAll()">
           <div class="alert alert-error" role="alert">
-            <strong>The export is not encrypted.</strong> It lists every password in plain text. Keep it somewhere safe and delete it when you're done.
+            <strong>{{ 'vault.export.warnTitle' | t }}</strong> {{ 'vault.export.warnBody' | t }}
           </div>
-          <label class="label" for="export-pass">Passphrase</label>
+          <label class="label" for="export-pass">{{ 'vault.passphrase' | t }}</label>
           <input id="export-pass" type="password" class="input max-w-sm" name="pass" [(ngModel)]="exportPass" autocomplete="current-password">
           <div class="flex gap-3">
-            <button type="submit" class="btn btn-primary" [disabled]="busy() || !exportPass">Download export</button>
-            <button type="button" class="btn" (click)="toggleExport()">Cancel</button>
+            <button type="submit" class="btn btn-primary" [disabled]="busy() || !exportPass">{{ 'vault.export.download' | t }}</button>
+            <button type="button" class="btn" (click)="toggleExport()">{{ 'vault.cancel' | t }}</button>
           </div>
         </form>
       }
@@ -64,37 +64,35 @@ import { VaultEntry, VaultState } from '../types';
         @for (e of state()!.entries; track e.id; let first = $first) {
           <div class="px-4 py-3" [class.border-t]="!first" [class.border-slate-100]="!first" [class.dark:border-slate-800]="!first">
             <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
-              <span class="badge alert-info">{{ e.kind }}</span>
+              <span class="badge alert-info">{{ kindLabel(e.kind) }}</span>
               <span class="min-w-0 flex-1 break-words text-sm font-medium" dir="auto">{{ e.site }}</span>
               <span class="min-w-0 break-all text-sm text-slate-600 dark:text-slate-300" dir="auto">{{ e.username }}</span>
-              <span class="text-xs text-slate-500">Updated {{ when(e.updated_at) }}</span>
+              <span class="text-xs text-slate-500">{{ 'vault.updated' | t: { date: when(e.updated_at) } }}</span>
               <span class="flex gap-2">
                 @if (secret()?.id === e.id) {
-                  <button type="button" class="btn" (click)="hide()">Hide</button>
+                  <button type="button" class="btn" (click)="hide()">{{ 'vault.hide' | t }}</button>
                 } @else {
-                  <button type="button" class="btn" [disabled]="busy()" (click)="askReveal(e)" [attr.aria-expanded]="asking() === e.id">Reveal</button>
+                  <button type="button" class="btn" [disabled]="busy()" (click)="askReveal(e)" [attr.aria-expanded]="asking() === e.id">{{ 'vault.reveal' | t }}</button>
                 }
-                <button type="button" class="btn btn-danger" [disabled]="busy()" (click)="remove(e)">Delete</button>
+                <button type="button" class="btn btn-danger" [disabled]="busy()" (click)="remove(e)">{{ 'vault.delete' | t }}</button>
               </span>
             </div>
             @if (asking() === e.id) {
               <form class="mt-3 flex flex-wrap items-end gap-3" (ngSubmit)="reveal(e)">
-                <div>
-                  <label class="label" [attr.for]="'rp' + e.id">Passphrase</label>
-                  <input [id]="'rp' + e.id" type="password" class="input w-64" name="pass" [(ngModel)]="revealPass" autocomplete="current-password">
+                <div class="w-full sm:w-64">
+                  <label class="label" [attr.for]="'rp' + e.id">{{ 'vault.passphrase' | t }}</label>
+                  <input [id]="'rp' + e.id" type="password" class="input" name="pass" [(ngModel)]="revealPass" autocomplete="current-password">
                 </div>
-                <button type="submit" class="btn btn-primary" [disabled]="busy() || !revealPass">Show secret</button>
-                <button type="button" class="btn" (click)="hide()">Cancel</button>
+                <button type="submit" class="btn btn-primary" [disabled]="busy() || !revealPass">{{ 'vault.showSecret' | t }}</button>
+                <button type="button" class="btn" (click)="hide()">{{ 'vault.cancel' | t }}</button>
               </form>
             }
             @if (secret()?.id === e.id) {
-              <p class="mt-3 select-all break-all rounded-lg bg-slate-100 px-3 py-2 font-mono text-sm dark:bg-slate-800" aria-live="polite">{{ secret()!.value }}</p>
+              <p class="mt-3 select-all break-all rounded-lg bg-slate-100 px-3 py-2 font-mono text-sm dark:bg-slate-800" dir="ltr" aria-live="polite">{{ secret()!.value }}</p>
             }
           </div>
         } @empty {
-          <p class="p-8 text-center text-sm text-slate-500">
-            Nothing saved yet. Passwords appear here when LinKit creates an account for you on a job site.
-          </p>
+          <p class="p-8 text-center text-sm text-slate-500">{{ 'vault.empty' | t }}</p>
         }
       </div>
     }
@@ -102,10 +100,12 @@ import { VaultEntry, VaultState } from '../types';
 })
 export class VaultPage implements OnInit {
   private readonly api = inject(Api);
+  private readonly i18n = inject(I18n);
+  private readonly loc = computed(() => localeOf(this.i18n.lang()));
   protected readonly state = signal<VaultState | null>(null);
   protected readonly busy = signal(false);
   protected readonly error = signal('');
-  protected readonly notice = signal('');
+  protected readonly notice = signal(''); // an i18n key, so it follows the language
   protected readonly asking = signal<number | null>(null);
   protected readonly secret = signal<{ id: number; value: string } | null>(null);
   protected readonly exporting = signal(false);
@@ -118,7 +118,9 @@ export class VaultPage implements OnInit {
     return this.run(async () => undefined);
   }
 
-  when = (iso: string): string => new Date(iso).toLocaleString();
+  num = (n: number): string => fmtNum(this.loc(), n);
+  kindLabel = (kind: string): string => labelOr(this.i18n, 'vault.kind.', kind);
+  when = (iso: string): string => new Date(iso).toLocaleString(this.loc());
 
   unlock(): Promise<void> {
     return this.run(async () => {
@@ -155,7 +157,7 @@ export class VaultPage implements OnInit {
   }
 
   async remove(e: VaultEntry): Promise<void> {
-    if (!confirm(`Delete the saved password for ${e.username} on ${e.site}? This can't be undone.`)) return;
+    if (!confirm(this.i18n.t('vault.confirmDelete', { user: e.username, site: e.site }))) return;
     await this.run(async () => {
       await this.api.delete(`/vault/entries/${e.id}`);
       if (this.secret()?.id === e.id || this.asking() === e.id) this.hide();
@@ -178,7 +180,7 @@ export class VaultPage implements OnInit {
       URL.revokeObjectURL(url);
       this.exportPass = '';
       this.exporting.set(false);
-      this.notice.set('Export downloaded. It is not encrypted: delete it when you are done.');
+      this.notice.set('vault.exported');
     });
   }
 
