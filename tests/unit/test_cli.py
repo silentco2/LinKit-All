@@ -76,3 +76,9 @@ def test_search_import_and_empty_discover(tmp_path: Path, monkeypatch: pytest.Mo
         assert runner.invoke(cli.app, ["status"]).exit_code == 0
     finally:
         get_settings.cache_clear()
+
+
+def test_doctor_finds_tectonic_through_the_helper(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(cli, "tectonic_path", lambda: "/cargo/bin/tectonic")
+    tectonic = next(c for c in cli.run_checks() if c.name == "Tectonic")
+    assert tectonic.path == "/cargo/bin/tectonic"

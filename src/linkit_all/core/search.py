@@ -62,6 +62,7 @@ class AISection(BaseModel):
 
     provider: ProviderName | None = None
     model: str | None = None
+    api_base: str | None = None  # local OpenAI-compatible server; litellm only. Keys stay in env.
 
 
 class EmailSection(BaseModel):

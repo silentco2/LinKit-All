@@ -1,8 +1,10 @@
 import time
+import types
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
+import httpx
 import keyring
 import pytest
 from fastapi.testclient import TestClient
@@ -470,3 +472,68 @@ def test_email_connect_test_disconnect(client: TestClient, monkeypatch: pytest.M
     assert client.delete("/api/email", headers=SAME_ORIGIN).status_code == 204
     assert vault.entries() == [] and client.get("/api/email").json()["connected"] is False
     assert post("/api/email/test").status_code == 404
+
+
+def _fake_servers(monkeypatch: pytest.MonkeyPatch, handler: Any) -> None:
+    from linkit_all.api import routes
+
+    real = httpx.AsyncClient
+    monkeypatch.setattr(
+        routes.httpx,
+        "AsyncClient",
+        lambda **kw: real(transport=httpx.MockTransport(handler), **kw),
+    )
+
+
+def test_local_models_lists_running_servers(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.port == 11434:
+            return httpx.Response(
+                200, json={"models": [{"name": "llama3.1:8b"}, {"name": "qwen3"}]}
+            )
+        return httpx.Response(200, json={"data": [{"id": "gemma-3"}]})
+
+    _fake_servers(monkeypatch, handler)
+    assert client.get("/api/ai/local").json() == {
+        "ollama": {"running": True, "models": ["llama3.1:8b", "qwen3"]},
+        "lmstudio": {"running": True, "models": ["gemma-3"]},
+    }
+
+
+def test_local_models_when_nothing_runs_or_it_times_out(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def refused(request: httpx.Request) -> httpx.Response:
+        if request.url.port == 11434:
+            raise httpx.ConnectError("refused")
+        raise httpx.ReadTimeout("slow")
+
+    _fake_servers(monkeypatch, refused)
+    down = {"running": False, "models": []}
+    assert client.get("/api/ai/local").json() == {"ollama": down, "lmstudio": down}
+
+
+def test_ai_check_passes_local_server_to_litellm(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import litellm
+
+    seen: dict[str, Any] = {}
+
+    async def fake_completion(**kw: Any) -> Any:
+        seen.update(kw)
+        message = types.SimpleNamespace(content='{"ok": true}')
+        return types.SimpleNamespace(choices=[types.SimpleNamespace(message=message)])
+
+    monkeypatch.setattr(litellm, "acompletion", fake_completion)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    body = {
+        "provider": "litellm",
+        "model": "openai/gemma-3",
+        "api_base": "http://127.0.0.1:1234/v1",
+    }
+    r = client.post("/api/ai/check", json=body, headers=SAME_ORIGIN).json()
+    assert r["ok"] and "openai/gemma-3" in r["message"]
+    assert seen["api_base"] == "http://127.0.0.1:1234/v1" and seen["api_key"] == "local"

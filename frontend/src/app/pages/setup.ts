@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { Api } from '../api';
 import { ApplicationAnswers, EmailState, lines, Profile, Provider, SearchConfig, Segment, Status, unlines } from '../types';
 
+type LocalServer = 'ollama' | 'lmstudio';
 type Step = 'profile' | 'ai' | 'search' | 'filters' | 'answers' | 'apply' | 'vault' | 'email' | 'finish';
 type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_disability';
 
@@ -102,24 +103,59 @@ type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_
                 <legend class="label">Provider</legend>
                 @for (p of providers; track p.id) {
                   <label class="flex items-start gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700"
-                         [class.border-brand-500]="cfg.ai.provider === p.id">
-                    <input type="radio" name="provider" class="mt-1" [value]="p.id" [(ngModel)]="cfg.ai.provider">
+                         [class.border-brand-500]="mode() === p.id">
+                    <input type="radio" name="provider" class="mt-1" [value]="p.id" [ngModel]="mode()" (ngModelChange)="setMode($event)">
                     <span>
                       <span class="font-medium">{{ p.label }}</span>
-                      @if (available()[p.id] === false) { <span class="badge tier-low ml-2">not installed</span> }
+                      @if (p.id !== 'local' && available()[p.id] === false) { <span class="badge tier-low ml-2">not installed</span> }
                       <span class="block text-xs text-slate-500">{{ p.hint }}</span>
                     </span>
                   </label>
                 }
               </fieldset>
-              <div>
-                <label class="label" for="model">Model (optional)</label>
-                <input id="model" class="input" [(ngModel)]="cfg.ai.model" [placeholder]="cfg.ai.provider === 'litellm' ? 'e.g. openai/gpt-5-mini' : 'leave empty for the CLI default'">
-              </div>
-              @if (cfg.ai.provider !== 'litellm') {
-                <p class="hint">Usage counts against your own plan limits. If a limit is reached, the run pauses and continues later.</p>
+              @if (mode() === 'local') {
+                <div class="space-y-3">
+                  @for (s of localServers; track s.id) {
+                    <div class="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                      <div class="flex items-center gap-2">
+                        <span class="font-medium">{{ s.label }}</span>
+                        @if (!local()) { <span class="badge">checking…</span> }
+                        @else if (local()![s.id].running) { <span class="badge tier-high">running</span> }
+                        @else { <span class="badge tier-low">not running</span> }
+                      </div>
+                      @if (local()?.[s.id]?.running) {
+                        @if (local()![s.id].models.length === 0) {
+                          <p class="hint">No models downloaded yet.</p>
+                        }
+                        <div class="mt-2 flex flex-wrap gap-2">
+                          @for (m of local()![s.id].models; track m) {
+                            <button type="button" class="btn" [class.btn-primary]="cfg.ai.model === s.prefix + m" (click)="pickLocal(s.id, m)">{{ m }}</button>
+                          }
+                        </div>
+                      }
+                    </div>
+                  }
+                  <button type="button" class="btn" (click)="scanLocal()">Scan again</button>
+                  <div>
+                    <label class="label" for="api-base">Server address (any OpenAI-compatible server)</label>
+                    <input id="api-base" class="input" [(ngModel)]="cfg.ai.api_base" placeholder="http://127.0.0.1:1234/v1">
+                  </div>
+                  <div>
+                    <label class="label" for="model">Model</label>
+                    <input id="model" class="input" [(ngModel)]="cfg.ai.model" placeholder="e.g. ollama/llama3.1 or openai/my-model">
+                  </div>
+                </div>
+                <p class="hint">Free and private: nothing leaves this computer. Small local models can score and tailor less accurately; their answers are checked against a strict format and retried when invalid.</p>
               } @else {
-                <p class="hint">Set your API key in the LINKIT_API_KEY environment variable for now (the encrypted vault comes later).</p>
+                <div>
+                  <label class="label" for="model">Model (optional)</label>
+                  <input id="model" class="input" [(ngModel)]="cfg.ai.model" [placeholder]="cfg.ai.provider === 'litellm' ? 'e.g. openai/gpt-5-mini' : 'leave empty for the CLI default'">
+                </div>
+                @if (cfg.ai.provider !== 'litellm') {
+                  <p class="hint">Usage counts against your own plan limits. If a limit is reached, the run pauses and continues later.</p>
+                } @else {
+                  <p class="hint">Set your API key in the LINKIT_API_KEY environment variable for now (the encrypted vault comes later).</p>
+                }
               }
               <div class="flex gap-3">
                 <button class="btn" (click)="testAI()" [disabled]="busy() || !cfg.ai.provider">Test connection</button>
@@ -336,6 +372,11 @@ type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_
                 <p class="text-sm text-rose-600" role="alert">The shortest pause can't be longer than the longest pause.</p>
               }
               <label class="flex items-center gap-2 text-sm"><input type="checkbox" [(ngModel)]="cfg.apply.headless">Hide the browser window (headless)</label>
+              <label class="flex items-start gap-3 text-sm">
+                <input type="checkbox" class="mt-1" [(ngModel)]="cfg.apply.generic_agent">
+                <span><span class="font-medium">Use the AI form agent for sites without a dedicated handler</span>
+                  <span class="block text-xs text-slate-500">One AI call per form page.</span></span>
+              </label>
               <button class="btn btn-primary" (click)="saveSearch('Apply settings saved')" [disabled]="busy() || pauseInvalid()">Save apply settings</button>
             </section>
           }
@@ -469,11 +510,18 @@ export class SetupPage implements OnInit {
     { id: 'email', label: 'Email' },
     { id: 'finish', label: 'Finish' },
   ];
-  protected readonly providers: { id: Provider; label: string; hint: string }[] = [
+  protected readonly providers: { id: Provider | 'local'; label: string; hint: string }[] = [
     { id: 'codex_cli', label: 'ChatGPT plan (Codex CLI)', hint: 'Uses your ChatGPT subscription through the codex command.' },
     { id: 'claude_cli', label: 'Claude plan (Claude Code CLI)', hint: 'Uses your Claude subscription through the claude command.' },
-    { id: 'litellm', label: 'API key or local model', hint: 'OpenAI, Anthropic, Gemini… or Ollama / LM Studio on this computer.' },
+    { id: 'litellm', label: 'API key', hint: 'OpenAI, Anthropic, Gemini… with your own key.' },
+    { id: 'local', label: 'Local model (free, private)', hint: 'Ollama or LM Studio running on this computer.' },
   ];
+  protected readonly localServers: { id: LocalServer; label: string; prefix: string; base: string }[] = [
+    { id: 'ollama', label: 'Ollama', prefix: 'ollama/', base: 'http://127.0.0.1:11434' },
+    { id: 'lmstudio', label: 'LM Studio', prefix: 'openai/', base: 'http://127.0.0.1:1234/v1' },
+  ];
+  protected readonly local = signal<Record<LocalServer, { running: boolean; models: string[] }> | null>(null);
+  protected readonly mode = signal<Provider | 'local' | null>(null);
   protected readonly jobspySites = ['linkedin', 'indeed', 'glassdoor', 'google', 'zip_recruiter'];
   protected readonly regionalSites = ['wuzzuf', 'bayt'];
   protected readonly seniorities = ['intern', 'junior', 'mid', 'senior', 'lead', 'manager', 'executive'];
@@ -488,6 +536,9 @@ export class SetupPage implements OnInit {
       this.api.get<EmailState>('/email'),
     ]);
     cfg.ai.provider ??= ai.provider;
+    cfg.ai.api_base ??= null;
+    this.mode.set(cfg.ai.provider === 'litellm' && cfg.ai.api_base ? 'local' : cfg.ai.provider);
+    if (this.mode() === 'local') void this.scanLocal();
     this.profile = profile;
     this.cfg = cfg;
     this.ans = ans;
@@ -643,6 +694,28 @@ export class SetupPage implements OnInit {
       this.ans = await this.api.put<ApplicationAnswers>('/profile/answers', this.ans);
       return 'Application answers saved';
     });
+  }
+
+  setMode(id: Provider | 'local'): void {
+    this.mode.set(id);
+    const ai = this.cfg!.ai;
+    ai.provider = id === 'local' ? 'litellm' : id;
+    if (id === 'local') {
+      void this.scanLocal();
+    } else {
+      ai.api_base = null;
+    }
+  }
+
+  async scanLocal(): Promise<void> {
+    this.local.set(null);
+    this.local.set(await this.api.get<Record<LocalServer, { running: boolean; models: string[] }>>('/ai/local'));
+  }
+
+  pickLocal(server: LocalServer, model: string): void {
+    const s = this.localServers.find((x) => x.id === server)!;
+    this.cfg!.ai.model = s.prefix + model;
+    this.cfg!.ai.api_base = s.base;
   }
 
   testAI(): Promise<void> {

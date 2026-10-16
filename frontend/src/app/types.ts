@@ -61,7 +61,7 @@ export interface SearchConfig {
     one_per_company: boolean;
   };
   matching: { ai_max_jobs: number; tier_high: number; tier_mid: number; batch_size: number };
-  ai: { provider: Provider | null; model: string | null };
+  ai: { provider: Provider | null; model: string | null; api_base: string | null };
   apply: ApplySection;
   email: { imap_host: string; imap_user: string; timeout_s: number; poll_s: number };
   schedule: ScheduleSection;
@@ -84,6 +84,7 @@ export interface ApplySection {
   headless: boolean;
   min_pause_s: number;
   max_pause_s: number;
+  generic_agent: boolean;
 }
 
 /** Null / empty means "ask me in the Action Center" for the sensitive fields. */

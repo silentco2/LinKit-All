@@ -27,6 +27,8 @@ def ai_settings(
 ) -> Settings:
     """CLI flags > the wizard's AI choice (saved with the search config) > env defaults."""
     chosen = {k: v for k, v in cfg.ai.model_dump().items() if v}
+    if chosen.get("provider") != "litellm":
+        chosen.pop("api_base", None)  # only the API/local adapter talks to a server
     try:
         return Settings.model_validate({**settings.model_dump(), **chosen, **(override or {})})
     except ValidationError as e:

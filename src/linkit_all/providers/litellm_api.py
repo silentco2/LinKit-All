@@ -1,5 +1,6 @@
 """API keys and local OpenAI-compatible servers (Ollama, LM Studio) through LiteLLM."""
 
+import os
 from typing import Any
 
 from linkit_all.providers.base import LLMProvider, ProviderError, UsageLimitError, classify
@@ -19,7 +20,10 @@ class LiteLLMProvider(LLMProvider):
         if not model:
             raise ProviderError("litellm needs a model, e.g. LINKIT_MODEL=openai/gpt-5-mini")
         super().__init__(model, **kwargs)
-        self.api_key = api_key
+        # Local OpenAI-compatible servers ignore the key, but the OpenAI client insists on one.
+        self.api_key = api_key or (
+            "local" if api_base and not os.environ.get("OPENAI_API_KEY") else None
+        )
         self.api_base = api_base
 
     async def _call(self, prompt: str) -> str:

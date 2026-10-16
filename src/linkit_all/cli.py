@@ -21,7 +21,7 @@ from linkit_all.core.models import Job
 from linkit_all.core.profile import ProfileIn, import_profile
 from linkit_all.core.runs import current_run
 from linkit_all.core.search import import_search
-from linkit_all.core.tools import bundled_libreoffice, chrome_path, soffice_path
+from linkit_all.core.tools import bundled_libreoffice, chrome_path, soffice_path, tectonic_path
 from linkit_all.providers import ProviderError, get_provider
 
 if TYPE_CHECKING:
@@ -55,7 +55,7 @@ def run_checks() -> list[Check]:
         Check("Google Chrome", chrome_path(), False, "needed to apply: https://www.google.com/chrome/"),
         Check("Codex CLI", shutil.which("codex"), False, "npm i -g @openai/codex"),
         Check("Claude CLI", shutil.which("claude"), False, "https://claude.com/claude-code"),
-        Check("Tectonic", shutil.which("tectonic"), False, "LaTeX CVs only: https://tectonic-typesetting.github.io"),
+        Check("Tectonic", tectonic_path(), False, "LaTeX CVs only: https://tectonic-typesetting.github.io"),
     ]  # fmt: skip
 
 

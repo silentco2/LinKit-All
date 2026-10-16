@@ -6,6 +6,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Literal
 
+import httpx
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, field_validator
@@ -234,9 +235,33 @@ def get_ai(request: Request) -> dict[str, Any]:
     }
 
 
+LOCAL_SERVERS = {  # local only: these probes never leave 127.0.0.1
+    "ollama": ("http://127.0.0.1:11434/api/tags", "models", "name"),
+    "lmstudio": ("http://127.0.0.1:1234/v1/models", "data", "id"),
+}
+
+
+async def _probe_local(client: httpx.AsyncClient, url: str, key: str, field: str) -> dict[str, Any]:
+    try:
+        r = await client.get(url)
+        r.raise_for_status()
+        names = [str(m[field]) for m in r.json().get(key, []) if isinstance(m, dict) and field in m]
+    except (httpx.HTTPError, ValueError, AttributeError):
+        return {"running": False, "models": []}
+    return {"running": True, "models": names}
+
+
+@router.get("/ai/local")
+async def local_models() -> dict[str, Any]:
+    async with httpx.AsyncClient(timeout=1.5) as client:
+        results = await asyncio.gather(*(_probe_local(client, *v) for v in LOCAL_SERVERS.values()))
+    return dict(zip(LOCAL_SERVERS, results, strict=True))
+
+
 class AICheck(BaseModel):
     provider: Literal["codex_cli", "claude_cli", "litellm"]
     model: str | None = None
+    api_base: str | None = None
 
 
 @router.post("/ai/check")
@@ -244,7 +269,13 @@ async def check_ai(request: Request, body: AICheck) -> dict[str, Any]:
     from linkit_all.providers import ProviderError, get_provider
 
     cfg = SearchConfig.model_validate(
-        {"ai": {"provider": body.provider, "model": body.model or None}}
+        {
+            "ai": {
+                "provider": body.provider,
+                "model": body.model or None,
+                "api_base": body.api_base or None,
+            }
+        }
     )
     try:
         message = await get_provider(ai_settings(_settings(request), cfg)).check()
