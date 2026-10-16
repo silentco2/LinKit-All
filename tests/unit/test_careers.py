@@ -9,7 +9,7 @@ import pytest
 from linkit_all.core.db import init_db
 from linkit_all.core.runs import current_run
 from linkit_all.core.search import SearchConfig
-from linkit_all.providers.base import LLMProvider
+from linkit_all.providers.base import LLMProvider, ProviderError, UsageLimitError
 from linkit_all.sources import registry
 from linkit_all.sources.base import JobStub, Task
 from linkit_all.sources.careers import Careers, Unsupported
@@ -22,21 +22,39 @@ JOB = FIX / "mozilla_job.html"
 
 
 class FakeAI(LLMProvider):
+    """Answers every page id it is shown, plus (optionally) ids it was never given."""
+
     name = "fake"
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        extra_ids: tuple[int, ...] = (),
+        skip_ids: tuple[int, ...] = (),
+        error: Exception | None = None,
+    ) -> None:
         super().__init__("fake")
         self.prompts: list[str] = []
+        self.extra_ids, self.skip_ids, self.error = extra_ids, skip_ids, error
 
     async def _call(self, prompt: str) -> str:
         self.prompts.append(prompt)
+        if self.error:
+            raise self.error
+        ids = [int(i) for i in re.findall(r"=== page id (\d+) ===", prompt)]
+        ids = [i for i in ids if i not in self.skip_ids] + list(self.extra_ids)
         return json.dumps(
             {
-                "title": "Staff Data Scientist (Ads)",
-                "location": "Remote US",
-                "remote": "remote",
-                "employment_type": "Full-time",
-                "posted_date": "2026-09-01",
+                "jobs": [
+                    {
+                        "id": i,
+                        "title": f"AI title {i}",
+                        "location": "Remote US",
+                        "remote": "remote",
+                        "employment_type": "Full-time",
+                        "posted_date": "2026-09-01",
+                    }
+                    for i in ids
+                ]
             }
         )
 
@@ -118,18 +136,96 @@ def test_link_heuristics_without_a_provider() -> None:
     assert len(run_search(client2, LISTING, limit=3)[0]) == 3
 
 
+def no_location(html: str) -> str:
+    return html.replace("Locations:", "").replace(
+        '<dd class="job-post-location">Remote US</dd>', ""
+    )
+
+
+def bare_site(n: int, job_html: str = "") -> dict[str, str]:
+    """A listing with n job links; each job page has an h1 but, by default, no location."""
+    links = "".join(f'<a href="/jobs/role-{i}-x">Backend Engineer {i}</a>' for i in range(n))
+    default = "<html><body><h1>Role {i}</h1><p>Build things. Hiring now.</p></body></html>"
+    pages = {"/careers": f"<html><body><p>{'Open roles. ' * 30}</p>{links}</body></html>"}
+    for i in range(n):
+        pages[f"/jobs/role-{i}-x"] = (job_html or default).replace("{i}", str(i))
+    return pages
+
+
+CAREERS = "https://acme.test/careers"
+
+
 def test_ai_extraction_decides_fields_not_urls() -> None:
     pages, paths = listing_with_jobs()
+    pages = {k: no_location(v) if k in paths else v for k, v in pages.items()}
     client, _ = site(pages)
     ai = FakeAI()
     stubs, _ = run_search(client, LISTING, ai, limit=2)
-    assert len(ai.prompts) == 2 and "Hiring Ranges" in ai.prompts[0]
+    assert len(ai.prompts) == 1 and "Hiring Ranges" in ai.prompts[0]  # both pages, one call
     assert "job-boards.greenhouse.io" not in ai.prompts[0]  # page text only, no hrefs
     s = stubs[0]
-    assert (s.title, s.location, s.remote) == ("Staff Data Scientist (Ads)", "Remote US", "remote")
+    assert (s.title, s.location, s.remote) == ("AI title 0", "Remote US", "remote")
     assert s.posted_at is not None and s.posted_at.year == 2026
     assert s.url == f"https://www.mozilla.org{paths[0]}"  # the URL is always ours
     assert s.extra["employment"] == "Full-time"
+    assert stubs[1].title == "AI title 1"
+
+
+def test_25_ai_pages_cost_three_calls() -> None:
+    client, _ = site(bare_site(25))
+    ai = FakeAI()
+    stubs, _ = run_search(client, CAREERS, ai)
+    assert len(stubs) == 25 and len(ai.prompts) == 3  # 10 + 10 + 5
+    assert all(p.count("=== page id") <= 10 for p in ai.prompts)
+    assert len({s.url for s in stubs}) == 25
+
+
+def test_excerpt_is_short() -> None:
+    client, _ = site(
+        bare_site(1, "<html><body><h1>R</h1><p>" + "word " * 2000 + "</p></body></html>")
+    )
+    ai = FakeAI()
+    run_search(client, CAREERS, ai)
+    assert len(ai.prompts[0]) < 4000
+
+
+def test_pages_with_a_location_need_no_ai() -> None:
+    labelled = (
+        "<html><body><h1>Role {i}</h1><p>Location: Cairo, Egypt</p><p>Build.</p></body></html>"
+    )
+    meta = '<html><head><meta name="geo.placename" content="Berlin"></head><body><h1>R {i}</h1></body></html>'
+    for html, where in ((labelled, "Cairo, Egypt"), (meta, "Berlin")):
+        client, _ = site(bare_site(12, html))
+        ai = FakeAI()
+        stubs, _ = run_search(client, CAREERS, ai)
+        assert ai.prompts == [] and len(stubs) == 12
+        assert stubs[0].location == where and stubs[0].title.startswith(
+            "Role" if "Role" in html else "R "
+        )
+    pages, _ = listing_with_jobs()  # Mozilla's "Locations:" label + value on the next line
+    client, _ = site(pages)
+    ai = FakeAI()
+    stubs, _ = run_search(client, LISTING, ai)
+    assert ai.prompts == [] and stubs[0].location == "Remote US"
+
+
+def test_invented_ids_are_ignored_and_missing_ids_fall_back_to_the_title() -> None:
+    client, _ = site(bare_site(3))
+    ai = FakeAI(extra_ids=(7, -1, 99), skip_ids=(1,))
+    stubs, _ = run_search(client, CAREERS, ai)
+    assert [s.title for s in stubs] == ["AI title 0", "Role 1", "AI title 2"]
+    assert len(stubs) == 3 and {s.url for s in stubs} == {
+        f"https://acme.test/jobs/role-{i}-x" for i in range(3)
+    }
+
+
+def test_provider_error_degrades_but_usage_limit_pauses() -> None:
+    client, _ = site(bare_site(2))
+    stubs, _ = run_search(client, CAREERS, FakeAI(error=ProviderError("boom")))
+    assert [s.title for s in stubs] == ["Role 0", "Role 1"]
+    client2, _ = site(bare_site(2))
+    with pytest.raises(UsageLimitError):
+        run_search(client2, CAREERS, FakeAI(error=UsageLimitError("usage limit reached")))
 
 
 def test_next_page_is_followed_and_capped() -> None:

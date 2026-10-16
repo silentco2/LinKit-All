@@ -1,7 +1,8 @@
 """Any company careers page that no ATS plugin covers.
 
 Order: JSON-LD JobPosting on the page -> links that look like job pages (each read through
-JSON-LD, else page text + AI extraction when a provider is available, else the page title) ->
+JSON-LD, else an <h1> plus a plainly labelled location, else page text sent to the AI in
+batches of AI_BATCH pages per call when a provider is available, else the page title) ->
 "unsupported". Every fetch is checked against robots.txt first (Http.allowed). Pages that
 need a browser or answer with a bot challenge are reported as unsupported, never worked around.
 """
@@ -23,7 +24,9 @@ from linkit_all.sources.text import html_to_text, normalize_url
 
 PAGE = 10  # job pages per checkpoint
 MAX_LIST_PAGES = 4  # the careers page plus at most 3 "next" pages
-MAX_TEXT = 6000  # characters of page text sent to the model
+AI_BATCH = 10  # job pages per AI call; PAGE == AI_BATCH so one checkpoint costs at most one call
+EXCERPT = 1500  # characters of each page's text sent to the model
+MAX_LOCATION = 80  # a longer "Location:" value is prose, not a location
 MIN_TEXT = 200  # a listing with less text and no job links is almost surely JS-rendered
 
 _JOB_PATH = re.compile(
@@ -51,11 +54,16 @@ class Unsupported(Exception):
 
 
 class ExtractedJob(BaseModel):
-    title: str
+    id: int  # our page number in the batch; replies with other ids are ignored
+    title: str = ""
     location: str = ""
     remote: Literal["remote", "hybrid", "onsite"] | None = None
     employment_type: str = ""
     posted_date: str | None = None
+
+
+class ExtractedBatch(BaseModel):
+    jobs: list[ExtractedJob]
 
 
 def _site(url: str) -> str:
@@ -85,6 +93,32 @@ def _company(tree: LexborHTMLParser, url: str) -> str:
 def _title(tree: LexborHTMLParser) -> str:
     h1, title = tree.css_first("h1"), tree.css_first("title")
     return " ".join(((h1.text() if h1 else "") or (title.text() if title else "")).split())
+
+
+_LOCATION_LABEL = re.compile(r"^locations?\s*:\s*(.*)$", re.I)
+_LOCATION_META = (
+    'meta[name="geo.placename"]',
+    'meta[property="og:locality"]',
+    '[itemprop="addressLocality"]',
+    '[itemprop="jobLocation"]',
+)
+
+
+def _location(tree: LexborHTMLParser) -> str:
+    """A location the page states plainly (meta, microdata, a short "Location:" label), else ''."""
+    for sel in _LOCATION_META:
+        node = tree.css_first(sel)
+        if node and (value := " ".join((node.attributes.get("content") or node.text()).split())):
+            return value[:MAX_LOCATION]
+    tree.strip_tags(["script", "style"])
+    body = tree.body.text(separator="\n") if tree.body else ""
+    lines = [ln for raw in body.splitlines() if (ln := raw.strip())]
+    for i, line in enumerate(lines):
+        if m := _LOCATION_LABEL.match(line):
+            value = m.group(1) or (lines[i + 1] if i + 1 < len(lines) else "")
+            if 2 <= len(value) <= MAX_LOCATION:
+                return value
+    return ""
 
 
 def _main_text(html: str) -> str:
@@ -121,8 +155,7 @@ class Careers(Source):
                 else "no job postings or job links found"
             )
         for start in range(start_page * PAGE, len(links), PAGE):
-            found = [await self._job(http, link, company) for link in links[start : start + PAGE]]
-            yield [s for s in found if s is not None]
+            yield await self._jobs(http, links[start : start + PAGE], company)
 
     async def _fetch(self, http: Http, url: str) -> str:
         if not await http.allowed(url):
@@ -164,7 +197,10 @@ class Careers(Source):
                 break
         return list(links.values())[:limit]
 
-    async def _job(self, http: Http, url: str, company: str) -> JobStub | None:
+    async def _page(
+        self, http: Http, url: str, company: str
+    ) -> JobStub | tuple[str, str, str, str] | None:
+        """A finished stub, or (url, h1/title, text, location) for a page that needs the AI."""
         if not await http.allowed(url):
             return None
         try:
@@ -173,15 +209,29 @@ class Careers(Source):
             return None
         if postings := job_postings(html):
             return _with_company(to_stub(postings[0], self.name, url, None), company)
-        title, text = _title(LexborHTMLParser(html)), _main_text(html)
-        found = await self._extract(text)
+        tree = LexborHTMLParser(html)
+        h1, location = tree.css_first("h1"), _location(tree)
+        title, text = _title(tree), _main_text(html)
+        if h1 and h1.text().strip() and location:  # title + location: no AI needed
+            return self._stub(url, company, title, text, None, location)
+        return url, title, text, location
+
+    def _stub(
+        self,
+        url: str,
+        company: str,
+        title: str,
+        text: str,
+        found: ExtractedJob | None,
+        location: str = "",
+    ) -> JobStub:
+        location = (found.location if found else "") or location
         posted = None
         if found and found.posted_date:
             try:
                 posted = from_iso(found.posted_date)
             except ValueError:
                 posted = None
-        location = found.location if found else ""
         return JobStub(
             source=self.name,
             url=url,
@@ -195,14 +245,35 @@ class Careers(Source):
             extra={"employment": found.employment_type} if found else {},
         )
 
-    async def _extract(self, text: str) -> ExtractedJob | None:
-        if self.provider is None:
-            return None
+    async def _jobs(self, http: Http, links: list[str], company: str) -> list[JobStub]:
+        done: list[JobStub] = []
+        pending: list[tuple[str, str, str, str]] = []
+        for link in links:
+            page = await self._page(http, link, company)
+            if isinstance(page, JobStub):
+                done.append(page)
+            elif page:
+                pending.append(page)
+        found = await self._extract([text for _, _, text, _ in pending])
+        for n, (url, title, text, location) in enumerate(pending):
+            done.append(self._stub(url, company, title, text, found.get(n), location))
+        return done
+
+    async def _extract(self, texts: list[str]) -> dict[int, ExtractedJob]:
+        """One AI call for a batch of pages; ids are ours, any other id in the reply is dropped."""
+        if self.provider is None or not texts:
+            return {}
+        pages = [{"id": n, "text": t[:EXCERPT]} for n, t in enumerate(texts)]
         try:
-            return await self.provider.complete(
-                render("extract_job.j2", text=text[:MAX_TEXT]), ExtractedJob
+            result = await self.provider.complete(
+                render("extract_job.j2", pages=pages), ExtractedBatch
             )
         except UsageLimitError:
             raise  # pause the run cleanly instead of silently degrading
         except ProviderError:
-            return None
+            return {}
+        out: dict[int, ExtractedJob] = {}
+        for job in result.jobs:
+            if 0 <= job.id < len(texts):
+                out.setdefault(job.id, job)
+        return out
