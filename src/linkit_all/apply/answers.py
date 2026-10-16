@@ -239,7 +239,8 @@ _STANDARD: list[tuple[str, re.Pattern[str]]] = [
     ]
 ]  # fmt: skip
 _SOURCE_NAMES = {"linkedin": "LinkedIn", "indeed": "Indeed", "glassdoor": "Glassdoor", "google": "Google",
-                 "zip_recruiter": "ZipRecruiter", "bayt": "Bayt", "wuzzuf": "Wuzzuf"}  # fmt: skip
+                 "zip_recruiter": "ZipRecruiter", "bayt": "Bayt", "wuzzuf": "Wuzzuf",
+                 "forasna": "Forasna"}  # fmt: skip
 
 
 def _standard_value(key: str, ctx: Context) -> Any:

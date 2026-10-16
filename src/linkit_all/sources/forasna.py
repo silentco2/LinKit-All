@@ -25,9 +25,6 @@ _LOC = re.compile(r"<loc>\s*([^<]+?)\s*</loc>")
 _URL = re.compile(r"<url>(.*?)</url>", re.S)
 _LASTMOD = re.compile(r"<lastmod>\s*([^<]+?)\s*</lastmod>")
 _JOB_SITEMAP = re.compile(r"/sitemap\d+\.xml$")  # not /careers/ (their own blog)
-# urllib's robots parser has no `*` wildcards, so apply the Disallow lines of forasna.com that
-# can touch a job URL here: /*uat*, /*staging*, /*pre-prod*, /*preprod*, and any query string.
-_DISALLOWED = re.compile(r"uat|staging|pre-?prod")
 
 
 class Forasna(Source):
@@ -83,5 +80,5 @@ class Forasna(Source):
 
 
 async def _allowed(http: Http, url: str) -> bool:
-    parts = urlsplit(url)
-    return not (parts.query or _DISALLOWED.search(parts.path)) and await http.allowed(url)
+    # Product choice, not a robots rule: sitemaps and job pages never need a query string.
+    return not urlsplit(url).query and await http.allowed(url)

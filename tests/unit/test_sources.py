@@ -598,8 +598,7 @@ def test_forasna_no_query_no_tasks() -> None:
 
 
 def test_forasna_robots_honored() -> None:
-    # Wildcard Disallows (/*uat*) are not understood by urllib's parser, so the source applies
-    # them itself: the "evaluation" slug is never fetched even though robots.txt lets us in.
+    # The wildcard Disallow /*uat* matches the "evaluation" slug, so it is never fetched.
     extra = (
         "<url><loc>https://forasna.com/job/p/evaluation-manager-444999</loc>"
         "<lastmod>{recent}</lastmod></url>"
