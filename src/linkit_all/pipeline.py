@@ -61,7 +61,12 @@ async def run_stage(
 
         async with make_client() as client:
             if stage == "discover":
-                stats = asdict(await discover(db, cfg, run_id, Http(client), registry()))
+                from linkit_all.providers import get_provider
+
+                # Only the generic careers-page source uses the model, for pages without
+                # JSON-LD; it falls back to the page title when the provider is unusable.
+                provider = get_provider(ai_settings(settings, cfg, ai_override), cache=db)
+                stats = asdict(await discover(db, cfg, run_id, Http(client), registry(provider)))
             else:
                 stats = {"enriched": await enrich(db, Http(client), registry())}
     elif stage == "rank":

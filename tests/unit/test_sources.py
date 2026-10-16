@@ -379,7 +379,8 @@ def test_discover_resume_and_enrich(tmp_path: Path) -> None:
     # Stripe posts two identical Dublin reqs; they collapse into one job.
     assert (stats.new, stats.duplicates) == (8, 1)  # type: ignore[attr-defined]
     assert "lever:gone" in stats.errors  # type: ignore[attr-defined]
-    assert any("no known ATS found" in u for u in stats.unsupported)  # type: ignore[attr-defined]
+    # no ATS on the page: the generic careers source tried it (404 here -> an error, not a skip)
+    assert "careers:https://nowhere.example/careers" in stats.errors  # type: ignore[attr-defined]
     with db() as s:
         assert s.query(Job).count() == 8
         assert all(c.done for c in s.scalars(select(SourceCheckpoint)))

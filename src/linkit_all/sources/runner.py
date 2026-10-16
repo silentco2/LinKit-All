@@ -13,6 +13,7 @@ from linkit_all.core.search import SearchConfig
 from linkit_all.core.state import transition
 from linkit_all.sources.ats_detector import detect
 from linkit_all.sources.base import JobStub, Source, Task
+from linkit_all.sources.careers import Unsupported
 from linkit_all.sources.http import Http
 from linkit_all.sources.store import Deduper, mark_task, store_page
 
@@ -29,18 +30,21 @@ class DiscoverStats:
 async def company_tasks(
     cfg: SearchConfig, http: Http, registry: dict[str, Source]
 ) -> tuple[list[Task], list[str]]:
-    """Resolve the company list (URLs or shorthands) to ATS board tasks."""
+    """Resolve the company list (URLs or shorthands) to ATS board tasks; URLs with no known
+    ATS go to the generic careers-page source."""
     tasks: dict[str, Task] = {}
     unsupported = []
     for entry in cfg.sources.companies:
         found = detect(entry)
         if found is None and entry.startswith("http"):
             try:  # a company's own careers page usually embeds its ATS
-                resp = await http.get(entry)
-                found = detect(resp.text) if resp.status_code < 400 else None
+                resp = await http.get(entry) if await http.allowed(entry) else None
+                found = detect(resp.text) if resp and resp.status_code < 400 else None
             except httpx.HTTPError:
                 found = None
-        if found is None:
+        if found is None and entry.startswith("http") and "careers" in registry:
+            tasks.setdefault(f"careers:{entry}", Task("careers", f"careers:{entry}", board=entry))
+        elif found is None:
             unsupported.append(f"{entry} (no known ATS found)")
         elif found[0] not in registry:
             unsupported.append(f"{entry} ({found[0]} not supported yet)")
@@ -82,6 +86,9 @@ async def discover(
                     stats.duplicates += len(stubs) - new
                     logger.info("{} page {}: {} new of {}", task.key, page, new, len(stubs))
                     page += 1
+            except Unsupported as e:  # not an error: tell the user why nothing came of it
+                stats.unsupported.append(f"{task.board} ({e})")
+                mark_task(db, run_id, task.key, str(e))
             except httpx.HTTPStatusError as e:  # e.g. board removed: retrying will not help
                 stats.errors[task.key] = str(e)
                 mark_task(db, run_id, task.key, str(e))
