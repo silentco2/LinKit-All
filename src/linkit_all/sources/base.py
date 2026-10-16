@@ -46,7 +46,10 @@ class Task:
 
 class Source(ABC):
     name: str
-    priority: int = 0  # lower runs first, so its copy of a duplicate job is the one kept
+    priority: int = 0  # lower wins: its copy of a duplicate job is the one kept
+    # How many of this source's tasks may run at once. 1 for anything rate-sensitive (scraped
+    # sites); public ATS JSON APIs raise it, their per-host limiters in Http pace the requests.
+    parallel: int = 1
 
     def tasks(self, cfg: SearchConfig) -> list[Task]:
         """Query-based sources expand the search config into tasks. ATS boards come from

@@ -39,6 +39,7 @@ def parse_posted(text: str | None, now: datetime | None = None) -> datetime | No
 
 class Workday(Source):
     name = "workday"
+    parallel = 4  # public JSON API; Http paces per host
 
     async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:
         tenant, wd, site = task.board.split("/")

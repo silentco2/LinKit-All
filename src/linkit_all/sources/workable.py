@@ -16,6 +16,7 @@ _URL = re.compile(r"apply\.workable\.com/([\w-]+)/j/(\w+)", re.I)
 
 class Workable(Source):
     name = "workable"
+    parallel = 4  # public JSON API; Http paces per host
 
     async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:
         if start_page > 0:

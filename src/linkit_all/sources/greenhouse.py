@@ -12,6 +12,7 @@ API = "https://boards-api.greenhouse.io/v1/boards/{board}/jobs"
 
 class Greenhouse(Source):
     name = "greenhouse"
+    parallel = 4  # public JSON API; Http paces per host
 
     async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:
         if start_page > 0:

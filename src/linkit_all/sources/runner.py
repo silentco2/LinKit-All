@@ -60,24 +60,30 @@ async def discover(
     run_id: int,
     http: Http,
     registry: dict[str, Source],
-    concurrency: int = 4,
+    max_running: int = 16,
 ) -> DiscoverStats:
     stats = DiscoverStats()
     tasks, stats.unsupported = await company_tasks(cfg, http, registry)
     tasks += [t for src in registry.values() for t in src.tasks(cfg)]
     with db() as s:
-        deduper = Deduper(s)
+        deduper = Deduper(s, lambda name: registry[name].priority if name in registry else 99)
         checkpoints = {
             c.key: (c.next_page, c.done)
             for c in s.scalars(select(SourceCheckpoint).filter_by(run_id=run_id))
         }
-    sem = asyncio.Semaphore(concurrency)
+    # Sources run side by side, each limited to its own `parallel`; the overall cap only bounds
+    # threads and memory. A task takes its source slot first, so it never holds an overall slot
+    # while waiting on its own source.
+    running = asyncio.Semaphore(max_running)
+    per_source = {
+        name: asyncio.Semaphore(registry[name].parallel) for name in {t.source for t in tasks}
+    }
 
     async def run(task: Task) -> None:
         start, done = checkpoints.get(task.key, (0, False))
         if done:
             return
-        async with sem:
+        async with per_source[task.source], running:
             page = start
             try:
                 async for stubs in registry[task.source].search(http, task, start):
@@ -99,9 +105,9 @@ async def discover(
                 stats.tasks_done += 1
                 mark_task(db, run_id, task.key, None)
 
-    # Higher-priority sources (company ATS APIs) first, so their copy of a duplicate wins.
-    for priority in sorted({registry[t.source].priority for t in tasks}):
-        await asyncio.gather(*(run(t) for t in tasks if registry[t.source].priority == priority))
+    # Priority no longer orders the run: store_page upgrades a stored duplicate to the
+    # higher-priority source's copy whenever that arrives.
+    await asyncio.gather(*(run(t) for t in tasks))
     return stats
 
 

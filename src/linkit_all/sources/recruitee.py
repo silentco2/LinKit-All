@@ -12,6 +12,7 @@ API = "https://{board}.recruitee.com/api/offers/"
 
 class Recruitee(Source):
     name = "recruitee"
+    parallel = 4  # public JSON API; Http paces per host
 
     async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:
         if start_page > 0:

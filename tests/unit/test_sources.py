@@ -1,7 +1,10 @@
 import asyncio
 import json
+import time
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pytest
@@ -14,7 +17,7 @@ from linkit_all.core.search import SearchConfig
 from linkit_all.sources import registry
 from linkit_all.sources.ashby import Ashby
 from linkit_all.sources.ats_detector import detect
-from linkit_all.sources.base import JobStub, Task
+from linkit_all.sources.base import JobStub, Source, Task
 from linkit_all.sources.greenhouse import Greenhouse
 from linkit_all.sources.http import Http
 from linkit_all.sources.lever import Lever
@@ -631,3 +634,116 @@ def test_forasna_resumes_from_checkpoint_page(monkeypatch: pytest.MonkeyPatch) -
     rest, fetched = _forasna_run(["مشتريات", "إدخال بيانات"], start_page=1)
     assert [[s.url for s in p] for p in rest] == [[s.url for s in full[1]]]
     assert len([p for p in fetched if p.startswith("/job/p/")]) == 1  # page 0 not fetched again
+
+
+class FakeSource(Source):
+    """Yields one job per task after a delay; records how many of its tasks ran at once."""
+
+    running = 0  # across all fake sources
+    overlap = 0  # most tasks of any sources running at once
+
+    def __init__(self, name: str, parallel: int = 1, priority: int = 0, delay: float = 0.05):
+        self.name, self.parallel, self.priority, self.delay = name, parallel, priority, delay
+        self.active = self.peak = 0
+
+    def tasks(self, cfg: SearchConfig) -> list[Task]:
+        return [Task(self.name, f"{self.name}:{i}", query=str(i)) for i in range(3)]
+
+    async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:
+        cls = type(self)
+        self.active += 1
+        cls.running += 1
+        self.peak, cls.overlap = max(self.peak, self.active), max(cls.overlap, cls.running)
+        try:
+            await asyncio.sleep(self.delay)
+        finally:
+            self.active -= 1
+            cls.running -= 1
+        yield [
+            JobStub(source=self.name, url=f"https://{self.name}.io/{task.query}",
+                    title=f"Job {task.query}", company=f"Co {task.query}",
+                    location="Cairo", ats=self.name, description=self.name * (3 - self.priority))
+        ]  # fmt: skip
+
+
+def run_discover(tmp_path: Path, sources: list[FakeSource]) -> tuple[Any, Any, float]:
+    db = init_db(tmp_path / "t.db")
+    FakeSource.running = FakeSource.overlap = 0
+
+    async def go() -> Any:
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(lambda r: httpx.Response(404))
+        ) as c:
+            return await discover(
+                db,
+                SearchConfig(),
+                current_run(db),
+                Http(c, attempts=1),
+                {s.name: s for s in sources},
+            )
+
+    start = time.monotonic()
+    stats = asyncio.run(go())
+    return db, stats, time.monotonic() - start
+
+
+def test_discover_runs_sources_side_by_side(tmp_path: Path) -> None:
+    a, b = FakeSource("a", delay=0.2), FakeSource("b", delay=0.2)
+    _, stats, took = run_discover(tmp_path, [a, b])
+    assert stats.tasks_done == 6
+    assert (a.peak, b.peak) == (1, 1)  # parallel=1: one task at a time per source
+    assert FakeSource.overlap == 2  # but the two sources overlapped
+    assert took < 1.0  # sum would be 1.2 s; max(source) is 0.6 s
+
+
+def test_discover_parallel_source_runs_tasks_together(tmp_path: Path) -> None:
+    api = FakeSource("api", parallel=3, delay=0.1)
+    _, stats, _ = run_discover(tmp_path, [api, FakeSource("slow", delay=0.1)])
+    assert stats.tasks_done == 6
+    assert api.peak == 3
+
+
+def test_discover_overall_cap_bounds_running_tasks(tmp_path: Path) -> None:
+    db = init_db(tmp_path / "t.db")
+    srcs = [FakeSource(n, parallel=3, delay=0.02) for n in "abc"]
+    FakeSource.running = FakeSource.overlap = 0
+
+    async def go() -> None:
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(lambda r: httpx.Response(404))
+        ) as c:
+            await discover(db, SearchConfig(), current_run(db), Http(c, attempts=1),
+                           {s.name: s for s in srcs}, max_running=4)  # fmt: skip
+
+    asyncio.run(go())
+    assert FakeSource.overlap == 4
+
+
+def test_discover_higher_priority_duplicate_upgrades_stored_job(tmp_path: Path) -> None:
+    # Same titles/companies/locations from two sources; the better one is slower, so the
+    # lower-priority copy is stored first.
+    best = FakeSource("best", priority=0, delay=0.3)
+    other = FakeSource("other", priority=1, delay=0.0)
+    db, stats, _ = run_discover(tmp_path, [best, other])
+    assert (stats.new, stats.duplicates) == (3, 3)
+    with db() as s:
+        jobs = list(s.scalars(select(Job)))
+        assert len(jobs) == 3
+        assert {(j.source, j.ats, j.url.split("/")[2]) for j in jobs} == {
+            ("best", "best", "best.io")
+        }
+        assert all(j.description == "bestbestbest" for j in jobs)  # the longer description
+    # keys stay consistent: the lower-priority URL is still a duplicate on the next run
+    with db() as s:
+        d = Deduper(s)
+        assert d.add(stub("Job 0", company="Co 0", url="https://other.io/0")) is None
+        assert d.add(stub("Job 0", company="Co 0", url="https://best.io/0")) is None
+
+
+def test_lower_priority_duplicate_does_not_replace(tmp_path: Path) -> None:
+    best = FakeSource("best", priority=0, delay=0.0)
+    other = FakeSource("other", priority=1, delay=0.2)
+    db, stats, _ = run_discover(tmp_path, [best, other])
+    assert (stats.new, stats.duplicates) == (3, 3)
+    with db() as s:
+        assert {j.source for j in s.scalars(select(Job))} == {"best"}

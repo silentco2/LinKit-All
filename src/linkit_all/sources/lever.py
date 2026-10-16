@@ -13,6 +13,7 @@ _REMOTE: dict[str, Remote] = {"remote": "remote", "hybrid": "hybrid", "on-site":
 
 class Lever(Source):
     name = "lever"
+    parallel = 4  # public JSON API; Http paces per host
 
     async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:
         if start_page > 0:
