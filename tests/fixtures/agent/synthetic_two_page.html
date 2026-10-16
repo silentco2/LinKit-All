@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>SYNTHETIC two-page application (hand-written test fixture, not a real company)</title></head>
+<body>
+<!-- Synthetic fixture for tests/e2e/test_agent_form.py. Not copied from any real site. -->
+<form id="app" onsubmit="window.submitted = (window.submitted || 0) + 1; return false;">
+  <section id="page1">
+    <h2>Step 1 of 2: About you</h2>
+    <div>
+      <label for="full_name">Full name *</label>
+      <input id="full_name" name="full_name" type="text" required>
+    </div>
+    <div>
+      <label for="email">Email *</label>
+      <input id="email" name="email" type="email" required>
+    </div>
+    <div>
+      <label for="phone">Phone</label>
+      <input id="phone" name="phone" type="tel">
+    </div>
+    <div>
+      <label for="country">Country *</label>
+      <select id="country" name="country" required>
+        <option value="">Select...</option>
+        <option>Egypt</option>
+        <option>United Kingdom</option>
+        <option>United States</option>
+      </select>
+    </div>
+    <!-- honeypot: off-screen, hidden from assistive tech, must never be filled -->
+    <div style="position:absolute; left:-9999px" aria-hidden="true">
+      <label for="website_url">Leave this empty</label>
+      <input id="website_url" name="website_url" type="text" tabindex="-1" autocomplete="off">
+    </div>
+    <p id="err1" role="alert" style="color:red"></p>
+    <button type="button" id="next">Next</button>
+  </section>
+
+  <section id="page2" hidden>
+    <h2>Step 2 of 2: Questions</h2>
+    <div>
+      <label for="why">Why do you want to work here? *</label>
+      <textarea id="why" name="why" required></textarea>
+    </div>
+    <fieldset>
+      <legend>Are you legally authorized to work in the United States? *</legend>
+      <label><input type="radio" name="auth" value="yes" required> Yes</label>
+      <label><input type="radio" name="auth" value="no"> No</label>
+    </fieldset>
+    <div>
+      <label><input type="checkbox" id="remote" name="remote"> I am open to remote work</label>
+    </div>
+    <button type="button" id="back">Back</button>
+    <button type="submit" id="send">Submit application</button>
+  </section>
+</form>
+<script>
+  window.submitted = 0;
+  // like real forms, editing a field clears its stale validation message
+  document.getElementById('app').addEventListener('input', () => { document.getElementById('err1').textContent = ''; });
+  document.getElementById('next').onclick = () => {
+    const bad = ['full_name', 'email', 'country'].filter((id) => !document.getElementById(id).value);
+    document.getElementById('err1').textContent = bad.length ? 'Please fill in all required fields.' : '';
+    if (bad.length) return;
+    document.getElementById('page1').hidden = true;
+    document.getElementById('page2').hidden = false;
+  };
+</script>
+</body>
+</html>

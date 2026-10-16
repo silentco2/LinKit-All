@@ -6,7 +6,7 @@ container with data-lk="<key>" and describes its controls. Filling uses those ke
 
 from typing import Any
 
-from playwright.async_api import Page
+from playwright.async_api import Locator, Page
 
 from linkit_all.apply.answers import Question
 
@@ -84,13 +84,24 @@ async def extract(
 
 async def fill(page: Page, q: Question, value: Any) -> None:
     """Put `value` into the question's controls. Raises FillError if the page refuses it."""
-    box = page.locator(f'[data-lk="{q.key}"]')
+    await fill_in(
+        page,
+        page.locator(f'[data-lk="{q.key}"]'),
+        page.locator(f'[data-lk-input="{q.key}"]'),
+        q,
+        value,
+    )
+
+
+async def fill_in(page: Page, box: Locator, field: Locator, q: Question, value: Any) -> None:
+    """`box` holds the question's controls (or is the control itself), `field` is the one
+    to type into. Shared by the ATS handlers and the generic form agent."""
     try:
         match q.kind:
             case "file":
-                await box.locator("input[type=file]").first.set_input_files(str(value))
+                await _inside(page, box, "input[type=file]").first.set_input_files(str(value))
             case "select":
-                await page.locator(f'[data-lk-input="{q.key}"]').select_option(label=str(value))
+                await field.select_option(label=str(value))
             case "radio":
                 await _choose(page, box, str(value), "radio")
             case "multi":
@@ -98,17 +109,22 @@ async def fill(page: Page, q: Question, value: Any) -> None:
                     await _choose(page, box, str(v), "checkbox")
             case "checkbox":
                 if value:
-                    await box.locator("input[type=checkbox]").first.check()
+                    await _inside(page, box, "input[type=checkbox]").first.check()
             case "yesno":
                 await box.get_by_role("button", name=str(value), exact=True).click()
             case "combobox":
-                await _combobox(page, box, str(value), exact=bool(q.options))
+                await _combobox(page, field, str(value), exact=bool(q.options))
             case _:
-                await page.locator(f'[data-lk-input="{q.key}"]').fill(str(value))
+                await field.fill(str(value))
     except FillError:
         raise
     except Exception as e:  # Playwright timeouts etc.: report which question failed
         raise FillError(f"could not fill {q.label!r}: {e}") from e
+
+
+def _inside(page: Page, box: Locator, css: str) -> Locator:
+    """`css` below `box`, or `box` itself when it is that element."""
+    return box.locator(css).or_(box.and_(page.locator(css)))
 
 
 async def _choose(page: Page, box: Any, text: str, role: str) -> None:
@@ -122,9 +138,8 @@ async def _choose(page: Page, box: Any, text: str, role: str) -> None:
     await label.first.click()
 
 
-async def _combobox(page: Page, box: Any, text: str, exact: bool) -> None:
+async def _combobox(page: Page, field: Locator, text: str, exact: bool) -> None:
     """React-select style: type, then pick the option from the opened list."""
-    field = box.locator("[data-lk-input]")
     await field.click()
     await field.fill(text)
     options = (
