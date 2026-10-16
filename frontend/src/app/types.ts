@@ -1,5 +1,5 @@
 export type Tier = 'high' | 'mid' | 'low';
-export const STAGES = ['discover', 'enrich', 'rank', 'score'] as const;
+export const STAGES = ['discover', 'enrich', 'rank', 'score', 'apply'] as const;
 export type Stage = (typeof STAGES)[number];
 export type Provider = 'codex_cli' | 'claude_cli' | 'litellm';
 
@@ -53,6 +53,45 @@ export interface SearchConfig {
   };
   matching: { ai_max_jobs: number; tier_high: number; tier_mid: number; batch_size: number };
   ai: { provider: Provider | null; model: string | null };
+  apply: ApplySection;
+}
+
+export interface ApplySection {
+  live: boolean;
+  submit_without_asking: boolean;
+  max_per_run: number;
+  daily_cap_per_site: number;
+  headless: boolean;
+  min_pause_s: number;
+  max_pause_s: number;
+}
+
+/** Null / empty means "ask me in the Action Center" for the sensitive fields. */
+export interface ApplicationAnswers {
+  first_name: string;
+  last_name: string;
+  city: string;
+  country: string;
+  current_company: string;
+  current_title: string;
+  linkedin: string;
+  github: string;
+  portfolio: string;
+  years_experience: number | null;
+  notice_period: string;
+  heard_about: string;
+  willing_to_relocate: boolean | null;
+  authorized_countries: string[];
+  needs_sponsorship: boolean | null;
+  salary_expectation: string;
+  salary_currency: string;
+  eeo_gender: string | null;
+  eeo_race: string | null;
+  eeo_hispanic: string | null;
+  eeo_veteran: string | null;
+  eeo_disability: string | null;
+  acknowledge_privacy: boolean | null;
+  acknowledge_legal: boolean | null;
 }
 
 export interface JobRow {

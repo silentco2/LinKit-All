@@ -2,9 +2,10 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Api } from '../api';
-import { lines, Profile, Provider, SearchConfig, Segment, Status, unlines } from '../types';
+import { ApplicationAnswers, lines, Profile, Provider, SearchConfig, Segment, Status, unlines } from '../types';
 
-type Step = 'profile' | 'ai' | 'search' | 'filters' | 'finish';
+type Step = 'profile' | 'ai' | 'search' | 'filters' | 'answers' | 'apply' | 'finish';
+type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_disability';
 
 @Component({
   selector: 'app-setup',
@@ -213,6 +214,122 @@ type Step = 'profile' | 'ai' | 'search' | 'filters' | 'finish';
             </section>
           }
 
+          @case ('answers') {
+            @if (ans) {
+              <section class="card space-y-4">
+                <h2>Application answers</h2>
+                <p class="text-sm text-slate-600 dark:text-slate-400">Application forms ask the same things again and again. Answer once here. Anything you leave on "Ask me" is never guessed: LinKit parks that job in the Action Center and asks you.</p>
+                <h3 class="text-sm font-semibold">Basics</h3>
+                <div class="grid gap-4 sm:grid-cols-2">
+                  <div><label class="label" for="a-first">First name (optional)</label><input id="a-first" class="input" [(ngModel)]="ans.first_name"><p class="hint">Leave empty to use your profile name.</p></div>
+                  <div><label class="label" for="a-last">Last name (optional)</label><input id="a-last" class="input" [(ngModel)]="ans.last_name"></div>
+                  <div><label class="label" for="a-city">City</label><input id="a-city" class="input" [(ngModel)]="ans.city"></div>
+                  <div><label class="label" for="a-country">Country</label><input id="a-country" class="input" [(ngModel)]="ans.country"></div>
+                  <div><label class="label" for="a-company">Current company</label><input id="a-company" class="input" [(ngModel)]="ans.current_company"></div>
+                  <div><label class="label" for="a-title">Current job title</label><input id="a-title" class="input" [(ngModel)]="ans.current_title"></div>
+                  <div><label class="label" for="a-linkedin">LinkedIn URL</label><input id="a-linkedin" type="url" class="input" [(ngModel)]="ans.linkedin"></div>
+                  <div><label class="label" for="a-github">GitHub URL</label><input id="a-github" type="url" class="input" [(ngModel)]="ans.github"></div>
+                  <div><label class="label" for="a-portfolio">Portfolio / website URL</label><input id="a-portfolio" type="url" class="input" [(ngModel)]="ans.portfolio"></div>
+                  <div><label class="label" for="a-years">Years of experience</label><input id="a-years" type="number" min="0" step="1" class="input" [(ngModel)]="ans.years_experience"></div>
+                  <div><label class="label" for="a-notice">Notice period</label><input id="a-notice" class="input" [(ngModel)]="ans.notice_period" placeholder="1 month"></div>
+                  <div><label class="label" for="a-heard">"How did you hear about us?" default</label><input id="a-heard" class="input" [(ngModel)]="ans.heard_about" placeholder="Job board"></div>
+                  <div>
+                    <label class="label" for="a-reloc">Willing to relocate</label>
+                    <select id="a-reloc" class="input" [(ngModel)]="ans.willing_to_relocate">
+                      <option [ngValue]="null">{{ askMe }}</option><option [ngValue]="true">Yes</option><option [ngValue]="false">No</option>
+                    </select>
+                  </div>
+                </div>
+
+                <h3 class="pt-2 text-sm font-semibold">Work and visa (sensitive)</h3>
+                <p class="hint">Only answered from what you enter here, never by the AI.</p>
+                <div class="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label class="label" for="a-auth">Countries you can legally work in (one per line)</label>
+                    <textarea id="a-auth" class="input h-24" [value]="unlines(ans.authorized_countries)" (change)="ans.authorized_countries = lines(val($event))" placeholder="Egypt&#10;United Arab Emirates"></textarea>
+                    <p class="hint">Leave empty to be asked each time.</p>
+                  </div>
+                  <div>
+                    <label class="label" for="a-spons">Need visa sponsorship</label>
+                    <select id="a-spons" class="input" [(ngModel)]="ans.needs_sponsorship">
+                      <option [ngValue]="null">{{ askMe }}</option><option [ngValue]="true">Yes</option><option [ngValue]="false">No</option>
+                    </select>
+                  </div>
+                  <div><label class="label" for="a-sal">Salary expectation</label><input id="a-sal" class="input" [(ngModel)]="ans.salary_expectation" placeholder="30000"><p class="hint">Typed as you would on a form. Leave empty to be asked.</p></div>
+                  <div><label class="label" for="a-cur">Salary currency</label><input id="a-cur" class="input" [(ngModel)]="ans.salary_currency" placeholder="EGP"></div>
+                </div>
+
+                <h3 class="pt-2 text-sm font-semibold">Voluntary demographics (all optional)</h3>
+                <p class="hint">Many US forms ask these. Each one is optional; "{{ askMe }}" means the Action Center asks you whenever a form needs it.</p>
+                <div class="grid gap-4 sm:grid-cols-2">
+                  @for (f of eeoFields; track f.key) {
+                    <div>
+                      <label class="label" [for]="'a-' + f.key">{{ f.label }}</label>
+                      <select [id]="'a-' + f.key" class="input" [(ngModel)]="ans[f.key]">
+                        <option [ngValue]="null">{{ askMe }}</option>
+                        @for (o of f.options; track o[0]) { <option [value]="o[0]">{{ o[1] }}</option> }
+                        <option value="decline">Prefer not to say</option>
+                      </select>
+                    </div>
+                  }
+                </div>
+
+                <h3 class="pt-2 text-sm font-semibold">Acknowledgements</h3>
+                <div class="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label class="label" for="a-priv">Privacy notices and data consent</label>
+                    <select id="a-priv" class="input" [(ngModel)]="ans.acknowledge_privacy">
+                      <option [ngValue]="null">{{ askMe }}</option><option [ngValue]="true">Accept for me</option>
+                    </select>
+                    <p class="hint">Accept required privacy notices and data-processing consents for me. These are the "I agree to the privacy policy" boxes.</p>
+                  </div>
+                  <div>
+                    <label class="label" for="a-legal">Legal agreements and certifications</label>
+                    <select id="a-legal" class="input" [(ngModel)]="ans.acknowledge_legal">
+                      <option [ngValue]="null">{{ askMe }}</option><option [ngValue]="true">Accept for me</option>
+                    </select>
+                    <p class="hint">Accept required arbitration agreements and "I certify my answers are true" statements for me. These are legally binding, so only choose "Accept" if you are comfortable with that.</p>
+                  </div>
+                </div>
+                <button class="btn btn-primary" (click)="saveAnswers()" [disabled]="busy()">Save answers</button>
+              </section>
+            }
+          }
+
+          @case ('apply') {
+            <section class="card space-y-4">
+              <h2>Applying</h2>
+              <div class="alert alert-info">Dry run is the default: LinKit opens each application, fills it in and takes a screenshot, but never presses Submit.</div>
+              <label class="flex items-start gap-3 text-sm">
+                <input type="checkbox" class="mt-1" [ngModel]="cfg.apply.live" (ngModelChange)="setLive($event)">
+                <span><span class="font-medium">Submit real applications (live mode)</span>
+                  <span class="block text-xs text-slate-500">Off = dry run.</span></span>
+              </label>
+              @if (cfg.apply.live) {
+                <div class="alert alert-error" role="alert"><strong>Live mode is on.</strong> LinKit will submit real job applications in your name, using your CV and answers. Submitted applications cannot be taken back.</div>
+              }
+              <label class="flex items-start gap-3 text-sm" [class.opacity-50]="!cfg.apply.live">
+                <input type="checkbox" class="mt-1" [(ngModel)]="cfg.apply.submit_without_asking" [disabled]="!cfg.apply.live">
+                <span><span class="font-medium">Submit without asking me first</span>
+                  <span class="block text-xs text-slate-500">Off = each live application waits in the Action Center for your click on "Submit". Only available in live mode.</span></span>
+              </label>
+              @if (cfg.apply.live && cfg.apply.submit_without_asking) {
+                <div class="alert alert-error" role="alert"><strong>No confirmation.</strong> Applications will be sent automatically as soon as the form is filled, with no chance to review them first.</div>
+              }
+              <div class="grid gap-4 sm:grid-cols-2">
+                <div><label class="label" for="p-run">Max applications per run</label><input id="p-run" type="number" min="1" max="100" class="input" [(ngModel)]="cfg.apply.max_per_run"></div>
+                <div><label class="label" for="p-day">Daily cap per job site</label><input id="p-day" type="number" min="1" max="200" class="input" [(ngModel)]="cfg.apply.daily_cap_per_site"><p class="hint">Live submissions per site per day.</p></div>
+                <div><label class="label" for="p-min">Shortest pause between applications (seconds)</label><input id="p-min" type="number" min="0" class="input" [(ngModel)]="cfg.apply.min_pause_s"></div>
+                <div><label class="label" for="p-max">Longest pause between applications (seconds)</label><input id="p-max" type="number" min="0" class="input" [(ngModel)]="cfg.apply.max_pause_s"><p class="hint">A random wait in this range keeps the pace human.</p></div>
+              </div>
+              @if (pauseInvalid()) {
+                <p class="text-sm text-rose-600" role="alert">The shortest pause can't be longer than the longest pause.</p>
+              }
+              <label class="flex items-center gap-2 text-sm"><input type="checkbox" [(ngModel)]="cfg.apply.headless">Hide the browser window (headless)</label>
+              <button class="btn btn-primary" (click)="saveSearch('Apply settings saved')" [disabled]="busy() || pauseInvalid()">Save apply settings</button>
+            </section>
+          }
+
           @case ('finish') {
             <section class="card space-y-4">
               <h2>Ready?</h2>
@@ -245,12 +362,29 @@ export class SetupPage implements OnInit {
   protected readonly available = signal<Partial<Record<Provider, boolean>>>({});
   protected profile: Profile | null = null;
   protected cfg: SearchConfig | null = null;
+  protected ans: ApplicationAnswers | null = null;
+  protected readonly askMe = 'Ask me when a form needs it';
+  protected readonly eeoFields: { key: EeoKey; label: string; options: [string, string][] }[] = [
+    { key: 'eeo_gender', label: 'Gender', options: [['male', 'Male'], ['female', 'Female'], ['non_binary', 'Non-binary']] },
+    {
+      key: 'eeo_race',
+      label: 'Race / ethnicity',
+      options: [['asian', 'Asian'], ['black', 'Black or African American'], ['hispanic', 'Hispanic or Latino'], ['white', 'White'],
+        ['middle_eastern', 'Middle Eastern or North African'], ['native', 'Native American or Alaska Native'],
+        ['pacific', 'Pacific Islander'], ['two_or_more', 'Two or more races']],
+    },
+    { key: 'eeo_hispanic', label: 'Hispanic or Latino', options: [['yes', 'Yes'], ['no', 'No']] },
+    { key: 'eeo_veteran', label: 'Veteran status', options: [['not_veteran', 'Not a veteran'], ['veteran', 'Veteran']] },
+    { key: 'eeo_disability', label: 'Disability', options: [['no', 'No disability'], ['yes', 'Yes, I have a disability']] },
+  ];
 
   protected readonly steps: { id: Step; label: string }[] = [
     { id: 'profile', label: 'Profile & CV' },
     { id: 'ai', label: 'AI' },
     { id: 'search', label: 'Search' },
     { id: 'filters', label: 'Filters' },
+    { id: 'answers', label: 'Application answers' },
+    { id: 'apply', label: 'Applying' },
     { id: 'finish', label: 'Finish' },
   ];
   protected readonly providers: { id: Provider; label: string; hint: string }[] = [
@@ -263,15 +397,17 @@ export class SetupPage implements OnInit {
   protected readonly seniorities = ['intern', 'junior', 'mid', 'senior', 'lead', 'manager', 'executive'];
 
   async ngOnInit(): Promise<void> {
-    const [profile, cfg, status, ai] = await Promise.all([
+    const [profile, cfg, status, ai, ans] = await Promise.all([
       this.api.get<Profile>('/profile'),
       this.api.get<SearchConfig>('/search'),
       this.api.get<Status>('/status'),
       this.api.get<{ provider: Provider; available: Record<Provider, boolean> }>('/ai'),
+      this.api.get<ApplicationAnswers>('/profile/answers'),
     ]);
     cfg.ai.provider ??= ai.provider;
     this.profile = profile;
     this.cfg = cfg;
+    this.ans = ans;
     this.status.set(status);
     this.available.set(ai.available);
     if (profile.cv_name) this.api.get<Segment[]>('/profile/cv/segments').then((s) => this.segments.set(s)).catch(() => {});
@@ -290,7 +426,17 @@ export class SetupPage implements OnInit {
   done(step: Step): boolean {
     const s = this.status();
     if (!s) return false;
-    return { profile: s.profile_ready && s.cv_ready, ai: s.ai_ready, search: s.search_ready, filters: s.search_ready, finish: false }[step];
+    return { profile: s.profile_ready && s.cv_ready, ai: s.ai_ready, search: s.search_ready, filters: s.search_ready, answers: false, apply: false, finish: false }[step];
+  }
+
+  setLive(live: boolean): void {
+    this.cfg!.apply.live = live;
+    if (!live) this.cfg!.apply.submit_without_asking = false; // only meaningful in live mode
+  }
+
+  pauseInvalid(): boolean {
+    const a = this.cfg?.apply;
+    return !!a && a.min_pause_s > a.max_pause_s;
   }
 
   checklist(): { label: string; ok: boolean }[] {
@@ -344,6 +490,13 @@ export class SetupPage implements OnInit {
     return this.run(async () => {
       this.cfg = await this.api.put<SearchConfig>('/search', this.cfg);
       return ok;
+    });
+  }
+
+  saveAnswers(): Promise<void> {
+    return this.run(async () => {
+      this.ans = await this.api.put<ApplicationAnswers>('/profile/answers', this.ans);
+      return 'Application answers saved';
     });
   }
 

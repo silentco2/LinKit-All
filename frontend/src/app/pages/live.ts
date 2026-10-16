@@ -9,6 +9,7 @@ const LABELS: Record<Stage, string> = {
   enrich: 'Read descriptions',
   rank: 'Filter & rank (free)',
   score: 'AI scoring',
+  apply: 'Apply',
 };
 
 interface RecentRun {
@@ -161,6 +162,8 @@ export class LivePage {
         return `${n('ranked')} ranked, ${n('filtered_out')} filtered out`;
       case 'score':
         return `${n('high')} high, ${n('mid')} to review, ${n('low')} low${n('not_scored') ? `, ${n('not_scored')} not scored yet` : ''}`;
+      case 'apply':
+        return `${n('applied')} applied, ${n('needs_user')} need you, ${n('failed')} failed, ${n('skipped')} skipped${r['dry_run'] ? ' (dry run)' : ''}`;
     }
   }
 
