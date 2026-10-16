@@ -4,9 +4,11 @@ import contextlib
 import re
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlparse
 
 from playwright.async_api import Page
 
+from linkit_all.apply.accounts import Account, PasswordRules
 from linkit_all.apply.answers import Question
 from linkit_all.apply.form import extract
 
@@ -39,6 +41,7 @@ class Handler:
     ignore: str = ""
     submit_button: str
     confirmation: re.Pattern[str]
+    password_rules: PasswordRules = PasswordRules()
 
     def form_url(self, job: JobInfo) -> str:
         return job.apply_url or job.url
@@ -77,3 +80,35 @@ class Handler:
             for i in range(min(await found.count(), 30))
         ]
         return sorted({t for t in texts if t})[:10]
+
+    # -- account gate: ATS sites that need a login override these (CLAUDE.md §5.5) --
+
+    def account_tenant(self, job: JobInfo) -> str | None:
+        """Which account this job needs (e.g. the employer's Workday tenant); None = no account."""
+        return None
+
+    def site_domains(self, job: JobInfo) -> list[str]:
+        """Domains the verification email and its links come from."""
+        host = urlparse(job.apply_url or job.url).hostname
+        return [host] if host else []
+
+    async def signed_in(self, page: Page) -> bool:
+        return True
+
+    async def two_factor_shown(self, page: Page) -> bool:
+        return False
+
+    async def login(self, page: Page, job: JobInfo, account: Account) -> None:
+        """Fill and submit the login form; return once the page has settled."""
+        raise NotImplementedError
+
+    async def signup(self, page: Page, job: JobInfo, account: Account) -> None:
+        """Fill and submit the sign-up form. Only the runner's `run_signup` calls this, and
+        never in dry-run mode."""
+        raise NotImplementedError
+
+    async def enter_code(self, page: Page, code: str) -> None:
+        raise NotImplementedError
+
+    async def follow_link(self, page: Page, link: str) -> None:
+        await page.goto(link, wait_until="domcontentloaded", timeout=60000)

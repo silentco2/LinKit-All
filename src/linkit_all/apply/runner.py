@@ -17,10 +17,18 @@ from playwright.async_api import BrowserContext, Page, Playwright, async_playwri
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
+from linkit_all.apply.accounts import (
+    Account,
+    create_account,
+    find_account,
+    mark_active,
+)
 from linkit_all.apply.answers import ApplicationAnswers, Context, Missing, Question
 from linkit_all.apply.assist import AnswerBank, answer_questions, profile_summary
+from linkit_all.apply.email_verify import EmailLoginError, credentials, wait_for_verification
 from linkit_all.apply.form import FillError, fill, lost_values
 from linkit_all.apply.handlers import HANDLERS, Handler, JobInfo
+from linkit_all.apply.vault import Vault, vault_for
 from linkit_all.core.config import Settings
 from linkit_all.core.models import (
     ActionItem,
@@ -54,6 +62,15 @@ async def click_submit(page: Page, handler: Handler, dry_run: bool) -> None:
     if dry_run:
         raise DryRunViolation("refusing to click Submit in dry-run mode")
     await page.locator(handler.submit_button).locator("visible=true").first.click()
+
+
+async def run_signup(
+    page: Page, handler: Handler, job: JobInfo, account: Account, dry_run: bool
+) -> None:
+    """The only place a sign-up form is submitted. Refuses in dry-run mode."""
+    if dry_run:
+        raise DryRunViolation("refusing to submit a sign-up form in dry-run mode")
+    await handler.signup(page, job, account)
 
 
 @dataclass
@@ -265,6 +282,78 @@ class Applier:
             await browser.tracing.stop(path=str(trace) if keep_trace else None)
             await page.close()
 
+    def _unlocked_vault(self) -> Vault | None:
+        vault = vault_for(self.settings, self.db)
+        if not vault.unlocked() and vault.initialized():
+            vault.unlock_from_keyring()
+        return vault if vault.unlocked() else None
+
+    async def _account_gate(
+        self, page: Page, handler: Handler, info: JobInfo, profile: Profile, out_dir: Path
+    ) -> Outcome | None:
+        """Sign in (signing up first when live) if the ATS needs an account. None = signed in."""
+        tenant = handler.account_tenant(info)
+        if tenant is None or await handler.signed_in(page):
+            return None
+        site = f"{handler.ats} ({tenant})"
+        live = self.cfg.apply.live
+
+        async def park(kind: ActionKind, message: str) -> Outcome:
+            shot = str(out_dir / "account.png")
+            await page.screenshot(path=shot)
+            with self.db.begin() as s:
+                _park(s, s.get_one(Job, info.id), kind, message, [], {}, [shot])
+            return Outcome("needs_user", message, [shot])
+
+        vault = self._unlocked_vault()
+        if vault is None:
+            msg = f"Unlock (or create) the vault so the app can sign in to {site}"
+            return await park(ActionKind.login_issue, msg)
+        account = find_account(vault, handler.ats, tenant)
+        if account is None:
+            if not live:  # no typing, no clicks: sign-up forms are never touched in a dry run
+                msg = f"would create an account on {site}"
+                with self.db.begin() as s:
+                    job = s.get_one(Job, info.id)
+                    _event(s, job, f"dry run: {msg}, not submitted", [])
+                    job.data = {**job.data, "dry_run_at": utcnow().isoformat()}
+                return Outcome("dry_run", msg)
+            mail = credentials(self.cfg.email, vault, profile.email)
+            if mail is None:
+                msg = "Connect your email in Setup so the app can read the verification email"
+                return await park(ActionKind.login_issue, msg)
+            account = create_account(  # saved before the sign-up click: a crash never loses it
+                vault, handler.ats, tenant, profile.email, handler.password_rules
+            )
+            since = utcnow()
+            await run_signup(page, handler, info, account, dry_run=not live)
+            if not await handler.signed_in(page):
+                try:
+                    found = await wait_for_verification(
+                        self.cfg.email, *mail, handler.site_domains(info), since, self.provider
+                    )
+                except EmailLoginError as e:
+                    return await park(ActionKind.login_issue, str(e))
+                if found is None or not (found.link or found.code):
+                    msg = f"No verification email from {site} arrived in time: check your inbox"
+                    return await park(ActionKind.login_issue, msg)
+                if found.link:
+                    await handler.follow_link(page, found.link)
+                elif found.code:
+                    await handler.enter_code(page, found.code)
+            account = mark_active(vault, account, handler.ats, tenant)
+        if not await handler.signed_in(page):
+            await handler.login(page, info, account)
+            if await handler.two_factor_shown(page):
+                msg = f"{site} wants a sign-in code: finish it in the open browser, then retry"
+                return await park(ActionKind.two_factor, msg)
+            if not await handler.signed_in(page):
+                return await park(ActionKind.login_issue, f"{site} rejected the saved login")
+            if account.status != "active":  # e.g. verified by hand after an earlier timeout
+                mark_active(vault, account, handler.ats, tenant)
+        await handler.open(page, info)  # back to the application form
+        return None
+
     async def _fill_and_decide(
         self,
         page: Page,
@@ -276,6 +365,8 @@ class Applier:
     ) -> Outcome:
         apply_cfg = self.cfg.apply
         await handler.open(page, info)
+        if (gated := await self._account_gate(page, handler, info, profile, out_dir)) is not None:
+            return gated
         questions = await handler.questions(page, info)
         job_brief = {"title": info.title, "company": info.company, "description": info.description}
         r = await answer_questions(
