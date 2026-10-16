@@ -62,6 +62,15 @@ class AISection(BaseModel):
     model: str | None = None
 
 
+class EmailSection(BaseModel):
+    """Mailbox that receives sign-up verification emails; the app password lives in the vault."""
+
+    imap_host: str = "imap.gmail.com"
+    imap_user: str = ""  # empty = the profile email
+    timeout_s: int = Field(300, ge=30, le=1800)  # how long to wait for a verification email
+    poll_s: int = Field(10, ge=3, le=120)
+
+
 class SearchConfig(BaseModel):
     search: SearchSection = SearchSection()
     sources: SourcesSection = SourcesSection()
@@ -69,6 +78,7 @@ class SearchConfig(BaseModel):
     matching: MatchingSection = MatchingSection()
     apply: ApplySection = ApplySection()
     ai: AISection = AISection()
+    email: EmailSection = EmailSection()
 
 
 def save_search(db: sessionmaker[Session], cfg: SearchConfig) -> None:
