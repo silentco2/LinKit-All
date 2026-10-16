@@ -138,23 +138,34 @@ Remaining:
 - Action Center kinds: login_issue, two_factor (keep/restore the page where possible).
 
 Execution tasks:
-- ⬜ T5.0 runner: check handler/job_info before tailoring (today a job is tailored, then skipped)
-- ⬜ T5.1 Vault core (`apply/vault/`): AES-GCM per secret, Argon2id key, keyring cache, lock/unlock, export; table + migration
-- ⬜ T5.2 Vault API + wizard "Vault" step + Vault screen
-- ⬜ T5.3 IMAP verification (`apply/email_verify/`): Gmail app password from the vault, code/link regex, AI fallback prompt; API test + wizard step
-- ⬜ T5.4 Accounts (`apply/accounts/`): password generator per site rules, save-to-vault before signup, login reuse; handler signup/login hooks; login_issue / two_factor parking
-- ⬜ T5.5a Discovery: SmartRecruiters + Recruitee sources (+ detector, fixtures, tests)
-- ⬜ T5.5b Discovery: Workable + Workday cxs sources
-- ⬜ T5.6 SmartRecruiters apply handler (public form, no account)
+- ✅ T5.0 runner: check handler/job_info before tailoring (today a job is tailored, then skipped)
+- ✅ T5.1 Vault core (`apply/vault/`): AES-GCM per secret, Argon2id key, keyring cache, lock/unlock, export; table + migration
+- ✅ T5.2 Vault API + wizard "Vault" step + Vault screen
+- ✅ T5.3 IMAP (core; API/wizard test in T5.4b) verification (`apply/email_verify/`): Gmail app password from the vault, code/link regex, AI fallback prompt; API test + wizard step
+- ✅ T5.4 Accounts (`apply/accounts/`): password generator per site rules, save-to-vault before signup, login reuse; handler signup/login hooks; login_issue / two_factor parking
+- ✅ T5.4b Email API + wizard "Email" step
+- ✅ T5.4c Runner uses the server's unlocked vault instance (today only a keyring-remembered unlock reaches the runner)
+- ✅ T5.5a Discovery: SmartRecruiters + Recruitee sources (+ detector, fixtures, tests)
+- ✅ T5.5b Discovery: Workable + Workday cxs sources
+- ⛔ T5.6 SmartRecruiters apply handler: the oneclick-ui form sits behind DataDome (bot challenge) and is client-rendered; needs a maintainer-saved rendered form, else the Phase 6 generic agent covers it
 - ⛔ T5.7 Workday / iCIMS / Taleo / SuccessFactors handlers: forms sit behind sign-up; need maintainer-saved pages or a supervised live session
 - ⛔ T5.8 Opt-in LinkedIn Easy Apply / Indeed Apply: need the maintainer's logged-in pages; off by default, ban-risk warning, low caps
-Decisions made by the orchestrator (override any): dry run never creates accounts (it fills the sign-up form, screenshots, stops); one vault entry per (ats, tenant); verification email matched by sender domain + time window, plain profile email (no plus-addressing).
+Decisions made by the orchestrator (override any): dry run never touches sign-up forms (outcome says an account would be created); live mode creates accounts automatically when a form needs one (the application itself still waits for confirmation unless "submit without asking"); one vault entry per (ats, tenant); verification email matched by sender domain + time window, plain profile email (no plus-addressing).
 
 ### Phase 6 — Generic agent ⬜
 - Generic career-page extractor (JSON-LD -> CSS heuristics -> AI extraction) for any URL.
 - Generic AI form agent: accessibility-tree snapshot -> field map JSON -> fill -> validate ->
   next page; the model decides, code executes; falls back to the Action Center.
 - Naukrigulf and Forasna discovery (obeying robots.txt).
+
+Execution tasks:
+- ✅ T6.1 Generic careers source (`sources/careers.py`): robots.txt helper, JSON-LD -> link heuristics -> AI extraction
+- ✅ T6.2a Generic form agent core (`apply/agent/`): control snapshot, AI field map, fill via answer engine, one-page step
+- ✅ T6.2b Agent in the runner: fallback for jobs with no handler, multi-page loop, guarded submit, account gate
+- ✅ T6.1b Batch the careers AI extraction (10 pages per call; skip AI when heuristics suffice)
+- ✅ T6.3 Forasna discovery (sitemaps + JSON-LD)
+- ⛔ T6.3b Naukrigulf: drops non-browser clients at the edge; needs maintainer-saved sitemap slice + job pages, never a disguised client
+- ✅ T6.4 robots.txt parser: `*`/`$` wildcards, merged groups, Crawl-delay from every group (stdlib parser misses these)
 
 ### Phase 7 — Later / release ⬜
 - Local models (Ollama / LM Studio) setup in the wizard.
@@ -165,6 +176,20 @@ Decisions made by the orchestrator (override any): dry run never creates account
 - Arabic/RTL UI, mobile layout check.
 - macOS/Linux LibreOffice bundles; host bundles as release assets with a download step.
 - MkDocs Material docs, GitHub repo + Actions, PyPI release.
+
+Execution tasks:
+- ✅ T7.1 Reports: per platform/board/run, over time, funnel; CSV + PDF export
+- ✅ T7.4a ODT (LibreOffice round trip) and PDF (pdf2docx + user approval) CV input
+- ✅ T7.4b LaTeX CV (TexSoup/pylatexenc text nodes, Tectonic compile)
+- ✅ T7.2 Scheduler (APScheduler, SQLAlchemy job store) + desktop notifications
+- ✅ T7.3 Local models (Ollama / LM Studio) in the wizard's AI step
+- ✅ T7.5a i18n runtime dictionary + RTL + shell + Setup (decision: no @angular/localize, one build ships in the wheel)
+- ✅ T7.5b translate remaining pages + mobile check per page
+- ✅ T7.6 MkDocs Material docs
+- ✅ T7.7 Gap backend (from the docs audit vs CLAUDE.md): "Open in app browser" for parked jobs (keep/restore page, §5.7) + honest park messages; tailoring patches on job detail (red-line, §5.4); live apply screenshot for the Live run page (§7 screencast-lite)
+- ✅ T7.10 Opt-in auto-apply for low-tier jobs (§5.6)
+- ✅ T7.11 UI for T7.7/T7.10 (Action Center button, job drawer red-line, Live run screenshot, matching toggle), after T7.5b
+- ⛔ Outlook OAuth (needs an Azure app registration), macOS/Linux LibreOffice bundles (need those OSes or CI), GitHub repo + PyPI release (outward-facing: maintainer's go-ahead)
 
 ## Known risks
 

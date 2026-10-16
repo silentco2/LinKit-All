@@ -1,18 +1,19 @@
 # Handoff — LinKit All
 
 Written 2026-10-16 for the next agent or developer. Read in this order: `CLAUDE.md` (rules,
-binding), `plan.md` (roadmap and every decision), then this file (current state and next
-steps). Ask the maintainer before changing a decision in either file.
+binding), `plan.md` (roadmap and every decision, including "Decisions made by the
+orchestrator"), then this file (current state and next steps). Ask the maintainer before
+changing a decision in either file.
 
 ## TL;DR
 
-- Phases 0–3 are done. Phase 4 (apply to Greenhouse/Lever/Ashby, no accounts) is done in
-  the backend; **its UI is not built yet**. That UI is the next task (see "Next steps").
-- 112 tests pass (`uv run pytest`), ruff and mypy are clean, every phase is committed.
+- Phases 0-7 are built, except the items blocked on the maintainer (see "Needs the
+  maintainer"). Every task in `plan.md` is done or marked blocked.
+- 300 tests pass (`uv run pytest`; 1 skipped: the real Tectonic compile), ruff and mypy are
+  clean, `npx ng build` is clean. The work sits in 30 commits since `0561687`.
 - Nothing has ever been submitted for real. Apply runs in dry-run mode by default and has
-  only been exercised as dry runs on live forms plus an offline e2e with a fake submit.
-- The end state is in `plan.md`: Phases 5 (accounts, vault, IMAP, more ATSs), 6 (generic
-  extractor and AI form agent) and 7 (local models, other CV formats, scheduler, release).
+  only been exercised as dry runs on live forms plus offline e2e tests with a fake submit.
+- User docs are in `docs/` (MkDocs Material); `uv run mkdocs serve` previews them.
 
 ## Environment (maintainer's machine)
 
@@ -25,6 +26,7 @@ steps). Ask the maintainer before changing a decision in either file.
 - LibreOffice: the minimal bundle is installed at
   `%LOCALAPPDATA%\linkit-all\tools\libreoffice` (the real data dir). The zip is in
   `build/lo/` (gitignored), built by `scripts/bundle_libreoffice.py`.
+- Tectonic is not installed (the one skipped test is the real LaTeX compile).
 
 ### Gotchas that cost time
 
@@ -34,6 +36,10 @@ steps). Ask the maintainer before changing a decision in either file.
    is invisible to the maintainer's terminals (example: a uv Python install broke `.venv` for
    the user). Install interpreters or global tools, and run anything that must land in the real
    data dir, through the Terminal panel (`run_in_terminal`). Writes under `D:\` are fine.
+   Consequence: the agent's shell **cannot see the real LibreOffice bundle**. For tests that
+   need it, install it into a D:\ data dir:
+   `LINKIT_DATA_DIR="D:\LinKit All\build\lo-test-data" uv run linkit install-libreoffice build/lo/<zip>`
+   and run those tests with the same `LINKIT_DATA_DIR`.
 2. **CLI AI providers from the agent's shell** may fail auth (refresh tokens). `linkit
    ai-check` works from the maintainer's terminal; prefer that for live AI checks.
 3. **Preview pane launcher**: starting `uv run linkit serve` from `.claude/launch.json` exits
@@ -45,6 +51,10 @@ steps). Ask the maintainer before changing a decision in either file.
    symbols like ✱.
 5. ruff format rewrites `\u2019`-style escapes to literal characters; smart-quote lines in
    `tailor/patches.py` carry `# noqa: RUF001` on purpose.
+6. **`uv run` cannot replace `linkit.exe` while a server is running** (Windows file lock).
+   Stop the server first, or use `uv run --no-sync ...`.
+7. **Do not run test processes in parallel**: LibreOffice tests (and anything using the same
+   LibreOffice profile) collide. Run `uv run pytest` once at a time.
 
 ### Scratch data (all gitignored under `build/`)
 
@@ -55,6 +65,7 @@ steps). Ask the maintainer before changing a decision in either file.
 - `build/forms` — saved live application pages (Greenhouse embed for Airbnb, Lever for
   Palantir, Ashby for OpenAI) with field dumps.
 - `build/dryrun` — the last dry run against those three live forms, with screenshots.
+- `build/lo`, `build/lo-test-data` — the LibreOffice zip and a D:\ data dir with it installed.
 - Throwaway inspection scripts lived in the agent's scratchpad (read-only form inspector,
   live dry-run harness); recreate them from the patterns in `tests/e2e/test_apply_lever.py`.
 
@@ -65,13 +76,22 @@ uv sync
 uv run linkit doctor                      # Python, LibreOffice, Chrome, Codex, Claude, Tectonic
 uv run linkit                             # UI at http://127.0.0.1:8765 (same as `linkit serve`)
 uv run linkit profile import profile.json # docs/profile.example.json
-uv run linkit search import search.toml   # docs/search.example.toml
+uv run linkit search import search.toml   # docs/search.example.toml (incl. [schedule])
 uv run linkit run discover|enrich|rank|score|apply   # one stage; `discover --new` starts a new run
 uv run linkit status ; uv run linkit jobs --tier mid
 uv run linkit tailor jd.txt               # debug: red-line patches for one job description
 uv run linkit ai-check --provider codex_cli
+uv run mkdocs serve                       # user docs preview (mkdocs build --strict must be clean)
 cd frontend && npm ci && npx ng build     # UI -> src/linkit_all/static/browser
 ```
+
+- **Arabic UI**: the language toggle is in the app shell; one build serves both languages
+  (runtime dictionary in `frontend/src/app/i18n/{en,ar}.ts`, RTL handled in `locale.ts`).
+- **Local models**: setup wizard, AI step, "Local model" (Ollama / LM Studio via `api_base`
+  on the `litellm` provider).
+- **Schedule**: "Schedule" section on the Live run page, or the `[schedule]` table in `search.toml`
+  (days, times, `new_run`). Needs the app running; a scheduled run does all five stages and is
+  a dry run unless live applying is on.
 
 UI hot reload: `LINKIT_DEV_ORIGINS='["http://localhost:4200"]' uv run linkit serve --no-open`,
 then `npm start` in `frontend/` (proxy in `frontend/proxy.conf.json`).
@@ -87,23 +107,33 @@ src/linkit_all/
   pipeline.py       run_stage(stage) for discover/enrich/rank/score/apply, shared by CLI and UI;
                     ai_settings() = CLI flags > wizard choice > env; shared embedder
   core/
-    config.py       Settings (LINKIT_* env): data_dir, provider, model, tailoring thresholds,
-                    embedding model, dev_origins
+    config.py       Settings (LINKIT_* env): data_dir, provider (codex_cli|claude_cli|litellm),
+                    model, tailoring thresholds, embedding model, dev_origins
     models.py       runs, jobs, job_events, llm_cache, profile (+answers JSON), locked_facts,
-                    tailored_cvs, search_config, source_checkpoints, answer_bank, action_items
+                    tailored_cvs, search_config, source_checkpoints, answer_bank, action_items,
+                    vault tables
     state.py        ALLOWED transitions; transition() writes job_events
-    search.py       SearchConfig: search, sources, filters, matching, apply, ai sections
-    profile.py      profile fields, DOCX upload checks, JSON import
-    runs.py, db.py, log.py (redaction), tools.py (find soffice/chrome; bundled LO first)
+    search.py       SearchConfig: search, sources, filters, matching, apply, ai, schedule sections
+    scheduler.py    APScheduler (SQLAlchemy job store) + desktop notifications; skips a tick
+                    if a run is already going
+    profile.py      profile fields, CV upload checks (DOCX/ODT/PDF/LaTeX), JSON import
+    runs.py, db.py, log.py (redaction), tools.py (find soffice/chrome/tectonic; bundled LO first)
     migrations/     Alembic; runs automatically in init_db()
   providers/        LLMProvider.complete(prompt, schema); claude_cli, codex_cli, litellm_api;
-                    prompts/*.j2 (json_output, json_retry, ping, tailor, score, answer, cover_letter)
-  sources/          base (JobStub, Task, Source), http (rate limits + retries), text (html->text,
-                    URL/company normalization, hash), store (Deduper), runner (discover, enrich),
-                    ats_detector, greenhouse, lever, ashby, jobspy_sites, wuzzuf, jsonld
+                    prompts/*.j2 (json_output, json_retry, ping, tailor, score, answer,
+                    cover_letter, ...)
+  sources/          base (JobStub, Task, Source), http (rate limits + retries + RFC 9309
+                    robots matcher), text (html->text, URL/company normalization, hash),
+                    store (Deduper), runner (discover, enrich), ats_detector,
+                    greenhouse, lever, ashby, smartrecruiters, recruitee, workable, workday
+                    (cxs), jobspy_sites, wuzzuf, forasna, careers (generic careers pages),
+                    jsonld
   matching/         rules (hard filters, seniority), rank (Embedder, rank_jobs), score (AI tiers)
-  tailor/           docx/segments, patches (rules), render/libreoffice, verify/layout, pipeline
-                    (tailor_docx, tailor_for, tailor_job; reuses an existing tailored CV)
+  tailor/           docx/segments, latex/ (TexSoup text nodes), patches (rules),
+                    render/{libreoffice,latex}.py (Tectonic), verify/layout,
+                    pipeline (tailor_docx, tailor_for, tailor_job; ODT/PDF/LaTeX entry; reuses an
+                    existing tailored CV)
+  reports/          per platform / board / run, over time, funnel; CSV + PDF export
   apply/
     answers.py      Question, ApplicationAnswers, sensitive_category(), sensitive/standard
                     answers, option pickers, resolve_static()
@@ -111,16 +141,29 @@ src/linkit_all/
                     answer_questions() (full resolution)
     form.py         page script that tags question containers (data-lk) and controls
                     (data-lk-input); fill(); lost_values() refill check
+    browser.py      persistent Chrome profile dir per ATS, live screenshot file (written every
+                    3 s while applying), app-browser session helpers
     handlers/       base (Handler, JobInfo, confirmation/CAPTCHA/error checks), greenhouse,
                     lever, ashby; HANDLERS registry
+    agent/          generic AI form agent: snapshot.js (control snapshot), field-map schema,
+                    one-page step; multi-page loop lives in the runner
+    vault/          AES-GCM per secret, Argon2id key from the passphrase, keyring cache,
+                    lock/unlock, export (re-asks the passphrase)
+    email_verify/   IMAP (Gmail app password from the vault): code/link regex first, AI
+                    fallback; matches sender domain + time window
+    accounts/       password generator per site rules, save-to-vault-before-sign-up, login reuse
     runner.py       Applier (persistent Chrome per ATS), pick_jobs (caps), apply(),
-                    click_submit() guard, apply_jobs(); ApplyBlocked, DryRunViolation
+                    click_submit() guard, apply_jobs(); handler or generic agent; account gate;
+                    ApplyBlocked, DryRunViolation
   api/              app (factory, lifespan, SPA fallback, serve), routes (all /api endpoints),
                     runner (PipelineRunner, one run at a time), events (EventBus + log sink),
                     security (LocalOnly middleware)
   static/browser/   built Angular app (gitignored, shipped in the wheel via hatch artifacts)
-frontend/src/app/   app.ts (shell, nav, badges), api.ts, live.ts (WebSocket), types.ts,
-                    pages/{setup,jobs,job-detail,review,live,report}.ts (inline templates)
+frontend/src/app/   app.ts (shell, nav, badges, language toggle), api.ts, live.ts (WebSocket),
+                    types.ts, i18n.ts + i18n/{en,ar}.ts (runtime dictionary), locale.ts (language,
+                    RTL), pages/{setup,jobs,job-detail,review,live,report,actions,answers,vault}.ts
+                    (inline templates)
+docs/               MkDocs Material user + developer guide (mkdocs.yml at the root)
 scripts/bundle_libreoffice.py   builds the minimal LibreOffice bundle (Windows)
 tests/unit, tests/e2e (apply flow on a saved Lever form), tests/fixtures/<ats>/
 ```
@@ -137,14 +180,29 @@ tests/unit, tests/e2e (apply flow on a saved Lever form), tests/fixtures/<ats>/
 - **Dry run never submits**: the runner returns before the submit step, and
   `click_submit()` raises `DryRunViolation`. Keep both. Live mode also waits for the user's
   confirmation unless "submit without asking" is on.
+- **Account gate**: the generated password is saved to the vault *before* the sign-up click.
+  A dry run never touches sign-up forms (the outcome
+  says an account would be created). Live mode creates accounts when a form needs one; the
+  application itself still waits for confirmation. One vault entry per (ats, tenant).
+- **App browser** ("Open in app browser" in the Action Center): opens the user's own window on
+  the same Chrome profile, fills nothing automatically, and runs are refused while it is open
+  (the profile can only be held by one browser).
+- **Generic agent**: the model returns a field map; our code fills, validates and clicks.
+  Answers still go through the answer engine (sensitive rules apply). A job becomes `applied`
+  only with confirmation wording on the page; otherwise it parks or fails.
 - **Applied only on proof**: a job becomes `applied` only when the ATS confirmation page
   text is seen (or the user says "applied by hand"). Otherwise: Action Center or `failed`
   with a reason. Screenshots before submit and after; a Playwright trace on failure.
+- **robots.txt**: `sources/http.py` implements RFC 9309 matching (`*` and `$` wildcards, merged
+  groups, Crawl-delay from every group; the stdlib parser misses these). Used by the careers,
+  Wuzzuf and Forasna sources. See the open question below for what is not covered.
+- **CAPTCHAs are never solved** or bypassed (CapSolver dropped); they park for the user, who
+  solves them in the open browser, then Retry. Never defeat bot challenges or disguise a
+  client (Naukrigulf, SmartRecruiters).
 - **Local only**: the server binds to 127.0.0.1; `LocalOnly` rejects foreign Host headers and
   cross-origin writes and WebSockets. Screenshot endpoints serve files only from the data dir.
 - **Privacy**: never log passwords, tokens or CV text (loguru patcher redacts secrets; log ids
   and counts). No telemetry. Only the chosen AI provider sees CV and job text.
-- **Scraping**: obey robots.txt, never defeat bot challenges, keep per-host rate limits.
 - **Tests**: no live-site calls in CI; e2e apply tests intercept every request. Never submit
   a real application without the maintainer's explicit go-ahead.
 
@@ -152,81 +210,49 @@ tests/unit, tests/e2e (apply flow on a saved Lever form), tests/fixtures/<ats>/
 
 | Phase | State | Notes |
 |---|---|---|
-| 0 Init | ✅ | CI matrix in `.github/workflows/ci.yml` (Python + frontend build) |
-| 1 Core | ✅ | providers verified live with Codex and Claude from the maintainer's terminal |
-| 2 Discovery + matching | ✅ | live: 5 company boards -> 2,075 jobs in 12 s; Cairo searches on LinkedIn/Indeed/Bayt; Wuzzuf via sitemaps |
-| 3 UI v1 | ✅ | all five screens checked in the browser with real data; a run started from the UI streamed live |
-| 4 Apply v1 | 🟡 | backend + API done and tested; UI missing |
-| 5–7 | ⬜ | see `plan.md` |
+| 0 Init | done | CI matrix in `.github/workflows/ci.yml` (Python + frontend build) |
+| 1 Core | done | providers verified live with Codex and Claude from the maintainer's terminal |
+| 2 Discovery + matching | done | live: 5 company boards -> 2,075 jobs in 12 s; Cairo searches on LinkedIn/Indeed/Bayt; Wuzzuf via sitemaps |
+| 3 UI v1 | done | setup wizard, jobs, review, live run, report checked in the browser with real data |
+| 4 Apply v1 | done | `c5c5494` wizard steps, `08b8451` answer bank API, `4b94e9a` Action Center, `3b1bad1` Live run apply, `378d340` answer bank page; dry-run verified on live Airbnb/Palantir/OpenAI forms |
+| 5 Apply v2 | partly | `474c270` runner checks handler before tailoring; `a6ac0e5`/`34986c6` vault core + UI; `40392b6`/`69a826e` IMAP verification + email step; `65fbc5f` account gate; `d6ff3bd`/`8f8acdf` SmartRecruiters, Recruitee, Workable, Workday discovery; `dfee500` runner uses the server's vault. Handlers for Workday/iCIMS/Taleo/SuccessFactors/SmartRecruiters and LinkedIn/Indeed apply: blocked |
+| 6 Generic | done except Naukrigulf | `93cd3be`/`48c8b27` careers source (batched AI extraction); `ad27af6`/`685bd7c` generic form agent + runner fallback; `4903956` Forasna; `9239b3e` RFC 9309 robots matcher |
+| 7 Later | partly | `276fa96` ODT/PDF CVs + reports; `bf15f7b` scheduler, notifications, LaTeX CVs; `49a422f` local models; `2403f4f`/`0fb0c7c` Arabic RTL UI; `5fd2425` MkDocs docs; `093780f`/`3908a83`/`0353d50` CLAUDE.md gap fixes (app browser, red-line, live view, low-tier opt-in). Outlook OAuth, macOS/Linux bundles, release: pending |
 
-## Next steps (finish Phase 4)
+## Needs the maintainer (blockers)
 
-### 1. Setup wizard: two new steps (`frontend/src/app/pages/setup.ts`)
+1. **First supervised live application** (Live on, confirm each). Nothing real has been sent.
+2. **Saved rendered pages** so handlers can be written: Workday, iCIMS, Taleo, SuccessFactors
+   (forms sit behind sign-up), SmartRecruiters (DataDome-protected, client-rendered), and a
+   sitemap slice + job pages for Naukrigulf (its edge drops non-browser clients; we never
+   disguise the client). Until then those sites use the generic agent or are unsupported.
+3. **A supervised session for real account creation + Gmail IMAP verification** (Gmail app
+   password); the account gate and email code are tested offline only.
+4. **Install Tectonic** so the real LaTeX compile test can run (the one skipped test).
+5. **Outlook OAuth** (needs an Azure app registration).
+6. **macOS/Linux LibreOffice bundles** (need those OSes or CI).
+7. **GitHub repo + PyPI release** (outward-facing: needs the maintainer's go-ahead).
 
-Insert between "Filters" and "Finish":
+## Open question for the maintainer
 
-**"Application answers"**: `GET/PUT /api/profile/answers` (body = `ApplicationAnswers` in
-`apply/answers.py`; PUT returns 409 until the profile is saved).
-- Basics: first/last name (optional overrides), city, country, current company/title,
-  LinkedIn/GitHub/portfolio, years of experience, notice period, "how did you hear" default,
-  willing to relocate (yes/no/ask me).
-- Work and visa (sensitive): countries you can work in (one per line), need sponsorship
-  (yes/no/ask me), salary expectation + currency.
-- Voluntary demographics, each optional, with "Ask me when a form needs it" as the empty
-  default: `eeo_gender` (male, female, non_binary, decline), `eeo_race` (asian, black,
-  hispanic, white, middle_eastern, native, pacific, two_or_more, decline), `eeo_hispanic`
-  (yes, no, decline), `eeo_veteran` (not_veteran, veteran, decline), `eeo_disability`
-  (no, yes, decline). Label "decline" as "Prefer not to say".
-- Acknowledgements: `acknowledge_privacy` ("Accept required privacy notices and
-  data-processing consents for me") and `acknowledge_legal` ("Accept required arbitration
-  agreements and 'I certify my answers are true' statements for me"). Tri-state; empty means
-  the Action Center asks each time. Explain both plainly.
+CLAUDE.md §5.2 says "obey robots.txt". Careers pages, Wuzzuf and Forasna are robots-checked,
+but the public ATS JSON APIs (Greenhouse, Lever, Ashby, SmartRecruiters, Recruitee, Workable,
+Workday cxs) and the python-jobspy sites (LinkedIn, Indeed, ...) are **not** robots-checked
+today. Decide whether that is acceptable (official public APIs / user-chosen sites) or should
+change. Resolve this before the public release.
 
-**"Applying"**: the `apply` section of `PUT /api/search` (`ApplySection` in
-`core/search.py`): `live` (big warning: real applications), `submit_without_asking`
-(disabled unless live; second warning), `max_per_run`, `daily_cap_per_site`, `headless`,
-`min_pause_s`/`max_pause_s`. Show the current mode in the shell (`/api/status` has
-`apply_live`).
+## Next steps
 
-### 2. Action Center screen (new `pages/actions.ts`, route `actions`, nav badge)
-
-- `GET /api/actions?status=open` -> items: `id, kind, message, questions[], answers{}
-  (filled summary: label -> {value, source}), screenshots (count), job{id, title, company,
-  location, score, url, apply_url}`.
-- Screenshot: `<img src="/api/actions/{id}/screenshot/{n}">`.
-- `POST /api/actions/{id}` with `{"decision": ..., "answers": {label: value}}`:
-  - `answer` (kind `unknown_question`): render each question by `kind` (select/radio/
-    combobox/yesno -> choices from `options`; multi -> checkboxes; checkbox -> yes/no; text ->
-    input; textarea -> textarea), show `reason` and a "sensitive" note. Required ones are
-    enforced (422 lists the first missing). Answers go to the answer bank as the user's, and
-    the job is requeued.
-  - `confirm` (kind `confirm_submit`): show the screenshot and the filled answers table with
-    source badges (profile, sensitive, bank, ai, file), then "Submit application" and "Skip".
-  - `retry`, `applied_by_hand` (shows an "Open application page" link to `apply_url`),
-    `skip` for `captcha` / `validation_error`.
-- `/api/status.actions_open` drives the nav badge. Refresh on `Live.changed()`.
-
-### 3. Live run and Jobs
-
-- Add `apply` to `STAGES` in `frontend/src/app/types.ts` and a label ("Apply" plus
-  "(dry run)" / "(live)") in `pages/live.ts`; summary from the result counts
-  `dry_run, applied, needs_user, failed, skipped`.
-- Job detail drawer: show the dry-run `filled` answers (`job.data.filled`, via a small API
-  addition to `/api/jobs/{id}`) and links to screenshots.
-
-### 4. Answer bank screen (small)
-
-New endpoints: list, edit and delete `answer_bank` rows (question, answer, source,
-sensitive, uses). Editing an AI answer should set `source = "user"`.
-
-### 5. Wrap up Phase 4
-
-- Tests for new endpoints; `npx ng build` clean; browser check of each screen against
-  `build/smoke/data` (run a dry-run apply from the UI on smoke jobs that have Greenhouse,
-  Lever or Ashby `ats`).
-- Update CLAUDE.md §5.5–5.7 if behavior changed (it is at its 200-line cap; tighten
-  something else rather than grow it).
-- With the maintainer: a first supervised live application (Live on, confirm each).
+1. Answer the robots.txt question above; change `sources/http.py` usage if the answer is "check
+   everything".
+2. Run the first supervised live application with the maintainer (item 1 above), then
+   real account creation + IMAP (item 3). Expect to fix handler details found live.
+3. As the maintainer supplies saved pages: write the Workday/iCIMS/Taleo/SuccessFactors/
+   SmartRecruiters handlers (plugin + fixture + tests each), then Naukrigulf.
+4. Pay down the debt below, roughly in this order: live-view event per job; iframes in the
+   generic agent; generic sign-up; JS-rendered careers pages; Arabic server messages; phone
+   job-title width; the rest.
+5. Release work once the maintainer says go: GitHub repo, CI on three OSes, PyPI.
 
 ## Knowledge from the live forms (keep handlers aligned)
 
@@ -256,46 +282,40 @@ sensitive, uses). Editing an AI answer should set `source = "user"`.
 
 ## Known issues and debt
 
-- CLAUDE.md is at its 200-line cap.
-- `SearchConfig` now also holds `ai` and `apply` settings (it's really "preferences"); renaming
-  would touch the API, UI and saved data, so it was left.
+- CLAUDE.md is at its 200-line cap (tighten something else rather than grow it).
+- `SearchConfig` also holds `ai`, `apply` and `schedule` settings (it's really "preferences");
+  renaming would touch the API, UI and saved data, so it was left.
 - Dedupe collapses same-title openings at the same company and location (fine while one job
   per company is the default).
 - Wuzzuf fetches only slugs containing every word of a query (each fetch costs 10 s).
+- Forasna fetches all numbered sitemaps each run (about 80 s).
+- Workday: `postedOn` is relative text ("Posted 3 Days Ago"), and the list may cap the total
+  at 2,000.
+- Careers source is httpx-only: JS-rendered careers pages are reported unsupported.
+- Generic agent ignores iframes, and there is no generic sign-up (sign-in pages park).
 - A combobox with no fixed options (city, country) picks the first suggestion after typing.
-- Live submission is untested against real sites (CAPTCHA behavior unknown); the first live
-  run must be supervised.
+- Live submission is untested against real sites (CAPTCHA behavior unknown).
+- `two_factor` and captcha resolution is manual: "Open in app browser", solve, then Retry.
+- The Live run screenshot is file-polled every 3 s (no per-job event).
+- Gmail spam folder is matched by the English name `[Gmail]/Spam` only.
+- ODT/PDF/LaTeX CV path skips LaTeX `\input` projects and package macros like `\cventry`.
+- Server park messages and source keys are English in the Arabic UI (raw `zip_recruiter`, ...).
+- Job titles are very narrow at phone width.
+- Jobs clicked while the drawer is open don't switch the drawer.
+- API keys are env-only (not stored in the vault).
 - When `ApplyBlocked` fires (AI limit, LibreOffice missing) the rest of that run's jobs wait
   for the next run.
 - Starlette's TestClient warns about httpx (`httpx2`); harmless.
-- `linkit run apply` exists, but `/api/runs` stage pickers in the UI don't offer `apply` yet.
 
 ## Conventions
 
 - Small focused commits; message body explains what and why; end with
-  `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+  `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>` (use the attribution the
+  session's system reminder gives). One commit per reviewed task.
 - Keep the code lazy and boring: reuse what exists, stdlib first, no speculative
   abstractions; mark deliberate shortcuts with a `ponytail:` comment naming the ceiling.
 - Type hints everywhere (mypy strict); a test for every new logic path; new source or
   handler = plugin + fixture + tests; fixtures are trimmed copies of real responses.
 - Prompts live in `providers/prompts/*.j2`, never inline; every AI output is validated
   against a Pydantic schema.
-
-## Commit history
-
-```
-607fadf Phase 4c (API): application answers and Action Center endpoints
-0b50535 Phase 4b: apply runner, Greenhouse/Lever/Ashby handlers, dry-run guard
-e674216 Phase 4a: answer engine, answer bank, Action Center tables
-e7fffb3 Phase 3 UI: Angular app with setup wizard, jobs, review, live run, report
-fa8c8d4 Phase 3 API: FastAPI routes, pipeline runner, live events, `linkit serve`
-2ee7f4f Phase 2: matching - hard rules, local ranking, AI tiering
-468ee41 Phase 2: Wuzzuf source via sitemaps + generic JSON-LD JobPosting parser
-15130db Phase 2: LinkedIn, Indeed, Glassdoor, Google, ZipRecruiter, Bayt via jobspy
-00558a4 Phase 2: discovery core + Greenhouse, Lever, Ashby sources
-39fdc06 Minimal portable LibreOffice bundle for DOCX -> PDF
-76beda7 Phase 1: DOCX tailoring (segments, patch rules, render, verify)
-2aad096 Phase 1 core: settings, DB, state machine, LLM providers
-36b8190 Initialize LinKit All project skeleton
-```
-(plus the commit that adds this file, `plan.md` and `linkit run apply`)
+- Update `plan.md` task status and this file when a decision or state changes.

@@ -64,8 +64,8 @@ Tailoring happens just before applying, never for jobs that will not be applied 
 
 ### 5.1 AI provider layer (`providers/`)
 - One `LLMProvider` interface: `complete(prompt, schema) -> validated Pydantic object`.
-- Adapters: `codex_cli`, `claude_cli`, `litellm_api` (also local OpenAI-compatible servers
-  via `api_base`). Pick with `LINKIT_PROVIDER`; test with `linkit ai-check`.
+- Providers: `codex_cli`, `claude_cli`, `litellm` (module `litellm_api`; local servers via
+  `api_base`, wizard's Local model option). Pick with `LINKIT_PROVIDER`; test: `linkit ai-check`.
 - CLI adapters (`codex_cli`, `claude_cli`): detect binary on PATH + version; verify sign-in with
   a tiny test prompt; run in an empty temp dir with the CLI's own tools disabled (check
   `--help` of the installed version for flags); prompt via stdin, parse JSON output; 1 call
@@ -73,14 +73,14 @@ Tailoring happens just before applying, never for jobs that will not be applied 
   usage counts against the user's own plan limits (vendor policy can change: keep swappable).
 - All outputs are JSON validated against schemas; retry on invalid output (max 2).
 - The model only decides; our code executes. Never let a model drive the browser directly.
-- Cache responses in SQLite by prompt hash. Track quota; pause run cleanly on limit errors.
+- Cache responses in SQLite by prompt hash. Track quota; pause cleanly on limit errors.
 - CLI concurrency cap: 1–3. Prompts live in `prompts/*.j2`, not in code.
 
 ### 5.2 Discovery (`sources/`)
 - Plugin per source with `search(query) -> JobStub[]` and `fetch_details(stub) -> Job`.
 - Priority: public ATS JSON APIs (Greenhouse, Lever, Ashby, SmartRecruiters, Recruitee,
-  Workable, Workday cxs endpoint) > python-jobspy (LinkedIn, Indeed, Glassdoor,
-  ZipRecruiter, Google, Bayt) > per-site plugins (Wuzzuf; later Naukrigulf, Forasna)
+  Workable, Workday cxs) > python-jobspy (LinkedIn, Indeed, Glassdoor, ZipRecruiter,
+  Google, Bayt) > per-site plugins (Wuzzuf, Forasna)
   > generic extractor (JSON-LD -> CSS heuristics -> AI extraction).
 - Obey robots.txt; never defeat bot challenges. Use APIs/sitemaps instead (Wuzzuf: job
   sitemaps + JSON-LD pages at its Crawl-delay 10; its search pages are disallowed).
@@ -108,23 +108,23 @@ Tailoring happens just before applying, never for jobs that will not be applied 
 - Output: LibreOffice -> PDF (submitted file). Verify: same page count, pixel/SSIM diff vs
   original within tolerance, pdfplumber text extract succeeds. On failure roll back patches.
 - Store every tailored version + patch list per job; UI shows a red-line diff.
-- Until the wizard exists: `linkit profile import profile.json` (docs/profile.example.json),
-  then `linkit tailor jd.txt` prints the red-line. Numbers/dates/contacts are auto-locked.
+- Debug: `linkit tailor jd.txt` prints the red-line. Numbers/dates/contacts are auto-locked.
 
 ### 5.5 Apply (`apply/`)
-- Order: per-ATS handler (Workday, Greenhouse, Lever, Ashby, iCIMS, Taleo, SmartRecruiters,
-  SuccessFactors, LinkedIn Easy Apply, Indeed Apply) -> generic AI form agent
-  (accessibility-tree snapshot -> field map JSON -> fill -> validate -> next) -> Action Center.
+- Order: per-ATS handler -> generic AI form agent (accessibility-tree snapshot -> field map
+  JSON -> fill -> validate -> next) -> Action Center. Handlers today: Greenhouse, Lever, Ashby;
+  every other site (Workday, iCIMS, Taleo, ...) falls back to the generic agent.
 - Headed Chrome by default, persistent profile per site, randomized human pacing,
   per-site daily caps, 1–3 parallel browsers.
 - Account gate: generate unique password (`secrets`, honoring site rules), save to vault
   BEFORE submitting signup, then verify via IMAP (code/link by regex, AI fallback).
+  Dry run never touches sign-up; live mode creates accounts when needed (password in the
+  vault before the click); the application still waits for confirmation unless 'submit without asking'.
 - Screening questions: answer bank (embedding match) -> AI draft from profile ->
   Action Center. Sensitive categories (section 2) never go to the AI.
 - LinkedIn Easy Apply and Indeed Apply break those sites' ToS: off by default, explicit opt-in
   with a ban-risk warning, low daily caps. No CAPTCHA solving: CAPTCHAs park for the user.
-- Cover letter only when the form has a cover-letter field.
-- Screenshot before submit and on confirmation; Playwright trace on failure.
+- Cover letter only if the form has a field. Screenshot before submit and on confirmation; trace on failure.
 - Success = confirmation page text and/or confirmation email. Otherwise state = failed
   with reason, never assumed applied.
 
@@ -135,17 +135,16 @@ user may opt in to auto-apply low too.
 
 ### 5.7 Action Center
 Parked jobs: unknown_question, confirm_submit, captcha, validation_error, login_issue, two_factor.
-Keep or restore the page so the user acts in one sitting; job resumes afterward.
+Parked jobs reopen via "Open in app browser" (same Chrome profile), then Retry.
 Notify via WebSocket + optional desktop notification.
 
 ### 5.8 Reports
-Counts of applied / failed / skipped / needs_user per platform and per career page,
-per run and over time; funnel (found -> filtered -> ranked -> scored -> applied); CSV/PDF export.
+Applied / failed / skipped / needs_user per platform and career page, per run and over time;
+funnel (found -> ... -> applied); CSV/PDF export.
 
 ## 6. Data & security
 - App data under platformdirs user data dir: db, CVs, tailored versions, screenshots, traces.
-- Vault: AES-GCM, key from master passphrase via Argon2id, cached with keyring.
-  Export requires re-entering the passphrase.
+- Vault: AES-GCM, key from master passphrase via Argon2id, cached with keyring; export re-asks it.
 - IMAP: app passwords (Gmail first, Yahoo). Outlook needs an OAuth path (later).
 - External tools: LibreOffice required (DOCX->PDF), Chrome for applying, Tectonic for LaTeX.
   `linkit doctor` checks them. Install for end users: `uv tool install linkit-all`.
@@ -157,7 +156,7 @@ per run and over time; funnel (found -> filtered -> ranked -> scored -> applied)
 ## 7. UI screens
 Setup wizard (profile, CV upload + preview, AI connection test, IMAP test, vault passphrase)
 · Sources · Filters & matching · Jobs table (virtualized) · Review queue · Live run
-(event stream + browser screencast) · Action Center · Vault · Reports.
+(event stream + 3-second read-only screenshot view) · Action Center · Vault · Reports.
 
 ## 8. Repository layout
 ```
@@ -185,15 +184,16 @@ docs/
 - Unsure about scope, a constraint, or a dependency? Ask; don't guess.
 
 ## 10. Build order
-1. Core: models, SQLite, state machine, provider layer (Claude CLI + Codex CLI + API keys), DOCX tailoring.
-2. Discovery: Greenhouse/Lever/Ashby APIs, python-jobspy (+Bayt), Wuzzuf, dedupe,
-   matching + batched AI tiering. Done; Naukrigulf/Forasna later.
-3. UI v1: setup wizard, jobs table, review queue, live run, basic report.
+Phases 1-7 are built; blocked items are listed in handoff.md.
+1. Core: models, SQLite, state machine, providers (Claude/Codex CLI, API keys), DOCX tailoring.
+2. Discovery + matching: ATS APIs, jobspy, Wuzzuf, Forasna, careers pages, dedupe, AI tiering.
+3. UI v1: setup wizard, jobs, review queue, live run, report.
 4. Apply v1: Greenhouse, Lever, Ashby (no accounts), answer bank, Action Center.
-5. Apply v2: Workday, iCIMS, Taleo, SmartRecruiters, SuccessFactors with account creation,
-   vault, Gmail IMAP verification. Opt-in: LinkedIn/Indeed apply.
-6. Generic career-page extractor; generic AI form agent.
-7. Later: local models, LaTeX/ODT/PDF input, scheduler, Outlook OAuth, docs, PyPI release.
+5. Apply v2: vault, Gmail IMAP, account gate built; Workday/iCIMS/Taleo/SuccessFactors
+   handlers blocked (need saved pages); LinkedIn/Indeed apply not built (opt-in).
+6. Generic careers extractor and AI form agent: built. Naukrigulf blocked.
+7. Local models, LaTeX/ODT/PDF CVs, scheduler, reports, Arabic UI, docs: built. Outlook
+   OAuth, macOS/Linux LO bundles, GitHub/PyPI release: pending.
 
 ## 11. License
 AGPL-3.0-or-later (code is reused from ApplyPilot/AIHawk). Reused files keep their
