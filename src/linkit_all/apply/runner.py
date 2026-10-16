@@ -217,16 +217,17 @@ class Applier:
         return picked
 
     async def apply(self, job_id: int) -> Outcome:
+        with self.db() as s:  # decide first: never tailor a job we won't apply to (CLAUDE.md §4)
+            job = s.get_one(Job, job_id)
+            info = job_info(job)
+        if info is None or job.ats not in HANDLERS:
+            return Outcome("skipped", f"no form handler for this posting ({job.ats})")
         try:
             cv = await tailor_job(self.db, job_id, self.provider, self.settings)
         except (RenderError, UsageLimitError, TailorError) as e:
             raise ApplyBlocked(str(e)) from e
         with self.db() as s:
-            job = s.get_one(Job, job_id)
-            info = job_info(job)
             profile = s.get_one(Profile, 1)
-        if info is None or job.ats not in HANDLERS:
-            return Outcome("skipped", f"no form handler for this posting ({job.ats})")
         handler = HANDLERS[job.ats]
         out_dir = self.settings.data_dir / "applications" / f"job_{job_id}"
         out_dir.mkdir(parents=True, exist_ok=True)
