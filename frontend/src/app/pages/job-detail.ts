@@ -3,6 +3,12 @@ import { Component, effect, inject, input, output, signal } from '@angular/core'
 import { Api } from '../api';
 import { JobDetail } from '../types';
 
+interface Filled { value: unknown; source: string }
+type Detail = Omit<JobDetail, 'events'> & {
+  filled?: Record<string, Filled> | null;
+  events: { id: number; at: string; to: string; message: string; screenshots: number }[];
+};
+
 const APPROVABLE = ['awaiting_review', 'below_threshold'];
 const FINAL = ['applied', 'skipped', 'filtered_out'];
 
@@ -67,11 +73,37 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
           <div class="mt-2 max-h-[50vh] overflow-auto text-sm leading-relaxed whitespace-pre-wrap" dir="auto">{{ j.description || 'No description yet.' }}</div>
         </section>
 
+        @if (filledRows(j); as rows) {
+          <section>
+            <h3 class="font-semibold">Filled answers</h3>
+            <table class="mt-2 w-full text-left text-sm">
+              <thead class="text-xs text-slate-500"><tr><th class="py-1 pr-3">Question</th><th class="py-1 pr-3">Value</th><th class="py-1">Source</th></tr></thead>
+              <tbody>
+                @for (r of rows; track r.label) {
+                  <tr class="border-t border-slate-200 align-top dark:border-slate-700">
+                    <td class="py-1 pr-3">{{ r.label }}</td>
+                    <td class="py-1 pr-3 break-words" dir="auto">{{ r.value }}</td>
+                    <td class="py-1"><span class="badge" [class]="r.source === 'sensitive' ? 'tier-mid' : 'tier-low'">{{ r.source || 'unknown' }}</span></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </section>
+        }
+
         <section>
           <h3 class="font-semibold">History</h3>
           <ol class="mt-2 space-y-1 border-l border-slate-200 pl-4 text-xs dark:border-slate-700">
             @for (e of j.events; track $index) {
-              <li><span class="text-slate-500">{{ e.at | date: 'short' }}</span> → <span class="font-medium">{{ e.to.replace('_', ' ') }}</span> {{ e.message }}</li>
+              <li><span class="text-slate-500">{{ e.at | date: 'short' }}</span> → <span class="font-medium">{{ e.to.replace('_', ' ') }}</span> {{ e.message }}
+                @if (e.screenshots) {
+                  <span class="ml-1">
+                    @for (n of range(e.screenshots); track n) {
+                      <a class="mr-1 underline" [href]="shot(e.id, n)" target="_blank" rel="noopener noreferrer"><img class="inline-block h-12 rounded border border-slate-200 align-middle dark:border-slate-700" [src]="shot(e.id, n)" [alt]="'Screenshot ' + (n + 1)" loading="lazy"></a>
+                    }
+                  </span>
+                }
+              </li>
             }
           </ol>
         </section>
@@ -83,7 +115,7 @@ export class JobDetailPanel {
   private readonly api = inject(Api);
   readonly jobId = input.required<number>();
   readonly changed = output<void>();
-  protected readonly job = signal<JobDetail | null>(null);
+  protected readonly job = signal<Detail | null>(null);
   protected readonly busy = signal(false);
   protected readonly error = signal('');
 
@@ -98,6 +130,23 @@ export class JobDetailPanel {
     return APPROVABLE.includes(state);
   }
 
+  filledRows(j: Detail): { label: string; value: string; source: string }[] | null {
+    if (!j.filled) return null;
+    return Object.entries(j.filled).map(([label, f]) => ({
+      label,
+      value: Array.isArray(f.value) ? f.value.join(', ') : String(f.value ?? ''),
+      source: f.source,
+    }));
+  }
+
+  range(n: number): number[] {
+    return Array.from({ length: n }, (_, i) => i);
+  }
+
+  shot(eventId: number, n: number): string {
+    return `/api/jobs/${this.jobId()}/events/${eventId}/screenshot/${n}`;
+  }
+
   final(state: string): boolean {
     return FINAL.includes(state);
   }
@@ -105,7 +154,7 @@ export class JobDetailPanel {
   async load(id: number): Promise<void> {
     this.error.set('');
     try {
-      this.job.set(await this.api.get<JobDetail>(`/jobs/${id}`));
+      this.job.set(await this.api.get<Detail>(`/jobs/${id}`));
     } catch (e) {
       this.error.set((e as Error).message);
     }

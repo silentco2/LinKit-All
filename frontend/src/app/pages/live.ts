@@ -31,7 +31,7 @@ interface RecentRun {
         <div class="flex flex-wrap gap-4">
           @for (s of stages; track s) {
             <label class="flex items-center gap-2 text-sm">
-              <input type="checkbox" [checked]="chosen().has(s)" (change)="toggle(s)"> {{ labels[s] }}
+              <input type="checkbox" [checked]="chosen().has(s)" (change)="toggle(s)"> {{ label(s) }}
             </label>
           }
         </div>
@@ -57,7 +57,7 @@ interface RecentRun {
             @for (s of run.stages; track s) {
               <li class="card p-4" [class.ring-2]="run.stage === s && run.running" [class.ring-brand-500]="run.stage === s && run.running">
                 <div class="flex items-center justify-between">
-                  <span class="font-medium">{{ labels[s] }}</span>
+                  <span class="font-medium">{{ label(s) }}</span>
                   <span class="text-xs" [class]="stageClass(s)">{{ stageStatus(s) }}</span>
                 </div>
                 @if (run.results[s]; as r) {
@@ -90,7 +90,7 @@ export class LivePage {
   protected readonly live = inject(Live);
   private readonly api = inject(Api);
   protected readonly stages = STAGES;
-  protected readonly labels = LABELS;
+  protected readonly applyLive = signal(false);
   protected readonly chosen = signal(new Set<Stage>(STAGES));
   protected readonly fresh = signal(false);
   protected readonly busy = signal(false);
@@ -100,6 +100,7 @@ export class LivePage {
   private readonly log = viewChild<ElementRef<HTMLElement>>('log');
 
   constructor() {
+    this.api.get<{ apply_live: boolean }>('/status').then((st) => this.applyLive.set(st.apply_live)).catch(() => undefined);
     effect(() => {
       this.live.events(); // keep the log scrolled to the newest line
       const el = this.log()?.nativeElement;
@@ -109,6 +110,10 @@ export class LivePage {
       this.live.changed();
       this.api.get<{ recent: RecentRun[] }>('/runs').then((r) => this.paused.set(r.recent.find((x) => x.status === 'paused') ?? null));
     });
+  }
+
+  label(s: Stage): string {
+    return s === 'apply' ? `Apply (${this.applyLive() ? 'live' : 'dry run'})` : LABELS[s];
   }
 
   toggle(s: Stage): void {
@@ -162,14 +167,22 @@ export class LivePage {
         return `${n('ranked')} ranked, ${n('filtered_out')} filtered out`;
       case 'score':
         return `${n('high')} high, ${n('mid')} to review, ${n('low')} low${n('not_scored') ? `, ${n('not_scored')} not scored yet` : ''}`;
-      case 'apply':
-        return `${n('applied')} applied, ${n('needs_user')} need you, ${n('failed')} failed, ${n('skipped')} skipped${r['dry_run'] ? ' (dry run)' : ''}`;
+      case 'apply': {
+        const parts = [
+          n('dry_run') && `${n('dry_run')} filled (dry run)`,
+          `${n('applied')} applied`,
+          `${n('needs_user')} need you`,
+          `${n('failed')} failed`,
+          `${n('skipped')} skipped`,
+        ];
+        return parts.filter(Boolean).join(', ');
+      }
     }
   }
 
   describe(e: LiveEvent): string {
     if (e.type === 'log') return e.message ?? '';
-    if (e.type === 'stage') return `${LABELS[e.stage!]}: ${e.status}${e.error ? ` (${e.error})` : ''}`;
+    if (e.type === 'stage') return `${this.label(e.stage!)}: ${e.status}${e.error ? ` (${e.error})` : ''}`;
     return `Run ${e.status}${e.error ? `: ${e.error}` : ''}`;
   }
 
