@@ -44,6 +44,7 @@ class MatchingSection(BaseModel):
     tier_high: int = Field(8, ge=1, le=10)  # score >= this: auto-apply
     tier_mid: int = Field(5, ge=1, le=10)  # score >= this: needs your approval
     batch_size: int = Field(15, ge=1, le=30)  # jobs per AI call
+    auto_apply_low: bool = False  # opt in: low-tier jobs are applied to as well (best first)
 
 
 class ApplySection(BaseModel):

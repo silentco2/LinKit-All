@@ -2,6 +2,8 @@
 
 ranked -> scored -> queued_apply (high) | awaiting_review (mid) | below_threshold (low).
 Jobs outside the top `ai_max_jobs` go straight to below_threshold (tier low).
+With `matching.auto_apply_low` the low tier is queued for apply instead, and existing
+below_threshold jobs are re-queued on the next score run.
 """
 
 from typing import Any
@@ -39,6 +41,7 @@ def tier_for(score: int, cfg: SearchConfig) -> Tier:
     return Tier.mid if score >= cfg.matching.tier_mid else Tier.low
 
 
+LOW_OPT_IN = "queued by the low-tier auto-apply opt-in"
 _NEXT = {Tier.high: JobState.queued_apply, Tier.mid: JobState.awaiting_review,
          Tier.low: JobState.below_threshold}  # fmt: skip
 
@@ -47,16 +50,24 @@ async def score_jobs(
     db: sessionmaker[Session], cfg: SearchConfig, provider: LLMProvider, run_id: int | None = None
 ) -> dict[str, int]:
     counts = {"high": 0, "mid": 0, "low": 0, "not_scored": 0}
+    opt_in = cfg.matching.auto_apply_low
     with db.begin() as s:
         profile = s.get(Profile, 1)
         if profile is None:
             raise ValueError("No profile yet: run `linkit profile import profile.json`")
+        if opt_in:  # opt-in turned on later: pick up earlier lows too
+            old_lows = list(s.scalars(select(Job).filter_by(state=JobState.below_threshold)))
+            for job in old_lows:
+                transition(s, job, JobState.queued_apply, LOW_OPT_IN)
+            counts["requeued_low"] = len(old_lows)
         ranked = list(s.scalars(select(Job).filter_by(state=JobState.ranked)))
         ranked.sort(key=lambda j: -j.data.get("rank", 0))
         top, rest = ranked[: cfg.matching.ai_max_jobs], ranked[cfg.matching.ai_max_jobs :]
         for job in rest:  # the free prefilter decided: low tier, no AI spent
             job.tier = Tier.low
             transition(s, job, JobState.below_threshold, "outside the top ranked jobs")
+            if opt_in:
+                transition(s, job, JobState.queued_apply, LOW_OPT_IN)
         counts["low"] += len(rest)
         batches = [
             [{"id": j.id, "title": j.title, "company": j.company, "location": j.location,
@@ -96,7 +107,10 @@ async def score_jobs(
                     {**job.data, "ai": ai},
                 )
                 transition(s, job, JobState.scored, f"AI score {r.score}")
-                transition(s, job, _NEXT[job.tier], f"tier {job.tier}")
+                if job.tier == Tier.low and opt_in:
+                    transition(s, job, JobState.queued_apply, LOW_OPT_IN)
+                else:
+                    transition(s, job, _NEXT[job.tier], f"tier {job.tier}")
                 counts[job.tier] += 1
         logger.info("scored batch {}/{}", n, len(batches))
     return counts

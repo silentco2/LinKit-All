@@ -196,3 +196,40 @@ def test_score_pauses_run_on_usage_limit(db: sessionmaker[Session]) -> None:
         run = s.get_one(Run, run_id)
         assert run.status == RunStatus.paused and "usage limit" in (run.pause_reason or "")
         assert s.query(Job).filter_by(state=JobState.ranked).count() == 2
+
+
+def test_auto_apply_low_off_keeps_lows_below_threshold(db: sessionmaker[Session]) -> None:
+    ranked_jobs(db, ["A", "B"])
+    asyncio.run(score_jobs(db, SearchConfig.model_validate({"matching": {"ai_max_jobs": 1}}),
+                           FakeAI({"A": 2})))  # fmt: skip
+    with db() as s:
+        states = {j.title: j.state for j in s.scalars(select(Job))}
+    assert states == {"A": JobState.below_threshold, "B": JobState.below_threshold}
+
+
+def test_auto_apply_low_queues_lows_and_requeues_old_ones(db: sessionmaker[Session]) -> None:
+    ranked_jobs(db, ["A", "B", "C"])
+    off = SearchConfig.model_validate({"matching": {"ai_max_jobs": 2}})
+    asyncio.run(score_jobs(db, off, FakeAI({"A": 9, "B": 2})))  # B AI-low, C outside the top 2
+    with db.begin() as s:
+        s.add(job(title="Out", company="Out", state=JobState.filtered_out))
+        s.add(job(title="New", company="New", state=JobState.ranked, data={"rank": 0.1}))
+    on = SearchConfig.model_validate({"matching": {"ai_max_jobs": 2, "auto_apply_low": True}})
+    counts = asyncio.run(score_jobs(db, on, FakeAI({"New": 3})))
+    assert counts["requeued_low"] == 2 and counts["low"] == 1
+    with db() as s:
+        jobs = {j.title: j for j in s.scalars(select(Job))}
+        msgs = {
+            t: s.scalars(
+                select(JobEvent.message).filter_by(job_id=j.id, to_state=JobState.queued_apply)
+            ).all()
+            for t, j in jobs.items()
+        }
+    assert jobs["Out"].state == JobState.filtered_out
+    for t in ("B", "C", "New"):  # AI-scored low, not-scored low, new AI-scored low
+        assert jobs[t].state == JobState.queued_apply and jobs[t].tier == Tier.low
+        assert "low-tier auto-apply opt-in" in msgs[t][0]
+    assert jobs["A"].state == JobState.queued_apply and "opt-in" not in msgs["A"][0]
+    # ordering used by pick_jobs: score first, then rank; unscored lows sort last
+    order = sorted(jobs.values(), key=lambda j: (-(j.score or 0), -(j.data.get("rank") or 0)))
+    assert next(j.title for j in order if j.state == JobState.queued_apply) == "A"
