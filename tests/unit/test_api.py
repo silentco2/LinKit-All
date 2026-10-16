@@ -11,6 +11,7 @@ from test_vault import CHEAP, PASS, SECRET, MemoryKeyring
 
 from linkit_all.api import runner as runner_module
 from linkit_all.api.app import create_app
+from linkit_all.apply.email_verify import EmailLoginError
 from linkit_all.apply.vault import Vault
 from linkit_all.core.config import Settings
 from linkit_all.core.models import ActionItem, ActionKind, AnswerEntry, Job, JobState, Tier
@@ -396,3 +397,76 @@ def test_vault_unlocks_from_keyring_on_startup(tmp_path: Path) -> None:
     second.state.vault = Vault(second.state.db, "api-test", CHEAP)
     with TestClient(second, base_url=BASE) as c:
         assert c.get("/api/status").json()["vault"] == {"initialized": True, "unlocked": True}
+
+
+def test_email_connect_test_disconnect(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[str, str, str]] = []
+    reject = {"on": False}
+
+    def fake_login(host: str, user: str, password: str) -> None:
+        calls.append((host, user, password))
+        if reject["on"] or password == "wrongpassword":  # noqa: S105
+            raise EmailLoginError("Gmail rejected the app password")
+
+    monkeypatch.setattr("linkit_all.api.routes.check_login", fake_login)
+    vault: Vault = client.app.state.vault  # type: ignore[attr-defined]
+
+    def post(path: str, body: object = None) -> Any:
+        return client.post(path, json=body or {}, headers=SAME_ORIGIN)
+
+    assert client.get("/api/email").json() == {
+        "imap_host": "imap.gmail.com",
+        "imap_user": "",
+        "connected": False,
+        "vault": {"initialized": False, "unlocked": False},
+    }
+    for path, body in (("/api/email", {"app_password": "x"}), ("/api/email/test", None)):
+        locked = post(path, body)
+        assert locked.status_code == 423 and locked.json()["detail"] == "Unlock the vault first"
+    assert client.delete("/api/email", headers=SAME_ORIGIN).status_code == 423
+
+    post("/api/vault/create", {"passphrase": PASS})
+    post("/api/vault/unlock", {"passphrase": PASS, "remember": False})
+    assert post("/api/email", {"app_password": "abcd"}).status_code == 400  # no address anywhere
+    assert post("/api/email/test").status_code == 404  # nothing saved
+    assert not calls
+
+    client.put("/api/profile", json={"full_name": "Me", "email": " Me@X.com "}, headers=SAME_ORIGIN)
+    assert client.get("/api/email").json()["imap_user"] == "me@x.com"  # from the profile
+    bad = post("/api/email", {"app_password": "wrongpassword"})
+    assert bad.status_code == 400 and bad.json()["detail"] == "Gmail rejected the app password"
+    assert "wrongpassword" not in bad.text
+    assert vault.entries() == [] and client.get("/api/search").json()["email"]["imap_user"] == ""
+
+    ok = post("/api/email", {"app_password": "abcd efgh ijkl mnop"})
+    assert ok.status_code == 200 and ok.json()["connected"] is True
+    assert "abcdefghijklmnop" not in ok.text
+    assert calls[-1] == ("imap.gmail.com", "me@x.com", "abcdefghijklmnop")  # spaces stripped
+    (entry,) = vault.entries()
+    assert (entry.kind, entry.site, entry.username) == ("imap", "imap.gmail.com", "me@x.com")
+    assert vault.get(entry.id) == "abcdefghijklmnop"
+    saved = client.get("/api/search").json()["email"]
+    assert saved["imap_host"] == "imap.gmail.com" and saved["imap_user"] == "me@x.com"
+    assert "abcdefghijklmnop" not in client.get("/api/search").text
+    assert client.get("/api/email").json()["connected"] is True
+
+    assert post("/api/email/test").json() == {"ok": True}
+    assert calls[-1] == ("imap.gmail.com", "me@x.com", "abcdefghijklmnop")
+    reject["on"] = True
+    failed = post("/api/email/test")
+    assert (
+        failed.status_code == 400 and failed.json()["detail"] == "Gmail rejected the app password"
+    )
+    reject["on"] = False
+
+    post("/api/vault/lock")
+    assert post("/api/email/test").status_code == 423
+    assert client.delete("/api/email", headers=SAME_ORIGIN).status_code == 423
+    got = client.get("/api/email").json()
+    assert got["connected"] is False and got["vault"]["unlocked"] is False
+
+    post("/api/vault/unlock", {"passphrase": PASS, "remember": False})
+    assert client.get("/api/email").json()["connected"] is True
+    assert client.delete("/api/email", headers=SAME_ORIGIN).status_code == 204
+    assert vault.entries() == [] and client.get("/api/email").json()["connected"] is False
+    assert post("/api/email/test").status_code == 404

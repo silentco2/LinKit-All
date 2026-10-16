@@ -57,6 +57,7 @@ export interface SearchConfig {
   matching: { ai_max_jobs: number; tier_high: number; tier_mid: number; batch_size: number };
   ai: { provider: Provider | null; model: string | null };
   apply: ApplySection;
+  email: { imap_host: string; imap_user: string; timeout_s: number; poll_s: number };
 }
 
 export interface ApplySection {
@@ -193,4 +194,11 @@ export interface VaultState {
   initialized: boolean;
   unlocked: boolean;
   entries: VaultEntry[];
+}
+
+export interface EmailState {
+  imap_host: string;
+  imap_user: string;
+  connected: boolean;
+  vault: { initialized: boolean; unlocked: boolean };
 }

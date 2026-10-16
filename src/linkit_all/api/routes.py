@@ -15,6 +15,7 @@ from linkit_all.api.events import EventBus
 from linkit_all.api.runner import PipelineRunner, RunBusy
 from linkit_all.apply.answers import ApplicationAnswers
 from linkit_all.apply.assist import AnswerBank
+from linkit_all.apply.email_verify import EmailLoginError, check_login, credentials
 from linkit_all.apply.vault import Vault, VaultError, VaultLocked, WrongPassphrase
 from linkit_all.core.config import Settings
 from linkit_all.core.models import (
@@ -668,3 +669,91 @@ def export_vault(request: Request, body: Passphrase) -> JSONResponse:
             "Cache-Control": "no-store",
         },
     )
+
+
+# --- email (IMAP, read-only; for sign-up verification mails) -------------------
+# The app password travels in the POST body only, goes straight to the vault and is never echoed.
+
+
+class EmailConnect(BaseModel):
+    imap_host: str | None = None
+    imap_user: str | None = None
+    app_password: str
+
+
+def _email_target(
+    request: Request, host: str | None = None, user: str | None = None
+) -> tuple[SearchConfig, str, str]:
+    """Config plus the effective (host, user): given value, else config, else the profile email."""
+    cfg = load_search(_db(request)) or SearchConfig()
+    host = (host or cfg.email.imap_host).strip().lower()
+    user = (user or cfg.email.imap_user or load_fields(_db(request))[0].email).strip().lower()
+    return cfg, host, user
+
+
+def _unlocked_vault(request: Request) -> Vault:
+    vault = _vault(request)
+    if not vault.unlocked():
+        raise HTTPException(423, "Unlock the vault first")
+    return vault
+
+
+@router.get("/email")
+def get_email(request: Request) -> dict[str, Any]:
+    _, host, user = _email_target(request)
+    vault = _vault(request)
+    connected = vault.unlocked() and any(
+        e.username.lower() == user for e in _vault_errors(lambda: vault.find("imap", host))
+    )
+    return {
+        "imap_host": host,
+        "imap_user": user,
+        "connected": connected,
+        "vault": {"initialized": vault.initialized(), "unlocked": vault.unlocked()},
+    }
+
+
+@router.post("/email")
+async def connect_email(request: Request, body: EmailConnect) -> dict[str, Any]:
+    vault = _unlocked_vault(request)
+    cfg, host, user = _email_target(request, body.imap_host, body.imap_user)
+    password = "".join(body.app_password.split())  # Google shows it as "abcd efgh ijkl mnop"
+    if "@" not in user:
+        raise HTTPException(400, "Enter your email address")
+    if not password:
+        raise HTTPException(400, "Enter the app password")
+    try:
+        await asyncio.to_thread(check_login, host, user, password)
+    except EmailLoginError as e:
+        raise HTTPException(400, str(e)) from None
+    _vault_errors(lambda: vault.put("imap", host, user, password))
+    cfg.email.imap_host, cfg.email.imap_user = host, user
+    save_search(_db(request), cfg)
+    return get_email(request)
+
+
+@router.post("/email/test")
+async def test_email(request: Request) -> dict[str, bool]:
+    vault = _unlocked_vault(request)
+    cfg, _, user = _email_target(request)
+    creds = _vault_errors(lambda: credentials(cfg.email, vault, user))
+    if creds is None:
+        raise HTTPException(404, "No email connected yet")
+    try:
+        await asyncio.to_thread(check_login, cfg.email.imap_host, *creds)
+    except EmailLoginError as e:
+        raise HTTPException(400, str(e)) from None
+    return {"ok": True}
+
+
+@router.delete("/email", status_code=204)
+def disconnect_email(request: Request) -> None:
+    vault = _unlocked_vault(request)
+    _, host, user = _email_target(request)
+
+    def drop() -> None:
+        for e in vault.find("imap", host):
+            if e.username.lower() == user:
+                vault.delete(e.id)
+
+    _vault_errors(drop)

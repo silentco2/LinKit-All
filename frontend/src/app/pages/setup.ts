@@ -2,9 +2,9 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Api } from '../api';
-import { ApplicationAnswers, lines, Profile, Provider, SearchConfig, Segment, Status, unlines } from '../types';
+import { ApplicationAnswers, EmailState, lines, Profile, Provider, SearchConfig, Segment, Status, unlines } from '../types';
 
-type Step = 'profile' | 'ai' | 'search' | 'filters' | 'answers' | 'apply' | 'vault' | 'finish';
+type Step = 'profile' | 'ai' | 'search' | 'filters' | 'answers' | 'apply' | 'vault' | 'email' | 'finish';
 type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_disability';
 
 @Component({
@@ -306,7 +306,7 @@ type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_
                   <span class="block text-xs text-slate-500">Off = dry run.</span></span>
               </label>
               @if (cfg.apply.live) {
-                <div class="alert alert-error" role="alert"><strong>Live mode is on.</strong> LinKit will submit real job applications in your name, using your CV and answers. Submitted applications cannot be taken back.</div>
+                <div class="alert alert-error" role="alert"><strong>Live mode is on.</strong> LinKit will submit real job applications in your name, using your CV and answers. Submitted applications cannot be taken back. Live mode also creates accounts on sites that require one (passwords are generated and kept in your vault).</div>
               }
               <label class="flex items-start gap-3 text-sm" [class.opacity-50]="!cfg.apply.live">
                 <input type="checkbox" class="mt-1" [(ngModel)]="cfg.apply.submit_without_asking" [disabled]="!cfg.apply.live">
@@ -364,6 +364,41 @@ type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_
             </section>
           }
 
+          @case ('email') {
+            <section class="card space-y-4">
+              <h2>Email <span class="text-sm font-normal text-slate-500">(optional)</span></h2>
+              <p class="text-sm text-slate-600 dark:text-slate-300">
+                Some job sites email a code or link to confirm a new account. Connect your Gmail so LinKit can read those emails.
+                It only reads: mails are never deleted or marked as read. Only your chosen AI provider ever sees an email's text,
+                and only when the code can't be found on this computer. Without this step, those applications wait in the Action Center.
+              </p>
+              @if (!status()?.vault?.unlocked) {
+                <div class="alert alert-info" role="status">Unlock the vault first (step 7). Your app password is kept there, encrypted.</div>
+              }
+              @if (email()?.connected) {
+                <div class="alert alert-ok" role="status">Connected as {{ email()!.imap_user }}.</div>
+              }
+              <form class="space-y-4" (ngSubmit)="emailSave()">
+                <div class="grid gap-4 sm:grid-cols-2">
+                  <div><label class="label" for="e-user">Email address</label><input id="e-user" type="email" class="input" name="euser" [(ngModel)]="eUser" autocomplete="email"></div>
+                  <div><label class="label" for="e-pass">App password</label><input id="e-pass" type="password" class="input" name="epass" [(ngModel)]="ePass" autocomplete="off" placeholder="abcd efgh ijkl mnop"></div>
+                </div>
+                <p class="hint">Not your normal password. In Gmail: Google Account -> Security -> 2-Step Verification -> App passwords. Create one named LinKit and paste it here (spaces are fine).</p>
+                <details class="text-sm">
+                  <summary class="cursor-pointer font-medium">Advanced</summary>
+                  <div class="mt-2 max-w-sm"><label class="label" for="e-host">IMAP server</label><input id="e-host" class="input" name="ehost" [(ngModel)]="eHost" autocomplete="off"></div>
+                </details>
+                <div class="flex flex-wrap gap-3">
+                  <button type="submit" class="btn btn-primary" [disabled]="busy() || !status()?.vault?.unlocked || !ePass.trim()">Test and save</button>
+                  @if (email()?.connected) {
+                    <button type="button" class="btn" (click)="emailTest()" [disabled]="busy()">Test again</button>
+                    <button type="button" class="btn" (click)="emailDisconnect()" [disabled]="busy()">Disconnect</button>
+                  }
+                </div>
+              </form>
+            </section>
+          }
+
           @case ('finish') {
             <section class="card space-y-4">
               <h2>Ready?</h2>
@@ -393,6 +428,7 @@ export class SetupPage implements OnInit {
   protected readonly message = signal<{ ok: boolean; text: string } | null>(null);
   protected readonly segments = signal<Segment[]>([]);
   protected readonly status = signal<Status | null>(null);
+  protected readonly email = signal<EmailState | null>(null);
   protected readonly available = signal<Partial<Record<Provider, boolean>>>({});
   protected profile: Profile | null = null;
   protected cfg: SearchConfig | null = null;
@@ -420,6 +456,7 @@ export class SetupPage implements OnInit {
     { id: 'answers', label: 'Application answers' },
     { id: 'apply', label: 'Applying' },
     { id: 'vault', label: 'Vault' },
+    { id: 'email', label: 'Email' },
     { id: 'finish', label: 'Finish' },
   ];
   protected readonly providers: { id: Provider; label: string; hint: string }[] = [
@@ -432,17 +469,19 @@ export class SetupPage implements OnInit {
   protected readonly seniorities = ['intern', 'junior', 'mid', 'senior', 'lead', 'manager', 'executive'];
 
   async ngOnInit(): Promise<void> {
-    const [profile, cfg, status, ai, ans] = await Promise.all([
+    const [profile, cfg, status, ai, ans, email] = await Promise.all([
       this.api.get<Profile>('/profile'),
       this.api.get<SearchConfig>('/search'),
       this.api.get<Status>('/status'),
       this.api.get<{ provider: Provider; available: Record<Provider, boolean> }>('/ai'),
       this.api.get<ApplicationAnswers>('/profile/answers'),
+      this.api.get<EmailState>('/email'),
     ]);
     cfg.ai.provider ??= ai.provider;
     this.profile = profile;
     this.cfg = cfg;
     this.ans = ans;
+    this.setEmail(email);
     this.status.set(status);
     this.available.set(ai.available);
     if (profile.cv_name) this.api.get<Segment[]>('/profile/cv/segments').then((s) => this.segments.set(s)).catch(() => {});
@@ -461,7 +500,7 @@ export class SetupPage implements OnInit {
   done(step: Step): boolean {
     const s = this.status();
     if (!s) return false;
-    return { profile: s.profile_ready && s.cv_ready, ai: s.ai_ready, search: s.search_ready, filters: s.search_ready, answers: false, apply: false, vault: s.vault.unlocked, finish: false }[step];
+    return { profile: s.profile_ready && s.cv_ready, ai: s.ai_ready, search: s.search_ready, filters: s.search_ready, answers: false, apply: false, vault: s.vault.unlocked, email: !!this.email()?.connected, finish: false }[step];
   }
 
   setLive(live: boolean): void {
@@ -540,6 +579,40 @@ export class SetupPage implements OnInit {
       await this.api.post('/vault/unlock', { passphrase: pass, remember: this.vremember });
       this.vpass = this.vconfirm = '';
       return create ? 'Vault created and unlocked' : 'Vault unlocked';
+    });
+  }
+
+  eUser = '';
+  eHost = 'imap.gmail.com';
+  ePass = '';
+
+  private setEmail(e: EmailState): void {
+    this.email.set(e);
+    this.eUser = e.imap_user;
+    this.eHost = e.imap_host;
+  }
+
+  emailSave(): Promise<void> {
+    return this.run(async () => {
+      const e = await this.api.post<EmailState>('/email', { imap_host: this.eHost, imap_user: this.eUser, app_password: this.ePass });
+      this.ePass = '';
+      this.setEmail(e);
+      return `Email connected: ${e.imap_user}`;
+    });
+  }
+
+  emailTest(): Promise<void> {
+    return this.run(async () => {
+      await this.api.post('/email/test');
+      return 'The email connection works';
+    });
+  }
+
+  emailDisconnect(): Promise<void> {
+    return this.run(async () => {
+      await this.api.delete('/email');
+      this.setEmail(await this.api.get<EmailState>('/email'));
+      return 'Email disconnected';
     });
   }
 
