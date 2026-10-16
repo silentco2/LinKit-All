@@ -74,6 +74,12 @@ def rank_jobs(db: sessionmaker[Session], cfg: SearchConfig, embed: Embed) -> dic
     counts = {"ranked": 0, "filtered_out": 0}
     now = utcnow()
     with db.begin() as s:
+        # Jobs a hard rule dropped earlier get another look when they pass today's filters
+        # (filters changed, or a rule was fixed). Company-rule drops stay put.
+        for job in s.scalars(select(Job).filter_by(state=JobState.filtered_out)):
+            if not job.data.get("company_rule") and rule_violation(job, cfg, now) is None:
+                transition(s, job, JobState.enriched, "passes your filters now: checked again")
+                counts["rechecked"] = counts.get("rechecked", 0) + 1
         jobs = list(s.scalars(select(Job).filter_by(state=JobState.enriched)))
         keep = []
         for job in jobs:
@@ -94,14 +100,14 @@ def rank_jobs(db: sessionmaker[Session], cfg: SearchConfig, embed: Embed) -> dic
         best: dict[str, Job] = {}
         for job in sorted(keep, key=lambda j: -j.data["rank"]):
             company = norm_company(job.company)
-            if cfg.filters.one_per_company and company in taken:
-                transition(
-                    s, job, JobState.filtered_out, "already in your pipeline for this company"
+            if cfg.filters.one_per_company and (company in taken or company in best):
+                why = (
+                    "already in your pipeline for this company"
+                    if company in taken
+                    else ("a better match at this company ranked higher")
                 )
-            elif cfg.filters.one_per_company and company in best:
-                transition(
-                    s, job, JobState.filtered_out, "a better match at this company ranked higher"
-                )
+                job.data = {**job.data, "company_rule": True}  # not re-checked by the loop above
+                transition(s, job, JobState.filtered_out, why)
             else:
                 best[company] = job
                 transition(s, job, JobState.ranked, f"local rank {job.data['rank']:.3f}")

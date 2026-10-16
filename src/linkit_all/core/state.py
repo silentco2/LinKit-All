@@ -20,7 +20,7 @@ ALLOWED: dict[JobState, frozenset[JobState]] = {
     S.applying: frozenset({S.needs_user, S.applied, S.failed}),
     S.needs_user: frozenset({S.queued_apply, S.applying, S.failed}),  # resolved in Action Center
     S.failed: frozenset({S.queued_apply}),  # retry
-    S.filtered_out: frozenset(),
+    S.filtered_out: frozenset({S.enriched}),  # filters changed: checked again
     S.applied: frozenset(),
     S.skipped: frozenset(),
 }

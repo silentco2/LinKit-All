@@ -25,9 +25,9 @@ from linkit_all.providers.base import LLMProvider, UsageLimitError
     ("title", "level"),
     [("Senior Backend Engineer", "senior"), ("Engineering Manager", "manager"),
      ("Senior Manager, Data", "manager"), ("Staff Engineer", "lead"), ("Jr. Developer", "junior"),
-     ("Software Engineering Intern", "intern"), ("Backend Engineer", "mid"), ("VP Engineering", "executive")],
+     ("Software Engineering Intern", "intern"), ("Backend Engineer", None), ("VP Engineering", "executive")],
 )  # fmt: skip
-def test_seniority(title: str, level: str) -> None:
+def test_seniority(title: str, level: str | None) -> None:
     assert seniority(title) == level
 
 
@@ -76,7 +76,21 @@ def test_rules(kw: dict[str, Any], reason: str | None) -> None:
 def test_remote_filter() -> None:
     cfg = SearchConfig.model_validate({"filters": {"remote": "remote"}})
     assert rule_violation(job(data={"remote": "remote"}), cfg, utcnow()) is None
-    assert "work mode onsite" in (rule_violation(job(), cfg, utcnow()) or "")
+    assert "work mode onsite" in (
+        rule_violation(job(data={"remote": "onsite"}), cfg, utcnow()) or ""
+    )
+    assert "work mode hybrid" in (
+        rule_violation(job(location="Cairo (Hybrid)"), cfg, utcnow()) or ""
+    )
+    assert rule_violation(job(location="Remote, Egypt"), cfg, utcnow()) is None
+    assert rule_violation(job(), cfg, utcnow()) is None  # unknown work mode is not a mismatch
+
+
+def test_unstated_seniority_passes() -> None:
+    cfg = SearchConfig.model_validate({"filters": {"seniority": ["junior"]}})
+    assert rule_violation(job(title="Frontend Developer"), cfg, utcnow()) is None
+    assert rule_violation(job(title="Junior Frontend Developer"), cfg, utcnow()) is None
+    assert "senior" in (rule_violation(job(title="Senior Frontend Developer"), cfg, utcnow()) or "")
 
 
 def fake_embed(texts: list[str]) -> np.ndarray[Any, np.dtype[np.float64]]:
@@ -130,6 +144,28 @@ def test_rank_filters_ranks_and_keeps_one_per_company(db: sessionmaker[Session])
     assert ranked["Backend Engineer"] > ranked["Sales Engineer"]
     assert "better match at this company" in out["Backend Developer"]
     assert "include" in out["Data Analyst"]
+
+
+def test_rank_rechecks_rule_drops_when_filters_change(db: sessionmaker[Session]) -> None:
+    add(
+        db,
+        job(title="Data Analyst", company="Umbrella"),
+        job(title="Backend Engineer", company="Acme"),
+    )
+    add(db, job(title="Backend Developer", company="Acme Inc", description="Java Spring"))
+    assert (
+        rank_jobs(db, CFG, fake_embed)["filtered_out"] == 2
+    )  # Data Analyst: rule; one Acme: company
+    looser = CFG.model_copy(deep=True)
+    looser.filters.title_include = []
+    counts = rank_jobs(db, looser, fake_embed)
+    assert counts["rechecked"] == 1  # the company-rule drop stays put
+    with db() as s:
+        analyst = s.scalars(select(Job).filter_by(title="Data Analyst")).one()
+        events = list(s.scalars(select(JobEvent.message).filter_by(job_id=analyst.id)))
+    assert analyst.state == JobState.ranked
+    assert any("checked again" in m for m in events)
+    assert rank_jobs(db, looser, fake_embed).get("rechecked") is None  # nothing left to revive
 
 
 class FakeAI(LLMProvider):
