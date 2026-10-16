@@ -27,7 +27,7 @@ from linkit_all.providers.base import LLMProvider, render
 
 _SNAPSHOT = (Path(__file__).parent / "snapshot.js").read_text("utf-8")
 
-_PAGE_TEXT = (
+PAGE_TEXT = (
     "() => (document.body ? document.body.innerText : '').replace(/\\s+/g, ' ').slice(0, 800)"
 )
 
@@ -243,14 +243,14 @@ async def step(
 ) -> StepResult:
     """One page: snapshot -> map -> answer -> fill -> re-check. Never clicks anything;
     `result.button` is what the caller may press (`press_next`, or `click_submit`)."""
-    if await _captcha_shown(page):
+    if await captcha_shown(page):
         return StepResult("other", "stop", reason="a CAPTCHA is shown: only you can solve it")
     controls = await snapshot(page)
     if not controls:
         return StepResult("other", "stop", reason="no form controls on the page")
     if any(c.kind == "password" for c in controls):
         return StepResult("login", "stop", reason="sign-in or sign-up page: needs the account flow")
-    page_text: str = await page.evaluate(_PAGE_TEXT)
+    page_text: str = await page.evaluate(PAGE_TEXT)
     fmap = await field_map(provider, controls, await page.title(), page_text)
     if fmap.page_kind not in ("form", "review"):
         return StepResult(fmap.page_kind, "stop", reason=f"page looks like: {fmap.page_kind}")
@@ -296,6 +296,6 @@ async def press_next(page: Page, result: StepResult) -> None:
     await page.locator(f'[data-lk-agent~="{result.button.id}"]').first.click()
 
 
-async def _captcha_shown(page: Page) -> bool:
+async def captcha_shown(page: Page) -> bool:
     frames = page.locator(CAPTCHA)
     return any([await frames.nth(i).is_visible() for i in range(await frames.count())])

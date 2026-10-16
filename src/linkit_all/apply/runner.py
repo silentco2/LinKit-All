@@ -6,14 +6,22 @@ ever recorded from the ATS confirmation page (CLAUDE.md §2, §5.5).
 """
 
 import asyncio
+import contextlib
 import random
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from loguru import logger
-from playwright.async_api import BrowserContext, Page, Playwright, async_playwright
+from playwright.async_api import (
+    BrowserContext,
+    Locator,
+    Page,
+    Playwright,
+    async_playwright,
+)
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -23,11 +31,21 @@ from linkit_all.apply.accounts import (
     find_account,
     mark_active,
 )
+from linkit_all.apply.agent import (
+    PAGE_TEXT,
+    captcha_shown,
+    field_map,
+    page_errors,
+    press_next,
+    snapshot,
+    step,
+)
 from linkit_all.apply.answers import ApplicationAnswers, Context, Missing, Question
 from linkit_all.apply.assist import AnswerBank, answer_questions, profile_summary
 from linkit_all.apply.email_verify import EmailLoginError, credentials, wait_for_verification
 from linkit_all.apply.form import FillError, fill, lost_values
 from linkit_all.apply.handlers import HANDLERS, Handler, JobInfo
+from linkit_all.apply.handlers.base import GENERIC_CONFIRMATION, wait_for_text
 from linkit_all.apply.vault import Vault, vault_for
 from linkit_all.core.config import Settings
 from linkit_all.core.models import (
@@ -57,11 +75,29 @@ class ApplyBlocked(RuntimeError):
     Jobs keep their state; the next run continues."""
 
 
-async def click_submit(page: Page, handler: Handler, dry_run: bool) -> None:
-    """The only place the final Submit is clicked. Refuses in dry-run mode."""
+MAX_AGENT_PAGES = 8
+
+
+async def click_submit(page: Page, target: Handler | Locator, dry_run: bool) -> None:
+    """The only place the final Submit is clicked: a handler's button, or the generic agent's
+    button. Refuses in dry-run mode."""
     if dry_run:
         raise DryRunViolation("refusing to click Submit in dry-run mode")
-    await page.locator(handler.submit_button).locator("visible=true").first.click()
+    if isinstance(target, Handler):
+        target = page.locator(target.submit_button).locator("visible=true")
+    await target.first.click()
+
+
+def _web_url(url: str | None) -> bool:
+    u = urlparse(url or "")
+    return u.scheme in ("http", "https") and bool(u.netloc)
+
+
+async def _settle(page: Page) -> None:
+    """Human pace, then let the next page finish loading (pages that long-poll never go idle)."""
+    await asyncio.sleep(random.uniform(0.3, 1.0))  # noqa: S311 (human pace, not crypto)
+    with contextlib.suppress(Exception):
+        await page.wait_for_load_state("networkidle", timeout=10000)
 
 
 async def run_signup(
@@ -221,7 +257,13 @@ class Applier:
                     select(Job).where(Job.state.in_([JobState.queued_apply, JobState.tailored]))
                 )
             )
-        jobs = [j for j in jobs if j.ats in HANDLERS and (live or not j.data.get("dry_run_at"))]
+        generic = self.cfg.apply.generic_agent
+        jobs = [
+            j
+            for j in jobs
+            if (j.ats in HANDLERS or (generic and _web_url(j.data.get("apply_url") or j.url)))
+            and (live or not j.data.get("dry_run_at"))
+        ]
         jobs.sort(key=lambda j: (-(j.score or 0), -(j.data.get("rank") or 0)))
         picked: list[int] = []
         per_site: dict[str, int] = {}
@@ -239,7 +281,9 @@ class Applier:
         with self.db() as s:  # decide first: never tailor a job we won't apply to (CLAUDE.md §4)
             job = s.get_one(Job, job_id)
             info = job_info(job)
-        if info is None or job.ats not in HANDLERS:
+        handler = HANDLERS.get(job.ats or "")
+        generic = self.cfg.apply.generic_agent
+        if info is None or (handler is None and not (generic and _web_url(info.apply_url))):
             return Outcome("skipped", f"no form handler for this posting ({job.ats})")
         try:
             cv = await tailor_job(self.db, job_id, self.provider, self.settings)
@@ -247,7 +291,6 @@ class Applier:
             raise ApplyBlocked(str(e)) from e
         with self.db() as s:
             profile = s.get_one(Profile, 1)
-        handler = HANDLERS[job.ats]
         out_dir = self.settings.data_dir / "applications" / f"job_{job_id}"
         out_dir.mkdir(parents=True, exist_ok=True)
         ctx = Context(
@@ -260,12 +303,15 @@ class Applier:
             job_source=job.source,
             resume_path=cv.pdf_path,
         )
-        browser = await self._context(job.ats)
+        browser = await self._context(handler.ats if handler else "generic")
         await browser.tracing.start(screenshots=True, snapshots=True)
         page = await browser.new_page()
         keep_trace = False
         try:
-            outcome = await self._fill_and_decide(page, handler, info, ctx, profile, out_dir)
+            if handler is not None:
+                outcome = await self._fill_and_decide(page, handler, info, ctx, profile, out_dir)
+            else:
+                outcome = await self._agent_apply(page, info, ctx, profile, out_dir)
             keep_trace = outcome.status == "failed"
             return outcome
         except UsageLimitError as e:  # before any state change: the job just waits
@@ -283,6 +329,124 @@ class Applier:
             trace = out_dir / "trace.zip"
             await browser.tracing.stop(path=str(trace) if keep_trace else None)
             await page.close()
+
+    async def _agent_apply(
+        self, page: Page, info: JobInfo, ctx: Context, profile: Profile, out_dir: Path
+    ) -> Outcome:
+        """A site without a handler: the model maps each page, our code fills and presses.
+        Same rules as the handlers: dry run never submits, live waits for the user's confirm
+        unless told not to, and "applied" needs a confirmation text on the page."""
+        apply_cfg = self.cfg.apply
+        live = apply_cfg.live
+        await page.goto(info.apply_url or info.url, wait_until="domcontentloaded", timeout=60000)
+        await _settle(page)
+        brief = {"title": info.title, "company": info.company, "description": info.description}
+        cv, summary = cv_text(profile), profile_summary(ctx)
+        filled: dict[str, Any] = {}
+        shots: list[str] = []
+
+        def park(
+            kind: ActionKind,
+            message: str,
+            questions: list[dict[str, Any]] | None = None,
+            answers: dict[str, Any] | None = None,
+        ) -> Outcome:
+            with self.db.begin() as s:
+                job = s.get_one(Job, info.id)
+                _park(s, job, kind, message, questions or [], answers or {}, shots[-1:])
+            return Outcome("needs_user", message, shots[-1:])
+
+        def fail(reason: str) -> Outcome:
+            with self.db.begin() as s:
+                job = s.get_one(Job, info.id)
+                if job.state != JobState.applying:
+                    transition(s, job, JobState.applying, "filling the application")
+                transition(s, job, JobState.failed, reason, shots[-1:])
+            return Outcome("failed", reason, shots[-1:])
+
+        for n in range(1, MAX_AGENT_PAGES + 1):
+            r = await step(
+                page, self.provider, ctx, self.bank, cv, summary, brief, out_dir, dry_run=not live
+            )
+            shots.append(str(out_dir / f"page_{n}.png"))
+            await page.screenshot(path=shots[-1], full_page=True)
+            filled.update(_summary(r.questions, r.answers, r.sources))
+            if await captcha_shown(page):
+                return park(ActionKind.captcha, "a CAPTCHA appeared: finish this one by hand")
+            if r.page_kind in ("login", "signup"):
+                return park(
+                    ActionKind.login_issue,
+                    "This site needs an account; sign in in the open browser, then Retry",
+                )
+            if r.missing:
+                return park(
+                    ActionKind.unknown_question,
+                    f"{len(r.missing)} question(s) need your answer",
+                    [_missing_dict(m) for m in r.missing],
+                )
+            if r.failed or r.unfilled or r.errors:
+                empty = [f"{label}: still empty" for label in r.unfilled]
+                problems = [*r.failed.values(), *empty, *r.errors]
+                return park(ActionKind.validation_error, "; ".join(problems)[:500], answers=filled)
+            if r.action == "stop" or r.button is None:
+                return fail(r.reason or "the form agent found no way forward")
+            if r.action == "next":
+                await press_next(page, r)
+                await _settle(page)
+                continue
+
+            # r.action == "submit" and nothing on the page is open
+            if not live:
+                msg = f"{len(filled)} fields filled on {n} pages"
+                with self.db.begin() as s:
+                    job = s.get_one(Job, info.id)
+                    _event(s, job, f"dry run: {msg}, not submitted", shots)
+                    job.data = {**job.data, "dry_run_at": utcnow().isoformat(), "filled": filled}
+                return Outcome("dry_run", msg, shots)
+            with self.db.begin() as s:
+                job = s.get_one(Job, info.id)
+                if not apply_cfg.submit_without_asking and not job.data.get("submit_confirmed"):
+                    message = "ready to submit: check the form and confirm"
+                    _park(s, job, ActionKind.confirm_submit, message, [], filled, shots[-1:])
+                    return Outcome("needs_user", "waiting for your confirmation", shots[-1:])
+                transition(s, job, JobState.applying, "submitting")
+            submit = page.locator(f'[data-lk-agent~="{r.button.id}"]')
+            await click_submit(page, submit, dry_run=not live)
+            done = str(out_dir / "after_submit.png")
+            seen = await wait_for_text(page, GENERIC_CONFIRMATION)
+            confirmed = seen and not await self._form_again(page)
+            await page.screenshot(path=done, full_page=True)
+            proof = [shots[-1], done]
+            if confirmed:
+                with self.db.begin() as s:
+                    job = s.get_one(Job, info.id)
+                    job.data = {**job.data, "applied_at": utcnow().isoformat(), "filled": filled}
+                    transition(s, job, JobState.applied, "confirmation page seen", proof)
+                return Outcome("applied", "submitted and confirmed", proof)
+            shots.append(done)
+            if await captcha_shown(page):
+                return park(
+                    ActionKind.captcha,
+                    "a CAPTCHA appeared: finish this one by hand",
+                    answers=filled,
+                )
+            if errors := await page_errors(page):
+                return park(ActionKind.validation_error, "; ".join(errors)[:500], answers=filled)
+            return fail("no confirmation page after submitting")
+        return fail(f"more than {MAX_AGENT_PAGES} pages: the form agent gave up")
+
+    async def _form_again(self, page: Page) -> bool:
+        """Extra check once the confirmation text matched: if the page still has form controls,
+        ask the model whether it really is a form. Model unavailable = trust the text."""
+        try:
+            controls = await snapshot(page)
+            if not controls:
+                return False
+            text: str = await page.evaluate(PAGE_TEXT)
+            fmap = await field_map(self.provider, controls, await page.title(), text)
+        except Exception:
+            return False
+        return fmap.page_kind in ("form", "review", "login", "signup")
 
     def _unlocked_vault(self) -> Vault | None:
         vault = self._vault if self._vault is not None else vault_for(self.settings, self.db)

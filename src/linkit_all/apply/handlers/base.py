@@ -19,6 +19,26 @@ CAPTCHA = (
 
 ERRORS = "[role=alert], [class*=error i], [class*=invalid i], .application-error"
 
+# Confirmation wording of sites without a handler (the generic form agent).
+GENERIC_CONFIRMATION = re.compile(
+    r"thank you for (applying|your application)|thanks? for applying|"
+    r"application (has been |was )?(successfully )?(submitted|received|sent)|"
+    r"we.ve received your application|we have received your application"
+)
+
+
+async def wait_for_text(page: Page, pattern: re.Pattern[str], timeout_ms: int = 25000) -> bool:
+    """True once the page text matches `pattern` (case-insensitive)."""
+    try:
+        await page.wait_for_function(
+            "re => new RegExp(re, 'i').test(document.body.innerText)",
+            arg=pattern.pattern,
+            timeout=timeout_ms,
+        )
+    except Exception:
+        return False
+    return True
+
 
 @dataclass
 class JobInfo:
@@ -58,15 +78,7 @@ class Handler:
         return await extract(page, self.container, self.label, self.description, self.ignore)
 
     async def confirmed(self, page: Page, timeout_ms: int = 25000) -> bool:
-        try:
-            await page.wait_for_function(
-                "re => new RegExp(re, 'i').test(document.body.innerText)",
-                arg=self.confirmation.pattern,
-                timeout=timeout_ms,
-            )
-        except Exception:
-            return False
-        return True
+        return await wait_for_text(page, self.confirmation, timeout_ms)
 
     async def captcha_shown(self, page: Page) -> bool:
         frames = page.locator(CAPTCHA)
