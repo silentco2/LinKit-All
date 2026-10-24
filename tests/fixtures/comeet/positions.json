@@ -1,0 +1,16 @@
+[
+  {
+    "uid": "BC.26F",
+    "name": "Data Analyst Lead",
+    "company_name": "Overwolf",
+    "url_active_page": "https://careers.overwolf.com/career/BC.26F",
+    "workplace_type": "Hybrid",
+    "time_updated": "2026-06-22T18:23:19Z",
+    "location": {"name": "HQ", "country": "IL", "city": "Ramat Gan", "state": "Israel"},
+    "details": [
+      {"name": "Description", "value": "<p>Lead our data team.</p>", "order": 1},
+      {"name": "Requirements", "value": "<ul><li>SQL</li></ul><script>alert(1)</script>", "order": 2}
+    ]
+  },
+  {"uid": "", "name": "No id"}
+]

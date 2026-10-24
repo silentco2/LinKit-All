@@ -1,0 +1,15 @@
+{
+  "status": "200",
+  "data": {
+    "totalCount": 1,
+    "requisitions": [
+      {
+        "requisitionId": 494,
+        "postingEffectiveDate": "6/15/2026",
+        "displayJobTitle": "European Operations Administrator",
+        "locations": [{"city": "Frankfurt am Main", "country": "DE"}],
+        "externalDescription": "<p>Coordinate shipments.</p><script>alert(1)</script>"
+      }
+    ]
+  }
+}

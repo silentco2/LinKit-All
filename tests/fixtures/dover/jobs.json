@@ -1,0 +1,16 @@
+{
+  "count": 4,
+  "next": null,
+  "previous": null,
+  "results": [
+    {"id": "f9fd123e-e7ff-4bcc-a16a-bb8c47e591b5", "title": "Cloud Infra Engineer",
+     "locations": [
+       {"location_type": "REMOTE", "location_option": {"display_name": "Brazil", "location_type": "COUNTRY", "country": "BR"}},
+       {"location_type": "REMOTE", "location_option": {"display_name": "International", "location_type": "REGION", "country": ""}}
+     ],
+     "workplace_type": "REMOTE", "is_published": true, "is_sample": false},
+    {"id": "sample-1", "title": "Sample Job", "locations": [], "workplace_type": "REMOTE", "is_published": true, "is_sample": true},
+    {"id": "unpub-1", "title": "Unpublished Job", "locations": [], "workplace_type": "REMOTE", "is_published": false, "is_sample": false},
+    {"id": "onsite-1", "title": "Office Manager", "locations": [], "workplace_type": "ON_SITE", "is_published": true, "is_sample": false}
+  ]
+}

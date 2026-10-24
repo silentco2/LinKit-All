@@ -1,0 +1,11 @@
+{
+  "id": "f9fd123e-e7ff-4bcc-a16a-bb8c47e591b5",
+  "title": "Cloud Infra Engineer",
+  "user_provided_description": "<p>Do things</p><script>alert(1)</script>",
+  "locations": [],
+  "workplace_type": "REMOTE",
+  "compensation": {"lower_bound": 80000, "upper_bound": 120000, "currency_code": "USD", "open_to_sharing_comp": true, "employment_type": "FULL_TIME", "offers_equity": true},
+  "visa_support": true,
+  "active": true,
+  "is_private": false
+}

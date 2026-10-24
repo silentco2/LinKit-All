@@ -1,0 +1,24 @@
+{
+  "maxCount": 2,
+  "jobPostings": [
+    {
+      "jobPostingId": 2566,
+      "jobTitle": "  Backend Engineer  ",
+      "jobDescription": "We&rsquo;re hiring.\n\nYou will:\n- ship Go\n- keep it simple",
+      "postingStartTimestampUTC": "2026-09-01T05:00:00+00:00",
+      "hasVirtualLocation": false,
+      "postingLocations": [
+        {"cityName": "Houston", "stateCode": "TX", "isoCountryCode": "US"},
+        {"cityName": "Toronto", "stateCode": "ON", "isoCountryCode": "CA"},
+        {"cityName": "Houston", "stateCode": "TX", "isoCountryCode": "US"}
+      ]
+    },
+    {
+      "jobPostingId": 3851,
+      "jobTitle": "Director, Strategic Services",
+      "jobDescription": "Lead the practice.",
+      "hasVirtualLocation": true,
+      "postingLocations": null
+    }
+  ]
+}

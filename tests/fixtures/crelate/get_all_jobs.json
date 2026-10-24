@@ -1,0 +1,27 @@
+{
+  "Jobs": [
+    {
+      "Id": "2ab5a6fa-8b64-414a-9cd0-d6de0804d599",
+      "Title": "Physical Therapist Assistant",
+      "CompanyName": "Career Tree Network (Discovery At Home)",
+      "Description": "<p>Home Health role.</p><script>alert(1)</script>",
+      "City": "Tampa",
+      "State": "FL",
+      "Country": "United States",
+      "Url": "/mw9k5zg5f4m8hfigm4p8hnzz6w",
+      "JobCode": "mw9k5zg5f4m8hfigm4p8hnzz6w",
+      "LastPostedOnDate": "2026-07-17T17:17:12.81Z"
+    },
+    {
+      "Id": "no-company-1",
+      "Title": "Recruiter (Remote)",
+      "Description": "<p>Join us.</p>",
+      "Country": "United States",
+      "Url": "/abc123",
+      "LastPostedOnDate": "2026-07-01T00:00:00Z"
+    },
+    {"Id": "", "Title": "No id"}
+  ],
+  "IsError": false,
+  "ErrorMessage": null
+}
