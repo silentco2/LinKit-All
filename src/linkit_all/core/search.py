@@ -25,6 +25,117 @@ def expand_query(q: str) -> list[str]:
     return [" ".join(" ".join(p).split()) for p in product(*alts)]
 
 
+# Public Telegram channels that post jobs, read through their web preview (t.me/s/<name>).
+# Curated by freehire (MIT, https://github.com/strelov1/freehire), where this list came from.
+DEFAULT_TELEGRAM_CHANNELS: tuple[str, ...] = (
+    "hrlunapark",
+    "normrabota",
+    "budujobs",
+    "streltsova_anastasiya",
+    "it_vakansii_jobs",
+    "vakansii_it",
+    "zrabota",
+    "huntmejob",
+    "newdirections",
+    "jobforjunior",
+    "young_june",
+    "juniors_rabota_jobs",
+    "jobs_juniors_remote",
+    "job_it_junior",
+    "remotejun",
+    "juno_jobs",
+    "young_intern",
+    "it_interns",
+    "refer_me_it",
+    "product_jobs",
+    "productjobgo",
+    "hireproproduct",
+    "forproducts",
+    "foranalysts",
+    "serious_tester",
+    "forallqa",
+    "job_python",
+    "Remoteit",
+    "young_relocate",
+    "remote_jobs_relocate",
+    "avito_career",
+    "mtsbankcareer",
+    "job_web3",
+    "crypto_vacancy_web3",
+    "careers_crypto",
+    "dot_aware",
+    "gocareers",
+    "jobs_and_internships_updates",
+    "jobsandinternshipsupdates",
+    "off_campus_jobs_and_internships",
+    "offcampus_phodenge",
+    "freshercareersdotin",
+    "OceanOfJobs",
+    "JobsPur",
+    "jobvila",
+    "hiringdaily",
+    "TorchBearerr",
+    "jobsstation_official",
+    "tamilanjobupdates",
+    "arunchauhanofficial",
+    "jobwithmayra",
+    "goyalarsh",
+    "vijaykushal",
+    "PrepTrain",
+    "cs_algo",
+    "dataanalyticsbuddy",
+    "cv_2essence",
+    "tohire_ng",
+    "jobnetworkng",
+    "dejob_global",
+    "DeJob_official",
+    "STEMJobsCR",
+    "amalw3amal1",
+    "seekingyourjobs",
+    "cafeinavagas",
+    "youritjob",
+    "worklinketh",
+    "talentatweb3",
+    "work_for_top",
+    "workfortop",
+    "forchiefs",
+    "xCareers",
+    "middle_top_vacancies",
+    "cgrowthcareer",
+    "vacanciesbest",
+    "morejobs",
+    "moskovskayarabota",
+    "digital_hr",
+    "huggabletalents",
+    "evacuatejobs",
+    "zarubezhom_jobs",
+    "marketing_jobs",
+    "forallmarketing",
+    "wantapply_marketing",
+    "wantapply_managers",
+    "wantapply_design",
+    "wantapply_analytics",
+    "wantapply_qa_jobs",
+    "naymarnya",
+    "halepnyirecruiting",
+    "devops_dou",
+    "dou_qa",
+    "frontend_dou",
+    "gamedev_dou",
+    "junior_dou_ua",
+)
+_CHANNEL_NAME = re.compile(r"[A-Za-z][A-Za-z0-9_]{3,31}")  # Telegram usernames: 4-32 characters
+_CHANNEL_PREFIX = re.compile(r"^(?:https?://)?(?:www\.)?(?:t|telegram)\.me/(?:s/)?|^@", re.I)
+
+
+def normalize_channel(raw: str) -> str:
+    """ "@name", "t.me/name", "https://t.me/s/name/123?x" -> "name"; ValueError if not a channel."""
+    name = _CHANNEL_PREFIX.sub("", raw.strip()).split("/")[0].split("?")[0]
+    if not _CHANNEL_NAME.fullmatch(name):
+        raise ValueError(f"{raw.strip()!r} is not a Telegram channel name")
+    return name
+
+
 class SearchSection(BaseModel):
     queries: list[str] = []
     locations: list[str] = [""]  # "" = anywhere
@@ -46,6 +157,19 @@ class SourcesSection(BaseModel):
     jobspy_country: str = "usa"  # Indeed only (Glassdoor gets none); e.g. "egypt", "qatar"
     regional: list[Literal["wuzzuf", "bayt", "forasna"]] = []
     enabled: list[str] = []  # names of aggregator / board / company source plugins to run
+    # Channels read when "telegram" is in `enabled`; "@name" and t.me links are accepted.
+    telegram_channels: list[str] = Field(default_factory=lambda: list(DEFAULT_TELEGRAM_CHANNELS))
+
+    @field_validator("telegram_channels")
+    @classmethod
+    def _channels(cls, v: list[str]) -> list[str]:
+        out: dict[str, str] = {}
+        for name in (normalize_channel(c) for c in v if c.strip()):
+            out.setdefault(name.lower(), name)  # t.me names are case-insensitive; first wins
+        return list(out.values())
+
+    use_discovered_boards: bool = False  # also crawl stored boards (`linkit discover-boards`)
+    boards_per_run: int = Field(300, ge=0, le=20000)  # stored boards crawled per run, oldest first
 
 
 class FiltersSection(BaseModel):

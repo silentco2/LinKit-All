@@ -134,6 +134,9 @@ export const ar: Record<string, string> = {
   'setup.search.country': 'الدولة لموقع Indeed (لا تُستخدم مع Glassdoor)',
   'setup.search.companies': 'صفحات الوظائف في الشركات (رابط في كل سطر)',
   'setup.search.companiesHint': 'الصق أي صفحة وظائف. تُكتشف لوحات Greenhouse وLever وAshby تلقائيًا.',
+  'setup.search.telegram': 'قراءة الوظائف من قنوات تيليجرام',
+  'setup.search.telegramChannels': 'قنوات تيليجرام (قناة في كل سطر)',
+  'setup.search.telegramHint': 'القنوات العامة فقط، تُقرأ عبر صفحة المعاينة على الويب دون تسجيل دخول: @name أو رابط t.me. منشورات عمرها حتى 45 يومًا. عند ربط الذكاء الاصطناعي تُقرأ المنشورات في دفعات من 10 (يُرسل نص المنشور إلى الذكاء الاصطناعي الذي اخترته)، وبدونه لا تتحول إلى وظائف إلا المنشورات التي تحتوي على رابط لموقع وظائف معروف.',
   'setup.search.save': 'حفظ البحث',
   'setup.search.saved': 'تم حفظ البحث',
 

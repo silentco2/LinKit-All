@@ -1,6 +1,6 @@
 # Sources
 
-LinKit All reads jobs from three kinds of place. You choose them in the wizard's **Search**
+LinKit All reads jobs from four kinds of place. You choose them in the wizard's **Search**
 step, or in a `search.toml` file ([example](search.example.toml)).
 
 ```toml
@@ -100,6 +100,75 @@ Glassdoor is searched without a country.
     responsible for how you use them. Company boards and sitemaps are the gentlest options.
 
 Naukrigulf is planned but not built.
+
+## Discovered company boards
+
+Besides the companies you list, LinKit All can keep its own list of company job boards and
+crawl a few hundred of them each run.
+
+```toml
+[sources]
+use_discovered_boards = true   # default false
+boards_per_run = 300           # 0 to 20000; the oldest-crawled boards go first
+```
+
+- **Where they come from.** `linkit discover-boards [--ats NAME ...] [--max-per-ats N]` asks
+  [Common Crawl](https://commoncrawl.org)'s public URL index which pages it has seen on each
+  ATS's hosts (for example `jobs.lever.co/*` or `*.myworkdayjobs.com`), reads the company out
+  of each link with the same patterns that recognise pasted links, and stores the new ones.
+  It prints how many boards it found and how many were new per ATS. `--max-per-ats` defaults
+  to 5000. The command can be run again at any time; it only adds what is missing.
+- **Where they are kept.** The `boards` table in the local database: ATS, company slug, where
+  it came from (`commoncrawl`, `user` for your own list, `detected` for an ATS board found on a
+  company careers page), when it was last crawled, how many jobs it had and how many crawls
+  failed in a row.
+- **How they are crawled.** With `use_discovered_boards` on, each discover run takes the
+  `boards_per_run` active boards that were crawled longest ago (never-crawled first), after the
+  companies you listed. Your own companies always run and do not count against that number.
+  A board that fails 5 crawls in a row is switched off; one success resets the count.
+- **Politeness.** The index gets at most 1 request per second, with the usual retries and
+  waits, and a descriptive `User-Agent`. LinKit All reads the index's `robots.txt` first and
+  does not query it if the file disallows it. At the time of writing that file disallows
+  everything except a few static pages, so `linkit discover-boards` stops with a "robots.txt
+  does not allow" error until the project decides how to treat the index (it is a public
+  API meant for programs, like the ATS feeds) or Common Crawl changes the file.
+- A new ATS plugin takes part by setting `cdx_hosts` (a list of Common Crawl URL patterns) next
+  to its `url_patterns`.
+
+## 4. Telegram channels
+
+Many hiring posts live only in public Telegram channels. LinKit All reads their **web
+preview** (`https://t.me/s/<channel>`), the page anyone can open without an account: no login,
+no bot, no Telegram API. Turn it on with the **Read jobs from Telegram channels** switch in
+the Search step (or put `"telegram"` in `sources.enabled`) and edit the channel list there.
+
+```toml
+[sources]
+enabled = ["telegram"]
+telegram_channels = ["hrlunapark", "@job_python", "https://t.me/zrabota"]
+```
+
+- **Channels.** The default list has 95 channels, taken from the open-source
+  [freehire](https://github.com/strelov1/freehire) project (MIT licence; see `NOTICE`). They are
+  mostly Russian, Ukrainian, Indian and English-language channels, so replace the list with
+  channels in your own languages. One per line; `@name` and `t.me/name` links are accepted.
+  A channel that does not exist or has its preview switched off is reported as unsupported.
+- **What becomes a job.** A post is looked at only if it contains a hiring word (English,
+  Russian, Ukrainian, Spanish or Arabic, such as `مطلوب` or `وظيفة`; Arabic letter variants and
+  diacritics are ignored) or links to a known job board. This costs no AI.
+- **Posts that link to a board** (Greenhouse, Lever, Workable and the others) become jobs
+  that apply through that link. No AI is needed.
+- **Other posts** are read by your chosen AI, 10 posts per call, about 1,500 characters each.
+  A post may hold several jobs or none. The post text is sent to your AI provider, as with your
+  CV; nothing else leaves your computer. The AI never invents a job: it only reports what the
+  post says, and the post itself is kept as the description. With no AI connected, these
+  posts are skipped.
+- **Age.** Posts older than 45 days are not stored. Each run reads up to 5 preview pages (about
+  100 posts) per channel.
+- **Politeness.** One channel at a time, at least 2 seconds between requests, and `robots.txt`
+  is checked first.
+- **Job address.** A job's address is its post (`https://t.me/<channel>/<id>`), which is what
+  stops it being stored twice. A second job found in the same post ends in `?job=2`.
 
 ## Politeness: robots.txt and rate limits
 

@@ -208,6 +208,13 @@ type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_
                           placeholder="https://boards.greenhouse.io/stripe&#10;https://jobs.lever.co/palantir&#10;https://www.notion.com/careers"></textarea>
                 <p class="hint">{{ 'setup.search.companiesHint' | t }}</p>
               </div>
+              <div>
+                <label class="flex items-center gap-2 text-sm font-medium"><input type="checkbox" [checked]="cfg.sources.enabled.includes('telegram')" (change)="toggle(cfg.sources.enabled, 'telegram')">{{ 'setup.search.telegram' | t }}</label>
+                <label class="label mt-2" for="telegram">{{ 'setup.search.telegramChannels' | t }}</label>
+                <textarea id="telegram" dir="ltr" class="input h-32 font-mono text-xs" [disabled]="!cfg.sources.enabled.includes('telegram')" [value]="unlines(cfg.sources.telegram_channels)" (change)="cfg.sources.telegram_channels = lines(val($event))"
+                          placeholder="@channel_name&#10;https://t.me/another_channel"></textarea>
+                <p class="hint">{{ 'setup.search.telegramHint' | t }}</p>
+              </div>
               <button class="btn btn-primary" (click)="saveSearch('setup.search.saved')" [disabled]="busy()">{{ 'setup.search.save' | t }}</button>
             </section>
           }

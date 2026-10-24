@@ -134,6 +134,9 @@ export const en: Record<string, string> = {
   'setup.search.country': 'Country for Indeed (not used for Glassdoor)',
   'setup.search.companies': 'Company career pages (one per line)',
   'setup.search.companiesHint': 'Paste any careers page. Greenhouse, Lever and Ashby boards are detected automatically.',
+  'setup.search.telegram': 'Read jobs from Telegram channels',
+  'setup.search.telegramChannels': 'Telegram channels (one per line)',
+  'setup.search.telegramHint': 'Public channels only, read through their web preview with no login: @name or a t.me link. Posts up to 45 days old. With an AI connected, posts are read in batches of 10 (the post text goes to your chosen AI); without one, only posts that link to a known job board become jobs.',
   'setup.search.save': 'Save search',
   'setup.search.saved': 'Search saved',
 

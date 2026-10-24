@@ -69,7 +69,7 @@ export function expandQueries(queries: string[]): string[] {
 
 export interface SearchConfig {
   search: { queries: string[]; locations: string[]; posted_within_days: number; max_results_per_query: number };
-  sources: { companies: string[]; jobspy: string[]; jobspy_country: string; regional: string[] };
+  sources: { companies: string[]; jobspy: string[]; jobspy_country: string; regional: string[]; enabled: string[]; telegram_channels: string[] };
   filters: {
     title_include: string[];
     title_exclude: string[];
