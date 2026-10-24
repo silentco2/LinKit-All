@@ -1,0 +1,35 @@
+{
+ "data": [
+  {
+   "slug": "data-engineer-berlin-1",
+   "company_name": "Passerelle",
+   "title": "Data Engineer",
+   "description": "<p>Build &amp; ship.</p>",
+   "remote": true,
+   "url": "https://www.arbeitnow.com/jobs/companies/passerelle/data-engineer-berlin-1",
+   "location": "Berlin",
+   "created_at": 1781713837
+  },
+  {
+   "slug": "senior-cloud-platform-engineer-140883",
+   "company_name": "Prolific",
+   "title": "Senior Cloud Platform Engineer",
+   "description": "&lt;h2 style=&quot;text-align: center;&quot;&gt;&lt;strong&gt;Senior Cloud Platform Engineer&lt;/strong&gt;&lt;/h2&gt;\n&lt;ul&gt;&lt;li&gt;Kubernetes at scale&lt;/li&gt;&lt;/ul&gt;<p>Find more jobs on Arbeitnow</p>",
+   "remote": false,
+   "url": "https://www.arbeitnow.com/jobs/companies/prolific/senior-cloud-platform-engineer-140883",
+   "location": "Hamburg (Remote possible)",
+   "created_at": 1781713000
+  },
+  {
+   "slug": "",
+   "company_name": "NoID",
+   "title": "skip me",
+   "url": "x",
+   "location": "Berlin",
+   "created_at": 1
+  }
+ ],
+ "links": {
+  "next": "https://www.arbeitnow.com/api/job-board-api?page=2"
+ }
+}

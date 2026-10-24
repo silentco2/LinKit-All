@@ -1,0 +1,12 @@
+{
+ "id": 34895,
+ "description": "<h2>О компании</h2><p>Full body</p><script>x()</script>",
+ "skills_objects": [
+  {
+   "name": "Go"
+  },
+  {
+   "name": "PostgreSQL"
+  }
+ ]
+}

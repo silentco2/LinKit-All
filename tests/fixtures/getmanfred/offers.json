@@ -1,0 +1,42 @@
+[
+ {
+  "id": 8407,
+  "slug": "mango-sr-designer",
+  "position": "Sr. Product Designer",
+  "status": "ACTIVE",
+  "locations": [
+   "Barcelona, España"
+  ],
+  "remotePercentage": 50,
+  "updatedAt": "2026-07-11T10:00:43.372Z",
+  "company": {
+   "name": "Mango"
+  }
+ },
+ {
+  "id": 9001,
+  "slug": "acme-backend",
+  "position": "Backend Engineer",
+  "status": "ACTIVE",
+  "locations": [],
+  "remotePercentage": 100,
+  "updatedAt": "2026-07-10T08:00:00.000Z",
+  "company": {
+   "name": "Acme"
+  }
+ },
+ {
+  "id": 7000,
+  "slug": "old-role",
+  "position": "Closed Role",
+  "status": "CLOSED",
+  "locations": [
+   "Madrid, España"
+  ],
+  "remotePercentage": 0,
+  "updatedAt": "2026-01-01T00:00:00.000Z",
+  "company": {
+   "name": "Gone"
+  }
+ }
+]

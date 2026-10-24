@@ -1,0 +1,48 @@
+{
+ "meta": {
+  "total": 2,
+  "offset": 0,
+  "limit": 100
+ },
+ "offers": [
+  {
+   "id": 34895,
+   "position": "Senior Golang Developer",
+   "url": "/vacancies/34895-senior-golang",
+   "published_at": "2026-06-19T12:55:17.948391",
+   "offer_description": "short summary",
+   "company": {
+    "name": "HR Prime"
+   },
+   "location_items": [
+    {
+     "label": "Москва",
+     "format": "office"
+    },
+    {
+     "label": "Москва",
+     "format": "office"
+    }
+   ]
+  },
+  {
+   "id": 35000,
+   "position": "Remote Eng",
+   "url": "/vacancies/35000-x",
+   "published_at": "2026-06-20T08:00:00",
+   "company": {
+    "name": "Acme"
+   },
+   "location_items": [
+    {
+     "label": "Россия",
+     "format": "remote"
+    },
+    {
+     "label": "Relocation",
+     "format": "relocation_company"
+    }
+   ]
+  }
+ ]
+}

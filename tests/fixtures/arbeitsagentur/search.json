@@ -1,0 +1,41 @@
+{
+ "ergebnisliste": [
+  {
+   "stellenangebotsTitel": "Python Entwickler (m/w/d)",
+   "stellenlokationen": [
+    {
+     "adresse": {
+      "plz": "58135",
+      "ort": "Hagen, Westfalen",
+      "region": "NORDRHEIN_WESTFALEN",
+      "land": "DEUTSCHLAND"
+     }
+    }
+   ],
+   "homeofficemoeglich": true,
+   "homeofficetyp": "NACH_VEREINBARUNG",
+   "datumErsteVeroeffentlichung": "2026-10-16",
+   "firma": "EUROPART Holding GmbH",
+   "referenznummer": "10001-1003871444-S"
+  },
+  {
+   "stellenangebotsTitel": "Re-listed",
+   "stellenlokationen": [
+    {
+     "adresse": {
+      "ort": "Berlin",
+      "region": "null"
+     }
+    }
+   ],
+   "homeofficemoeglich": false,
+   "datumErsteVeroeffentlichung": "2026-10-10",
+   "firma": "Other GmbH",
+   "referenznummer": "EXT-1",
+   "externeURL": "https://aubi-plus.example/x"
+  }
+ ],
+ "maxErgebnisse": 2,
+ "page": 1,
+ "size": 100
+}

@@ -1,0 +1,36 @@
+{
+ "meta": {
+  "hasMore": false
+ },
+ "jobs": [
+  {
+   "id": 165923983,
+   "title": "Senior Software Engineer, Storage",
+   "organization": "Airbnb",
+   "location": "San Francisco, CA",
+   "country": "US",
+   "category": "technology",
+   "jobType": "Full-time",
+   "descriptionExcerpt": "Short excerpt here",
+   "postedAt": "2026-10-20T05:41:25.987Z",
+   "url": "https://devglobaljobs.com/jobs/detail/165923983"
+  },
+  {
+   "id": 165916167,
+   "title": "Full Stack Developer",
+   "organization": "RemoteCo",
+   "location": "Remote",
+   "country": "GB",
+   "category": "technology",
+   "jobType": "Contract",
+   "descriptionExcerpt": "Remote work excerpt",
+   "postedAt": "2026-10-20T05:11:28.119Z",
+   "url": "https://acme.example/apply/42"
+  },
+  {
+   "id": 0,
+   "title": "No id",
+   "organization": "X"
+  }
+ ]
+}

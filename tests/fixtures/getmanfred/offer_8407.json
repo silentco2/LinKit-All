@@ -1,0 +1,17 @@
+{
+ "id": 8407,
+ "introduction": "Intro text.",
+ "responsibilities": [
+  "Design flows",
+  "Ship UI"
+ ],
+ "whatOffering": "Nice perks.",
+ "techs": [
+  {
+   "name": "Figma"
+  },
+  {
+   "name": "Sketch"
+  }
+ ]
+}

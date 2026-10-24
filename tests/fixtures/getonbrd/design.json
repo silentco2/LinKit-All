@@ -1,0 +1,42 @@
+{
+ "data": [
+  {
+   "id": "engineering-manager-rankmi-santiago",
+   "attributes": {
+    "title": "Engineering Manager",
+    "description": "dup",
+    "remote_modality": "hybrid",
+    "countries": [
+     "Chile"
+    ],
+    "published_at": 1781711852,
+    "company": {
+     "data": {
+      "id": 1339
+     }
+    }
+   }
+  },
+  {
+   "id": "ux-designer-acme",
+   "attributes": {
+    "title": "UX Designer",
+    "description": "<p>Design things</p>",
+    "remote_modality": "fully_remote",
+    "countries": [
+     "Peru",
+     "Mexico"
+    ],
+    "published_at": 1781711000,
+    "company": {
+     "data": {
+      "id": 77
+     }
+    }
+   }
+  }
+ ],
+ "meta": {
+  "total_pages": 1
+ }
+}

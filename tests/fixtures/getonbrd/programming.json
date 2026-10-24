@@ -1,0 +1,26 @@
+{
+ "data": [
+  {
+   "id": "engineering-manager-rankmi-santiago",
+   "attributes": {
+    "title": "Engineering Manager",
+    "description": "<ul><li>Reqs</li></ul>",
+    "functions": "<ul><li>Lead</li></ul>",
+    "benefits": "<div>Perks</div>",
+    "remote_modality": "hybrid",
+    "countries": [
+     "Chile"
+    ],
+    "published_at": 1781711852,
+    "company": {
+     "data": {
+      "id": 1339
+     }
+    }
+   }
+  }
+ ],
+ "meta": {
+  "total_pages": 1
+ }
+}

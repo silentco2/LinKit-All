@@ -1,0 +1,57 @@
+{
+ "data": {
+  "jobs": [
+   {
+    "title": "Senior Scala Engineer",
+    "slug": "remote-senior-scala-engineer-abc",
+    "company": {
+     "name": "Acme"
+    },
+    "location": {
+     "city": "Berlin",
+     "country": "Germany"
+    },
+    "remote": true,
+    "firstPublished": "2026-07-15T21:18:56.516Z",
+    "descriptionHtml": "<p>Build &amp; ship with Scala.</p>",
+    "tags": [
+     {
+      "label": "Scala"
+     },
+     {
+      "label": "Kafka"
+     }
+    ]
+   },
+   {
+    "title": "On-site Clojure Dev",
+    "slug": "clojure-dev-2",
+    "company": {
+     "name": "Globex"
+    },
+    "location": {
+     "city": null,
+     "country": "France"
+    },
+    "remote": false,
+    "firstPublished": "2026-07-10T00:00:00Z",
+    "descriptionHtml": "<p>Onsite role.</p>",
+    "tags": []
+   },
+   {
+    "title": "No slug",
+    "slug": "",
+    "company": {
+     "name": "NoSlug"
+    }
+   },
+   {
+    "title": "No company",
+    "slug": "has-slug-3",
+    "company": {
+     "name": ""
+    }
+   }
+  ]
+ }
+}

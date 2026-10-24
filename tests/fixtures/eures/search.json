@@ -1,0 +1,37 @@
+{
+ "numberRecords": 2,
+ "jvs": [
+  {
+   "id": "MTAwMDEtMTAwMTEzOTMxMS1TIDE",
+   "title": "Software Engineer",
+   "description": "<p>We build things.</p>",
+   "employer": {
+    "name": "SUSS MicroTec Solutions GmbH & Co. KG"
+   },
+   "creationDate": 1739403609768,
+   "locationMap": {
+    "DE": [
+     "DE12B"
+    ],
+    "EL": [
+     "EL30"
+    ]
+   },
+   "positionOfferingCode": "directhire",
+   "positionScheduleCodes": [
+    "fulltime"
+   ]
+  },
+  {
+   "id": "X1",
+   "title": "Anonymous Analyst",
+   "description": "<p>Analyse.</p>",
+   "creationDate": 1739403609768,
+   "locationMap": {
+    "FR": [
+     "FR101"
+    ]
+   }
+  }
+ ]
+}
