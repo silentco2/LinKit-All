@@ -1,0 +1,16 @@
+{
+ "id": 403456,
+ "job_type": "INTERN",
+ "description": "<p>Growth role.</p>",
+ "min_salary": null,
+ "max_salary": null,
+ "currency": "INR",
+ "salary_type": "MONTHLY",
+ "is_salary_visible": false,
+ "skill": [
+  "sales"
+ ],
+ "workplace_type": "REMOTE",
+ "remote": true,
+ "created_at": "2026-09-08T08:59:05+05:30"
+}

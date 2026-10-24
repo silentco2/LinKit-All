@@ -1,0 +1,32 @@
+{
+ "total": 3,
+ "page": 1,
+ "pages": 2,
+ "limit": 100,
+ "docs": [
+  {
+   "_id": "job1",
+   "publicate": "published",
+   "title": "  Python Developer  ",
+   "description": "<p>Build bots</p><script>evil()</script>",
+   "requirements": "<p>Python, 3y</p>",
+   "city": "Global",
+   "region": "SP",
+   "country": "BR",
+   "workplace_type": "remote",
+   "career_url": "https://jobs.quickin.io/botcity/jobs/job1",
+   "created_at": "2026-07-03T21:54:21.543Z"
+  },
+  {
+   "_id": "job2",
+   "publicate": "draft",
+   "title": "Hidden Role",
+   "description": "<p>secret</p>",
+   "city": "Sao Paulo",
+   "region": "SP",
+   "country": "BR",
+   "workplace_type": "remote",
+   "created_at": "2026-07-02T10:00:00.000Z"
+  }
+ ]
+}

@@ -1,0 +1,14 @@
+{
+ "count": 2,
+ "next": "https://api.pyjamahr.com/api/career/jobs/?company_slug=dodo-payments&page=2",
+ "previous": null,
+ "results": [
+  {
+   "id": 404497,
+   "slug": "talent-acquisition-intern-2",
+   "title": "Talent Acquisition Intern",
+   "location": "Bengaluru, Karnataka, India",
+   "workplace_type": "ON_SITE"
+  }
+ ]
+}

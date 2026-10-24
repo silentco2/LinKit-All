@@ -1,0 +1,35 @@
+{
+ "@odata.count": 4,
+ "value": [
+  {
+   "jobId": "200-de_DE",
+   "title": "Buchhalter",
+   "company": "BFS Health Finance GmbH",
+   "description": "<p>Zahlen</p>",
+   "teleComuteId": "telecommute3",
+   "isActive": true,
+   "datePosted": "2026-05-29T07:58:01Z",
+   "country": "Germany",
+   "location": {
+    "city": "Berlin",
+    "countryProvince": "DE-BE"
+   },
+   "link": "https://jobsearch.createyourowncareer.com/job-invite/200/?locale=de_DE"
+  },
+  {
+   "jobId": "300-en_GB",
+   "title": "Closed Role",
+   "company": "Riverty Norway AS",
+   "description": "<p>gone</p>",
+   "teleComuteId": "telecommute1",
+   "isActive": false,
+   "datePosted": "2026-05-29T07:58:01Z",
+   "country": "Germany",
+   "location": {
+    "city": "Berlin",
+    "countryProvince": "DE-BE"
+   },
+   "link": "https://jobsearch.createyourowncareer.com/job-invite/300/?locale=en_GB"
+  }
+ ]
+}

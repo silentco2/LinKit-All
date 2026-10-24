@@ -1,0 +1,18 @@
+[
+ {
+  "uuid": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "name": "Backend Engineer",
+  "url": "https://ats.rippling.com/acme/jobs/3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "workLocation": {
+   "label": "London, United Kingdom"
+  }
+ },
+ {
+  "uuid": "9b2c1d3e-1111-4222-8333-444455556666",
+  "name": "Remote SRE",
+  "url": "https://ats.rippling.com/acme/jobs/9b2c1d3e-1111-4222-8333-444455556666",
+  "workLocation": {
+   "label": "Remote"
+  }
+ }
+]

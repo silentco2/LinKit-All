@@ -1,0 +1,27 @@
+{
+ "totalPages": 2,
+ "totalElements": 3,
+ "contents": [
+  {
+   "vacancy": {
+    "id": "v3",
+    "title": "Hybrid Product Manager",
+    "localization": {
+     "city": "Sao Paulo",
+     "province": "SP",
+     "country": "Brasil"
+    },
+    "jobModel": [
+     "HYBRID"
+    ],
+    "publication": {
+     "startDate": "2026-06-12"
+    }
+   },
+   "company": {
+    "tenant": "intelbras",
+    "name": "Intelbras"
+   }
+  }
+ ]
+}

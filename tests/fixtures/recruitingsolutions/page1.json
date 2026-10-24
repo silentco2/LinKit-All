@@ -1,0 +1,35 @@
+{
+ "@odata.count": 4,
+ "value": [
+  {
+   "jobId": "100-de_DE",
+   "title": "Ingenieur",
+   "company": "Riverty Group GmbH",
+   "description": "<p>Body</p>",
+   "teleComuteId": "telecommute1",
+   "isActive": true,
+   "datePosted": "2026-05-29T07:58:01Z",
+   "country": "Germany",
+   "location": {
+    "city": "Berlin",
+    "countryProvince": "DE-BE"
+   },
+   "link": "https://jobsearch.createyourowncareer.com/job-invite/100/?locale=de_DE"
+  },
+  {
+   "jobId": "100-en_GB",
+   "title": "Engineer",
+   "company": "Riverty Group GmbH",
+   "description": "<p>Body</p>",
+   "teleComuteId": "telecommute1",
+   "isActive": true,
+   "datePosted": "2026-05-29T07:58:01Z",
+   "country": "Germany",
+   "location": {
+    "city": "Berlin",
+    "countryProvince": "DE-BE"
+   },
+   "link": "https://jobsearch.createyourowncareer.com/job-invite/100/?locale=en_GB"
+  }
+ ]
+}

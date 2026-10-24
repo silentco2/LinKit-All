@@ -1,0 +1,10 @@
+{
+ "uuid": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+ "name": "Backend Engineer",
+ "url": "https://ats.rippling.com/acme/jobs/3fa85f64-5717-4562-b3fc-2c963f66afa6",
+ "createdOn": "2026-03-11T09:37:20.990000-07:00",
+ "description": {
+  "company": "<p>About Acme boilerplate.</p>",
+  "role": "<h3>Role</h3><p>Build the backend.</p>"
+ }
+}

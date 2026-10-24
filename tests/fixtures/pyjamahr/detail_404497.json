@@ -1,0 +1,17 @@
+{
+ "id": 404497,
+ "job_type": "INTERN",
+ "description": "<p>Great internship.</p>",
+ "min_salary": 15000.0,
+ "max_salary": 20000.0,
+ "currency": "INR",
+ "salary_type": "MONTHLY",
+ "is_salary_visible": true,
+ "skill": [
+  "recruitment",
+  "onboarding"
+ ],
+ "workplace_type": "ON_SITE",
+ "remote": false,
+ "created_at": "2026-09-10T14:40:13+05:30"
+}

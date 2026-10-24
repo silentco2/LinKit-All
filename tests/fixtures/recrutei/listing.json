@@ -1,0 +1,51 @@
+{
+ "message": "ok",
+ "data": {
+  "total": 3,
+  "departments": 2,
+  "vacancies": [
+   {
+    "department": "Geral",
+    "total": 2,
+    "items": [
+     {
+      "id": 108736,
+      "title": "Analista de Suporte N2 Jr",
+      "regime": "CLT",
+      "company_name": "Digisystem",
+      "location": [
+       "Brasilia",
+       "DF",
+       "Brasil"
+      ],
+      "public_link": "https://jobs.recrutei.com.br/digisystem/vacancy/108736-analista"
+     },
+     {
+      "id": 157190,
+      "title": "Desenvolvedor Fullstack Senior",
+      "regime": "Pessoa Jurídica",
+      "company_name": "Digisystem",
+      "location": [
+       "Brasil"
+      ],
+      "public_link": "https://jobs.recrutei.com.br/digisystem/vacancy/157190-dev"
+     }
+    ]
+   },
+   {
+    "department": "TI",
+    "total": 1,
+    "items": [
+     {
+      "id": 157191,
+      "title": "Remote QA",
+      "regime": "CLT",
+      "company_name": "Digisystem",
+      "location": "Não informado",
+      "public_link": "https://jobs.recrutei.com.br/digisystem/vacancy/157191-qa"
+     }
+    ]
+   }
+  ]
+ }
+}

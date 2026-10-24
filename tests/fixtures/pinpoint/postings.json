@@ -1,0 +1,31 @@
+{
+ "data": [
+  {
+   "id": "217178",
+   "title": "Pipeline Engineer",
+   "url": "https://acme.pinpointhq.com/en/postings/abc",
+   "description": "<div>Build pipelines.</div>",
+   "key_responsibilities": "<ul><li>Own ingest</li></ul>",
+   "skills_knowledge_expertise": "<ul><li>Go</li></ul>",
+   "benefits": "<div>Health cover.</div>",
+   "workplace_type": "onsite",
+   "location": {
+    "city": "Annapolis",
+    "province": "Maryland",
+    "name": "HQ"
+   }
+  },
+  {
+   "id": "217179",
+   "title": "Remote Engineer",
+   "url": "https://acme.pinpointhq.com/en/postings/def",
+   "description": "<div>Work from anywhere.</div>",
+   "workplace_type": "remote",
+   "location": {
+    "city": "",
+    "province": "",
+    "name": "Remote"
+   }
+  }
+ ]
+}

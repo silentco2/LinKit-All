@@ -1,0 +1,49 @@
+{
+ "totalPages": 2,
+ "totalElements": 3,
+ "contents": [
+  {
+   "vacancy": {
+    "id": "v1",
+    "title": "Backend Engineer",
+    "localization": {
+     "city": "Florianopolis",
+     "province": "SC",
+     "country": "Brasil"
+    },
+    "jobModel": [
+     "IN_PERSON"
+    ],
+    "publication": {
+     "startDate": "2026-06-10"
+    }
+   },
+   "company": {
+    "tenant": "intelbras",
+    "name": "Intelbras"
+   }
+  },
+  {
+   "vacancy": {
+    "id": "v2",
+    "title": "Remote Data Engineer",
+    "localization": {
+     "city": "",
+     "province": "",
+     "country": "Brasil"
+    },
+    "jobModel": [
+     "REMOTE",
+     "HYBRID"
+    ],
+    "publication": {
+     "startDate": "2026-06-11"
+    }
+   },
+   "company": {
+    "tenant": "intelbras",
+    "name": "Intelbras"
+   }
+  }
+ ]
+}
