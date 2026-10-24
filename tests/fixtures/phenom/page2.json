@@ -1,0 +1,15 @@
+{
+ "refineSearch": {
+  "data": {
+   "jobs": [
+    {
+     "jobSeqNo": "R3",
+     "title": "Engineer R3",
+     "cityState": "Remote",
+     "locale": "",
+     "postedDate": "2026-05-17T22:00:00.000+0000"
+    }
+   ]
+  }
+ }
+}

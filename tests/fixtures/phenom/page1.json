@@ -1,0 +1,22 @@
+{
+ "refineSearch": {
+  "data": {
+   "jobs": [
+    {
+     "jobSeqNo": "R1",
+     "title": "Engineer R1",
+     "cityState": "Bonn, NRW",
+     "locale": "en_GLOBAL",
+     "postedDate": "2026-05-17T22:00:00.000+0000"
+    },
+    {
+     "jobSeqNo": "R2",
+     "title": "Engineer R2",
+     "cityState": "Bonn, NRW",
+     "locale": "en_GLOBAL",
+     "postedDate": "2026-05-17T22:00:00.000+0000"
+    }
+   ]
+  }
+ }
+}

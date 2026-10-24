@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<workzag-jobs>
+  <position>
+    <id>2632015</id>
+    <office>Hamburg</office>
+    <name>Game Designer</name>
+    <jobDescriptions>
+      <jobDescription><name>Tasks</name><value><![CDATA[<p>Design the game.</p>]]></value></jobDescription>
+    </jobDescriptions>
+    <createdAt>2026-01-30T16:17:59+00:00</createdAt>
+  </position>
+</workzag-jobs>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<workzag-jobs>
+  <position>
+    <id>2596159</id>
+    <subcompany>Acme Handwerk GmbH</subcompany>
+    <office>Hamburg</office>
+    <department>Engineering</department>
+    <name>Senior Go Engineer (m/w/d)</name>
+    <jobDescriptions>
+      <jobDescription><name>Tasks</name><value><![CDATA[<p>Build the pipeline.</p>]]></value></jobDescription>
+      <jobDescription><name>Requirements</name><value><![CDATA[<ul><li>Go</li></ul>]]></value></jobDescription>
+    </jobDescriptions>
+    <createdAt>2026-04-09T20:28:25+00:00</createdAt>
+  </position>
+  <position>
+    <id>2596160</id>
+    <office>Remote</office>
+    <name>Platform Engineer</name>
+    <jobDescriptions>
+      <jobDescription><name>Tasks</name><value><![CDATA[<p>Work from anywhere.</p>]]></value></jobDescription>
+    </jobDescriptions>
+    <createdAt>2026-04-09T20:28:25+00:00</createdAt>
+  </position>
+  <position>
+    <id>2632015</id>
+    <office>Hamburg</office>
+    <name>Game Designer</name>
+    <jobDescriptions></jobDescriptions>
+    <createdAt>2026-01-30T16:17:59+00:00</createdAt>
+  </position>
+  <position>
+    <id>2514154</id>
+    <office>Munich (Hybrid)</office>
+    <name>Marketing Intern (f/m/x)</name>
+    <jobDescriptions></jobDescriptions>
+    <createdAt>2026-01-30T16:17:59+00:00</createdAt>
+  </position>
+</workzag-jobs>

@@ -1,0 +1,33 @@
+{
+ "hasMore": false,
+ "items": [
+  {
+   "TotalJobsCount": 3,
+   "requisitionList": [
+    {
+     "Id": "30607",
+     "Title": "Backend Engineer",
+     "PostedDate": "2026-06-16",
+     "PrimaryLocation": "Berlin, Germany",
+     "PrimaryLocationCountry": "DE",
+     "WorkplaceTypeCode": "ORA_ON_SITE"
+    },
+    {
+     "Id": "30610",
+     "Title": "Data Engineer",
+     "PostedDate": "2026-06-12",
+     "PrimaryLocation": "United States",
+     "PrimaryLocationCountry": "US",
+     "WorkplaceTypeCode": "ORA_REMOTE"
+    },
+    {
+     "Id": "170159",
+     "Title": "Summer Analyst",
+     "PostedDate": "2026-08-15",
+     "PrimaryLocation": "Warsaw, Poland",
+     "WorkplaceTypeCode": "ORA_HYBRID"
+    }
+   ]
+  }
+ ]
+}
