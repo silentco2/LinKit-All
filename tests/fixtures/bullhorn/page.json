@@ -1,0 +1,31 @@
+{
+ "total": 2,
+ "start": 0,
+ "count": 500,
+ "data": [
+  {
+   "id": 4231,
+   "title": "Senior Go Engineer",
+   "publicDescription": "<p>Build backends.</p><script>alert(1)</script>",
+   "address": {
+    "city": "Austin",
+    "state": "TX",
+    "countryName": "United States"
+   },
+   "dateAdded": 1750617799000,
+   "employmentType": "Contract To Hire"
+  },
+  {
+   "id": 4232,
+   "title": "Recruiter",
+   "publicDescription": "<p>Hire.</p>",
+   "address": {
+    "city": "",
+    "state": "",
+    "countryName": "Canada"
+   },
+   "dateAdded": 0,
+   "employmentType": ""
+  }
+ ]
+}

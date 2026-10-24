@@ -1,0 +1,15 @@
+{
+ "result": {
+  "jobOpening": {
+   "jobOpeningName": "Senior Designer",
+   "jobOpeningShareUrl": "https://acme.bamboohr.com/careers/52",
+   "description": "<p>Do the work.</p><script>x()</script>",
+   "location": {
+    "city": "Yerevan",
+    "state": null,
+    "addressCountry": "Armenia"
+   },
+   "datePosted": "2025-01-14"
+  }
+ }
+}

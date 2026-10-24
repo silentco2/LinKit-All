@@ -1,0 +1,25 @@
+{
+ "result": [
+  {
+   "id": "52",
+   "jobOpeningName": "Senior Designer",
+   "isRemote": false,
+   "locationType": "0",
+   "employmentStatusLabel": "Full-Time",
+   "location": {
+    "city": "Yerevan",
+    "state": null
+   }
+  },
+  {
+   "id": "53",
+   "jobOpeningName": "Remote Engineer",
+   "isRemote": true,
+   "locationType": null,
+   "location": {
+    "city": null,
+    "state": null
+   }
+  }
+ ]
+}

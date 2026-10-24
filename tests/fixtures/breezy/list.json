@@ -1,0 +1,40 @@
+[
+ {
+  "id": "52",
+  "name": "Senior Designer",
+  "url": "https://acme.breezy.hr/p/52-senior-designer",
+  "location": {
+   "city": "Yerevan",
+   "country": {
+    "name": "Armenia",
+    "id": "AM"
+   },
+   "is_remote": false
+  },
+  "type": {
+   "id": "fullTime",
+   "name": "Full-Time"
+  },
+  "company": {
+   "name": "Acme Inc"
+  },
+  "published_date": "2025-01-14T00:20:37.073Z"
+ },
+ {
+  "id": "53",
+  "name": "Remote Engineer",
+  "url": "https://acme.breezy.hr/p/53-remote-engineer",
+  "location": {
+   "city": "",
+   "country": {
+    "name": "",
+    "id": ""
+   },
+   "is_remote": true
+  },
+  "type": {
+   "name": "Full-Time"
+  },
+  "published_date": "2025-02-01T00:00:00.000Z"
+ }
+]

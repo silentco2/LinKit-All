@@ -1,0 +1,13 @@
+{
+ "itemID": "9201_1",
+ "requisitionTitle": "Legal Counsel",
+ "postDate": "2026-06-14T19:00:00.000-05:00",
+ "requisitionDescription": "&lt;p&gt;Do &lt;b&gt;law&lt;/b&gt;.&lt;/p&gt;&lt;script&gt;x()&lt;/script&gt;",
+ "requisitionLocations": [
+  {
+   "nameCode": {
+    "shortName": " Remote, EST, US"
+   }
+  }
+ ]
+}

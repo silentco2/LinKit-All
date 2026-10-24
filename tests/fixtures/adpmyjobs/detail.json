@@ -1,0 +1,24 @@
+{
+ "count": 1,
+ "jobRequisitions": [
+  {
+   "reqId": "5001",
+   "jobTitle": "Sr. SQE",
+   "postingDate": "2026-09-03T17:28:52Z",
+   "jobDescription": "<p>Do <b>quality</b>.</p><script>x()</script>",
+   "requisitionLocations": [
+    {
+     "address": {
+      "cityName": "Auburn Hills",
+      "country": {
+       "longName": "United States"
+      },
+      "countrySubdivisionLevel1": {
+       "longName": "Michigan"
+      }
+     }
+    }
+   ]
+  }
+ ]
+}
