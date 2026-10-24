@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Rekrymesta avoimet työpaikat</title>
+    <link>https://rekrymesta.likeit.fi/jsp/duuni/AdvertList.jsp</link>
+    <item>
+      <title> Lähihoitaja, Helsinki </title>
+      <link>https://rekrymesta.likeit.fi/jsp/duuni/AdvertShow.jsp?guest=1&amp;id=4711</link>
+      <description>&lt;p&gt;Etsimme lähihoitajaa.&lt;/p&gt;&lt;script&gt;alert(1)&lt;/script&gt;</description>
+      <category>Uusimaa, Helsinki</category>
+      <pubDate>Mon, 05 Oct 2026 08:00:00 +0300</pubDate>
+      <dc:date>2026-10-05T08:00:00+03:00</dc:date>
+    </item>
+    <item>
+      <title>Etätyö Developer</title>
+      <link>https://rekrymesta.likeit.fi/jsp/duuni/AdvertShow.jsp?id=4712</link>
+      <description>&lt;p&gt;Remote coding.&lt;/p&gt;</description>
+      <category>Remote, Finland</category>
+      <pubDate>Tue, 06 Oct 2026 08:00:00 +0300</pubDate>
+    </item>
+    <item>
+      <title>Not a posting</title>
+      <link>https://rekrymesta.likeit.fi/jsp/duuni/AdvertList.jsp</link>
+      <description>list</description>
+    </item>
+  </channel>
+</rss>

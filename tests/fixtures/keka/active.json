@@ -1,0 +1,18 @@
+[
+  {
+    "id": 101,
+    "title": "Senior Data Engineer",
+    "description": "<p>Build pipelines.</p><script>alert(1)</script>",
+    "jobLocations": [{"city": "Hyderabad", "state": "Telangana", "countryName": "India"}],
+    "jobType": 2,
+    "publishedOn": "2026-09-01T09:30:00Z"
+  },
+  {
+    "id": 102,
+    "title": "Remote QA Analyst",
+    "description": "<p>Test things.</p>",
+    "jobLocations": [],
+    "jobType": 1,
+    "publishedOn": "2026-09-02T09:30:00"
+  }
+]

@@ -1,0 +1,44 @@
+{
+  "company_name": "IERUS Technologies, Inc.",
+  "jobs": [
+    {
+      "id": "dgLTVq3fbbbkS61af48PpK",
+      "title": "Systems and Network Administrator",
+      "detail_url": "https://careers.jobscore.com/careers/ierustechnologiesinc/jobs/systems-and-network-administrator-dgLTVq3fbbbkS61af48PpK?ref=rss&sid=68",
+      "description": "<p>IERUS specializes in RF.</p><script>alert(1)</script>",
+      "city": "Huntsville",
+      "state": "AL",
+      "country": "US",
+      "location": "Huntsville, AL, US",
+      "remote": "No | Must be able to work onsite all of the time",
+      "job_type": "Full Time",
+      "experience_level": "Mid-Level",
+      "opened_date": "2026-03-31T17:04:28.293Z"
+    },
+    {
+      "id": "remote42",
+      "title": "Senior Front-End Engineer",
+      "detail_url": "https://careers.jobscore.com/careers/ierustechnologiesinc/jobs/fe-remote42",
+      "description": "<p>Build UI.</p>",
+      "location": "Remote in Joinville, Santa Catarina, Brazil",
+      "remote": "Yes | Can work remotely all of the time",
+      "job_type": "Contractor",
+      "experience_level": "Experienced (Non-Manager)",
+      "opened_date": "2026-05-01"
+    },
+    {
+      "id": "hyb7",
+      "title": "Field Engineer",
+      "detail_url": "",
+      "description": "<p>Travel.</p>",
+      "country": "US",
+      "remote": "Yes | Can work remotely some of the time",
+      "job_type": "Full Time",
+      "opened_date": "2026-05-02"
+    },
+    {
+      "title": "No id",
+      "description": "<p>Dropped.</p>"
+    }
+  ]
+}
