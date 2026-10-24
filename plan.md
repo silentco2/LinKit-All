@@ -33,7 +33,7 @@ later local models.
 | Company boards | user's list + pasted URLs; the ATS detector maps URLs or careers-page HTML to Greenhouse/Lever/Ashby |
 | Job sites | python-jobspy: LinkedIn, Indeed, Glassdoor, Google, ZipRecruiter, and Bayt (jobspy supports Bayt natively) |
 | Regional boards | Wuzzuf (own plugin via sitemaps), Bayt (jobspy); Naukrigulf, Forasna later |
-| Scraping ethics | obey robots.txt (careers pages, site plugins; public ATS JSON APIs and jobspy sites exempt by maintainer decision 2026-10-16), never defeat bot challenges (Wuzzuf search is disallowed and Cloudflare-protected, so the plugin reads its job sitemaps at Crawl-delay 10) |
+| Scraping ethics | never defeat bot challenges (no fingerprint spoofing, challenge solving, proxies, fake UAs); robots.txt not enforced since 2026-10-25 (maintainer: "do as freehire does"); per-host rate limits and Crawl-delay pacing kept (Wuzzuf search is disallowed and Cloudflare-protected, so the plugin reads its job sitemaps at Crawl-delay 10) |
 | Embeddings | fastembed `paraphrase-multilingual-MiniLM-L12-v2` (220 MB, Arabic + English), chunked + mean-pooled; numpy cosine (sqlite-vec deferred) |
 | AI scale | hard rules + free local rank first; only the top `ai_max_jobs` go to the AI, batched 10-20 per call |
 | Tiers | score 8-10 high -> auto-apply; 5-7 mid -> user review; <5 or not AI-scored -> low (hidden, user may opt in) |
@@ -222,13 +222,23 @@ Crawl discovery step plus the user's own list. Aggregator API keys live in the v
 Setup "API keys" section. Telegram: t.me/s web-preview reader, freehire's 95 channels plus
 user-added (Arabic hiring words in the prefilter). Logic is re-implemented in Python, no
 code copied verbatim; NOTICE credits freehire (MIT). Survey: scratchpad freehire-survey.md.
-- ⬜ F0a Source framework: auto-registry (no shared registry edits), per-module detector
+- ✅ F0a Source framework: auto-registry (no shared registry edits), per-module detector
   patterns, shared helpers (403/429 retry-with-backoff, paging), per-source test files
-- ⬜ F0b Boards table + `linkit discover-boards` (Common Crawl CDX per ATS) + per-run rotation caps
-- ⬜ F0c API keys in the vault + Setup section + `api_key()` helper for sources
-- ⬜ F0d Workday: 2,000-cap facet split, 403/429 backoff, details only for unseen jobs
-- ⬜ F0e Telegram reader, channel table + Setup, Arabic prefilter, link-out to ATS, batched AI extraction
-- ⬜ F1.x ATS feed adapters (~117), batches of ~12
+- 🟡 F0b Boards (built; robots no longer enforced, so Common Crawl discovery works after T-robots) table + `linkit discover-boards` (Common Crawl CDX per ATS) + per-run rotation caps
+- ✅ F0c API keys in the vault + Setup section + `api_key()` helper for sources
+- ✅ F0d Workday: 2,000-cap facet split, 403/429 backoff, details only for unseen jobs
+- ✅ F0e Telegram reader, channel table + Setup, Arabic prefilter, link-out to ATS, batched AI extraction
+- F1 ATS feed adapters (sources/ats/), shared brief: scratchpad brief-adapters.md
+  - ✅ F1.1 adp adpmyjobs applicantstack applitrack appone avature bamboohr beesite betterteam breezy briefhq bullhorn careerplug
+  - ✅ F1.2 careerspage catsone cleverstaff clinch comeet compleo cornerstone crelate dayforce deel dover earcu eightfold
+  - ✅ F1.3 emply enlizt epam eploy erecruiter factorial feishujobs freshteam friendwork geekhunter gem gethired gr8people
+  - ✅ F1.4 gupy gusto harri hcshiring herp hibob higherme hireclick hireology hiringroom hiringthing hrmanager hrmdirect
+  - ✅ F1.5 hrmos humanbit huntflow hurma icims idealtraits inhire ismartrecruit isolvedhire itechart jazzhr jibe jobappnetwork
+  - ✅ F1.6 jobscore jobspage jobvite join keka likeit loxo luxoft manatal mindsight mokahr neogov northstone
+  - ✅ F1.7 odoo opencats oracle pageup pandape paradox paycom paycor paylocity peopleforce peoplesoft personio phenom
+  - 🟡 F1.8 pinpoint potok pyjamahr quickin radancy rapyd recruiterflow recruitingsolutions recrutei rippling scalis selfrecruit senior
+  - 🟡 F1.9 softgarden solides spark speedrun successfactors talentadore talenthr talentlyft taleo taleobe teamtailor tenstreet traffit
+  - 🟡 F1.10 trakstar ukg ukgready vention vouch werecruit workablemarketplace workstream wpyoast zoho ashbygraphql
 - ⬜ F2.x Aggregator APIs (~50), batches of ~10
 - ⬜ F3 Job boards (honest ones) + RSS
 - ⬜ F4.x The 52 single-company plugins (minus bypass ones), batches of ~12

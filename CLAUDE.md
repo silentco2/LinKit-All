@@ -82,8 +82,8 @@ Tailoring happens just before applying, never for jobs that will not be applied 
   Workable, Workday cxs) > python-jobspy (LinkedIn, Indeed, Glassdoor, ZipRecruiter,
   Google, Bayt) > per-site plugins (Wuzzuf, Forasna)
   > generic extractor (JSON-LD -> CSS heuristics -> AI extraction).
-- Obey robots.txt (careers pages, Wuzzuf/Forasna sitemaps); never defeat bot challenges. Exempt
-  by maintainer decision: public ATS JSON APIs and python-jobspy sites (user-chosen).
+- Never defeat bot challenges: no TLS-fingerprint spoofing, challenge-solving browsers, rotating
+  proxies or fake crawler/app user agents. robots.txt is not enforced (maintainer, 2026-10-25).
 - ATS detector routes any pasted URL (or careers-page HTML) to the right plugin.
 - Per-domain rate limits, checkpoints every page, dedupe by normalized URL +
   hash(title, company, location) + rapidfuzz near-duplicate check.
