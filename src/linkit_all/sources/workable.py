@@ -21,6 +21,7 @@ class Workable(Source):
         re.compile(r"apply\.workable\.com/api/v\d/(?:widget/)?accounts/([\w-]+)", re.I),
         re.compile(r"apply\.workable\.com/([\w-]+)", re.I),
     )
+    cdx_hosts = ("apply.workable.com/*",)
     parallel = 4  # public JSON API; Http paces per host
 
     async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:

@@ -14,6 +14,7 @@ from linkit_all.core.state import transition
 from linkit_all.sources.ats_detector import detect
 from linkit_all.sources.base import JobStub, Source, Task
 from linkit_all.sources.careers import Unsupported
+from linkit_all.sources.discovery import board_tasks, note_crawl, upsert_boards
 from linkit_all.sources.http import Http
 from linkit_all.sources.store import Deduper, mark_task, store_page
 
@@ -28,18 +29,24 @@ class DiscoverStats:
 
 
 async def company_tasks(
-    cfg: SearchConfig, http: Http, registry: dict[str, Source]
+    cfg: SearchConfig,
+    http: Http,
+    registry: dict[str, Source],
+    db: sessionmaker[Session] | None = None,
 ) -> tuple[list[Task], list[str]]:
     """Resolve the company list (URLs or shorthands) to ATS board tasks; URLs with no known
-    ATS go to the generic careers-page source."""
+    ATS go to the generic careers-page source. With `db`, the boards found are stored too
+    ("user" when the entry names the ATS, "detected" when a careers page led to it)."""
     tasks: dict[str, Task] = {}
     unsupported = []
     for entry in cfg.sources.companies:
         found = detect(entry)
+        source = "user"
         if found is None and entry.startswith("http"):
             try:  # a company's own careers page usually embeds its ATS
                 resp = await http.get(entry) if await http.allowed(entry) else None
                 found = detect(resp.text) if resp and resp.status_code < 400 else None
+                source = "detected"
             except httpx.HTTPError:
                 found = None
         if found is None and entry.startswith("http") and "careers" in registry:
@@ -50,6 +57,8 @@ async def company_tasks(
             unsupported.append(f"{entry} ({found[0]} not supported yet)")
         else:
             ats, board = found
+            if db is not None:
+                upsert_boards(db, ats, [board], source)
             tasks.setdefault(f"{ats}:{board}", Task(ats, f"{ats}:{board}", board=board))
     return list(tasks.values()), unsupported
 
@@ -63,7 +72,11 @@ async def discover(
     max_running: int = 16,
 ) -> DiscoverStats:
     stats = DiscoverStats()
-    tasks, stats.unsupported = await company_tasks(cfg, http, registry)
+    tasks, stats.unsupported = await company_tasks(cfg, http, registry, db)
+    mine = {t.key for t in tasks}  # the user's companies always run
+    stored = board_tasks(db, cfg, registry, mine)
+    board_keys = {t.key for t in stored}
+    tasks += stored
     tasks += [t for src in registry.values() if src.is_enabled(cfg) for t in src.tasks(cfg)]
     with db() as s:
         deduper = Deduper(s, lambda name: registry[name].priority if name in registry else 99)
@@ -85,8 +98,11 @@ async def discover(
             return
         async with per_source[task.source], running:
             page = start
+            seen = 0
+            ok = True
             try:
                 async for stubs in registry[task.source].search(http, task, start):
+                    seen += len(stubs)
                     new = store_page(db, run_id, task.key, page, stubs, deduper)
                     stats.new += new
                     stats.duplicates += len(stubs) - new
@@ -96,14 +112,18 @@ async def discover(
                 stats.unsupported.append(f"{task.board} ({e})")
                 mark_task(db, run_id, task.key, str(e))
             except httpx.HTTPStatusError as e:  # e.g. board removed: retrying will not help
+                ok = False
                 stats.errors[task.key] = str(e)
                 mark_task(db, run_id, task.key, str(e))
             except Exception as e:  # network, parsing: leave undone so a resume retries
+                ok = False
                 stats.errors[task.key] = f"{type(e).__name__}: {e}"
                 logger.warning("{} failed: {}", task.key, stats.errors[task.key])
             else:
                 stats.tasks_done += 1
                 mark_task(db, run_id, task.key, None)
+            if task.key in board_keys:
+                note_crawl(db, task.source, task.board, seen, ok)
 
     # Priority no longer orders the run: store_page upgrades a stored duplicate to the
     # higher-priority source's copy whenever that arrives.

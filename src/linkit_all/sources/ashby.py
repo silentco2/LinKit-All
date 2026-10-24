@@ -16,6 +16,7 @@ class Ashby(Source):
     name = "ashby"
     kind = "ats"
     url_patterns = (re.compile(r"jobs\.ashbyhq\.com/([\w.%-]+)", re.I),)
+    cdx_hosts = ("jobs.ashbyhq.com/*",)
     parallel = 4  # public JSON API; Http paces per host
 
     async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:

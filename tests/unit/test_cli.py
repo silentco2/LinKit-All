@@ -82,3 +82,30 @@ def test_doctor_finds_tectonic_through_the_helper(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setattr(cli, "tectonic_path", lambda: "/cargo/bin/tectonic")
     tectonic = next(c for c in cli.run_checks() if c.name == "Tectonic")
     assert tectonic.path == "/cargo/bin/tectonic"
+
+
+def test_discover_boards_prints_counts_and_reports_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from linkit_all.sources import discovery
+
+    monkeypatch.setenv("LINKIT_DATA_DIR", str(tmp_path))
+    get_settings.cache_clear()
+
+    async def fake(
+        db: object, http: object, reg: object, ats: object, cap: int
+    ) -> dict[str, object]:
+        assert list(ats) == ["lever"] and cap == 7  # type: ignore[call-overload]
+        return {"lever": discovery.AtsResult(found=7, new=5)}
+
+    monkeypatch.setattr(discovery, "discover_boards", fake)
+    result = runner.invoke(cli.app, ["discover-boards", "--ats", "lever", "--max-per-ats", "7"])
+    assert result.exit_code == 0 and "lever: 7 boards found, 5 new" in result.output
+
+    async def refused(*a: object, **k: object) -> None:
+        raise discovery.DiscoveryError("robots.txt does not allow x")
+
+    monkeypatch.setattr(discovery, "discover_boards", refused)
+    result = runner.invoke(cli.app, ["discover-boards"])
+    assert result.exit_code == 1 and "robots.txt does not allow" in result.output
+    get_settings.cache_clear()

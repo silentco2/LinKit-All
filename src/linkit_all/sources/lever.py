@@ -19,6 +19,7 @@ class Lever(Source):
         re.compile(r"jobs(?:\.eu)?\.lever\.co/([\w.-]+)", re.I),
         re.compile(r"api(?:\.eu)?\.lever\.co/v0/postings/([\w.-]+)", re.I),
     )
+    cdx_hosts = ("jobs.lever.co/*",)
     parallel = 4  # public JSON API; Http paces per host
 
     async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:

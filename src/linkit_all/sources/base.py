@@ -61,6 +61,9 @@ class Source(ABC):
     default_on: bool = False  # opt-in kinds only: run without being listed in sources.enabled
     # ATS plugins: regexes over a URL or page HTML. Group 1.. is the board slug (joined by "/").
     url_patterns: Sequence[re.Pattern[str]] = ()
+    # ATS plugins: Common Crawl CDX url patterns that list the vendor's boards, e.g.
+    # "jobs.lever.co/*" or "*.recruitee.com". Empty = not discoverable (see discovery.py).
+    cdx_hosts: Sequence[str] = ()
 
     def is_enabled(self, cfg: SearchConfig) -> bool:
         """Should discovery ask this source for tasks? Opt-in kinds need `sources.enabled`;

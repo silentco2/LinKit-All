@@ -184,6 +184,24 @@ class SourceCheckpoint(Base):
     error: Mapped[str | None] = mapped_column(Text)
 
 
+class Board(Base):
+    """A company's job board on an ATS: found in Common Crawl, listed by the user, or detected
+    on a careers page. Discovery crawls the active ones in rotation (oldest crawl first)."""
+
+    __tablename__ = "boards"
+    __table_args__ = (UniqueConstraint("ats", "slug"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ats: Mapped[str] = mapped_column(String(32))
+    slug: Mapped[str] = mapped_column(String(255))  # the plugin's board slug, e.g. "stripe"
+    source: Mapped[str] = mapped_column(String(16))  # "commoncrawl" | "user" | "detected"
+    active: Mapped[bool] = mapped_column(default=True, index=True)
+    discovered_at: Mapped[datetime] = mapped_column(default=utcnow)
+    last_crawled_at: Mapped[datetime | None]
+    last_jobs: Mapped[int] = mapped_column(default=0)
+    failures: Mapped[int] = mapped_column(default=0)  # failed crawls in a row
+
+
 class AnswerEntry(Base):
     """Answer bank: questions answered before, reused when a new form asks the same thing."""
 

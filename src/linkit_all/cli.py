@@ -251,6 +251,36 @@ def run_discover(
         typer.secho(f"  skipped {entry}", fg="yellow")
 
 
+@app.command("discover-boards")
+def discover_boards_cmd(
+    ats: Annotated[
+        list[str] | None, typer.Option("--ats", help="Only this ATS (repeatable); default all.")
+    ] = None,
+    max_per_ats: Annotated[int, typer.Option(min=1, help="Boards to keep per ATS.")] = 5000,
+) -> None:
+    """Find company job boards in Common Crawl's index and store them for crawling."""
+    from linkit_all.sources import registry
+    from linkit_all.sources.discovery import DiscoveryError, discover_boards, make_http
+    from linkit_all.sources.http import make_client
+
+    db = _stage_db()
+
+    async def go() -> dict[str, Any]:
+        async with make_client() as client:
+            return await discover_boards(db, make_http(client), registry(), ats or (), max_per_ats)
+
+    try:
+        results = asyncio.run(go())
+    except (DiscoveryError, ValueError) as e:
+        typer.echo(f"discover-boards failed: {e}", err=True)
+        raise typer.Exit(1) from e
+    for name, r in results.items():
+        line = f"{name}: {r.found} boards found, {r.new} new"
+        typer.secho(
+            f"{line} (stopped: {r.error})" if r.error else line, fg="yellow" if r.error else None
+        )
+
+
 @run_app.command("enrich")
 def run_enrich() -> None:
     """Fill in missing job descriptions (discovered -> enriched)."""

@@ -19,6 +19,7 @@ class Greenhouse(Source):
         re.compile(r"(?:job-boards|boards)(?:\.eu)?\.greenhouse\.io/([\w-]+)", re.I),
         re.compile(r"boards-api\.greenhouse\.io/v1/boards/([\w-]+)", re.I),
     )
+    cdx_hosts = ("boards.greenhouse.io/*", "job-boards.greenhouse.io/*")
     parallel = 4  # public JSON API; Http paces per host
 
     async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:
