@@ -1,0 +1,70 @@
+{
+ "title": "Workable",
+ "totalSize": 4,
+ "jobs": [
+  {
+   "department": "PRA",
+   "id": "399040a9-8c84-4a3d-ab9d-02ab036d6cf8",
+   "title": "Python Developer",
+   "state": "published",
+   "description": "<p>Remote Python role.</p><script>x()</script>",
+   "socialSharingDescription": "Are you a Python Developer looking for an exciting opportuni",
+   "employmentType": "Full-time",
+   "benefitsSection": "",
+   "requirementsSection": "",
+   "url": "https://jobs.workable.com/view/87gW9bnZMGhiuouxYfmutJ/remote-python-developer-in-athens-at-european-dynamics",
+   "language": "en",
+   "locations": [
+    "TELECOMMUTE",
+    "Athens, Attica, Greece"
+   ],
+   "location": {
+    "city": "Athens",
+    "subregion": "Attica",
+    "countryName": "Greece"
+   },
+   "created": "2026-10-01T09:20:02.114Z",
+   "updated": "2026-10-01T09:20:02.114Z",
+   "company": {
+    "id": "76bb50c5-04fa-42dc-a813-7b1e377d324d",
+    "title": "EUROPEAN DYNAMICS",
+    "website": "http://www.eurodyn.com",
+    "url": "https://jobs.workable.com/company/fEngW8oPQVhXrenX1cLyBg/jobs-at-european-dynamics"
+   },
+   "isFeatured": false,
+   "workplace": "remote"
+  },
+  {
+   "department": "Software Engineering",
+   "id": "draft-1",
+   "title": "Draft Role",
+   "state": "draft",
+   "description": "<p>Are you a <strong>Python Developer</strong>?</p>",
+   "socialSharingDescription": "Are you passionate about AI? 🤖 At Satori Analytics, we aim t",
+   "employmentType": "Full-time",
+   "benefitsSection": "<p>Perks on Perks.</p>",
+   "requirementsSection": "<p>Must-have: Django.</p>",
+   "url": "https://jobs.workable.com/view/hmYTCi1LmQzzAgU9ZttVnZ/hybrid-python-developer-in-athens-at-satori-analytics",
+   "language": "en",
+   "locations": [
+    "Athens, Attica, Greece"
+   ],
+   "location": {
+    "city": "Athens",
+    "subregion": "Attica",
+    "countryName": "Greece"
+   },
+   "created": "2026-10-02T13:50:09.632Z",
+   "updated": "2026-10-02T13:50:09.632Z",
+   "company": {
+    "id": "b8bd0b6a-4a62-484e-bcb5-f24b781087ff",
+    "title": "Satori Analytics",
+    "website": "http://satorianalytics.com",
+    "url": "https://jobs.workable.com/company/oP7xVQywvA86PcDQfxsmB2/jobs-at-satori-analytics"
+   },
+   "isFeatured": false,
+   "workplace": "hybrid"
+  }
+ ],
+ "autoAppliedFilters": {}
+}

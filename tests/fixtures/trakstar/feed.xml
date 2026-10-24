@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:job="https://recruiterbox.com/rss/job/">
+  <channel>
+    <title>Cheesecake Labs Jobs</title>
+    <item>
+      <title>Senior Go Engineer</title>
+      <link>http://cheesecakelabs.hire.trakstar.com/jobs/fk0zjzb</link>
+      <guid>http://cheesecakelabs.hire.trakstar.com/jobs/fk0zjzb</guid>
+      <pubDate>Thu, 18 Jun 2026 00:00:00 +0530</pubDate>
+      <description>&lt;p&gt;Build the &lt;strong&gt;pipeline&lt;/strong&gt;.&lt;/p&gt;&lt;script&gt;x()&lt;/script&gt;</description>
+      <job:locationCity>Florian&#243;polis</job:locationCity>
+      <job:locationState>SC</job:locationState>
+      <job:locationCountry>Brazil</job:locationCountry>
+      <job:positionType>full_time</job:positionType>
+    </item>
+    <item>
+      <title>Remote Platform Engineer</title>
+      <link>http://cheesecakelabs.hire.trakstar.com/jobs/ab1cdef</link>
+      <guid>http://cheesecakelabs.hire.trakstar.com/jobs/ab1cdef</guid>
+      <pubDate>Thu, 18 Jun 2026 00:00:00 +0530</pubDate>
+      <description>&lt;p&gt;Work from anywhere.&lt;/p&gt;</description>
+      <job:locationCity>Remote</job:locationCity>
+      <job:locationCountry>Brazil</job:locationCountry>
+      <job:positionType>full_time</job:positionType>
+    </item>
+  </channel>
+</rss>

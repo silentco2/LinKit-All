@@ -1,0 +1,69 @@
+{
+ "title": "Workable",
+ "totalSize": 4,
+ "nextPageToken": "TOK2",
+ "jobs": [
+  {
+   "id": "891f852f-c94e-4b49-a0d7-664b29eb0783",
+   "title": "Python Developer",
+   "state": "published",
+   "description": "<p>Stafio.ai builds AI solutions.</p><br /><h3>Responsibilities</h3><ul><li>Develop Python services.</li></ul>",
+   "socialSharingDescription": "Stafio.ai is a forward-thinking technology company specializ",
+   "employmentType": "Full-time",
+   "benefitsSection": "",
+   "requirementsSection": "<ul><li>Experience as a Python Developer.</li></ul>",
+   "url": "https://jobs.workable.com/view/hW66kQAD12FZomzksq5y78/python-developer-in-noida-at-stafio.ai",
+   "language": "en",
+   "locations": [
+    "Noida, Uttar Pradesh, India"
+   ],
+   "location": {
+    "city": "Noida",
+    "subregion": "Uttar Pradesh",
+    "countryName": "India"
+   },
+   "created": "2026-10-08T07:03:12.910Z",
+   "updated": "2026-10-08T07:03:12.910Z",
+   "company": {
+    "id": "4570c1a8-3d6c-4cd5-a0bc-a60fbe6256e9",
+    "title": "Stafio.ai",
+    "website": "https://stafio.ai/",
+    "url": "https://jobs.workable.com/company/9zkD3BuchAxWVNwwpC67xB/jobs-at-stafio.ai"
+   },
+   "isFeatured": false,
+   "workplace": "on_site"
+  },
+  {
+   "department": "Software Engineering",
+   "id": "8480275a-ca09-49ff-879a-3dc3637f93f7",
+   "title": "Python Developer",
+   "state": "published",
+   "description": "<p>Are you a <strong>Python Developer</strong>?</p>",
+   "socialSharingDescription": "Are you passionate about AI? 🤖 At Satori Analytics, we aim t",
+   "employmentType": "Full-time",
+   "benefitsSection": "<p>Perks on Perks.</p>",
+   "requirementsSection": "<p>Must-have: Django.</p>",
+   "url": "https://jobs.workable.com/view/hmYTCi1LmQzzAgU9ZttVnZ/hybrid-python-developer-in-athens-at-satori-analytics",
+   "language": "en",
+   "locations": [
+    "Athens, Attica, Greece"
+   ],
+   "location": {
+    "city": "Athens",
+    "subregion": "Attica",
+    "countryName": "Greece"
+   },
+   "created": "2026-10-02T13:50:09.632Z",
+   "updated": "2026-10-02T13:50:09.632Z",
+   "company": {
+    "id": "b8bd0b6a-4a62-484e-bcb5-f24b781087ff",
+    "title": "Satori Analytics",
+    "website": "http://satorianalytics.com",
+    "url": "https://jobs.workable.com/company/oP7xVQywvA86PcDQfxsmB2/jobs-at-satori-analytics"
+   },
+   "isFeatured": false,
+   "workplace": "hybrid"
+  }
+ ],
+ "autoAppliedFilters": {}
+}

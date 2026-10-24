@@ -1,0 +1,6 @@
+{"totalCount":2,"opportunities":[
+ {"Id":"id-1","Title":"Backend Engineer","PostedDate":"2026-06-19T22:12:06.752Z","BriefDescription":"brief one",
+  "Locations":[{"LocalizedName":"Vancity Centre","Address":{"City":"Vancouver","State":{"Name":"British Columbia"},"Country":{"Name":"Canada"}}}]},
+ {"Id":"id-2","Title":"Data Analyst","PostedDate":"2026-06-18T00:00:00Z","BriefDescription":"brief two",
+  "Locations":[{"LocalizedName":"Remote - US","Address":null}]}
+]}

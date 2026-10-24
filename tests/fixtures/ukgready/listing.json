@@ -1,0 +1,9 @@
+{"_paging":{"offset":1,"size":200,"total":2},"job_requisitions":[
+ {"id":1040452356,"job_title":"Backend Engineer","job_description":"a truncated preview...",
+  "location":{"address_line_1":"5441 E Lincoln Hwy","city":"Merrillville","state":"IN","country":"USA","zip":"46410"},
+  "base_pay_from":32.5,"base_pay_to":41,"base_pay_frequency":"HOUR",
+  "employee_type":{"name":"FT Non-Exempt"},"is_remote_job":false},
+ {"id":1040451353,"job_title":"Data Analyst","job_description":"another preview...",
+  "location":{"city":"Sydney","country":"AUS"},
+  "base_pay_frequency":"YEAR","employee_type":{"name":"Exempt"},"is_remote_job":true}
+]}
