@@ -1,0 +1,4 @@
+{"count":4,"items":[
+  {"advertId":2001,"title":"  Senior Java Engineer  ","name":"Senior Java Engineer","url":"https://acme.traffit.com/public/an/abc","validStart":1770284174,"description":"<p>Build things</p><script>evil()</script>","geolocation":"{\"iso\":\"pl\",\"locality\":\"Warszawa\",\"region1\":\"Mazowieckie\",\"country\":\"Polska\"}"},
+  {"advertId":2002,"title":"","name":"Remote Fallback Role","url":"https://acme.traffit.com/public/an/def","geolocation":null}
+]}

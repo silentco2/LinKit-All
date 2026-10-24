@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:tt="https://teamtailor.com/locations" version="2.0">
+<channel>
+<title>Acme jobs</title>
+<item>
+<title>Cloud Engineer</title>
+<link>https://jobs.acme.com/jobs/12345-cloud-engineer</link>
+<remoteStatus>hybrid</remoteStatus>
+</item>
+<item>
+<title>Designer</title>
+<link>https://jobs.acme.com/jobs/678901-designer</link>
+<remoteStatus>none</remoteStatus>
+</item>
+</channel>
+</rss>

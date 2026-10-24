@@ -1,0 +1,3 @@
+{"data":{"count":3,"currentPage":2,"totalPages":2,"data":[
+  {"id":2003,"title":"Remote SRE","description":"<p>On call</p>","currentState":"em_andamento","city":{"name":""},"state":{"name":"","code":""},"homeOffice":true,"jobType":"remoto","createdAt":"2026-06-09"}
+]}}

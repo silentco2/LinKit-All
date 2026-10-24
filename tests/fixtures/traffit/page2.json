@@ -1,0 +1,4 @@
+{"count":4,"items":[
+  {"advertId":0,"advertPublishId":0,"title":"No Id","url":"https://acme.traffit.com/public/an/ghi"},
+  {"advertId":0,"advertPublishId":2004,"title":"Publish Id Only","url":"https://acme.traffit.com/public/an/jkl","geolocation":"not json"}
+]}

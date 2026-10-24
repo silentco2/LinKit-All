@@ -1,0 +1,4 @@
+{"data":{"count":3,"currentPage":1,"totalPages":2,"data":[
+  {"id":2001,"title":"  Backend Engineer  ","description":"<p>Build things</p><script>evil()</script>","currentState":"em_andamento","city":{"name":"Florianópolis"},"state":{"name":"Santa Catarina","code":"SC"},"homeOffice":false,"jobType":"hibrido","createdAt":"2026-06-11","redirectLink":"https://malformed/x"},
+  {"id":2002,"title":"Closed Role","currentState":"encerrada","city":{"name":"São Paulo"},"state":{"name":"São Paulo","code":"SP"},"homeOffice":false,"jobType":"presencial","createdAt":"2026-06-10"}
+]}}

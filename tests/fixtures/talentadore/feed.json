@@ -1,0 +1,8 @@
+{
+  "company": "Acme Oy",
+  "jobs": [
+    {"id": "yjMOo", "job_token": "mWXEgr", "name": "AI Engineer", "link": "https://ats.talentadore.com/apply/ai-engineer/mWXEgr", "description_html": "<p>Build models.</p><script>alert(1)</script>", "description_text": "Build models.", "start_date": "2026-07-10T12:16:20Z", "updated": "2026-07-11T09:00:00Z", "city": "Helsinki", "county": "", "country": "Finland", "location": "Pasilankatu 2 A"},
+    {"id": "RyGxO", "job_token": "m5n9e1", "name": "Remote Designer", "link": "https://ats.talentadore.com/apply/remote-designer/m5n9e1", "description_html": "", "description_text": "Design things.", "start_date": "", "updated": "2026-07-09T08:00:00Z", "city": "", "county": "", "country": "Remote"},
+    {"id": "none", "job_token": "", "name": "No token", "link": "https://ats.talentadore.com/apply/x/y"}
+  ]
+}
