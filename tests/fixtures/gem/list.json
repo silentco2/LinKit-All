@@ -1,0 +1,5 @@
+{"data":{"oatsExternalJobPostings":{"jobPostings":[
+ {"extId":"X1","title":"Backend Engineer","locations":[{"city":"San Diego","isoCountry":"USA","isRemote":false}],"job":{"locationType":"IN_OFFICE"}},
+ {"extId":"X2","title":"Remote SRE","locations":[{"city":"","isoCountry":"COL","isRemote":true}],"job":{"locationType":"REMOTE"}},
+ {"extId":"X3","title":"Gone Soon","locations":[],"job":{}}
+]}}}

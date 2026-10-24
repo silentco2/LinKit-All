@@ -1,0 +1,59 @@
+{
+ "company": {
+  "name": "ITGEO"
+ },
+ "publications": [
+  {
+   "publishedJobId": 6080,
+   "company": null,
+   "status": 0,
+   "title": "Middle backend developer (.NET)",
+   "salaryTo": 170000,
+   "salaryFrom": 150000,
+   "description": "<p>У нас амбициозные планы на развитие функционала платформы и для их реализации мы ищем <strong>backend-разработчика</strong>, которому интересно как писать код, так и самостоятельно продумывать способ реализации задачи.</p>",
+   "dateCreated": "2019-10-23T14:39:25.15",
+   "lastUpdate": "2019-10-30T10:25:37.757",
+   "publishDateTime": "2019-10-23T14:39:25.15",
+   "regionId": 1759,
+   "city": "Москва",
+   "subway": null,
+   "address": null,
+   "expYearsMin": 2,
+   "expYearsMax": null,
+   "schedule": "Fulltime",
+   "workplaceType": "Office",
+   "questionnaires": [],
+   "employmentType": "Fulltime",
+   "currency": 0,
+   "externalPublicationUrl": "/c656f1c111eb44075d21d77f57216c72/6080",
+   "specializationId": null,
+   "formId": null
+  },
+  {
+   "publishedJobId": 6077,
+   "company": null,
+   "status": 0,
+   "title": "Middle frontend developer (Angular)",
+   "salaryTo": 200000,
+   "salaryFrom": 0,
+   "description": "<p>Число пользователей растет (а мы хотим, чтобы клиенты получали только положительные впечатления) и у нас амбициозные планы на развитие функционала нашей платформы, поэтому мы ищем <strong>frontend-разработчика</strong>, которому интересно как писать код, так и самостоятельно продумывать способ реализации задачи.</p>",
+   "dateCreated": "2019-10-23T13:14:07.443",
+   "lastUpdate": "2019-10-30T10:26:10.557",
+   "publishDateTime": "2019-10-23T13:14:07.443",
+   "regionId": 1759,
+   "city": "Москва",
+   "subway": null,
+   "address": null,
+   "expYearsMin": 2,
+   "expYearsMax": null,
+   "schedule": "Fulltime",
+   "workplaceType": "Office",
+   "questionnaires": [],
+   "employmentType": "Fulltime",
+   "currency": 0,
+   "externalPublicationUrl": "/c656f1c111eb44075d21d77f57216c72/6077",
+   "specializationId": null,
+   "formId": null
+  }
+ ]
+}

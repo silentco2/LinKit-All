@@ -1,0 +1,49 @@
+{
+ "vacancies": [
+  {
+   "id": "d647700e-d039-4d8f-b185-d649226b5cef",
+   "externalCseAdLink": null,
+   "title": "ØRESUNDSLINJEN søger passioneret kok",
+   "titleAsUrl": "oresundslinjen-soger-passioneret-kok",
+   "talentPool": false,
+   "published": "2026-09-08T08:46:56.8250402Z",
+   "location": "Færgevej, 8, 3000, Helsingør",
+   "shortId": "2exc7k",
+   "translations": [
+    {
+     "title": "ØRESUNDSLINJEN søger passioneret kok",
+     "content": "<p>Er du en erfaren kok, taler et af de tre skandinaviske sprog og har lyst på en anderledes hverdag til søs, hvor du bliver en del af et engageret team som sikrer, at vores gæster får god mad og en god oplevelse fra afgang til ankomst? Vil du arbejde med gode smager og høj kvalitet? Så er det måske dig, vi søger efter.</p><p>Som kok hos ØRESUNDSLINJEN bliver du en vigtig del af teamet ombord på vores færge Tycho Brahe. Ombord skibet finder du en af Øresunds mest populære buffetrestauranter, Libitum Social Dining, som har siden åbningen af restauranten foråret 2024 serveret over en kvart million gæster!</p>",
+     "languageKey": "da-DK"
+    },
+    {
+     "title": "ØRESUNDSLINJEN söker passionerad kock",
+     "content": "<p>Är du en erfaren kock, talar ett av de tre skandinaviska språken og och sugen på en annorlunda vardag till sjöss, där du blir en del av ett engagerat team som ser till att våra gäster får god mat och en trevlig upplevelse från avgång till ankomst? Vill du arbeta med goda smaker och hög kvalitet? Då är det kanske just dig vi söker.</p><p>Som kock på ÖRESUNDSLINJEN blir du en viktig del av teamet ombord vår färja Tycho Brahe.&nbsp;<br />På fartyget hittar du en av Öresunds mest populära bufférestauranger, Libitum Social Dining, som har sedan öppningen av restaurangen våren 2024 serverat över en kvarts miljon gäster!</p>",
+     "languageKey": "sv-SE"
+    }
+   ]
+  },
+  {
+   "id": "27bdadd9-f83e-4c62-a603-4ff17da33d06",
+   "externalCseAdLink": null,
+   "title": "Unsolicited applications ",
+   "titleAsUrl": "unsolicited-applications",
+   "talentPool": true,
+   "published": "2026-05-13T10:30:09.0819403Z",
+   "location": "",
+   "shortId": "moxy5t",
+   "translations": [
+    {
+     "title": "Uopfordrede ansøgninger",
+     "content": "",
+     "languageKey": "da-DK"
+    },
+    {
+     "title": "Unsolicited applications ",
+     "content": "",
+     "languageKey": "en-GB"
+    }
+   ]
+  }
+ ],
+ "count": 4
+}

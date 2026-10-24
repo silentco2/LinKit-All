@@ -1,0 +1,1 @@
+({"htm":"<tr jobOfferId='3500000' offerId='4900001' externalJobOfferId='580001' externalJobOfferRegionId='310001' comId='20002054' skkResult='offer'><td class='skk_positionName'>Remote Analyst</td><td>Warszawa</td></tr><tr tp='2' tr='4' pn='2' ps='3' style='display:none;'></tr>"})

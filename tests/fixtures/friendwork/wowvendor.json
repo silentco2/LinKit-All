@@ -1,0 +1,59 @@
+{
+ "company": {
+  "name": "WowVendor"
+ },
+ "publications": [
+  {
+   "publishedJobId": 125340,
+   "company": null,
+   "status": 0,
+   "title": "Менеджер по продажам",
+   "salaryTo": 120000,
+   "salaryFrom": 50000,
+   "description": "<ul>\n<li value=\"1\" style=\"text-align: start;\">Общение и консультация клиентов на английском языке в текстовом формате.</li>\n<li value=\"2\" style=\"text-align: start;\">Продажи услуг тёплым клиентам, имеющим опыт с нашими услугами.</li>\n</ul>",
+   "dateCreated": "2026-10-05T18:04:26.447",
+   "lastUpdate": "2026-10-05T18:04:42.813",
+   "publishDateTime": "2026-10-05T18:04:26.447",
+   "regionId": 0,
+   "city": "",
+   "subway": null,
+   "address": null,
+   "expYearsMin": null,
+   "expYearsMax": null,
+   "schedule": "Fulltime",
+   "workplaceType": "Remote",
+   "questionnaires": [],
+   "employmentType": "Fulltime",
+   "currency": 0,
+   "externalPublicationUrl": "/WowVendor/125340",
+   "specializationId": null,
+   "formId": 4965
+  },
+  {
+   "publishedJobId": 123646,
+   "company": null,
+   "status": 0,
+   "title": "SMM Marketing Specialist",
+   "salaryTo": 0,
+   "salaryFrom": 0,
+   "description": "<p>Здесь могло бы быть долгое вступление о том, кто мы такие и чем занимаемся, но мы всё понимаем, поэтому ты можешь поближе познакомиться с нами в профиле нашей компании.</p>",
+   "dateCreated": "2026-09-17T13:51:25.117",
+   "lastUpdate": "2026-09-17T13:51:25.117",
+   "publishDateTime": "2026-09-17T13:51:25.117",
+   "regionId": 0,
+   "city": "",
+   "subway": null,
+   "address": null,
+   "expYearsMin": 3,
+   "expYearsMax": null,
+   "schedule": "Flexible",
+   "workplaceType": "Remote",
+   "questionnaires": [],
+   "employmentType": "Fulltime",
+   "currency": 0,
+   "externalPublicationUrl": "/WowVendor/123646",
+   "specializationId": null,
+   "formId": 18329
+  }
+ ]
+}

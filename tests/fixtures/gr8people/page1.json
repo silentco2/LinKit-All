@@ -1,0 +1,4 @@
+{"data":{"searchJobs":{"results":{"nodes":[
+ {"key":"4709","title":"FSR - Chicago, IL","descriptionHTML":"<p>Serve customers.</p><script>x()</script>","workplaceType":"ON_SITE","postedOn":"2026-03-18T19:59:49.013Z","positionType":{"name":"Full Time"},"primaryPlace":{"name":"Chicago, IL, USA"},"places":{"nodes":[{"name":"Chicago, IL, USA"},{"name":"Austin, TX, USA"}]}},
+ {"key":"","title":"No key","descriptionHTML":"x"}
+],"pageInfo":{"hasNextPage":true,"endCursor":"CURSOR2"},"totalCount":3}}}}
