@@ -83,9 +83,11 @@ A source is one module; nothing shared is edited, so many can be written side by
 
 **No bypassing.** A source reads what the site publishes to everyone, politely. Never use TLS
 fingerprint spoofing, challenge-solving browsers, rotating proxies, or fake crawler or app user
-agents; do not defeat a CAPTCHA or bot check. Obey robots.txt (`await http.allowed(url)`) unless
-the source is a public ATS JSON API or a jobspy site. If a site blocks us, the source reports an
-error and the maintainer decides; it does not get a workaround.
+agents; do not defeat a CAPTCHA or bot check. robots.txt is not enforced (maintainer decision,
+2026-10-25): no source refuses a URL because of it. Keep the per-host rate limit, and for an HTML
+page call `await http.allowed(url)` before fetching: it always returns `True` and, on the first
+request to a host, reads that host's `Crawl-delay` so the host is paced. If a site blocks us, the
+source reports an error and the maintainer decides; it does not get a workaround.
 
 ## Frontend
 
@@ -167,7 +169,8 @@ These come from the project's `CLAUDE.md`. Read it before a larger change.
     - user data stays local; no telemetry; no hard-coded secrets; never log passwords,
       tokens or full CV text;
     - never click the final Submit in dry-run mode.
-- Scrapers obey `robots.txt`, keep per-host rate limits, and never defeat bot challenges.
+- Scrapers never defeat bot challenges. `robots.txt` is not enforced; per-host rate limits and
+  `Crawl-delay` pacing stay.
 - Update `CLAUDE.md` when a decision in it changes.
 
 ## License

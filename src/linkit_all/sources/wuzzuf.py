@@ -1,6 +1,6 @@
-"""Wuzzuf (Egypt, Saudi Arabia) through its published sitemaps, as robots.txt allows.
+"""Wuzzuf (Egypt, Saudi Arabia) through its published sitemaps.
 
-robots.txt disallows search pages (/*?q=) and asks for Crawl-delay: 10, so this reads the
+Search pages are Cloudflare-protected and robots.txt asks for Crawl-delay: 10, so this reads the
 job sitemaps, keeps recent URLs whose slug contains every word of one of your queries, and
 fetches those job pages one every 10 s (see SLOW_HOSTS). Each page carries a JobPosting.
 """

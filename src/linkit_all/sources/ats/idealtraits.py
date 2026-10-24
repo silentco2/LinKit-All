@@ -14,7 +14,6 @@ from selectolax.lexbor import LexborHTMLParser
 from linkit_all.sources.ats._f13 import name_from_slug
 from linkit_all.sources.ats._f15 import fetch_html, posting_stub
 from linkit_all.sources.base import JobStub, Remote, Source, Task
-from linkit_all.sources.careers import Unsupported
 from linkit_all.sources.http import Http
 
 MAX_PAGES = 50  # a ceiling, never the way a walk ends
@@ -83,8 +82,7 @@ class IdealTraits(Source):
         total = -1
         for page in range(1, MAX_PAGES + 1):
             url = list_url(board, page)
-            if not await http.allowed(url):
-                raise Unsupported(f"robots.txt does not allow fetching {url}")
+            await http.allowed(url)
             resp = await http.get(url, headers=XHR)
             resp.raise_for_status()
             data = resp.json()

@@ -50,18 +50,6 @@ def test_resume_skips_earlier_chunks(
     assert search_pages(Jobvite(), make_handler(load_fixture), board="hbg", start_page=1) == []
 
 
-def test_robots_refusal_stops_the_board(search_pages: Callable[..., list[list[JobStub]]]) -> None:
-    import pytest
-
-    from linkit_all.sources.careers import Unsupported
-
-    def handler(req: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, text="User-agent: *\nDisallow: /")
-
-    with pytest.raises(Unsupported):
-        search_pages(Jobvite(), handler, board="hbg")
-
-
 def test_fetch_details(
     fetch_details: Callable[..., JobStub], load_fixture: Callable[[str], Any]
 ) -> None:

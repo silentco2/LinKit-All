@@ -103,9 +103,9 @@ def test_discover_boards_prints_counts_and_reports_errors(
     assert result.exit_code == 0 and "lever: 7 boards found, 5 new" in result.output
 
     async def refused(*a: object, **k: object) -> None:
-        raise discovery.DiscoveryError("robots.txt does not allow x")
+        raise discovery.DiscoveryError("Common Crawl is unreachable")
 
     monkeypatch.setattr(discovery, "discover_boards", refused)
     result = runner.invoke(cli.app, ["discover-boards"])
-    assert result.exit_code == 1 and "robots.txt does not allow" in result.output
+    assert result.exit_code == 1 and "Common Crawl is unreachable" in result.output
     get_settings.cache_clear()

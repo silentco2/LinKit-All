@@ -60,8 +60,8 @@ These rules are built into the code, not just written down.
 - **CAPTCHAs are yours.** LinKit All never solves or bypasses a CAPTCHA. It stops and asks you.
 - **Your data stays here.** Only the AI provider you choose sees your CV and job text.
   There is no telemetry. See [Privacy and security](privacy.md).
-- **Polite scraping.** Careers pages and sitemaps are read only where `robots.txt` allows,
-  with per-site rate limits. Bot challenges are never worked around. See [Sources](sources.md).
+- **Polite scraping.** Per-site rate limits, and a site's `Crawl-delay` slows requests to it.
+  `robots.txt` is not enforced. Bot challenges are never worked around. See [Sources](sources.md).
 
 ## Where to start
 

@@ -72,16 +72,6 @@ def test_resume_from_a_later_listing_page(
     assert not any("/jobs?perPage=60" in c and "page=" not in c for c in calls)
 
 
-def test_robots_refusal_raises(search_pages: Callable[..., list[list[JobStub]]]) -> None:
-    from linkit_all.sources.careers import Unsupported
-
-    def handler(req: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, text="User-agent: *\nDisallow: /jobs")
-
-    with pytest.raises(Unsupported):
-        search_pages(Luxoft(), handler, board="career.luxoft.com")
-
-
 def test_task_and_registration() -> None:
     tasks = Luxoft().tasks(SearchConfig())
     assert len(tasks) == 1 and tasks[0].source == "luxoft" and tasks[0].board == "career.luxoft.com"

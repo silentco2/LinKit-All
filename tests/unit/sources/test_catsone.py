@@ -2,12 +2,10 @@ from collections.abc import Callable
 from typing import Any
 
 import httpx
-import pytest
 
 from linkit_all.sources.ats.catsone import Catsone
 from linkit_all.sources.ats_detector import detect
 from linkit_all.sources.base import JobStub
-from linkit_all.sources.careers import Unsupported
 
 
 def test_search_listing(
@@ -30,16 +28,6 @@ def test_search_listing(
     assert first.extra["id"] == "16831828" and first.ats == "catsone"
     assert second.remote == "remote"
     assert search_pages(Catsone(), handler, board="acme.catsone.com", start_page=1) == []
-
-
-def test_robots_disallow_stops_the_board(
-    search_pages: Callable[..., list[list[JobStub]]],
-) -> None:
-    def handler(req: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, text="User-agent: *\nDisallow: /")
-
-    with pytest.raises(Unsupported):
-        search_pages(Catsone(), handler, board="acme.catsone.com")
 
 
 def test_fetch_details(

@@ -10,7 +10,6 @@ from selectolax.lexbor import LexborHTMLParser, LexborNode
 
 from linkit_all.sources.ats._f12 import name_from_slug
 from linkit_all.sources.base import JobStub, Remote, Source, Task
-from linkit_all.sources.careers import Unsupported
 from linkit_all.sources.http import Http
 from linkit_all.sources.text import html_to_text
 
@@ -66,8 +65,7 @@ class HiringRoom(Source):
         seen: set[str] = set()
         for page in range(1, MAX_PAGES + 1):
             url = PAGER.format(board=board, page=page)
-            if not await http.allowed(url):
-                raise Unsupported(f"robots.txt does not allow fetching {url}")
+            await http.allowed(url)
             form = {"selectedPage": str(page), "typePortal": "external"}
             # ponytail: Http has no public form POST; its private _send is the one retry path.
             resp = await http._send("POST", url, data=form)
@@ -112,8 +110,9 @@ class HiringRoom(Source):
         )
 
     async def fetch_details(self, http: Http, stub: JobStub) -> JobStub:
-        if not _URL.search(stub.url) or not await http.allowed(stub.url):
+        if not _URL.search(stub.url):
             return stub
+        await http.allowed(stub.url)
         resp = await http.get(stub.url)
         if resp.status_code in (404, 410):
             return stub

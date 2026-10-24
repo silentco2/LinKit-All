@@ -18,7 +18,6 @@ from test_careers import site as fake_site
 from linkit_all.core.tools import chrome_path
 from linkit_all.providers.base import LLMProvider
 from linkit_all.sources.base import JobStub, Task
-from linkit_all.sources.browser_extract import BrowserError, PageBrowser
 from linkit_all.sources.careers import Careers, Unsupported
 from linkit_all.sources.http import Http
 
@@ -225,22 +224,10 @@ def test_an_api_url_the_model_invented_is_rejected(tmp_path: Path) -> None:
     assert all("evil.test" not in url for _, url in browser.seen)  # never requested
 
 
-def test_robots_disallow_never_opens_the_browser(tmp_path: Path) -> None:
+def test_robots_disallow_does_not_stop_the_browser(tmp_path: Path) -> None:
     ai, browser = RecipeAI(API_RECIPE), api_site()
-    with pytest.raises(Unsupported, match=r"robots\.txt"):
-        crawl(tmp_path, ai, browser, robots="User-agent: *\nDisallow: /careers\n")
-    assert browser.seen == [] and ai.prompts == []
-
-    async def direct() -> None:  # the browser checks robots itself, before it even starts Chrome
-        client, _ = fake_site({}, "User-agent: *\nDisallow: /\n")
-        pb = PageBrowser(browser)
-        async with client:
-            with pytest.raises(BrowserError, match=r"robots\.txt"):
-                await pb.capture(Http(client, attempts=1), URL)
-        assert pb._browser is None
-
-    asyncio.run(direct())
-    assert browser.seen == []
+    stubs, _ = crawl(tmp_path, ai, browser, robots="User-agent: *\nDisallow: /careers\n")
+    assert len(stubs) == 3 and browser.documents == [URL]
 
 
 def test_a_challenge_page_is_unsupported_and_nothing_is_clicked(tmp_path: Path) -> None:

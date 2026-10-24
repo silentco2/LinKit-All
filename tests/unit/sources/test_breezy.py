@@ -47,16 +47,5 @@ def test_fetch_details_keeps_the_stub_when_the_page_has_no_body(
     assert fetch_details(Breezy(), handler, stub) == stub
 
 
-def test_robots_disallow_is_respected(search_pages, fetch_details, load_fixture):
-    data = load_fixture("breezy/list.json")
-    stub = search_pages(Breezy(), lambda req: httpx.Response(200, json=data), board="acme")[0][0]
-
-    def handler(req: httpx.Request) -> httpx.Response:
-        assert req.url.path == "/robots.txt", "page must not be fetched"
-        return httpx.Response(200, text="User-agent: *\nDisallow: /p/\n")
-
-    assert fetch_details(Breezy(), handler, stub) == stub
-
-
 def test_url_patterns():
     assert detect("https://agbo.breezy.hr/p/1-x", [Breezy()]) == ("breezy", "agbo")

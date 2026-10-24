@@ -11,7 +11,6 @@ from selectolax.lexbor import LexborHTMLParser
 from selectolax.lexbor import LexborNode as Node
 
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
-from linkit_all.sources.careers import Unsupported
 from linkit_all.sources.http import Http
 from linkit_all.sources.text import html_to_text
 
@@ -81,8 +80,7 @@ class AppliTrack(Source):
     url_patterns = (re.compile(r"applitrack\.com/([\w-]+)/onlineapp", re.I),)
 
     async def _page(self, http: Http, url: str) -> LexborHTMLParser:
-        if not await http.allowed(url):
-            raise Unsupported(f"robots.txt does not allow fetching {url}")
+        await http.allowed(url)
         resp = await http.get(url)
         resp.raise_for_status()
         return LexborHTMLParser(written(decode(resp.content)))

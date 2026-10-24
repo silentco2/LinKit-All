@@ -19,7 +19,6 @@ from linkit_all.core.search import SearchConfig
 from linkit_all.sources import registry
 from linkit_all.sources.base import JobStub, Source, Task
 from linkit_all.sources.discovery import (
-    DiscoveryError,
     board_tasks,
     discover_boards,
     make_http,
@@ -144,20 +143,19 @@ def test_all_ats_with_hosts_are_asked_and_empty_ones_reported(tmp_path: Path) ->
     assert {"workday", "ashby", "recruitee"} <= set(res)
 
 
-def test_robots_refusal_and_bad_names(tmp_path: Path) -> None:
+def test_robots_disallow_does_not_stop_discovery_and_bad_names(tmp_path: Path) -> None:
     db = init_db(tmp_path / "t.db")
     base = cdx_handler({GH: GH_URLS})
 
     def deny(req: httpx.Request) -> httpx.Response:
         if req.url.path == "/robots.txt":
-            return httpx.Response(200, text="User-agent: *\nDisallow: /CC-\n")
+            return httpx.Response(200, text="User-agent: *\nDisallow: /\n")
         return base(req)
 
-    with pytest.raises(DiscoveryError, match="robots"):
-        run(deny, db, ats=["greenhouse"])
+    assert run(deny, db, ats=["greenhouse"])["greenhouse"].found > 0
     with pytest.raises(ValueError, match="nope"):
         run(base, db, ats=["nope"])
-    assert stored(db, "greenhouse") == []
+    assert stored(db, "greenhouse") == ["acme", "figma", "stripe"]
 
 
 def test_failure_midway_keeps_what_was_found(tmp_path: Path) -> None:

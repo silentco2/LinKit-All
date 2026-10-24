@@ -52,8 +52,7 @@ the page itself. It goes in this order and stops at the first that works:
    10 pages per call. It skips the AI whenever the free steps are enough.
 3. **Browser fallback.** Many career pages draw their job list with JavaScript, so the
    plain page has no jobs in it. When steps 1 and 2 find nothing and you have an AI
-   connected, LinKit All opens the page once in headless Chrome (after checking
-   `robots.txt`), waits for the page to settle (at most about 20 seconds), and collects:
+   connected, LinKit All opens the page once in headless Chrome, waits for the page to settle (at most about 20 seconds), and collects:
    JSON-LD job postings, the JSON the page loaded in the background, and a short summary
    of the repeated blocks in the drawn page. Your AI then picks **how** to read the list:
    the JSON-LD, one of those JSON responses, or CSS selectors. It decides only; LinKit All
@@ -88,7 +87,7 @@ Glassdoor is searched without a country.
   [python-jobspy](https://github.com/speedyapply/JobSpy) library. LinKit All runs one
   request stream per site. These sites limit automated searches fast, and LinkedIn
   especially. A search that fails is not marked done, so a resumed run tries it again.
-- **Wuzzuf** (Egypt, Saudi Arabia) has its search pages disallowed in `robots.txt`, so
+- **Wuzzuf** (Egypt, Saudi Arabia) protects its search pages with Cloudflare, so
   LinKit All reads its published job sitemaps instead. It keeps recent jobs whose address
   contains every word of one of your searches, then fetches those pages one every 10
   seconds, as Wuzzuf asks.
@@ -127,11 +126,8 @@ boards_per_run = 300           # 0 to 20000; the oldest-crawled boards go first
   companies you listed. Your own companies always run and do not count against that number.
   A board that fails 5 crawls in a row is switched off; one success resets the count.
 - **Politeness.** The index gets at most 1 request per second, with the usual retries and
-  waits, and a descriptive `User-Agent`. LinKit All reads the index's `robots.txt` first and
-  does not query it if the file disallows it. At the time of writing that file disallows
-  everything except a few static pages, so `linkit discover-boards` stops with a "robots.txt
-  does not allow" error until the project decides how to treat the index (it is a public
-  API meant for programs, like the ATS feeds) or Common Crawl changes the file.
+  waits, and a descriptive `User-Agent`. The index's `robots.txt` is not enforced, but its
+  `Crawl-delay` still slows the requests.
 - A new ATS plugin takes part by setting `cdx_hosts` (a list of Common Crawl URL patterns) next
   to its `url_patterns`.
 
@@ -165,25 +161,20 @@ telegram_channels = ["hrlunapark", "@job_python", "https://t.me/zrabota"]
   posts are skipped.
 - **Age.** Posts older than 45 days are not stored. Each run reads up to 5 preview pages (about
   100 posts) per channel.
-- **Politeness.** One channel at a time, at least 2 seconds between requests, and `robots.txt`
-  is checked first.
+- **Politeness.** One channel at a time, at least 2 seconds between requests.
 - **Job address.** A job's address is its post (`https://t.me/<channel>/<id>`), which is what
   stops it being stored twice. A second job found in the same post ends in `?job=2`.
 
-## Politeness: robots.txt and rate limits
+## Politeness: rate limits and Crawl-delay
 
-- **robots.txt.** Before LinKit All reads a company's own careers page (to look for a
-  job board or for jobs), or a Forasna job page, it reads that site's `robots.txt` (once
-  per run). If the file is missing (a 4xx answer), everything is allowed. If the site is
-  down or errors (5xx or no answer), LinKit All does not crawl it this run. The file is
-  read the way RFC 9309 describes: all groups that name `LinKitAll` are merged (otherwise
-  the `*` groups), `*` and `$` work inside paths, and the longest matching rule wins (Allow
-  wins a tie). A `Crawl-delay` that is slower than LinKit All's own rate is followed.
-- **Where robots.txt is not checked.** The ATS feeds (Greenhouse, Lever and the others) are
-  public JSON APIs meant for programs. Wuzzuf is built by hand around its published rules:
-  it uses only sitemaps and job pages, never the disallowed search pages. The job-site
-  library (python-jobspy) makes its own requests. Leaving these two out is a deliberate
-  project decision.
+- **robots.txt is not enforced.** No source refuses a URL because of it (maintainer decision,
+  2026-10-25). LinKit All never bypasses bot protection: no TLS-fingerprint spoofing,
+  challenge-solving browsers, rotating proxies or fake crawler or app user agents, and a bot
+  challenge makes the source report the page as unsupported.
+- **Crawl-delay.** Before the first request to a site's HTML pages, LinKit All reads that
+  site's `robots.txt` once per run, only for its `Crawl-delay` (the largest value in the
+  groups that name `LinKitAll`, otherwise the `*` groups). A delay slower than LinKit All's own
+  rate is followed. A missing or failing `robots.txt` changes nothing.
 - **Rate limits per host.** Normally 2 requests per second per host. Slower for some:
   LinkedIn 1 request per 2 seconds, Wuzzuf and Forasna 1 request per 10 seconds, Workable
   and Workday 1 per second.

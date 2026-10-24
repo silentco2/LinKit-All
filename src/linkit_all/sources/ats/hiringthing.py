@@ -64,8 +64,7 @@ class HiringThing(Source):
         return list(found.values())
 
     async def posting(self, http: Http, url: str, host: str) -> JobStub | None:
-        if not await http.allowed(url):
-            return None
+        await http.allowed(url)
         resp = await http.get(url)
         if resp.status_code in (404, 410):
             return None

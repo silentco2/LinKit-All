@@ -2,10 +2,8 @@
 
 import asyncio
 import contextlib
-import re
-import string
 from typing import Any
-from urllib.parse import quote, urlsplit
+from urllib.parse import urlsplit
 
 import httpx
 from aiolimiter import AsyncLimiter
@@ -17,7 +15,7 @@ from tenacity import (
 )
 
 USER_AGENT = "LinKitAll/0.1 (personal job search tool)"
-ROBOTS_TOKEN = "LinKitAll"  # noqa: S105 - product token robots.txt groups are matched against
+ROBOTS_TOKEN = "LinKitAll"  # noqa: S105 - product token robots.txt Crawl-delay groups name
 # Requests per second for hosts that throttle hard; others get default_rate.
 SLOW_HOSTS = {
     "www.linkedin.com": 0.5,
@@ -28,64 +26,28 @@ SLOW_HOSTS = {
 SLOW_SUFFIXES = {".myworkdayjobs.com": 1.0}  # one host per Workday tenant
 
 
-_URL_SAFE = "!#$&'()*+,/:;=?@[]%~-._"
-_UNRESERVED = frozenset(string.ascii_letters + string.digits + "-._~")
-
-
-def _norm(s: str) -> str:
-    """Percent-encode non-ASCII, uppercase escapes, decode unreserved ones: comparable paths."""
-
-    def fix(m: re.Match[str]) -> str:
-        ch = chr(int(m[1], 16))
-        return ch if ch in _UNRESERVED else "%" + m[1].upper()
-
-    return re.sub(r"%([0-9A-Fa-f]{2})", fix, quote(s, safe=_URL_SAFE))
-
-
-class Robots:
-    """One host's robots.txt for one product token, per RFC 9309: every group naming the token
-    (else every `*` group) is merged; `*` and `$` work in paths; the longest matching rule wins,
-    Allow on a tie; `Crawl-delay` is the largest of the selected groups."""
-
-    def __init__(self, text: str, token: str = ROBOTS_TOKEN) -> None:
-        groups: list[tuple[set[str], list[tuple[bool, str]], list[float]]] = []
-        in_agents = False  # consecutive User-agent lines share one group
-        for raw in text.splitlines():
-            key, sep, value = raw.split("#", 1)[0].partition(":")
-            key, value = key.strip().lower(), value.strip()
-            if not sep:
-                continue
-            if key == "user-agent":
-                if not in_agents:
-                    groups.append((set(), [], []))
-                groups[-1][0].add(value.lower())
-                in_agents = True
-            elif key in ("allow", "disallow", "crawl-delay") and groups:
-                in_agents = False
-                if key == "crawl-delay":
-                    with contextlib.suppress(ValueError):
-                        groups[-1][2].append(float(value))
-                elif value:  # empty Disallow = allow everything; empty Allow = nothing
-                    groups[-1][1].append((key == "allow", value))
-        mine = [g for g in groups if token.lower() in g[0]] or [g for g in groups if "*" in g[0]]
-        self._rules: list[tuple[int, bool, re.Pattern[str]]] = []
-        for _, rules, _ in mine:
-            for allow, pattern in rules:
-                pat = _norm(pattern if pattern[0] in "/*" else "/" + pattern)
-                body = pat.removesuffix("$")
-                rx = ".*".join(re.escape(part) for part in body.split("*"))
-                self._rules.append(
-                    (len(pat), allow, re.compile(rx + (r"\Z" if body != pat else "")))
-                )
-        self.crawl_delay = max((d for g in mine for d in g[2] if d > 0), default=None)
-
-    def can_fetch(self, url: str) -> bool:
-        parts = urlsplit(url)
-        if parts.path == "/robots.txt":
-            return True
-        path = _norm((parts.path or "/") + (f"?{parts.query}" if parts.query else ""))
-        hits = [(n, allow) for n, allow, rx in self._rules if rx.match(path)]
-        return max(hits)[1] if hits else True  # (length, allow): longest wins, True beats False
+def crawl_delay(text: str, token: str = ROBOTS_TOKEN) -> float | None:
+    """Largest `Crawl-delay` among the robots.txt groups naming `token` (else the `*` groups).
+    Only pacing is read from robots.txt; Allow/Disallow rules are ignored."""
+    groups: list[tuple[set[str], list[float]]] = []
+    in_agents = False  # consecutive User-agent lines share one group
+    for raw in text.splitlines():
+        key, sep, value = raw.split("#", 1)[0].partition(":")
+        key, value = key.strip().lower(), value.strip()
+        if not sep:
+            continue
+        if key == "user-agent":
+            if not in_agents:
+                groups.append((set(), []))
+            groups[-1][0].add(value.lower())
+            in_agents = True
+        elif key in ("allow", "disallow", "crawl-delay") and groups:
+            in_agents = False
+            if key == "crawl-delay":
+                with contextlib.suppress(ValueError):
+                    groups[-1][1].append(float(value))
+    mine = [g for g in groups if token.lower() in g[0]] or [g for g in groups if "*" in g[0]]
+    return max((d for g in mine for d in g[1] if d > 0), default=None)
 
 
 class RetryableStatus(Exception):
@@ -107,7 +69,7 @@ class Http:
         self._default = default_rate
         self._attempts = attempts
         self._limiters: dict[str, AsyncLimiter] = {}
-        self._robots: dict[str, Robots] = {}  # per host, for this run only
+        self._robots_read: set[str] = set()  # hosts whose Crawl-delay was looked up this run
         self._robots_lock = asyncio.Lock()
 
     def _limiter(self, host: str) -> AsyncLimiter:
@@ -141,34 +103,28 @@ class Http:
         raise AssertionError("unreachable")  # pragma: no cover
 
     async def allowed(self, url: str) -> bool:
-        """May we fetch `url`? Reads the host's robots.txt once per run and applies its
-        Crawl-delay to that host. 4xx = no robots.txt = allowed; 5xx or network error = not."""
+        """Always True: robots.txt is not enforced. The first call per host reads its robots.txt
+        once, only to apply its Crawl-delay to that host's rate limit."""
         parts = urlsplit(url)
         host = parts.netloc.lower()
         async with self._robots_lock:
-            if host not in self._robots:
-                self._robots[host] = await self._fetch_robots(parts.scheme, host)
-        return self._robots[host].can_fetch(url)
+            if host not in self._robots_read:
+                self._robots_read.add(host)
+                await self._apply_crawl_delay(parts.scheme, host)
+        return True
 
-    async def _fetch_robots(self, scheme: str, host: str) -> Robots:
+    async def _apply_crawl_delay(self, scheme: str, host: str) -> None:
         name = host.split(":")[0]
-        text = "User-agent: *\nDisallow: /"  # 5xx or network error: no crawl
-        try:  # one attempt, no retries: a failing robots.txt means "do not crawl" this run
+        try:  # one attempt, no retries; any failure just leaves the rate unchanged
             async with self._limiter(name):
                 resp = await self.client.get(f"{scheme}://{host}/robots.txt")
-            if resp.status_code < 400:
-                text = resp.text
-            elif resp.status_code < 500 and resp.status_code != 429:
-                text = ""  # no robots.txt (or none for us): everything is allowed
         except httpx.HTTPError:
-            pass
-        robots = Robots(text)
-        if delay := robots.crawl_delay:
+            return
+        if resp.status_code < 400 and (delay := crawl_delay(resp.text)):
             rate = 1 / delay
             if rate < (self._rates.get(name) or self._default):
                 self._rates[name] = rate
                 self._limiters.pop(name, None)  # rebuilt with the slower rate
-        return robots
 
     async def get_json(self, url: str, **kwargs: Any) -> Any:
         resp = await self.get(url, **kwargs)

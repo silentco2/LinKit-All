@@ -51,9 +51,9 @@ class Breezy(Source):
         )
 
     async def fetch_details(self, http: Http, stub: JobStub) -> JobStub:
-        # The position page is HTML on the company's Breezy subdomain: honour its robots.txt.
-        if not _URL.search(stub.url) or not await http.allowed(stub.url):
+        if not _URL.search(stub.url):
             return stub
+        await http.allowed(stub.url)
         resp = await http.get(stub.url)
         if resp.status_code in (404, 410):
             return stub

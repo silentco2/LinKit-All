@@ -63,7 +63,7 @@ _SKIP_TAGS = {"option", "br", "path", "meta", "link", "hr", "source"}
 
 
 class BrowserError(Exception):
-    """The browser route is not available for this page (no Chrome, robots, load failure)."""
+    """The browser route is not available for this page (no Chrome, load failure)."""
 
 
 class Challenge(BrowserError):
@@ -428,8 +428,7 @@ class PageBrowser:
         self._hosts.clear()
 
     async def capture(self, http: Http, url: str) -> Capture:
-        if not await http.allowed(url):  # before every navigation
-            raise BrowserError(f"robots.txt does not allow fetching {url}")
+        await http.allowed(url)  # picks up the host's Crawl-delay before every navigation
         parts = urlsplit(url)
         host_lock = self._hosts.setdefault(parts.netloc.lower(), asyncio.Lock())
         async with host_lock, self._slots:

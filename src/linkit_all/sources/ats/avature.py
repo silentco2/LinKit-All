@@ -80,8 +80,7 @@ class Avature(Source):
         for page in range(start_page, (len(entries) + PAGE - 1) // PAGE):
             stubs = []
             for url, lastmod in entries[page * PAGE : (page + 1) * PAGE]:
-                if not await http.allowed(url):
-                    continue
+                await http.allowed(url)
                 resp = await http.get(url)
                 if resp.status_code in (404, 410):
                     continue
@@ -118,15 +117,14 @@ class Avature(Source):
         entries = await self._job_locs(http, index)
         if not entries:
             robots = f"https://{board}/robots.txt"
-            if await http.allowed(robots):
-                resp = await http.get(robots)
-                tried = {index}
-                for url in _ROBOTS_MAP.findall(resp.text if resp.status_code < 400 else ""):
-                    if urlsplit(url).netloc.lower() != board or url in tried:
-                        continue  # another host's portal, or one already tried
-                    tried.add(url)
-                    if entries := await self._job_locs(http, url):
-                        break
+            resp = await http.get(robots)
+            tried = {index}
+            for url in _ROBOTS_MAP.findall(resp.text if resp.status_code < 400 else ""):
+                if urlsplit(url).netloc.lower() != board or url in tried:
+                    continue  # another host's portal, or one already tried
+                tried.add(url)
+                if entries := await self._job_locs(http, url):
+                    break
         if not entries:
             raise Unsupported(f"no JobDetail postings in the sitemaps of {board}")
         return entries
@@ -149,8 +147,7 @@ class Avature(Source):
 
     @staticmethod
     async def _xml(http: Http, url: str) -> str | None:
-        if not await http.allowed(url):
-            raise Unsupported(f"robots.txt does not allow fetching {url}")
+        await http.allowed(url)
         resp = await http.get(url)
         if resp.status_code in (404, 410):
             return None

@@ -90,9 +90,8 @@ class PageUp(Source):
     @staticmethod
     async def envelope(http: Http, url: str) -> str:
         """The `results` fragment of an XHR answer. Without the header the site redirects to the
-        full HTML page. robots.txt is read first, as for any careers page."""
-        if not await http.allowed(url):
-            raise Unsupported(f"robots.txt does not allow fetching {url}")
+        full HTML page."""
+        await http.allowed(url)
         resp = await http.get(url, headers=XHR)
         resp.raise_for_status()
         return str(resp.json().get("results") or "")

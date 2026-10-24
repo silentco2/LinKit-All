@@ -36,7 +36,7 @@ NOT_SLUGS = frozenset(
 
 
 class DiscoveryError(Exception):
-    """Common Crawl could not be used (robots.txt, network, unexpected answer)."""
+    """Common Crawl could not be used (network, unexpected answer)."""
 
 
 @dataclass
@@ -64,17 +64,15 @@ async def _get(
 
 
 async def latest_index(http: Http, sleep: Callable[[float], Awaitable[None]]) -> str:
-    """CDX API root of the newest collection, after checking the index's robots.txt."""
-    if not await http.allowed(COLLINFO):
-        raise DiscoveryError(f"{CC_HOST} robots.txt does not allow {COLLINFO}")
+    """CDX API root of the newest collection. Same host as COLLINFO, so one allowed() call reads
+    the host's Crawl-delay for both requests."""
+    await http.allowed(COLLINFO)
     resp = await _get(http, COLLINFO, sleep)
     try:
         resp.raise_for_status()
         index = f"https://{CC_HOST}/{resp.json()[0]['id']}-index"
     except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError) as e:
         raise DiscoveryError(f"unexpected answer from {COLLINFO}: {e}") from e
-    if not await http.allowed(index):
-        raise DiscoveryError(f"{CC_HOST} robots.txt does not allow queries to {index}")
     return index
 
 

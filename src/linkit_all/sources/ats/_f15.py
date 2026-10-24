@@ -8,7 +8,6 @@ from typing import Any
 
 from linkit_all.sources.ats._f13 import get_page
 from linkit_all.sources.base import JobStub, from_iso, remote_from_text
-from linkit_all.sources.careers import Unsupported
 from linkit_all.sources.http import Http
 from linkit_all.sources.jsonld import job_postings, to_stub
 from linkit_all.sources.text import html_to_text
@@ -18,9 +17,8 @@ _PLACEHOLDER = re.compile(r"\bUNAVAILABLE\b,?\s*")  # iCIMS fills unknown addres
 
 
 async def fetch_html(http: Http, url: str) -> str | None:
-    """The page text (robots.txt checked first); None when the site says the page is gone."""
-    if not await http.allowed(url):
-        raise Unsupported(f"robots.txt does not allow fetching {url}")
+    """The page text; None when the site says the page is gone."""
+    await http.allowed(url)
     resp = await http.get(url)
     if resp.status_code in (404, 410):
         return None

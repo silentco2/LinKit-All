@@ -1,9 +1,7 @@
 import httpx
-import pytest
 
 from linkit_all.sources.ats.careerplug import CareerPlug, job_links
 from linkit_all.sources.ats_detector import detect
-from linkit_all.sources.careers import Unsupported
 
 BASE = "https://acme.careerplug.com/"
 
@@ -54,14 +52,6 @@ def test_resume_starts_at_the_given_page(search_pages, load_fixture):
     assert [p[0].extra["id"] for p in pages] == ["200"]
     assert "https://acme.careerplug.com/jobs?page=2" in calls
     assert "https://acme.careerplug.com/jobs" not in calls
-
-
-def test_robots_disallow_is_unsupported(search_pages):
-    def handler(req: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, text="User-agent: *\nDisallow: /jobs\n")
-
-    with pytest.raises(Unsupported):
-        search_pages(CareerPlug(), handler, board="acme")
 
 
 def test_url_patterns():

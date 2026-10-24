@@ -8,7 +8,6 @@ from urllib.parse import urljoin
 from selectolax.lexbor import LexborHTMLParser
 
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
-from linkit_all.sources.careers import Unsupported
 from linkit_all.sources.http import Http
 from linkit_all.sources.jsonld import job_postings, to_stub
 from linkit_all.sources.text import html_to_text
@@ -37,8 +36,7 @@ class CareerPlug(Source):
         seen: set[str] = set()
         for page in range(start_page + 1, MAX_PAGES + 1):
             list_url = f"https://{host}/jobs" + (f"?page={page}" if page > 1 else "")
-            if not await http.allowed(list_url):
-                raise Unsupported(f"robots.txt does not allow fetching {list_url}")
+            await http.allowed(list_url)
             resp = await http.get(list_url)
             resp.raise_for_status()
             fresh = [u for u in job_links(resp.text, f"https://{host}/") if u not in seen]
@@ -50,8 +48,9 @@ class CareerPlug(Source):
 
     async def posting(self, http: Http, url: str, board: str) -> JobStub | None:
         m = _JOB.search(url)
-        if m is None or not await http.allowed(url):
+        if m is None:
             return None
+        await http.allowed(url)
         resp = await http.get(url)
         if resp.status_code in (404, 410):
             return None

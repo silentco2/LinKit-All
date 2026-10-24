@@ -155,8 +155,7 @@ class Telegram(Source):
 
     async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:
         channel, cutoff = task.board, utcnow() - timedelta(days=MAX_AGE_DAYS)
-        if not await http.allowed(PREVIEW.format(channel=channel)):
-            raise Unsupported(f"robots.txt does not allow fetching the preview of {channel}")
+        await http.allowed(PREVIEW.format(channel=channel))
         before = 0
         for page in range(MAX_PAGES):
             posts = await self._preview(http, channel, before)

@@ -3,10 +3,11 @@
 Order: JSON-LD JobPosting on the page -> links that look like job pages (each read through
 JSON-LD, else an <h1> plus a plainly labelled location, else page text sent to the AI in
 batches of AI_BATCH pages per call when a provider is available, else the page title) ->
-"unsupported". Every fetch is checked against robots.txt first (Http.allowed). A page with no
-jobs in its HTML is then opened in Chrome when a provider is available (browser_extract: the AI
-picks JSON-LD, a background JSON response or CSS selectors, our code runs it). Pages that still
-give nothing, or answer with a bot challenge, are reported as unsupported, never worked around.
+"unsupported". robots.txt is not enforced; its Crawl-delay still slows the host (Http.allowed).
+A page with no jobs in its HTML is then opened in Chrome when a provider is available
+(browser_extract: the AI picks JSON-LD, a background JSON response or CSS selectors, our code
+runs it). Pages that still give nothing, or answer with a bot challenge, are reported as
+unsupported, never worked around.
 """
 
 import re
@@ -213,8 +214,7 @@ class Careers(Source):
         return done
 
     async def _fetch(self, http: Http, url: str) -> str:
-        if not await http.allowed(url):
-            raise Unsupported(f"robots.txt does not allow fetching {url}")
+        await http.allowed(url)
         resp = await http.get(url)
         title = LexborHTMLParser(resp.text).css_first("title")
         if is_challenge(resp.status_code, title.text() if title else "", resp.text):
@@ -246,7 +246,7 @@ class Careers(Source):
             seen.add(normalize_url(nxt))
             try:
                 html, url = await self._fetch(http, nxt), nxt
-            except Unsupported:  # robots or challenge on page 2+: keep what page 1 gave
+            except Unsupported:  # challenge on page 2+: keep what page 1 gave
                 break
         return list(links.values())[:limit]
 
@@ -254,8 +254,6 @@ class Careers(Source):
         self, http: Http, url: str, company: str
     ) -> JobStub | tuple[str, str, str, str] | None:
         """A finished stub, or (url, h1/title, text, location) for a page that needs the AI."""
-        if not await http.allowed(url):
-            return None
         try:
             html = await self._fetch(http, url)
         except (httpx.HTTPError, RetryableStatus):  # a dead link must not sink the page

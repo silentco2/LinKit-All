@@ -10,7 +10,6 @@ from lxml import etree
 
 from linkit_all.sources.ats._f13 import name_from_slug
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
-from linkit_all.sources.careers import Unsupported
 from linkit_all.sources.common import strip_html
 from linkit_all.sources.http import Http
 
@@ -28,8 +27,7 @@ class GetHired(Source):
         if start_page > 0:
             return
         url = FEED.format(board=task.board)
-        if not await http.allowed(url):
-            raise Unsupported(f"robots.txt does not allow fetching {url}")
+        await http.allowed(url)
         resp = await http.get(url)
         if resp.is_redirect or not str(resp.url).startswith(url):  # unknown tenant -> sign-in page
             raise ValueError(f"gethired: no career site for {task.board!r}")

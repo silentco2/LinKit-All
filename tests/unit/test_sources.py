@@ -609,22 +609,19 @@ def test_forasna_no_query_no_tasks() -> None:
     assert "forasna" in registry()
 
 
-def test_forasna_robots_honored() -> None:
-    # The wildcard Disallow /*uat* matches the "evaluation" slug, so it is never fetched.
+def test_forasna_robots_is_not_enforced() -> None:
+    # The wildcard Disallow /*uat* matches the "evaluation" slug; it is fetched anyway.
     extra = (
         "<url><loc>https://forasna.com/job/p/evaluation-manager-444999</loc>"
         "<lastmod>{recent}</lastmod></url>"
     )
     _, fetched = _forasna_run(["evaluation manager", "مشتريات"], extra_entries=extra)
-    assert "/job/p/evaluation-manager-444999" not in fetched
+    assert "/job/p/evaluation-manager-444999" in fetched
     assert any(p.endswith("-444100") for p in fetched)
-    # robots.txt that closes the job pages: sitemaps are read, pages are not.
-    pages, fetched = _forasna_run(["مشتريات"], robots=(200, "User-agent: *\nDisallow: /job/p/\n"))
-    assert pages == [] and not [p for p in fetched if p.startswith("/job/p/")]
-    # robots.txt that closes everything, or fails with a 5xx: nothing is fetched at all.
+    # robots.txt that closes everything, or fails with a 5xx: pages are fetched all the same.
     for robots in ((200, "User-agent: *\nDisallow: /\n"), (503, "")):
         pages, fetched = _forasna_run(["مشتريات"], robots=robots)
-        assert pages == [] and fetched == []
+        assert pages and [p for p in fetched if p.startswith("/job/p/")]
 
 
 def test_forasna_resumes_from_checkpoint_page(monkeypatch: pytest.MonkeyPatch) -> None:

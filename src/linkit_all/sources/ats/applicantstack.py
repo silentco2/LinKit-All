@@ -24,7 +24,7 @@ class ApplicantStack(Source):
     name = "applicantstack"
     kind = "ats"
     url_patterns = (re.compile(r"([\w-]+)\.applicantstack\.com", re.I),)
-    # robots.txt asks for Crawl-delay 5 per tenant host; Http applies it after reading robots.
+    # robots.txt asks for Crawl-delay 5 per tenant host; Http applies it after reading robots.txt.
 
     async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:
         board = task.board.lower()
@@ -32,8 +32,7 @@ class ApplicantStack(Source):
         seen: set[str] = set()
         for page in range(start_page + 1, MAX_PAGES + 1):
             url = LISTING.format(board=board) + (f"?pge={page}" if page > 1 else "")
-            if not await http.allowed(url):
-                raise Unsupported(f"robots.txt does not allow fetching {url}")
+            await http.allowed(url)
             resp = await http.get(url)
             resp.raise_for_status()
             rows, total = self.parse_listing(resp.text, board, company)
@@ -92,8 +91,9 @@ class ApplicantStack(Source):
 
     async def fetch_details(self, http: Http, stub: JobStub) -> JobStub:
         m = _URL.search(stub.url)
-        if not m or not await http.allowed(stub.url):
+        if not m:
             return stub
+        await http.allowed(stub.url)
         resp = await http.get(stub.url)
         resp.raise_for_status()
         postings = job_postings(resp.text)[:1]  # its own "title" is often null: keep the row's

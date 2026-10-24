@@ -44,7 +44,8 @@ async def company_tasks(
         source = "user"
         if found is None and entry.startswith("http"):
             try:  # a company's own careers page usually embeds its ATS
-                resp = await http.get(entry) if await http.allowed(entry) else None
+                await http.allowed(entry)
+                resp = await http.get(entry)
                 found = detect(resp.text) if resp and resp.status_code < 400 else None
                 source = "detected"
             except httpx.HTTPError:

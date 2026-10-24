@@ -50,7 +50,7 @@ def links(html: str, base: str, keep: Callable[[str], bool]) -> list[str]:
 
 
 async def page_text(http: Http, url: str) -> str | None:
-    """Robots-checked GET of one detail page; None when it is gone, refused or unreadable, so
+    """GET of one detail page; None when it is gone, refused or unreadable, so
     one bad posting never stops the board."""
     try:
         return (await get_page(http, url)).text

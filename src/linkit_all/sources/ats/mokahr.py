@@ -16,7 +16,6 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 from linkit_all.sources.ats._f13 import name_from_slug
 from linkit_all.sources.base import JobStub, Source, Task
-from linkit_all.sources.careers import Unsupported
 from linkit_all.sources.common import strip_html
 from linkit_all.sources.http import Http
 
@@ -26,8 +25,6 @@ MAX_PAGES = 100
 IV = b"de7c21ed8d6f50fe"  # published in every tenant page's init-data; the same on all of them
 _BOARD = re.compile(r"^(?:(r1)/)?([A-Za-z0-9_-]+)/([1-9][0-9]*)$")
 CHINA = timezone(timedelta(hours=8))  # tenants write zone-less timestamps in China time
-# Tenant sites app.mokahr.com's robots.txt excludes.
-DISALLOWED = frozenset({"lingjuninvest/46355", "shopee/74378"})
 # The row names a district only; the first four digits of its city code give the city in English.
 CITIES = {
     "1101": "Beijing", "3101": "Shanghai", "1201": "Tianjin", "5001": "Chongqing",
@@ -80,8 +77,6 @@ class MokaHR(Source):
         if not m:
             raise ValueError(f"mokahr: board {task.board!r} is not <orgId>/<siteId>")
         region, org, site = m.groups()
-        if f"{org}/{site}" in DISALLOWED:
-            raise Unsupported(f"mokahr: robots.txt excludes {org}/{site}")
         host = "hire-r1.mokahr.com" if region else "app.mokahr.com"
         company = name_from_slug(org)
         for page in range(start_page, MAX_PAGES):

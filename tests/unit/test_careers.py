@@ -93,14 +93,6 @@ def run_search(
     return asyncio.run(go()), http
 
 
-def mozilla_pages() -> dict[str, str]:
-    listing = (FIX / "mozilla_listings.html").read_text("utf-8")
-    pages = {"/en-US/careers/listings/": listing}
-    for job_id in range(1, 100):  # every job link serves the saved job page
-        pages[f"/en-US/careers/position/gh/{job_id}/"] = JOB.read_text("utf-8")
-    return pages
-
-
 def listing_with_jobs() -> tuple[dict[str, str], list[str]]:
     """The saved Mozilla listing, with job pages served for exactly the links it contains."""
     listing = (FIX / "mozilla_listings.html").read_text("utf-8")
@@ -243,26 +235,11 @@ def test_next_page_is_followed_and_capped() -> None:
     assert lists == ["/list", "/list?p=2", "/list?p=3", "/list?p=4"]  # MAX_LIST_PAGES
 
 
-def test_robots_disallow_fetches_nothing_else() -> None:
-    client, calls = site(mozilla_pages(), robots="User-agent: *\nDisallow: /\n")
-    with pytest.raises(Unsupported, match=r"robots\.txt"):
-        run_search(client, LISTING)
-    assert calls == ["/robots.txt"]
-
-
-def test_robots_group_for_our_token_and_server_errors() -> None:
-    robots = "User-agent: *\nAllow: /\n\nUser-agent: LinKitAll\nDisallow: /en-US/careers/\n"
-    client, calls = site(mozilla_pages(), robots=robots)
-    with pytest.raises(Unsupported):
-        run_search(client, LISTING)
-    assert calls == ["/robots.txt"]
-
-    def boom(req: httpx.Request) -> httpx.Response:
-        return httpx.Response(503)
-
-    http = Http(httpx.AsyncClient(transport=httpx.MockTransport(boom)), attempts=1)
-    assert asyncio.run(http.allowed("https://acme.test/jobs")) is False  # 5xx = do not crawl
-    assert asyncio.run(Http(site({})[0]).allowed("https://acme.test/jobs")) is True  # 404 = allow
+def test_robots_disallow_is_not_enforced() -> None:
+    pages, paths = listing_with_jobs()
+    client, calls = site(pages, robots="User-agent: *\nDisallow: /\n")
+    stubs, _ = run_search(client, LISTING)
+    assert len(stubs) == 6 and calls == ["/robots.txt", "/en-US/careers/listings/", *paths]
 
 
 def test_crawl_delay_lowers_the_host_rate() -> None:

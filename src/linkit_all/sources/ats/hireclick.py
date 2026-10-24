@@ -76,8 +76,9 @@ class HireClick(Source):
         yield stubs
 
     async def fetch_details(self, http: Http, stub: JobStub) -> JobStub:
-        if not _ID.search(stub.url) or not await http.allowed(stub.url):
+        if not _ID.search(stub.url):
             return stub
+        await http.allowed(stub.url)
         resp = await http.get(stub.url)
         # A taken-down posting redirects to /jobboard/ instead of answering 404.
         if resp.status_code in (404, 410) or resp.is_redirect or not _ID.search(str(resp.url)):

@@ -1,9 +1,7 @@
 import httpx
-import pytest
 
 from linkit_all.core.search import SearchConfig
 from linkit_all.sources import registry
-from linkit_all.sources.careers import Unsupported
 from linkit_all.sources.companies.briefhq import BriefHQ
 
 
@@ -26,14 +24,6 @@ def test_search_reads_the_inline_postings(search_pages, load_fixture):
     assert "Ship product with customers." in onsite.description
     assert remote.remote == "remote"
     assert remote.url == "https://briefhq.ai/careers/#senior-product-builder-engineering"
-
-
-def test_robots_disallow_is_unsupported(search_pages):
-    def handler(req: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, text="User-agent: *\nDisallow: /careers\n")
-
-    with pytest.raises(Unsupported):
-        search_pages(BriefHQ(), handler, board="https://briefhq.ai/careers/")
 
 
 def test_it_is_a_company_plugin_that_runs_only_when_enabled():

@@ -8,7 +8,6 @@ from aiolimiter import AsyncLimiter
 from linkit_all.sources.ats.hrmos import Hrmos, job_links
 from linkit_all.sources.ats_detector import detect
 from linkit_all.sources.base import JobStub
-from linkit_all.sources.careers import Unsupported
 from linkit_all.sources.http import Http
 
 
@@ -17,10 +16,10 @@ def _no_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(Http, "_limiter", lambda self, host: AsyncLimiter(1000, 1))
 
 
-def _serve(routes: dict[str, str], robots: str = "") -> Callable[[httpx.Request], httpx.Response]:
+def _serve(routes: dict[str, str]) -> Callable[[httpx.Request], httpx.Response]:
     def handler(req: httpx.Request) -> httpx.Response:
         if req.url.path == "/robots.txt":
-            return httpx.Response(200 if robots else 404, text=robots)
+            return httpx.Response(404)
         for key in sorted(routes, key=len, reverse=True):
             if key in str(req.url):
                 return httpx.Response(200, text=routes[key])
@@ -68,14 +67,6 @@ def test_job_links_keep_only_this_boards_jobs(load_fixture: Callable[[str], Any]
     html = load_fixture("hrmos/page1.html")
     assert job_links(html, "acme") == ["https://hrmos.co/pages/acme/jobs/job1"]
     assert job_links(html, "other") == []  # the bare listing, board root, deeper and foreign links
-
-
-def test_robots_refusal_stops_the_board(
-    search_pages: Callable[..., list[list[JobStub]]], load_fixture: Callable[[str], Any]
-) -> None:
-    handler = _serve(_routes(load_fixture), robots="User-agent: *\nDisallow: /pages/")
-    with pytest.raises(Unsupported):
-        search_pages(Hrmos(), handler, board="acme")
 
 
 def test_url_patterns() -> None:

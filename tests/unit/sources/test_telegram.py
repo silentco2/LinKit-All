@@ -265,21 +265,13 @@ def test_pages_back_until_old_and_resume(search_pages: Callable[..., Any]) -> No
     assert [[s.url for s in p] for p in resumed] == [["https://t.me/chan/20"], []]
 
 
-def test_empty_preview_is_unsupported_and_robots_respected(
+def test_empty_preview_is_unsupported(
     search_pages: Callable[..., Any],
 ) -> None:
     from linkit_all.sources.careers import Unsupported
 
     with pytest.raises(Unsupported, match="no public posts"):
         run(Telegram(), ok(page()), search_pages)
-
-    def blocked(req: httpx.Request) -> httpx.Response:
-        if req.url.path == "/robots.txt":
-            return httpx.Response(200, text="User-agent: *\nDisallow: /s/")
-        raise AssertionError("must not fetch")
-
-    with pytest.raises(Unsupported, match=r"robots\.txt"):
-        run(Telegram(), blocked, search_pages)
 
 
 def test_http_error_raises(search_pages: Callable[..., Any]) -> None:

@@ -8,7 +8,6 @@ from urllib.parse import urljoin, urlsplit
 from selectolax.lexbor import LexborHTMLParser
 
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
-from linkit_all.sources.careers import Unsupported
 from linkit_all.sources.http import Http
 from linkit_all.sources.jsonld import job_postings, to_stub
 from linkit_all.sources.text import html_to_text
@@ -35,8 +34,7 @@ class Betterteam(Source):
 
     async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:
         base = f"https://{task.board.lower()}.betterteam.com/"
-        if not await http.allowed(base):
-            raise Unsupported(f"robots.txt does not allow fetching {base}")
+        await http.allowed(base)
         resp = await http.get(base)
         resp.raise_for_status()
         # The root page renders the whole board, so a tenant larger than it holds is truncated.
@@ -49,8 +47,7 @@ class Betterteam(Source):
             yield stubs
 
     async def posting(self, http: Http, url: str, board: str) -> JobStub | None:
-        if not await http.allowed(url):
-            return None
+        await http.allowed(url)
         resp = await http.get(url)
         if resp.status_code in (404, 410):
             return None

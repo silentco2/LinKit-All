@@ -70,16 +70,6 @@ def test_page_without_the_table_is_not_a_listing(search_pages):
         search_pages(ApplicantStack(), handler, board="gone")
 
 
-def test_robots_disallow_is_respected(search_pages):
-    def handler(req: httpx.Request) -> httpx.Response:
-        if req.url.path == "/robots.txt":
-            return httpx.Response(200, text="User-agent: *\nDisallow: /x/\n")
-        raise AssertionError("must not fetch")
-
-    with pytest.raises(Unsupported):
-        search_pages(ApplicantStack(), handler, board="ozarkhealth")
-
-
 def test_fetch_details_reads_jobposting_but_keeps_the_row_title(fetch_details, load_fixture):
     def handler(req: httpx.Request) -> httpx.Response:
         if req.url.path == "/robots.txt":

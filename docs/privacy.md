@@ -52,7 +52,7 @@ runs them in an empty folder with their own tools off.
 
 LinKit All talks to: the job sources you list, the application sites you apply to, your AI
 provider, your mail server (only if you connect email), and Hugging Face, once, to
-download the ranking model. It also fetches `robots.txt` files. That is all.
+download the ranking model. It also fetches `robots.txt` files, only to read a site's `Crawl-delay`. That is all.
 
 **There is no telemetry, analytics or crash reporting.** These docs use system fonts and no
 trackers either.

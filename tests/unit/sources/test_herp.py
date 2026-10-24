@@ -8,7 +8,6 @@ from linkit_all.sources.ats import herp
 from linkit_all.sources.ats.herp import Herp
 from linkit_all.sources.ats_detector import detect
 from linkit_all.sources.base import JobStub
-from linkit_all.sources.careers import Unsupported
 
 
 def _handler(load_fixture: Callable[[str], Any], calls: list[str]) -> Any:
@@ -64,16 +63,6 @@ def test_chunks_and_resume(
     pages = search_pages(Herp(), _handler(load_fixture, calls), board="acme", start_page=1)
     assert [[s.title for s in p] for p in pages] == [["Frontend Engineer"]]
     assert "/v1/acme/job1" not in calls
-
-
-def test_robots_refusal_stops_the_board(
-    search_pages: Callable[..., list[list[JobStub]]],
-) -> None:
-    def handler(req: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, text="User-agent: *\nDisallow: /")
-
-    with pytest.raises(Unsupported):
-        search_pages(Herp(), handler, board="acme")
 
 
 def test_a_vanished_job_page_is_skipped(

@@ -9,7 +9,6 @@ from linkit_all.sources.ats import mokahr
 from linkit_all.sources.ats.mokahr import MokaHR, decrypt
 from linkit_all.sources.ats_detector import detect
 from linkit_all.sources.base import JobStub
-from linkit_all.sources.careers import Unsupported
 
 
 def test_plain_listing_on_the_international_host(
@@ -108,8 +107,6 @@ def test_api_error_and_bad_boards(search_pages: Callable[..., list[list[JobStub]
         search_pages(MokaHR(), lambda req: httpx.Response(200, json=refused), board="o/1")
     with pytest.raises(ValueError, match="not <orgId>/<siteId>"):
         search_pages(MokaHR(), lambda req: httpx.Response(200, json={}), board="just-a-slug")
-    with pytest.raises(Unsupported, match="robots"):  # a tenant the site's robots.txt excludes
-        search_pages(MokaHR(), lambda req: httpx.Response(200, json={}), board="shopee/74378")
 
 
 def test_url_patterns() -> None:

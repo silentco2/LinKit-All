@@ -3,7 +3,6 @@
 import httpx
 
 from linkit_all.sources.base import Remote
-from linkit_all.sources.careers import Unsupported
 from linkit_all.sources.http import Http
 
 _MODES: dict[str, Remote] = {
@@ -16,11 +15,9 @@ _MODES: dict[str, Remote] = {
 
 
 async def get_page(http: Http, url: str) -> httpx.Response:
-    """GET a human-facing page: robots.txt is checked first and a refusal stops the board with
-    a readable message. HTTP errors raise (the runner records them); nothing is retried around
-    a block."""
-    if not await http.allowed(url):
-        raise Unsupported(f"robots.txt does not allow fetching {url}")
+    """GET a human-facing page (the host's Crawl-delay applies). HTTP errors raise (the runner
+    records them); nothing is retried around a block."""
+    await http.allowed(url)
     resp = await http.get(url)
     resp.raise_for_status()
     return resp

@@ -122,8 +122,8 @@ src/linkit_all/
   providers/        LLMProvider.complete(prompt, schema); claude_cli, codex_cli, litellm_api;
                     prompts/*.j2 (json_output, json_retry, ping, tailor, score, answer,
                     cover_letter, ...)
-  sources/          base (JobStub, Task, Source), http (rate limits + retries + RFC 9309
-                    robots matcher), text (html->text, URL/company normalization, hash),
+  sources/          base (JobStub, Task, Source), http (rate limits + retries + Crawl-delay
+                    pacing), text (html->text, URL/company normalization, hash),
                     store (Deduper), runner (discover, enrich), ats_detector,
                     greenhouse, lever, ashby, smartrecruiters, recruitee, workable, workday
                     (cxs), jobspy_sites, wuzzuf, forasna, careers (generic careers pages),
@@ -193,9 +193,11 @@ tests/unit, tests/e2e (apply flow on a saved Lever form), tests/fixtures/<ats>/
 - **Applied only on proof**: a job becomes `applied` only when the ATS confirmation page
   text is seen (or the user says "applied by hand"). Otherwise: Action Center or `failed`
   with a reason. Screenshots before submit and after; a Playwright trace on failure.
-- **robots.txt**: `sources/http.py` implements RFC 9309 matching (`*` and `$` wildcards, merged
-  groups, Crawl-delay from every group; the stdlib parser misses these). Used by the careers,
-  Wuzzuf and Forasna sources. See the open question below for what is not covered.
+- **robots.txt is not enforced** (maintainer, 2026-10-25): no source refuses a URL because of it.
+  `Http.allowed(url)` always returns True; on the first request to a host it reads robots.txt
+  once, only to apply that host's `Crawl-delay` (`sources/http.py`). Per-host rate limits stay.
+  Bot protection is never bypassed: no TLS-fingerprint spoofing, challenge-solving browsers,
+  rotating proxies or fake crawler/app user agents.
 - **CAPTCHAs are never solved** or bypassed (CapSolver dropped); they park for the user, who
   solves them in the open browser, then Retry. Never defeat bot challenges or disguise a
   client (Naukrigulf, SmartRecruiters).
@@ -235,10 +237,8 @@ tests/unit, tests/e2e (apply flow on a saved Lever form), tests/fixtures/<ats>/
 
 ## Resolved: robots.txt scope
 
-Maintainer decision (2026-10-16): the public ATS JSON APIs (Greenhouse, Lever, Ashby,
-SmartRecruiters, Recruitee, Workable, Workday cxs) and the python-jobspy sites stay exempt
-from robots.txt checks; careers pages, Wuzzuf and Forasna are robots-checked. Recorded in
-CLAUDE.md §5.2 — don't add or remove checks without asking.
+Maintainer decision (2026-10-25, replaces the 2026-10-16 one): robots.txt is not enforced
+anywhere; Crawl-delay pacing and per-host rate limits stay. Recorded in CLAUDE.md §5.2.
 
 ## Next steps
 

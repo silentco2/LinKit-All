@@ -1,6 +1,6 @@
-"""Forasna (Egypt, Saudi Arabia; mostly Arabic) via its published sitemaps, as robots.txt allows.
+"""Forasna (Egypt, Saudi Arabia; mostly Arabic) via its published sitemaps.
 
-robots.txt allows everything except search/filter URLs and asks for Crawl-delay: 10, so this
+robots.txt asks for Crawl-delay: 10 (search/filter URLs are not used), so this
 reads the numbered sitemaps, keeps recent /job/p/ URLs whose slug contains every word of one of
 your queries, and fetches those pages one every 10 s (see SLOW_HOSTS). Each page carries a
 JobPosting. Slugs are mostly Arabic: use Arabic query words (e.g. "محاسب") to match Arabic
@@ -59,7 +59,7 @@ class Forasna(Source):
         # others are category and company pages, ~10 MB each), so all are read: ~1 request per
         # 10 s. Remember the job sitemap's name between runs if this gets slow.
         for sitemap in await self._sitemaps(http):
-            if not await _allowed(http, sitemap):
+            if urlsplit(sitemap).query:  # sitemaps and job pages never need a query string
                 continue
             text = (await http.get(sitemap)).text
             for entry in _URL.findall(text):
@@ -71,15 +71,8 @@ class Forasna(Source):
                 slug = norm(unquote(urlsplit(loc.group(1)).path.rsplit("/", 1)[-1])).split()
                 if any(all(word in slug for word in q) for q in queries):
                     urls.add(loc.group(1))
-        return [u for u in sorted(urls) if await _allowed(http, u)]  # stable page order
+        return [u for u in sorted(urls) if not urlsplit(u).query]  # stable page order
 
     async def _sitemaps(self, http: Http) -> list[str]:
-        if not await _allowed(http, SITEMAP):
-            return []
         index = (await http.get(SITEMAP)).text
         return [u for u in _LOC.findall(index) if _JOB_SITEMAP.search(u)]
-
-
-async def _allowed(http: Http, url: str) -> bool:
-    # Product choice, not a robots rule: sitemaps and job pages never need a query string.
-    return not urlsplit(url).query and await http.allowed(url)

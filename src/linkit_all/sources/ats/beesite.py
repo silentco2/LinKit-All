@@ -103,9 +103,9 @@ class BeeSite(Source):
         )
 
     async def fetch_details(self, http: Http, stub: JobStub) -> JobStub:
-        # The page is on the employer's own domain, not the BeeSite host: check its robots.txt.
-        if stub.description or not await http.allowed(stub.url):
+        if stub.description:
             return stub
+        await http.allowed(stub.url)  # the employer's own host: pick up its Crawl-delay
         resp = await http.get(stub.url)
         resp.raise_for_status()
         return stub.model_copy(update={"description": body_from_page(resp.text)})

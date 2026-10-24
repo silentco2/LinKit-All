@@ -14,7 +14,6 @@ from linkit_all.sources.ats._f12 import name_from_slug
 from linkit_all.sources.ats._f16 import page_text, when
 from linkit_all.sources.ats._f17 import XHR, hydrate, post_form, text_of
 from linkit_all.sources.base import JobStub, Remote, Source, Task, remote_from_text
-from linkit_all.sources.careers import Unsupported
 from linkit_all.sources.http import Http
 from linkit_all.sources.jsonld import job_postings, to_stub
 from linkit_all.sources.text import html_to_text
@@ -115,8 +114,7 @@ class Pandape(Source):
         if not _BOARD.match(board):
             raise ValueError(f"pandape: board {task.board!r} is not a tenant label")
         site = "https://" + HOST.format(board=board)
-        if not await http.allowed(f"{site}/ListVacancies"):
-            raise Unsupported(f"robots.txt does not allow fetching {site}/ListVacancies")
+        await http.allowed(f"{site}/ListVacancies")
         cards = await self.cards(http, site, board)
         read = 0
 
