@@ -3,6 +3,7 @@
 import asyncio
 import shutil
 from datetime import date
+from functools import partial
 from pathlib import Path
 from typing import Any, Literal
 
@@ -20,6 +21,7 @@ from linkit_all.apply.assist import AnswerBank
 from linkit_all.apply.browser import UserBrowser, fresh_live_shot, profile_dir
 from linkit_all.apply.email_verify import EmailLoginError, check_login, credentials
 from linkit_all.apply.vault import Vault, VaultError, VaultLocked, WrongPassphrase
+from linkit_all.core.api_keys import KNOWN, delete_keys, get_keys, set_keys
 from linkit_all.core.config import Settings
 from linkit_all.core.models import (
     ActionItem,
@@ -915,3 +917,63 @@ def disconnect_email(request: Request) -> None:
                 vault.delete(e.id)
 
     _vault_errors(drop)
+
+
+# --- API keys (job-aggregator APIs; stored in the vault) ------------------------
+# Values travel in the PUT body only. Responses carry the saved non-secret fields and, for secret
+# ones, only the last 4 characters.
+
+
+def _mask(value: str) -> str:
+    return "••••" + value[-4:] if len(value) > 8 else "••••"
+
+
+@router.get("/keys")
+def list_keys(request: Request) -> list[dict[str, Any]]:
+    vault = _vault(request)
+    out = []
+    for spec in KNOWN.values():
+        saved = _vault_errors(partial(get_keys, vault, spec.name))
+        out.append(
+            {
+                "name": spec.name,
+                "label": spec.label,
+                "fields": [
+                    {"name": f.name, "label": f.label, "secret": f.secret} for f in spec.fields
+                ],
+                "signup_url": spec.signup_url,
+                "note": spec.note,
+                "configured": saved is not None,
+                "current": {
+                    f.name: _mask(saved[f.name]) if f.secret else saved[f.name]
+                    for f in spec.fields
+                    if saved and f.name in saved
+                },
+            }
+        )
+    return out
+
+
+@router.put("/keys/{name}")
+def put_keys(request: Request, name: str, body: dict[str, str]) -> list[dict[str, Any]]:
+    vault = _unlocked_vault(request)
+    if name not in KNOWN:
+        raise HTTPException(422, "Unknown provider")
+    # A blank field keeps its saved value, so one field can change without retyping the rest.
+    values = {
+        **(_vault_errors(lambda: get_keys(vault, name)) or {}),
+        **{k: v for k, v in body.items() if v.strip()},
+    }
+    try:
+        _vault_errors(lambda: set_keys(vault, name, values))
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    return list_keys(request)
+
+
+@router.delete("/keys/{name}", status_code=204)
+def remove_keys(request: Request, name: str) -> None:
+    vault = _unlocked_vault(request)
+    if name not in KNOWN:
+        raise HTTPException(422, "Unknown provider")
+    _vault_errors(lambda: delete_keys(vault, name))

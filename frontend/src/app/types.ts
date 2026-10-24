@@ -259,6 +259,17 @@ export interface EmailState {
   vault: { initialized: boolean; unlocked: boolean };
 }
 
+export interface ApiKeyProvider {
+  name: string;
+  label: string;
+  fields: { name: string; label: string; secret: boolean }[];
+  signup_url: string;
+  note: string;
+  configured: boolean;
+  /** Saved non-secret values; secret fields appear only as a masked hint. */
+  current: Partial<Record<string, string>>;
+}
+
 export interface OutcomeRow {
   name: string;
   found: number;

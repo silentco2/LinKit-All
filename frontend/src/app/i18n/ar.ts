@@ -53,6 +53,7 @@ export const ar: Record<string, string> = {
   'setup.step.apply': 'التقديم',
   'setup.step.vault': 'الخزنة',
   'setup.step.email': 'البريد الإلكتروني',
+  'setup.step.keys': 'مفاتيح API',
   'setup.step.finish': 'الإنهاء',
 
   // Setup: profile and CV
@@ -293,6 +294,18 @@ export const ar: Record<string, string> = {
   'setup.email.connectedMsg': 'تم ربط البريد الإلكتروني: {user}',
   'setup.email.works': 'اتصال البريد الإلكتروني يعمل',
   'setup.email.disconnected': 'تم قطع اتصال البريد الإلكتروني',
+
+  // Setup: API keys
+  'setup.keys.title': 'مفاتيح API',
+  'setup.keys.intro': 'تشارك هذه المواقع إعلانات وظائفها عبر واجهة API مجانية. سجّل في الموقع والصق المفتاح هنا ليتمكن LinKit من البحث فيه أيضًا. تُحفظ المفاتيح مشفّرة في الخزنة، ولا تظهر كاملة مرة أخرى، ولا تُرسل إلا إلى الموقع الذي تخصه. كل بطاقة اختيارية.',
+  'setup.keys.needVault': 'افتح الخزنة أولًا (الخطوة 7). تُحفظ فيها مفاتيحك مشفّرة.',
+  'setup.keys.configured': 'تم الإعداد',
+  'setup.keys.signup': 'احصل على مفتاح مجاني',
+  'setup.keys.keepHint': 'اتركه فارغًا للإبقاء على القيمة المحفوظة',
+  'setup.keys.save': 'حفظ',
+  'setup.keys.remove': 'إزالة',
+  'setup.keys.saved': 'تم حفظ مفتاح {name}',
+  'setup.keys.removed': 'تمت إزالة مفتاح {name}',
 
   // Setup: finish
   'setup.finish.title': 'هل أنت جاهز؟',

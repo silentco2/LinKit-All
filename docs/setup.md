@@ -127,7 +127,18 @@ Under **Advanced** you can change the IMAP server (default `imap.gmail.com`). On
 has been tested. Another IMAP provider that accepts app passwords may work if you enter its
 server. Outlook needs a different sign-in method that is not built yet.
 
-## 9. Finish
+## 9. API keys
+
+Some job sites share their listings through a free API: Adzuna (app ID and app key), Reed
+(API key), USAJobs (API key and the email you registered with) and WhatJobs (a publisher ID
+per country, written `gb=123, us=456`). Register on each site with the link on its card and
+paste the key. It is optional, and every card is separate.
+
+Unlock the vault first (step 7). The keys are kept there, encrypted, and are never shown in
+full again: a saved secret appears only as its last 4 characters. To change one field, leave
+the other secret fields blank and they keep their saved value. **Remove** deletes the key.
+
+## 10. Finish
 
 A checklist shows what is ready: profile, CV, AI provider, a search or company, and
 LibreOffice. **Find jobs now** runs discover, enrich, rank and score. Nothing is applied

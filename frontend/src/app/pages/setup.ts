@@ -3,10 +3,10 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Api } from '../api';
 import { I18n, TPipe } from '../i18n';
-import { ApplicationAnswers, EmailState, expandQueries, lines, Profile, Provider, SearchConfig, Segment, Status, unlines, WorkMode } from '../types';
+import { ApiKeyProvider, ApplicationAnswers, EmailState, expandQueries, lines, Profile, Provider, SearchConfig, Segment, Status, unlines, WorkMode } from '../types';
 
 type LocalServer = 'ollama' | 'lmstudio';
-type Step = 'profile' | 'ai' | 'search' | 'filters' | 'answers' | 'apply' | 'vault' | 'email' | 'finish';
+type Step = 'profile' | 'ai' | 'search' | 'filters' | 'answers' | 'apply' | 'vault' | 'email' | 'keys' | 'finish';
 type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_disability';
 
 // Labels in the arrays below are i18n keys; the template runs them through the `t` pipe.
@@ -463,6 +463,42 @@ type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_
             </section>
           }
 
+          @case ('keys') {
+            <section class="card space-y-4">
+              <h2>{{ 'setup.keys.title' | t }} <span class="text-sm font-normal text-slate-500">({{ 'common.optional' | t }})</span></h2>
+              <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'setup.keys.intro' | t }}</p>
+              @if (!status()?.vault?.unlocked) {
+                <div class="alert alert-info" role="status">{{ 'setup.keys.needVault' | t }}</div>
+              }
+              <div class="grid gap-4 lg:grid-cols-2">
+                @for (p of keys(); track p.name) {
+                  <form class="card space-y-3" (ngSubmit)="keySave(p)">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <h3 class="font-semibold">{{ p.label }}</h3>
+                      @if (p.configured) { <span class="badge tier-high">{{ 'setup.keys.configured' | t }}</span> }
+                    </div>
+                    <p class="hint">{{ p.note }}</p>
+                    @for (f of p.fields; track f.name) {
+                      <div>
+                        <label class="label" [for]="'k-' + p.name + '-' + f.name">{{ f.label }}</label>
+                        <input [id]="'k-' + p.name + '-' + f.name" dir="ltr" class="input" [name]="p.name + '-' + f.name" [(ngModel)]="keyVals[p.name][f.name]"
+                          [type]="f.secret ? 'password' : 'text'" autocomplete="off" [placeholder]="p.configured && f.secret ? (p.current[f.name] ?? '') : ''">
+                        @if (p.configured && f.secret) { <p class="hint">{{ 'setup.keys.keepHint' | t }}</p> }
+                      </div>
+                    }
+                    <div class="flex flex-wrap items-center gap-3">
+                      <button type="submit" class="btn btn-primary" [disabled]="busy() || !status()?.vault?.unlocked || !keyReady(p)">{{ 'setup.keys.save' | t }}</button>
+                      @if (p.configured) {
+                        <button type="button" class="btn" (click)="keyRemove(p)" [disabled]="busy() || !status()?.vault?.unlocked">{{ 'setup.keys.remove' | t }}</button>
+                      }
+                      <a class="text-sm underline" [href]="p.signup_url" target="_blank" rel="noopener">{{ 'setup.keys.signup' | t }}</a>
+                    </div>
+                  </form>
+                }
+              </div>
+            </section>
+          }
+
           @case ('finish') {
             <section class="card space-y-4">
               <h2>{{ 'setup.finish.title' | t }}</h2>
@@ -494,6 +530,8 @@ export class SetupPage implements OnInit {
   protected readonly segments = signal<Segment[]>([]);
   protected readonly status = signal<Status | null>(null);
   protected readonly email = signal<EmailState | null>(null);
+  protected readonly keys = signal<ApiKeyProvider[]>([]);
+  protected keyVals: Record<string, Record<string, string>> = {};
   protected readonly available = signal<Partial<Record<Provider, boolean>>>({});
   protected profile: Profile | null = null;
   protected cfg: SearchConfig | null = null;
@@ -521,6 +559,7 @@ export class SetupPage implements OnInit {
     { id: 'apply', label: 'setup.step.apply' },
     { id: 'vault', label: 'setup.step.vault' },
     { id: 'email', label: 'setup.step.email' },
+    { id: 'keys', label: 'setup.step.keys' },
     { id: 'finish', label: 'setup.step.finish' },
   ];
   protected readonly providers: { id: Provider | 'local'; label: string; hint: string }[] = [
@@ -562,6 +601,7 @@ export class SetupPage implements OnInit {
     this.cfg = cfg;
     this.ans = ans;
     this.setEmail(email);
+    this.setKeys(await this.api.get<ApiKeyProvider[]>('/keys'));
     this.status.set(status);
     this.available.set(ai.available);
     if (profile.cv_name) this.api.get<Segment[]>('/profile/cv/segments').then((s) => this.segments.set(s)).catch(() => {});
@@ -597,7 +637,7 @@ export class SetupPage implements OnInit {
   done(step: Step): boolean {
     const s = this.status();
     if (!s) return false;
-    return { profile: s.profile_ready && s.cv_ready, ai: s.ai_ready, search: s.search_ready, filters: s.search_ready, answers: false, apply: false, vault: s.vault.unlocked, email: !!this.email()?.connected, finish: false }[step];
+    return { profile: s.profile_ready && s.cv_ready, ai: s.ai_ready, search: s.search_ready, filters: s.search_ready, answers: false, apply: false, vault: s.vault.unlocked, email: !!this.email()?.connected, keys: this.keys().some((k) => k.configured), finish: false }[step];
   }
 
   setLive(live: boolean): void {
@@ -689,6 +729,7 @@ export class SetupPage implements OnInit {
       if (create) await this.api.post('/vault/create', { passphrase: pass });
       await this.api.post('/vault/unlock', { passphrase: pass, remember: this.vremember });
       this.vpass = this.vconfirm = '';
+      this.setKeys(await this.api.get<ApiKeyProvider[]>('/keys')); // saved keys are only visible once unlocked
       return this.i18n.t(create ? 'setup.vault.created' : 'setup.vault.unlockedMsg');
     });
   }
@@ -724,6 +765,32 @@ export class SetupPage implements OnInit {
       await this.api.delete('/email');
       this.setEmail(await this.api.get<EmailState>('/email'));
       return this.i18n.t('setup.email.disconnected');
+    });
+  }
+
+  /** Secret inputs start empty (the server only ever sends a masked hint); other fields show the saved value. */
+  private setKeys(list: ApiKeyProvider[]): void {
+    this.keys.set(list);
+    this.keyVals = Object.fromEntries(list.map((p) => [p.name, Object.fromEntries(p.fields.map((f) => [f.name, f.secret ? '' : (p.current[f.name] ?? '')]))]));
+  }
+
+  /** A configured provider keeps its saved secrets when their inputs are left blank. */
+  keyReady(p: ApiKeyProvider): boolean {
+    return p.fields.every((f) => !!this.keyVals[p.name][f.name].trim() || (p.configured && f.secret));
+  }
+
+  keySave(p: ApiKeyProvider): Promise<void> {
+    return this.run(async () => {
+      this.setKeys(await this.api.put<ApiKeyProvider[]>(`/keys/${p.name}`, this.keyVals[p.name]));
+      return this.i18n.t('setup.keys.saved', { name: p.label });
+    });
+  }
+
+  keyRemove(p: ApiKeyProvider): Promise<void> {
+    return this.run(async () => {
+      await this.api.delete(`/keys/${p.name}`);
+      this.setKeys(await this.api.get<ApiKeyProvider[]>('/keys'));
+      return this.i18n.t('setup.keys.removed', { name: p.label });
     });
   }
 

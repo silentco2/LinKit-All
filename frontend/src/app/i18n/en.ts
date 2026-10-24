@@ -53,6 +53,7 @@ export const en: Record<string, string> = {
   'setup.step.apply': 'Applying',
   'setup.step.vault': 'Vault',
   'setup.step.email': 'Email',
+  'setup.step.keys': 'API keys',
   'setup.step.finish': 'Finish',
 
   // Setup: profile and CV
@@ -293,6 +294,18 @@ export const en: Record<string, string> = {
   'setup.email.connectedMsg': 'Email connected: {user}',
   'setup.email.works': 'The email connection works',
   'setup.email.disconnected': 'Email disconnected',
+
+  // Setup: API keys
+  'setup.keys.title': 'API keys',
+  'setup.keys.intro': 'These job sites share their listings through a free API. Register on the site, paste the key here, and LinKit can search it too. Keys are stored encrypted in the vault, never shown again in full, and only sent to the site they belong to. Every card is optional.',
+  'setup.keys.needVault': 'Unlock the vault first (step 7). Your keys are kept there, encrypted.',
+  'setup.keys.configured': 'Configured',
+  'setup.keys.signup': 'Get a free key',
+  'setup.keys.keepHint': 'Leave blank to keep the saved value',
+  'setup.keys.save': 'Save',
+  'setup.keys.remove': 'Remove',
+  'setup.keys.saved': 'Saved the {name} key',
+  'setup.keys.removed': 'Removed the {name} key',
 
   // Setup: finish
   'setup.finish.title': 'Ready?',
