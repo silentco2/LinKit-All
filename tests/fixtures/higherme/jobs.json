@@ -1,0 +1,220 @@
+{
+ "data": [
+  {
+   "id": "607afbaf44f91",
+   "attributes": {
+    "title": "Server",
+    "full_time": true,
+    "part_time": true,
+    "about": "<p>Modern American Eatery... welcome to CAMP in Greenville, SC! </p><p>We are now hiring hospitable, outgoing and passionate individuals who are dedicated to guest service. The chef-driven restaurant will offer Modern American fare in a cool, comfortable and lively setting with outdoor patio service and a rooftop bar. Table 301 is proud of the company culture it’s built over the past 20+ years.</p>",
+    "summary": "<p>Camp, is seeking enthusiastic <strong>server </strong>candidates to join our team!</p><p><br></p><p>Are you interested in working in the hospitality industry? Do you enjoy building relationships, and getting to know people? We have just the right place for you!</p><p><br></p><p>Table 301 is now hiring hospitable, outgoing and passionate individuals who are dedicated to guest service. Table 301 restaurants are great places to dine partly because they are great places to work. We work hard. We focus all of our energies on delighting our guests, and we have fun doing it. Over the past 20+ years, we’ve built a company culture we’re proud of and would love to add more people to our team who are as committed to hospitality as we are.</p><p><br></p><p>Table 301 offers excellent benefits including:</p><ul><li><strong>Competitive Wages</strong></li><li><strong>Health Benefits</strong>&nbsp;(including medical and optional dental and vision)</li><li><strong>Matching 401k Program</strong></li><li><strong>Paid Time Off</strong></li><li><strong>35% dining discount</strong></li><li><strong>Financial Planning Education</strong></li><li><strong>Employee Assistance Programs</strong></li><li>And more…</li></ul>",
+    "requirements": [
+     "Team player",
+     "Reliable and responsible",
+     "Intermediate to advanced knowledge, and comprehension on beer, wine, and spirits preferred",
+     "Minimum 2 years of experience in a high volume environment",
+     "Minimum 2 years of experience in a fine dining environment",
+     "Must have flexibility and availability to work a combination of am, pm, and weekend shifts",
+     "ServSafe Certification preferred",
+     "Great interpersonal skills",
+     "Team player with a \"Go-Giver\" attitude"
+    ],
+    "salary": {
+     "min": null,
+     "max": null,
+     "type": "hourly"
+    },
+    "status": "published",
+    "updated_at": "2026-10-20T07:16:09+00:00"
+   },
+   "relations": {
+    "location": {
+     "id": "6078985786d16",
+     "attributes": {
+      "nickname": "Camp",
+      "city": "Greenville",
+      "state": {
+       "name": "South Carolina",
+       "short": "SC"
+      },
+      "country": {
+       "name": "United States",
+       "short": "US"
+      }
+     },
+     "relations": {
+      "brand": {
+       "id": "6078977d8dfec",
+       "attributes": {
+        "name": "Camp"
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "id": "607afd6ed39c1",
+   "attributes": {
+    "title": "Bartender",
+    "full_time": true,
+    "part_time": true,
+    "about": "<p>Modern American Eatery.</p><p>Camp, in Greenville, SC is now hiring hospitable, outgoing and passionate individuals who are dedicated to guest service. The chef-driven restaurant offers Modern American fare in a cool, comfortable and lively setting with outdoor patio service and a rooftop bar. Table 301 is proud of the company culture it’s built over the past 20+ years.</p>",
+    "summary": "<p>Camp, is seeking enthusiastic <strong>bartender </strong>candidates to join our team!</p><p><br></p><p>Are you interested in working in the hospitality industry? Do you enjoy building relationships, and getting to know people? We have just the right place for you!</p><p><br></p><p>Table 301 is now hiring hospitable, outgoing and passionate individuals who are dedicated to guest service. Table 301 restaurants are great places to dine partly because they are great places to work. We work hard. We focus all of our energies on delighting our guests, and we have fun doing it. Over the past 20+ years, we’ve built a company culture we’re proud of and would love to add more people to our team who are as committed to hospitality as we are.</p><p><br></p><p>Table 301 offers excellent benefits including:</p><ul><li><strong>Competitive Wages</strong></li><li><strong>Health Benefits</strong>&nbsp;(including medical and optional dental and vision)</li><li><strong>Matching 401k Program</strong></li><li><strong>Paid Time Off</strong></li><li><strong>35% dining discount</strong></li><li><strong>Financial Planning Education</strong></li><li><strong>Employee Assistance Programs</strong></li><li>And more…</li></ul>",
+    "requirements": [
+     "Minimum 1 year of experience in bartending",
+     "Minimum 1 year of experience in fine dining/high volume environment",
+     "Positive attitude",
+     "Flexibility and availability to work nights and weekends",
+     "Must be reliable and responsible",
+     "Team player with a \"Go-Giver\" attitude",
+     "Works well in high volume/high stress environments",
+     "Great interpersonal skills"
+    ],
+    "salary": {
+     "min": 52000,
+     "max": 60000,
+     "type": "salary"
+    },
+    "status": "published",
+    "updated_at": "2026-10-17T06:35:23+00:00"
+   },
+   "relations": {
+    "location": {
+     "id": "6078985786d16",
+     "attributes": {
+      "nickname": "Camp",
+      "city": "Greenville",
+      "state": {
+       "name": "South Carolina",
+       "short": "SC"
+      },
+      "country": {
+       "name": "United States",
+       "short": "US"
+      }
+     },
+     "relations": {
+      "brand": {
+       "id": "6078977d8dfec",
+       "attributes": {
+        "name": "Camp"
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "id": "607afe6ff239b",
+   "attributes": {
+    "title": "Host",
+    "full_time": true,
+    "part_time": true,
+    "about": "<p>Modern American Eatery.</p><p><span style=\"color: black;\">A new restaurant is coming to downtown Greenville, SC! Table 301 is now hiring hospitable, outgoing and passionate individuals who are dedicated to guest service to open its newest venture located in Camperdown Plaza. The chef-driven restaurant will offer Modern American fare in a cool, comfortable and lively setting with outdoor patio service and a rooftop bar. Table 301 is proud of the company culture it’s built over the past 20+ years. </span></p>",
+    "summary": "<p>Table 301 restaurant groups newest restaurant, Camp, is seeking enthusiastic <strong>host </strong>candidates to join our team!</p><p>&nbsp;</p><p>Are you interested in working in the hospitality industry? Do you enjoy building relationships, and getting to know people? We have just the right place for you!</p><p>&nbsp;</p><p>Table 301 is now hiring hospitable, outgoing and passionate individuals who are dedicated to guest service. Table 301 restaurants are great places to dine partly because they are great places to work. We work hard. We focus all of our energies on delighting our guests, and we have fun doing it. Over the past 20+ years, we’ve built a company culture we’re proud of and would love to add more people to our team who are as committed to hospitality as we are.</p><p>&nbsp;</p><p>Table 301 offers excellent benefits including:</p><ul><li><strong>Competitive Wages</strong></li><li><strong>Health Benefits</strong>&nbsp;(including medical and optional dental and vision)</li><li><strong>Matching 401k Program</strong></li><li><strong>Paid Time Off</strong></li><li><strong>35% dining discount</strong></li><li><strong>Financial Planning Education</strong></li><li><strong>Employee Assistance Programs</strong></li><li>And more…</li></ul>",
+    "requirements": [
+     "Excellent communication skills (oral, and written)",
+     "Strong organizational skills and ability to multi-task",
+     "Must be a team player, and work well with others",
+     "Positive attitude",
+     "Maintain punctual attendance",
+     "Reliable",
+     "Must have availability to work AM/PM and weekend shifts",
+     "Comply with a dress code that prohibits displaying tattoos, and unnatural hair colors, such as blue or pink",
+     "Piercings are limited to earrings only. No facial piercings please."
+    ],
+    "salary": {
+     "min": null,
+     "max": null,
+     "type": "hourly"
+    },
+    "status": "published",
+    "updated_at": "2026-10-17T01:03:30+00:00"
+   },
+   "relations": {
+    "location": {
+     "id": "6078985786d16",
+     "attributes": {
+      "nickname": "Camp",
+      "city": "Greenville",
+      "state": {
+       "name": "South Carolina",
+       "short": "SC"
+      },
+      "country": {
+       "name": "United States",
+       "short": "US"
+      }
+     },
+     "relations": {
+      "brand": {
+       "id": "6078977d8dfec",
+       "attributes": {
+        "name": "Camp"
+       }
+      }
+     }
+    }
+   }
+  },
+  {
+   "id": "draftxx",
+   "attributes": {
+    "title": "Hidden Draft",
+    "full_time": true,
+    "part_time": true,
+    "about": "<p>Modern American Eatery... welcome to CAMP in Greenville, SC! </p><p>We are now hiring hospitable, outgoing and passionate individuals who are dedicated to guest service. The chef-driven restaurant will offer Modern American fare in a cool, comfortable and lively setting with outdoor patio service and a rooftop bar. Table 301 is proud of the company culture it’s built over the past 20+ years.</p>",
+    "summary": "<p>Camp, is seeking enthusiastic <strong>server </strong>candidates to join our team!</p><p><br></p><p>Are you interested in working in the hospitality industry? Do you enjoy building relationships, and getting to know people? We have just the right place for you!</p><p><br></p><p>Table 301 is now hiring hospitable, outgoing and passionate individuals who are dedicated to guest service. Table 301 restaurants are great places to dine partly because they are great places to work. We work hard. We focus all of our energies on delighting our guests, and we have fun doing it. Over the past 20+ years, we’ve built a company culture we’re proud of and would love to add more people to our team who are as committed to hospitality as we are.</p><p><br></p><p>Table 301 offers excellent benefits including:</p><ul><li><strong>Competitive Wages</strong></li><li><strong>Health Benefits</strong>&nbsp;(including medical and optional dental and vision)</li><li><strong>Matching 401k Program</strong></li><li><strong>Paid Time Off</strong></li><li><strong>35% dining discount</strong></li><li><strong>Financial Planning Education</strong></li><li><strong>Employee Assistance Programs</strong></li><li>And more…</li></ul>",
+    "requirements": [
+     "Team player",
+     "Reliable and responsible",
+     "Intermediate to advanced knowledge, and comprehension on beer, wine, and spirits preferred",
+     "Minimum 2 years of experience in a high volume environment",
+     "Minimum 2 years of experience in a fine dining environment",
+     "Must have flexibility and availability to work a combination of am, pm, and weekend shifts",
+     "ServSafe Certification preferred",
+     "Great interpersonal skills",
+     "Team player with a \"Go-Giver\" attitude"
+    ],
+    "salary": {
+     "min": 15,
+     "max": 18,
+     "type": "hourly"
+    },
+    "status": "draft",
+    "updated_at": "2026-10-20T07:16:09+00:00"
+   },
+   "relations": {
+    "location": {
+     "id": "6078985786d16",
+     "attributes": {
+      "nickname": "Camp",
+      "city": "Greenville",
+      "state": {
+       "name": "South Carolina",
+       "short": "SC"
+      },
+      "country": {
+       "name": "United States",
+       "short": "US"
+      }
+     },
+     "relations": {
+      "brand": {
+       "id": "6078977d8dfec",
+       "attributes": {
+        "name": "Camp"
+       }
+      }
+     }
+    }
+   }
+  }
+ ],
+ "meta": {
+  "current_page": 1,
+  "last_page": 1,
+  "total": 4
+ }
+}

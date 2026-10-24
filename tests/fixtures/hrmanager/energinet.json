@@ -1,0 +1,216 @@
+{
+ "CustomerAlias": "energinet",
+ "CustomerName": "Energinet",
+ "TransactionStatus": {
+  "Description": "The operation completed successfully.",
+  "StatusCode": 0
+ },
+ "Items": [
+  {
+   "AdvertisementUrl": "https://candidate.hr-manager.net/ApplicationInit.aspx?cid=316&ProjectId=188952&DepartmentId=9728&MediaId=5",
+   "Advertisements": [
+    {
+     "Content": "<p>Energinet spiller en kritisk rolle i det danske samfund ved at forfølge tre sammenhængende mål: At sikre energiforsyningen og energisuveræniteten, muliggøre den grønne omstilling og øge dansk konkurrenceevne gennem energi til konkurrencedygtige priser og med høj leveringssikkerhed.</p>\r\n\r\n<p><strong>Før Energinet gennem en markant udvikling</strong></p>\r\n\r\n<p>Energinet søger en administrerende direktør, der skal sætte retningen for Energinet i en kritisk og omskiftelig tid, særligt i forhold til eltransmissionskapacitet og elektrificering. Efterspørgslen efter kapacitet vokser hurtigt som følge af elektrificering og vedvarende energiproduktion, og efterspørgslens omfang og tempo har blotlagt betydelige udfordringer inden for planlægning, eksekvering og kundeleverancer. Der skal leveres en stor indsats fra Energinets side for at udbygge elsystemet markant og udnytte den eksisterende kapacitet maksimalt. Det kræver såvel nye tekniske, markedsmæssige og digitale løsninger som et langt tættere samarbejde med kunder, myndigheder og øvrige interessenter. Samtidig skal Energinet opbygge en kommende brintinfrastruktur i Danmark, og udvikle et stadigt grønnere gassystem.</p>\r\n\r\n<p>Rollen som administrerende direktør udgør dermed en af de mest betydningsfulde ledelsesopgaver i Danmark, med direkte indvirkning på konkurrenceevne, energiforsyningssikkerhed, industriel vækst og tempoet i den grønne omstilling.</p>\r\n\r\n<p>Sammen med den øvrige ledelse skal du skabe en tydelig vej mod bed</p>",
+     "Created": "/Date(1791377933000+0200)/",
+     "Description": "",
+     "Id": 144558,
+     "ImageUrl": "https://cdn-recruiter.hr-manager.net/Export/Attachments/ViewAdvertisementImage.ashx?AdvertisementId=144558&cid=316",
+     "ImageUrlSecure": "https://cdn-recruiter.hr-manager.net/Export/Attachments/ViewAdvertisementImage.ashx?AdvertisementId=144558&cid=316",
+     "Introduction": "",
+     "LastUpdated": "/Date(1791378240000+0200)/",
+     "Video": {
+      "Embed": "",
+      "Url": null
+     }
+    }
+   ],
+   "Created": "/Date(1791275444000+0200)/",
+   "Department": {
+    "Address": "",
+    "City": "",
+    "Country": "",
+    "County": "",
+    "DeepPositionCount": 1,
+    "Id": 9728,
+    "Name": "Energinet",
+    "POBox": "",
+    "PositionCount": 1,
+    "SubItems": [],
+    "Zip": ""
+   },
+   "Id": 188952,
+   "Name": "Administrerende direktør til Energinet",
+   "PositionLocationMultiSelection": [
+    {
+     "DeepPositionCount": 1,
+     "Id": 14338,
+     "Name": "Fredericia",
+     "PositionCount": 1,
+     "SubItems": []
+    },
+    {
+     "DeepPositionCount": 1,
+     "Id": 14340,
+     "Name": "Ballerup",
+     "PositionCount": 1,
+     "SubItems": []
+    }
+   ],
+   "ProjectType": "RecruitmentProject",
+   "Published": "/Date(1791377991000+0200)/",
+   "WorkPlace": "Fredericia / Ballerup"
+  },
+  {
+   "AdvertisementUrl": "https://candidate.hr-manager.net/ApplicationInit.aspx?cid=316&ProjectId=188781&DepartmentId=21678&MediaId=5",
+   "Advertisements": [
+    {
+     "Content": "<p><strong>Afdelingsleder med fokus på data og systemmodellering</strong></p>\r\n\r\n<p>Vil du stå i spidsen for en afdeling, der skal styrke anvendelsen af data i Energinet og på tværs af energisektoren og udvikle digitale løsninger til planlægningen af fremtidens elnet?</p>\r\n\r\n<p>Energinet er en central virksomhed inden for energisektoren i Danmark. I Energinet Systemansvar arbejder vi med at sikre en stabil og bæredygtig energiforsyning til gavn for samfundet. Som afdelingsleder får du en central rolle i vores indsats for at udnytte data og skabe digitale løsninger, der bidrager ind i Energinets kerneopgaver. Vi søger en leder til afdelingen Data og systemmodellering, som kan sætte tydelig retning, skabe resultater gennem andre og fremme samarbejdet på tværs af organisationen.</p>\r\n\r\n<p><strong>Ledelse af dygtige specialister med brede samarbejdsflader</strong></p>\r\n\r\n<p>Som leder af Data og systemmodellering udvikler og leder du en afdeling, som har tre primære ansvarsområder:</p>\r\n\r\n<ul>\r\n\t<li>Skabe transparens om energisystemet gennem ansvar for ekstern datapublicering bl.a. via Energi Data Service</li>\r\n\t<li>Organisere og samle en tværgående dataindsats og videreudvikle det fælles datafundament</li>\r\n\t<li>Udvikle digitale løsninger og systemmodeller, som understøtter planlægning af elnettets fremtidige infrastruktur.</li>\r\n</ul>\r\n\r\n<p>Afdelingen består af produktejere, forretningsudviklere, softwareudviklere og dataspecialister og fungerer som bindeled mellem Systemansvars</p>",
+     "Created": "/Date(1791196074000+0200)/",
+     "Description": "",
+     "Id": 144555,
+     "ImageUrl": "https://cdn-recruiter.hr-manager.net/Export/Attachments/ViewAdvertisementImage.ashx?AdvertisementId=144555&cid=316",
+     "ImageUrlSecure": "https://cdn-recruiter.hr-manager.net/Export/Attachments/ViewAdvertisementImage.ashx?AdvertisementId=144555&cid=316",
+     "Introduction": "",
+     "LastUpdated": "/Date(1791196137000+0200)/",
+     "Video": {
+      "Embed": "",
+      "Url": null
+     }
+    }
+   ],
+   "Created": "/Date(1785738485000+0200)/",
+   "Department": {
+    "Address": "",
+    "City": "",
+    "Country": "",
+    "County": "",
+    "DeepPositionCount": 1,
+    "Id": 21678,
+    "Name": "Systemansvar",
+    "POBox": "",
+    "PositionCount": 1,
+    "SubItems": [],
+    "Zip": ""
+   },
+   "Id": 188781,
+   "Name": "Afdelingsleder med fokus på data og systemmodellering",
+   "PositionLocationMultiSelection": [
+    {
+     "DeepPositionCount": 1,
+     "Id": 14338,
+     "Name": "Fredericia",
+     "PositionCount": 1,
+     "SubItems": []
+    }
+   ],
+   "ProjectType": "RecruitmentProject",
+   "Published": "/Date(1791196167000+0200)/",
+   "WorkPlace": "Fredericia"
+  },
+  {
+   "AdvertisementUrl": "https://candidate.hr-manager.net/ApplicationInit.aspx?cid=316&ProjectId=188943&DepartmentId=21678&MediaId=5",
+   "Advertisements": [
+    {
+     "Content": "<p><strong>Afdelingsleder til Digitale Markedsprodukter og Porteføljestyring</strong></p>\r\n\r\n<p> </p>\r\n\r\n<p>Vil du arbejde med at udvikle digitale løsninger, der understøtter morgendagens energimarkeder, og samtidig sikre overblik over en digital portefølje samt et solidt fokus på cybersikkerhed og risikostyring i Systemansvar?</p>\r\n\r\n<p>Energinet er en central virksomhed i energisektoren i Danmark. I Energinet Systemansvar arbejder vi med at sikre en stabil og bæredygtig energiforsyning til gavn for samfundet. I Energinet spiller digitale løsninger en afgørende rolle i den grønne omstilling og udviklingen af et effektivt og velfungerende elmarked. Vi søger en leder til afdelingen Digitale Markedsprodukter og Porteføljestyring, som kan sætte retning, skabe resultater gennem andre og fremme samarbejdet på tværs af organisationen.</p>\r\n\r\n<p><strong>Sæt retning for en strategisk digital produktportefølje</strong></p>\r\n\r\n<p>Som leder af Digitale Markedsprodukter og Porteføljestyring udvikler og leder du en afdeling, der understøtter nogle af Energinets vigtigste strategiske mål. Du skal skabe sammenhæng mellem forretning, digitalisering og governance og sikre, at Systemansvars digitale initiativer prioriteres og realiseres med fokus på værdiskabelse og effekt.</p>\r\n\r\n<p>Du får det overordnede ansvar for den digitale udviklingsportefølje i Systemansvar, herunder de processer og styringsmekanismer, der understøtter prioritering, investeringsbeslutninger og gevinstrealisering.</p>\r\n</p>",
+     "Created": "/Date(1791199578000+0200)/",
+     "Description": "",
+     "Id": 144556,
+     "ImageUrl": null,
+     "ImageUrlSecure": null,
+     "Introduction": "",
+     "LastUpdated": null,
+     "Video": {
+      "Embed": "",
+      "Url": null
+     }
+    }
+   ],
+   "Created": "/Date(1790709138000+0200)/",
+   "Department": {
+    "Address": "",
+    "City": "",
+    "Country": "",
+    "County": "",
+    "DeepPositionCount": 1,
+    "Id": 21678,
+    "Name": "Systemansvar",
+    "POBox": "",
+    "PositionCount": 1,
+    "SubItems": [],
+    "Zip": ""
+   },
+   "Id": 188943,
+   "Name": "Afdelingsleder til Digitale Markedsprodukter og Porteføljestyring",
+   "PositionLocationMultiSelection": [
+    {
+     "DeepPositionCount": 1,
+     "Id": 14338,
+     "Name": "Fredericia",
+     "PositionCount": 1,
+     "SubItems": []
+    }
+   ],
+   "ProjectType": "RecruitmentProject",
+   "Published": "/Date(1791199588000+0200)/",
+   "WorkPlace": "Fredericia"
+  },
+  {
+   "AdvertisementUrl": "https://candidate.hr-manager.net/ApplicationInit.aspx?cid=316&ProjectId=188952&DepartmentId=9728&MediaId=5",
+   "Advertisements": [
+    {
+     "Content": "<p>Energinet spiller en kritisk rolle i det danske samfund ved at forfølge tre sammenhængende mål: At sikre energiforsyningen og energisuveræniteten, muliggøre den grønne omstilling og øge dansk konkurrenceevne gennem energi til konkurrencedygtige priser og med høj leveringssikkerhed.</p>\r\n\r\n<p><strong>Før Energinet gennem en markant udvikling</strong></p>\r\n\r\n<p>Energinet søger en administrerende direktør, der skal sætte retningen for Energinet i en kritisk og omskiftelig tid, særligt i forhold til eltransmissionskapacitet og elektrificering. Efterspørgslen efter kapacitet vokser hurtigt som følge af elektrificering og vedvarende energiproduktion, og efterspørgslens omfang og tempo har blotlagt betydelige udfordringer inden for planlægning, eksekvering og kundeleverancer. Der skal leveres en stor indsats fra Energinets side for at udbygge elsystemet markant og udnytte den eksisterende kapacitet maksimalt. Det kræver såvel nye tekniske, markedsmæssige og digitale løsninger som et langt tættere samarbejde med kunder, myndigheder og øvrige interessenter. Samtidig skal Energinet opbygge en kommende brintinfrastruktur i Danmark, og udvikle et stadigt grønnere gassystem.</p>\r\n\r\n<p>Rollen som administrerende direktør udgør dermed en af de mest betydningsfulde ledelsesopgaver i Danmark, med direkte indvirkning på konkurrenceevne, energiforsyningssikkerhed, industriel vækst og tempoet i den grønne omstilling.</p>\r\n\r\n<p>Sammen med den øvrige ledelse skal du skabe en tydelig vej mod bed</p>",
+     "Created": "/Date(1791377933000+0200)/",
+     "Description": "",
+     "Id": 144558,
+     "ImageUrl": "https://cdn-recruiter.hr-manager.net/Export/Attachments/ViewAdvertisementImage.ashx?AdvertisementId=144558&cid=316",
+     "ImageUrlSecure": "https://cdn-recruiter.hr-manager.net/Export/Attachments/ViewAdvertisementImage.ashx?AdvertisementId=144558&cid=316",
+     "Introduction": "",
+     "LastUpdated": "/Date(1791378240000+0200)/",
+     "Video": {
+      "Embed": "",
+      "Url": null
+     }
+    }
+   ],
+   "Created": "/Date(1791275444000+0200)/",
+   "Department": {
+    "Address": "",
+    "City": "",
+    "Country": "",
+    "County": "",
+    "DeepPositionCount": 1,
+    "Id": 9728,
+    "Name": "Energinet",
+    "POBox": "",
+    "PositionCount": 1,
+    "SubItems": [],
+    "Zip": ""
+   },
+   "Id": 1,
+   "Name": "Initiativansogning",
+   "PositionLocationMultiSelection": [
+    {
+     "DeepPositionCount": 1,
+     "Id": 14338,
+     "Name": "Fredericia",
+     "PositionCount": 1,
+     "SubItems": []
+    },
+    {
+     "DeepPositionCount": 1,
+     "Id": 14340,
+     "Name": "Ballerup",
+     "PositionCount": 1,
+     "SubItems": []
+    }
+   ],
+   "ProjectType": "OpenApplication",
+   "Published": "/Date(1791377991000+0200)/",
+   "WorkPlace": "Fredericia / Ballerup"
+  }
+ ],
+ "PositionCountCustomer": 4,
+ "PositionCountList": 4,
+ "PositionCountSearch": 4,
+ "PositionCountSkipped": 0
+}

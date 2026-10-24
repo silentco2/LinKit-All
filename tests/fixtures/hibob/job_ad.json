@@ -1,0 +1,40 @@
+{
+ "filterGroups": {
+  "departments": []
+ },
+ "jobAdDetails": [
+  {
+   "id": "04e764ae-fb6c-4303-ba2f-509b917804c2",
+   "title": "Data Scientist, Client Facing",
+   "department": "Customer",
+   "employmentType": "Employee",
+   "site": "New York",
+   "country": "United States",
+   "language": "en",
+   "description": "<p>We build AI &amp; finance tooling.</p><script>alert(1)</script>",
+   "requirements": "<ul><li>4+ years as a data scientist</li></ul>",
+   "responsibilities": "<ul><li>Work on-site with clients</li></ul>",
+   "benefits": "<ul><li>$140-170k DOE</li></ul>",
+   "sectionLabels": {},
+   "publishedAt": "2026-04-22T07:20:46.518438210Z",
+   "workspaceTypeId": "hybrid",
+   "workspaceType": "Hybrid"
+  },
+  {
+   "id": "b3c1d0aa-1111-4222-8333-444455556666",
+   "title": "Support Agent",
+   "site": "Remote",
+   "country": "Germany",
+   "description": "<p>Answer tickets.</p>",
+   "requirements": "",
+   "responsibilities": "",
+   "benefits": "",
+   "publishedAt": "2026-05-01T10:00:00Z",
+   "workspaceType": "Remote"
+  },
+  {
+   "id": "",
+   "title": "No id, no dedup key"
+  }
+ ]
+}

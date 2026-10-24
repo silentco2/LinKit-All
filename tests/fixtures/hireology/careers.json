@@ -1,0 +1,42 @@
+{
+ "data": [
+  {
+   "type": "careers",
+   "id": "25816",
+   "attributes": {
+    "id": 25816,
+    "name": "Pet Sitter",
+    "remote": false,
+    "job-description": "<p>Sit pets.</p><script>x()</script>",
+    "locations": [
+     "Highlands Ranch, CO"
+    ],
+    "status": "Open",
+    "career-site-url": "https://careers.hireology.com/acme/25816/description"
+   }
+  },
+  {
+   "type": "careers",
+   "id": "25817",
+   "attributes": {
+    "id": 25817,
+    "name": "Dispatcher",
+    "remote": true,
+    "job-description": "<p>Route trucks.</p>",
+    "locations": [],
+    "status": "Open",
+    "career-site-url": null
+   }
+  },
+  {
+   "type": "careers",
+   "id": "999",
+   "attributes": {
+    "id": 999,
+    "name": "Closed Role",
+    "status": "Filled",
+    "locations": []
+   }
+  }
+ ]
+}

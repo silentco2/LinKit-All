@@ -1,0 +1,32 @@
+{
+ "data": [
+  {
+   "id": 12691526,
+   "name": "Pessoa Desenvolvedora FrontEnd Sênior",
+   "jobType": "vacancy_type_effective",
+   "addressCity": "",
+   "addressStateShortName": "",
+   "addressState": "",
+   "addressCountry": "Brasil",
+   "addressDistrict": "",
+   "remoteWorking": true,
+   "workplaceType": "remote",
+   "departmentName": "Tecnologia",
+   "quickApply": false
+  },
+  {
+   "id": 12679978,
+   "name": "Analista Sênior de Garantia da Receita",
+   "jobType": "vacancy_type_effective",
+   "addressCity": "São Paulo",
+   "addressStateShortName": "SP",
+   "addressState": "São Paulo",
+   "addressCountry": "Brasil",
+   "addressDistrict": "Vila Cordeiro",
+   "remoteWorking": false,
+   "workplaceType": "hybrid",
+   "departmentName": "Garantia de Receita",
+   "quickApply": false
+  }
+ ]
+}
