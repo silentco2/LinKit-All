@@ -212,3 +212,23 @@ Execution tasks:
 - Frontend: `cd frontend && npx ng build`.
 - Live checks only read or dry-run: never submit a real application without the
   maintainer's explicit go-ahead.
+
+### Phase 8 — Sources ported from freehire (MIT) 🟡
+Decisions (maintainer, 2026-10-24): port every adapter that works with honest plain HTTP, in
+batches; adapters that need freehire's bot-protection layer (tls-client fingerprints,
+Scrapling challenge-solving browser, rotating proxies, spoofed Googlebot/app user agents,
+ALTCHA proof-of-work) are NOT ported (CLAUDE.md §5.2). Company lists come from a Common
+Crawl discovery step plus the user's own list. Aggregator API keys live in the vault with a
+Setup "API keys" section. Telegram: t.me/s web-preview reader, freehire's 95 channels plus
+user-added (Arabic hiring words in the prefilter). Logic is re-implemented in Python, no
+code copied verbatim; NOTICE credits freehire (MIT). Survey: scratchpad freehire-survey.md.
+- ⬜ F0a Source framework: auto-registry (no shared registry edits), per-module detector
+  patterns, shared helpers (403/429 retry-with-backoff, paging), per-source test files
+- ⬜ F0b Boards table + `linkit discover-boards` (Common Crawl CDX per ATS) + per-run rotation caps
+- ⬜ F0c API keys in the vault + Setup section + `api_key()` helper for sources
+- ⬜ F0d Workday: 2,000-cap facet split, 403/429 backoff, details only for unseen jobs
+- ⬜ F0e Telegram reader, channel table + Setup, Arabic prefilter, link-out to ATS, batched AI extraction
+- ⬜ F1.x ATS feed adapters (~117), batches of ~12
+- ⬜ F2.x Aggregator APIs (~50), batches of ~10
+- ⬜ F3 Job boards (honest ones) + RSS
+- ⬜ F4.x The 52 single-company plugins (minus bypass ones), batches of ~12
