@@ -72,7 +72,11 @@ async def run_stage(
                 # Only the generic careers-page source uses the model, for pages without
                 # JSON-LD; it falls back to the page title when the provider is unusable.
                 provider = get_provider(ai_settings(settings, cfg, ai_override), cache=db)
-                stats = asdict(await discover(db, cfg, run_id, Http(client), registry(provider)))
+                stats = asdict(
+                    await discover(
+                        db, cfg, run_id, Http(client), registry(provider, settings.data_dir)
+                    )
+                )
             else:
                 stats = {"enriched": await enrich(db, Http(client), registry())}
     elif stage == "rank":

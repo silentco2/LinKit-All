@@ -3,21 +3,32 @@
 Order: JSON-LD JobPosting on the page -> links that look like job pages (each read through
 JSON-LD, else an <h1> plus a plainly labelled location, else page text sent to the AI in
 batches of AI_BATCH pages per call when a provider is available, else the page title) ->
-"unsupported". Every fetch is checked against robots.txt first (Http.allowed). Pages that
-need a browser or answer with a bot challenge are reported as unsupported, never worked around.
+"unsupported". Every fetch is checked against robots.txt first (Http.allowed). A page with no
+jobs in its HTML is then opened in Chrome when a provider is available (browser_extract: the AI
+picks JSON-LD, a background JSON response or CSS selectors, our code runs it). Pages that still
+give nothing, or answer with a bot challenge, are reported as unsupported, never worked around.
 """
 
 import re
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
+from pathlib import Path
 from typing import Literal
 from urllib.parse import urljoin, urlsplit
 
 import httpx
+from playwright.async_api import Request, Route
 from pydantic import BaseModel
 from selectolax.lexbor import LexborHTMLParser
 
 from linkit_all.providers.base import LLMProvider, ProviderError, UsageLimitError, render
 from linkit_all.sources.base import JobStub, Source, Task, from_iso, remote_from_text
+from linkit_all.sources.browser_extract import (
+    BrowserError,
+    BrowserExtractor,
+    Challenge,
+    is_challenge,
+    site,
+)
 from linkit_all.sources.http import Http, RetryableStatus
 from linkit_all.sources.jsonld import job_postings, to_stub
 from linkit_all.sources.text import html_to_text, normalize_url
@@ -43,10 +54,7 @@ _ROLE = re.compile(
     re.I,
 )
 _NEXT_TEXT = {"next", "next page", "next »", "›", "»", "older", "more jobs", "load more"}  # noqa: RUF001
-_CHALLENGE = re.compile(
-    r"just a moment|attention required|verify you are human|are you a robot|captcha|cf-chl", re.I
-)
-_SECOND_LEVEL = {"co", "com", "org", "gov", "ac", "net"}
+CHALLENGE_MESSAGE = "the site answered with a bot challenge; it is not bypassed"
 
 
 class Unsupported(Exception):
@@ -66,13 +74,6 @@ class ExtractedBatch(BaseModel):
     jobs: list[ExtractedJob]
 
 
-def _site(url: str) -> str:
-    """Registrable domain, good enough without a public-suffix list (example.co.uk)."""
-    parts = (urlsplit(url).hostname or "").split(".")
-    keep = 3 if len(parts) > 2 and len(parts[-1]) == 2 and parts[-2] in _SECOND_LEVEL else 2
-    return ".".join(parts[-keep:])
-
-
 def _looks_like_job(url: str, text: str) -> bool:
     path = urlsplit(url).path
     if _NOT_JOB.search(path) or _FILE.search(path):
@@ -87,7 +88,7 @@ def _is_next(rel: str, text: str) -> bool:
 def _company(tree: LexborHTMLParser, url: str) -> str:
     meta = tree.css_first('meta[property="og:site_name"]')
     name = (meta.attributes.get("content") if meta else "") or ""
-    return name.strip() or _site(url).split(".")[0].title()
+    return name.strip() or site(url).split(".")[0].title()
 
 
 def _title(tree: LexborHTMLParser) -> str:
@@ -135,8 +136,24 @@ class Careers(Source):
     name = "careers"
     priority = 3  # after the ATS APIs and site plugins, which have cleaner data
 
-    def __init__(self, provider: LLMProvider | None = None) -> None:
+    def __init__(
+        self,
+        provider: LLMProvider | None = None,
+        data_dir: Path | None = None,
+        route: Callable[[Route, Request], Awaitable[None]] | None = None,
+    ) -> None:
         self.provider = provider
+        # The browser fallback needs a provider (it picks the extraction method) and a folder for
+        # the recipe cache. `route` answers the browser's requests in tests.
+        self._browser = (
+            BrowserExtractor(provider, data_dir / "careers", route)
+            if provider and data_dir
+            else None
+        )
+
+    async def aclose(self) -> None:
+        if self._browser is not None:
+            await self._browser.close()
 
     async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:
         url = task.board
@@ -149,23 +166,58 @@ class Careers(Source):
             return
         links = await self._job_links(http, url, html, task.limit)
         if not links:
-            raise Unsupported(
-                "needs a browser; not supported yet"
-                if len(html_to_text(html)) < MIN_TEXT
-                else "no job postings or job links found"
-            )
+            found = (await self._rendered(http, url))[: task.limit]
+            if not found:
+                raise Unsupported(
+                    "needs a browser; not supported yet"
+                    if len(html_to_text(html)) < MIN_TEXT
+                    else "no job postings or job links found"
+                )
+            for start in range(start_page * PAGE, len(found), PAGE):
+                yield await self._finish(http, found[start : start + PAGE], company)
+            return
         for start in range(start_page * PAGE, len(links), PAGE):
             yield await self._jobs(http, links[start : start + PAGE], company)
+
+    async def _rendered(self, http: Http, url: str) -> list[JobStub]:
+        """Jobs read from the page as Chrome draws it ([] when the fallback is off or fails)."""
+        if self._browser is None:
+            return []
+        try:
+            return await self._browser.jobs(http, url)
+        except Challenge:
+            raise Unsupported(CHALLENGE_MESSAGE) from None
+        except BrowserError:
+            return []
+
+    async def _finish(self, http: Http, found: list[JobStub], company: str) -> list[JobStub]:
+        """Listing entries with a description are done; the rest go through the normal per-job
+        path (JSON-LD, labelled location, AI), keeping what the listing already told us."""
+        done = [_with_company(s, company) for s in found if s.description]
+        listed = {s.url: s for s in found if not s.description}
+        for job in await self._jobs(http, list(listed), company):
+            lst = listed.get(job.url)
+            done.append(
+                job
+                if lst is None
+                else job.model_copy(
+                    update={
+                        "title": lst.title,
+                        "location": job.location or lst.location,
+                        "posted_at": job.posted_at or lst.posted_at,
+                        "ats": lst.ats or job.ats,
+                    }
+                )
+            )
+        return done
 
     async def _fetch(self, http: Http, url: str) -> str:
         if not await http.allowed(url):
             raise Unsupported(f"robots.txt does not allow fetching {url}")
         resp = await http.get(url)
         title = LexborHTMLParser(resp.text).css_first("title")
-        if _CHALLENGE.search(title.text() if title else "") or (
-            resp.status_code >= 400 and _CHALLENGE.search(resp.text[:5000])
-        ):
-            raise Unsupported("the site answered with a bot challenge; it is not bypassed")
+        if is_challenge(resp.status_code, title.text() if title else "", resp.text):
+            raise Unsupported(CHALLENGE_MESSAGE)
         resp.raise_for_status()
         return resp.text
 
@@ -176,7 +228,7 @@ class Careers(Source):
             nxt = ""
             for a in LexborHTMLParser(html).css("a[href]"):
                 href = urljoin(url, (a.attributes.get("href") or "").strip()).split("#")[0]
-                if not href.startswith("http") or _site(href) != _site(url):
+                if not href.startswith("http") or site(href) != site(url):
                     continue
                 text = " ".join(a.text().split())
                 if _is_next(a.attributes.get("rel") or "", text):

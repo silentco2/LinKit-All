@@ -107,7 +107,10 @@ async def discover(
 
     # Priority no longer orders the run: store_page upgrades a stored duplicate to the
     # higher-priority source's copy whenever that arrives.
-    await asyncio.gather(*(run(t) for t in tasks))
+    try:
+        await asyncio.gather(*(run(t) for t in tasks))
+    finally:
+        await asyncio.gather(*(src.aclose() for src in registry.values()))
     return stats
 
 

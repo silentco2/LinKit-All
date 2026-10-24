@@ -248,7 +248,7 @@ CLAUDE.md §5.2 — don't add or remove checks without asking.
 3. As the maintainer supplies saved pages: write the Workday/iCIMS/Taleo/SuccessFactors/
    SmartRecruiters handlers (plugin + fixture + tests each), then Naukrigulf.
 4. Pay down the debt below, roughly in this order: live-view event per job; iframes in the
-   generic agent; generic sign-up; JS-rendered careers pages; Arabic server messages; phone
+   generic agent; generic sign-up; Arabic server messages; phone
    job-title width; the rest.
 5. Release work once the maintainer says go: GitHub repo, CI on three OSes, PyPI.
 
@@ -289,7 +289,9 @@ CLAUDE.md §5.2 — don't add or remove checks without asking.
 - Forasna fetches all numbered sitemaps each run (about 80 s).
 - Workday: `postedOn` is relative text ("Posted 3 Days Ago"), and the list may cap the total
   at 2,000.
-- Careers source is httpx-only: JS-rendered careers pages are reported unsupported.
+- Careers browser fallback (`sources/browser_extract.py`) is live-untested: only fixtures via route
+  interception. Links to a known ATS found there set `JobStub.ats` but are not re-routed to that
+  ATS plugin; job pages are still read over httpx, so a JS-only job page keeps the listing's title.
 - Generic agent ignores iframes, and there is no generic sign-up (sign-in pages park).
 - A combobox with no fixed options (city, country) picks the first suggestion after typing.
 - Live submission is untested against real sites (CAPTCHA behavior unknown).

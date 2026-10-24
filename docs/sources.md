@@ -50,9 +50,27 @@ the page itself. It goes in this order and stops at the first that works:
    and reads each one. For pages without structured data it reads the page's heading and
    a plainly labelled location. When that is not enough, it sends the page text to your AI,
    10 pages per call. It skips the AI whenever the free steps are enough.
-3. **Unsupported.** Pages that need a real browser to draw their jobs, or that answer with a
-   bot challenge, are reported as "unsupported" in the run. LinKit All never works around a
-   challenge.
+3. **Browser fallback.** Many career pages draw their job list with JavaScript, so the
+   plain page has no jobs in it. When steps 1 and 2 find nothing and you have an AI
+   connected, LinKit All opens the page once in headless Chrome (after checking
+   `robots.txt`), waits for the page to settle (at most about 20 seconds), and collects:
+   JSON-LD job postings, the JSON the page loaded in the background, and a short summary
+   of the repeated blocks in the drawn page. Your AI then picks **how** to read the list:
+   the JSON-LD, one of those JSON responses, or CSS selectors. It decides only; LinKit All
+   checks the choice against what it captured and runs it. Job links always come from the
+   page or the response, never from the AI, and must be on the company's own site or a
+   known ATS. If the chosen method finds no jobs, the other methods that the page supports
+   are tried (JSON-LD, then the JSON response, then CSS). The jobs found this way then
+   follow the same path as in step 2 (a job whose description came with the list skips
+   fetching its page).
+   This costs **one AI call per site**: the working recipe is saved per site in
+   `careers/recipes.json` in the data folder (the method and its settings only, no page
+   text) and reused on later runs. If a saved recipe stops finding jobs, it is dropped
+   and the AI is asked once more. Chrome is started only when a page needs it, at most two
+   pages are open at once and one per site, and it is closed at the end of the discovery run.
+4. **Unsupported.** Pages that still give nothing (or when there is no AI or no Chrome), or
+   that answer with a bot challenge, are reported as "unsupported" in the run. LinKit All
+   never works around a challenge or a CAPTCHA, and the browser never clicks anything.
 
 It follows at most the careers page plus three "next page" links.
 

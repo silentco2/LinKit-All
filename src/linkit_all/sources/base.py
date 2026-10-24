@@ -60,6 +60,9 @@ class Source(ABC):
     def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:
         """Yield one list of stubs per page, starting at `start_page` (for resume)."""
 
+    async def aclose(self) -> None:  # noqa: B027 - optional hook, nothing to do by default
+        """Release anything held for a discovery run (a browser, say). Called once at its end."""
+
     async def fetch_details(self, http: Http, stub: JobStub) -> JobStub:
         """Fill in the description when the listing did not include it."""
         return stub

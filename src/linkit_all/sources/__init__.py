@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from linkit_all.providers.base import LLMProvider
 from linkit_all.sources.ashby import Ashby
 from linkit_all.sources.base import Source
@@ -13,7 +15,9 @@ from linkit_all.sources.workday import Workday
 from linkit_all.sources.wuzzuf import Wuzzuf
 
 
-def registry(provider: LLMProvider | None = None) -> dict[str, Source]:
+def registry(
+    provider: LLMProvider | None = None, data_dir: Path | None = None
+) -> dict[str, Source]:
     sources: list[Source] = [
         Greenhouse(),
         Lever(),
@@ -25,6 +29,6 @@ def registry(provider: LLMProvider | None = None) -> dict[str, Source]:
         *jobspy_sources(),
         Wuzzuf(),
         Forasna(),
-        Careers(provider),  # the AI fallback for pages without JSON-LD
+        Careers(provider, data_dir),  # the AI fallback for pages without JSON-LD
     ]
     return {s.name: s for s in sources}
