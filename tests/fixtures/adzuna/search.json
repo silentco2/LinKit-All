@@ -1,0 +1,51 @@
+{
+ "count": 999,
+ "results": [
+  {
+   "id": "4812345678",
+   "title": "Backend Engineer",
+   "description": "Great role. Build APIs in Python &amp; Go for a growing team&hellip;",
+   "created": "2026-08-07T13:10:31Z",
+   "redirect_url": "https://www.adzuna.co.uk/jobs/land/ad/4812345678",
+   "company": {
+    "display_name": "Acme"
+   },
+   "location": {
+    "display_name": "Leeds, West Yorkshire",
+    "area": [
+     "UK",
+     "Yorkshire",
+     "Leeds"
+    ]
+   },
+   "salary_min": 55000.0,
+   "salary_max": 65000.0,
+   "salary_is_predicted": "0",
+   "category": {
+    "tag": "it-jobs",
+    "label": "IT Jobs"
+   }
+  },
+  {
+   "id": 4812345679,
+   "title": "Remote Data Engineer",
+   "description": "Numeric id and a predicted salary.",
+   "created": "2026-08-06T09:00:00Z",
+   "redirect_url": "https://www.adzuna.co.uk/jobs/land/ad/4812345679",
+   "company": {
+    "display_name": "Globex"
+   },
+   "location": {
+    "display_name": "UK"
+   },
+   "salary_min": 40000.0,
+   "salary_max": 50000.0,
+   "salary_is_predicted": "1"
+  },
+  {
+   "id": "1",
+   "title": "",
+   "redirect_url": "https://www.adzuna.co.uk/jobs/land/ad/1"
+  }
+ ]
+}

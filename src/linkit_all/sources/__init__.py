@@ -18,15 +18,17 @@ A plugin module defines a `Source` subclass (see `base.py`) with:
   company plugins also implement `tasks(cfg)`; they are only asked when the user lists their
   `name` in `sources.enabled` (or `default_on = True`). ATS plugins run from the company list.
 
-The constructor may take `provider` and/or `data_dir`; they are filled in by name. A module that
-needs several instances (one per jobspy site) defines `def sources(**ctx) -> list[Source]`
-instead, and the classes in it are not scanned.
+The constructor may take `provider`, `data_dir` and/or `keys`; they are filled in by name. `keys`
+is `keys(provider_name) -> {field: value} | None`, the API keys saved in the vault (see
+`core/api_keys.py`); it is looked up when asked, so a vault unlocked later still works. A
+module that needs several instances (one per jobspy site) defines
+`def sources(**ctx) -> list[Source]` instead, and the classes in it are not scanned.
 """
 
 import importlib
 import inspect
 import pkgutil
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -86,14 +88,22 @@ def _instances(mod: ModuleType, ctx: dict[str, Any]) -> list[Source]:
     return out
 
 
+KeyGetter = Callable[[str], dict[str, str] | None]
+
+
+def no_keys(name: str) -> dict[str, str] | None:
+    return None
+
+
 def registry(
     provider: LLMProvider | None = None,
     data_dir: Path | None = None,
+    keys: KeyGetter | None = None,
     *,
     extra_packages: Iterable[str] = (),
 ) -> dict[str, Source]:
     """Every source plugin by name. `extra_packages` adds more packages to scan (tests)."""
-    ctx = {"provider": provider, "data_dir": data_dir}
+    ctx = {"provider": provider, "data_dir": data_dir, "keys": keys or no_keys}
     found: dict[str, Source] = {}
     for mod in _modules([*PACKAGES, *extra_packages]):
         try:

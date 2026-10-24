@@ -1,6 +1,7 @@
 """Pipeline stages, shared by the CLI (`linkit run <stage>`) and the UI's run button."""
 
 import asyncio
+from collections.abc import Callable
 from dataclasses import asdict
 from typing import TYPE_CHECKING, Any
 
@@ -35,6 +36,23 @@ def ai_settings(
         raise PipelineError(f"invalid AI settings: {e}") from e
 
 
+def api_key_getter(
+    db: sessionmaker[Session], settings: Settings, vault: "Vault | None" = None
+) -> Callable[[str], dict[str, str] | None]:
+    """`keys(provider)` for source plugins: the server's vault, else this data dir's vault opened
+    with the keyring. None while the vault is locked or the provider has no saved keys."""
+    from linkit_all.apply.vault import vault_for
+    from linkit_all.core.api_keys import get_keys
+
+    def keys(name: str) -> dict[str, str] | None:
+        v = vault if vault is not None else vault_for(settings, db)
+        if not v.unlocked() and v.initialized():
+            v.unlock_from_keyring()
+        return get_keys(v, name)
+
+    return keys
+
+
 _embedder: Any = None  # the model takes seconds to load; keep it for the process
 
 
@@ -65,6 +83,7 @@ async def run_stage(
         from linkit_all.sources.http import Http, make_client
         from linkit_all.sources.runner import discover, enrich
 
+        keys = api_key_getter(db, settings, vault)
         async with make_client() as client:
             if stage == "discover":
                 from linkit_all.providers import get_provider
@@ -72,13 +91,10 @@ async def run_stage(
                 # Only the generic careers-page source uses the model, for pages without
                 # JSON-LD; it falls back to the page title when the provider is unusable.
                 provider = get_provider(ai_settings(settings, cfg, ai_override), cache=db)
-                stats = asdict(
-                    await discover(
-                        db, cfg, run_id, Http(client), registry(provider, settings.data_dir)
-                    )
-                )
+                sources = registry(provider, settings.data_dir, keys)
+                stats = asdict(await discover(db, cfg, run_id, Http(client), sources))
             else:
-                stats = {"enriched": await enrich(db, Http(client), registry())}
+                stats = {"enriched": await enrich(db, Http(client), registry(keys=keys))}
     elif stage == "rank":
         from linkit_all.matching.rank import rank_jobs
 
