@@ -25,6 +25,7 @@ _LASTMOD = re.compile(r"<lastmod>\s*([^<]+?)\s*</lastmod>")
 
 class Wuzzuf(Source):
     name = "wuzzuf"
+    kind = "regional"
     priority = 2
 
     def tasks(self, cfg: SearchConfig) -> list[Task]:

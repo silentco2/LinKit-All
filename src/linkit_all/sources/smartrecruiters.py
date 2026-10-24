@@ -18,6 +18,11 @@ _SECTIONS = ("jobDescription", "qualifications", "additionalInformation")
 
 class SmartRecruiters(Source):
     name = "smartrecruiters"
+    kind = "ats"
+    url_patterns = (
+        re.compile(r"smartrecruiters\.com/(?:oneclick-ui/company|v1/companies)/([\w-]+)", re.I),
+        re.compile(r"(?:jobs|careers)\.smartrecruiters\.com/([\w-]+)", re.I),
+    )
     parallel = 4  # public JSON API; Http paces per host
 
     async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:

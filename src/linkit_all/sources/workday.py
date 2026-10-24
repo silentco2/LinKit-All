@@ -39,6 +39,11 @@ def parse_posted(text: str | None, now: datetime | None = None) -> datetime | No
 
 class Workday(Source):
     name = "workday"
+    kind = "ats"
+    url_patterns = (
+        re.compile(r"([\w-]+)\.(wd\d+)\.myworkdayjobs\.com/wday/cxs/[\w-]+/([\w-]+)", re.I),
+        re.compile(r"([\w-]+)\.(wd\d+)\.myworkdayjobs\.com/(?:[a-z]{2}-[A-Z]{2}/)?([\w-]+)"),
+    )
     parallel = 4  # public JSON API; Http paces per host
 
     async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:

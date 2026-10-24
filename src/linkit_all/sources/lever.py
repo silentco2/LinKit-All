@@ -1,5 +1,6 @@
 """Lever public postings API (global and EU instances)."""
 
+import re
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -13,6 +14,11 @@ _REMOTE: dict[str, Remote] = {"remote": "remote", "hybrid": "hybrid", "on-site":
 
 class Lever(Source):
     name = "lever"
+    kind = "ats"
+    url_patterns = (
+        re.compile(r"jobs(?:\.eu)?\.lever\.co/([\w.-]+)", re.I),
+        re.compile(r"api(?:\.eu)?\.lever\.co/v0/postings/([\w.-]+)", re.I),
+    )
     parallel = 4  # public JSON API; Http paces per host
 
     async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:

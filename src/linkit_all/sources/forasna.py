@@ -29,6 +29,7 @@ _JOB_SITEMAP = re.compile(r"/sitemap\d+\.xml$")  # not /careers/ (their own blog
 
 class Forasna(Source):
     name = "forasna"
+    kind = "regional"
     priority = 2
 
     def tasks(self, cfg: SearchConfig) -> list[Task]:

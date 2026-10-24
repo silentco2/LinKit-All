@@ -1,5 +1,6 @@
 """Greenhouse public job board API (one call returns every job with its description)."""
 
+import re
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -12,6 +13,12 @@ API = "https://boards-api.greenhouse.io/v1/boards/{board}/jobs"
 
 class Greenhouse(Source):
     name = "greenhouse"
+    kind = "ats"
+    url_patterns = (  # the embed form must come before the plain board form
+        re.compile(r"greenhouse\.io/embed/job_board(?:/js)?\?for=([\w-]+)", re.I),
+        re.compile(r"(?:job-boards|boards)(?:\.eu)?\.greenhouse\.io/([\w-]+)", re.I),
+        re.compile(r"boards-api\.greenhouse\.io/v1/boards/([\w-]+)", re.I),
+    )
     parallel = 4  # public JSON API; Http paces per host
 
     async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:

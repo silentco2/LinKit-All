@@ -1,5 +1,6 @@
 """Recruitee public offers API (one call returns every offer with its description)."""
 
+import re
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -12,6 +13,8 @@ API = "https://{board}.recruitee.com/api/offers/"
 
 class Recruitee(Source):
     name = "recruitee"
+    kind = "ats"
+    url_patterns = (re.compile(r"([\w-]+)\.recruitee\.com", re.I),)
     parallel = 4  # public JSON API; Http paces per host
 
     async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:

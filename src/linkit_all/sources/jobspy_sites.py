@@ -47,6 +47,7 @@ def _scrape_jobs(**kwargs: Any) -> list[dict[str, Any]]:
 
 
 class JobSpySite(Source):
+    kind = "jobspy"
     priority = 1  # after company ATS APIs
 
     def __init__(self, site: str, scrape: Scraper = _scrape_jobs) -> None:
@@ -127,3 +128,8 @@ JOBSPY_SITES = ("linkedin", "indeed", "glassdoor", "google", "zip_recruiter", "b
 
 def jobspy_sources(scrape: Scraper = _scrape_jobs) -> list[JobSpySite]:
     return [JobSpySite(site, scrape) for site in JOBSPY_SITES]
+
+
+def sources(**_: Any) -> list[Source]:
+    """Registry hook: one source per jobspy site."""
+    return [*jobspy_sources()]

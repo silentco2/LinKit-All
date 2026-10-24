@@ -52,6 +52,41 @@ and builds the frontend.
 - Prompts live in `src/linkit_all/providers/prompts/*.j2`, never in code. Every AI answer is
   validated against a Pydantic schema.
 
+## Adding a job source
+
+A source is one module; nothing shared is edited, so many can be written side by side.
+`registry()` imports every module in `linkit_all.sources` and its sub-packages and keeps every
+`Source` subclass it finds. A module that fails to import is logged and skipped.
+
+1. **Module** in the folder that fits: `src/linkit_all/sources/ats/<name>.py` (a company
+   job-board vendor), `aggregators/` (an API listing many employers), `boards/` (a job site) or
+   `companies/` (one employer).
+2. **Class** `class Acme(Source)` with `name` (unique, lower case), `kind`
+   (`"ats"`, `"aggregator"`, `"board"` or `"company"`), and `search()`. Add `fetch_details()` when
+   the list has no description, `parallel` for public JSON APIs, `priority` when its copy of a
+   duplicate job is better or worse than others. The constructor may take `provider` and
+   `data_dir`. Several instances from one module (one per site) come from a module-level
+   `def sources(**ctx) -> list[Source]` instead.
+3. **ATS only:** `url_patterns = (re.compile(r"acme\.example/([\w-]+)", re.I),)`. The groups,
+   joined with `/`, are the board slug. The detector picks them up, and `acme:slug` works in the
+   company list.
+4. **Aggregators, boards, companies:** implement `tasks(cfg)` returning `Task`s. They are only
+   asked when the user lists the `name` under `sources.enabled` in the search config, or when the
+   class sets `default_on = True`. ATS plugins run from the company list and need no switch.
+5. **Helpers** in `linkit_all.sources.common`: `retry_while` (backoff that honours `Retry-After`),
+   `paged` (offset paging with resume), `absolute`, `strip_html`. `Http` already rate-limits per
+   host and retries 429 and 5xx.
+6. **Tests:** `tests/unit/sources/test_<name>.py` with a trimmed real response in
+   `tests/fixtures/<name>/`. The fixtures `load_fixture`, `search_pages`, `fetch_details` and
+   `mock_transport` in `tests/unit/sources/conftest.py` do the plumbing. Test the stub fields,
+   paging and resume, and the empty and error cases. No live calls.
+
+**No bypassing.** A source reads what the site publishes to everyone, politely. Never use TLS
+fingerprint spoofing, challenge-solving browsers, rotating proxies, or fake crawler or app user
+agents; do not defeat a CAPTCHA or bot check. Obey robots.txt (`await http.allowed(url)`) unless
+the source is a public ATS JSON API or a jobspy site. If a site blocks us, the source reports an
+error and the maintainer decides; it does not get a workaround.
+
 ## Frontend
 
 The UI is an Angular app in `frontend/` (signals, Tailwind, Chart.js). It builds into

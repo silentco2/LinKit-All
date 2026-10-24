@@ -134,6 +134,7 @@ def _with_company(stub: JobStub, company: str) -> JobStub:
 
 class Careers(Source):
     name = "careers"
+    kind = "careers"
     priority = 3  # after the ATS APIs and site plugins, which have cleaner data
 
     def __init__(

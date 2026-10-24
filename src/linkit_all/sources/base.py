@@ -1,7 +1,8 @@
 """Source plugin interface: a source yields pages of job stubs for a task."""
 
+import re
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Literal
@@ -12,6 +13,12 @@ from linkit_all.core.search import SearchConfig
 from linkit_all.sources.http import Http
 
 Remote = Literal["remote", "hybrid", "onsite"]
+SourceKind = Literal[
+    "ats", "aggregator", "board", "company", "jobspy", "regional", "careers", "telegram"
+]
+# Kinds the user switches on by name in `sources.enabled`. The others are driven by something
+# else: the company list (ats, careers) or their own lists `sources.jobspy` / `sources.regional`.
+OPT_IN_KINDS: frozenset[str] = frozenset({"aggregator", "board", "company", "telegram"})
 
 
 class JobStub(BaseModel):
@@ -50,6 +57,15 @@ class Source(ABC):
     # How many of this source's tasks may run at once. 1 for anything rate-sensitive (scraped
     # sites); public ATS JSON APIs raise it, their per-host limiters in Http pace the requests.
     parallel: int = 1
+    kind: SourceKind = "ats"  # always set it in a new plugin; see linkit_all.sources
+    default_on: bool = False  # opt-in kinds only: run without being listed in sources.enabled
+    # ATS plugins: regexes over a URL or page HTML. Group 1.. is the board slug (joined by "/").
+    url_patterns: Sequence[re.Pattern[str]] = ()
+
+    def is_enabled(self, cfg: SearchConfig) -> bool:
+        """Should discovery ask this source for tasks? Opt-in kinds need `sources.enabled`;
+        the rest decide in `tasks()` from their own config."""
+        return self.kind not in OPT_IN_KINDS or self.default_on or self.name in cfg.sources.enabled
 
     def tasks(self, cfg: SearchConfig) -> list[Task]:
         """Query-based sources expand the search config into tasks. ATS boards come from

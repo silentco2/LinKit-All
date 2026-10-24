@@ -64,7 +64,7 @@ async def discover(
 ) -> DiscoverStats:
     stats = DiscoverStats()
     tasks, stats.unsupported = await company_tasks(cfg, http, registry)
-    tasks += [t for src in registry.values() for t in src.tasks(cfg)]
+    tasks += [t for src in registry.values() if src.is_enabled(cfg) for t in src.tasks(cfg)]
     with db() as s:
         deduper = Deduper(s, lambda name: registry[name].priority if name in registry else 99)
         checkpoints = {

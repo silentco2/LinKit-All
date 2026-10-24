@@ -45,6 +45,7 @@ class SourcesSection(BaseModel):
     jobspy: list[Literal["linkedin", "indeed", "glassdoor", "google", "zip_recruiter"]] = []
     jobspy_country: str = "usa"  # Indeed only (Glassdoor gets none); e.g. "egypt", "qatar"
     regional: list[Literal["wuzzuf", "bayt", "forasna"]] = []
+    enabled: list[str] = []  # names of aggregator / board / company source plugins to run
 
 
 class FiltersSection(BaseModel):
