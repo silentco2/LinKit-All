@@ -305,7 +305,7 @@ Execution tasks:
   a sighting for every duplicate; first_seen/seen_runs helpers
 - ✅ G2 `matching/trust/normalize.py` (NFKC, homoglyphs, leetspeak, Arabic letter variants,
   clause negation with coercion override) + `scam.py` rules, floors and trace (EN + AR)
-- ⬜ G3 `matching/trust/ghost.py`: age (posted_at, ATS first-published, first sighting), reposts
+- ✅ G3 `matching/trust/ghost.py`: age (posted_at, ATS first-published, first sighting), reposts
   and still-open across runs, vagueness port (EN + AR), vague titles, company role surge,
   missing salary (small)
 - ⬜ G4 Wire into rank: thresholds, filtered_out/low with codes, settings section, restore/report API
