@@ -47,6 +47,18 @@ FIXTURE = Path(__file__).parents[1] / "fixtures/agent/synthetic_two_page.html"
 FORM = re.sub(r'onsubmit="[^"]*"', 'method="post" action="/submit"', FIXTURE.read_text("utf-8"))
 CONFIRM = "<html><body><h1>Thank you for applying!</h1><p>We have received it.</p></body></html>"
 LOGIN = "<html><body><h1>Sign in</h1><input type=password aria-label=Password></body></html>"
+EMBED_URL = "https://careers.acme.test/embed"
+EMBED_FORM = re.sub(
+    r'onsubmit="[^"]*"',
+    'method="post" action="/submit"',
+    (FIXTURE.parent / "iframe_form.html").read_text("utf-8"),
+)
+IFRAME_PAGE = (
+    (FIXTURE.parent / "iframe_parent.html")
+    .read_text("utf-8")
+    .replace("__SRC__", EMBED_URL)
+    .replace("__HIDDEN__", "about:blank")
+)
 CAPTCHA = FORM.replace("<body>", '<body><iframe title="reCAPTCHA challenge" width=200 height=100>')
 
 
@@ -74,7 +86,7 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         s.flush()
         s.add(TailoredCV(job_id=job.id, docx_path=str(cv), pdf_path=str(pdf)))
 
-    state: dict[str, Any] = {"page": FORM, "after_submit": CONFIRM, "posts": []}
+    state: dict[str, Any] = {"page": FORM, "after_submit": CONFIRM, "posts": [], "extra": {}}
 
     async def handle(route: Route) -> None:
         req = route.request
@@ -83,6 +95,8 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
             await route.fulfill(body=state["after_submit"], content_type="text/html")
         elif req.url == URL:
             await route.fulfill(body=state["page"], content_type="text/html")
+        elif req.url in state["extra"]:
+            await route.fulfill(body=state["extra"][req.url], content_type="text/html")
         else:
             await route.abort()
 
@@ -98,7 +112,9 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
 
     monkeypatch.setattr(runner.Applier, "_context", routed)
     # a failed submission would otherwise wait 25 s for a confirmation that never comes
-    monkeypatch.setattr(runner, "wait_for_text", partial(runner.wait_for_text, timeout_ms=1500))
+    monkeypatch.setattr(
+        runner, "wait_for_confirmation", partial(runner.wait_for_confirmation, timeout_ms=1500)
+    )
     return {"db": db, "settings": settings, "job": job.id, "state": state, "posts": state["posts"]}
 
 
@@ -211,3 +227,29 @@ def test_generic_agent_off_leaves_such_jobs_alone(env: dict[str, Any]) -> None:
     counts = run(env, generic_agent=False)
     assert sum(counts.values()) == 0
     assert state_of(env) == JobState.queued_apply
+
+
+def iframe_site(env: dict[str, Any]) -> None:
+    # no controls beside the frame, so the page showing only the confirmation is not a form again
+    env["state"]["page"] = re.sub(
+        r"<div>\s*<label for=\"referral\".*?</div>", "", IFRAME_PAGE, flags=re.S
+    )
+    env["state"]["extra"][EMBED_URL] = EMBED_FORM
+
+
+def test_form_in_an_iframe_is_filled_in_dry_run_without_submitting(env: dict[str, Any]) -> None:
+    iframe_site(env)
+    assert run(env)["dry_run"] == 1
+    assert env["posts"] == []  # dry run never clicks the iframe's Submit
+    with env["db"]() as s:
+        filled = s.get_one(Job, env["job"]).data["filled"]
+    assert filled["Full name"]["value"] == "Jane Doe"
+
+
+def test_form_in_an_iframe_is_submitted_live_and_confirmed_inside_the_frame(
+    env: dict[str, Any],
+) -> None:
+    iframe_site(env)
+    assert run(env, live=True, submit_without_asking=True)["applied"] == 1
+    assert len(env["posts"]) == 1  # the Submit inside the frame was clicked, once
+    assert state_of(env) == JobState.applied  # the confirmation text is inside the iframe

@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>SYNTHETIC embedded application form (hand-written test fixture)</title></head>
+<body>
+<!-- Synthetic fixture for tests/e2e/test_agent_iframe.py. Not copied from any real site. -->
+<form id="app" onsubmit="window.submitted = (window.submitted || 0) + 1; return false;">
+  <div>
+    <label for="full_name">Full name *</label>
+    <input id="full_name" name="full_name" type="text" required>
+  </div>
+  <div>
+    <label for="email">Email *</label>
+    <input id="email" name="email" type="email" required>
+  </div>
+  <div>
+    <label for="country">Country *</label>
+    <select id="country" name="country" required>
+      <option value="">Select...</option>
+      <option>Egypt</option>
+      <option>United Kingdom</option>
+      <option>United States</option>
+    </select>
+  </div>
+  <div>
+    <label for="why">Why do you want to work here? *</label>
+    <textarea id="why" name="why" required></textarea>
+  </div>
+  <button type="submit" id="submit">Submit application</button>
+</form>
+</body>
+</html>

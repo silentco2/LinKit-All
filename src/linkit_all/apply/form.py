@@ -6,7 +6,7 @@ container with data-lk="<key>" and describes its controls. Filling uses those ke
 
 from typing import Any
 
-from playwright.async_api import Locator, Page
+from playwright.async_api import Frame, Locator, Page
 
 from linkit_all.apply.answers import Question
 
@@ -93,7 +93,9 @@ async def fill(page: Page, q: Question, value: Any) -> None:
     )
 
 
-async def fill_in(page: Page, box: Locator, field: Locator, q: Question, value: Any) -> None:
+async def fill_in(
+    page: Page | Frame, box: Locator, field: Locator, q: Question, value: Any
+) -> None:
     """`box` holds the question's controls (or is the control itself), `field` is the one
     to type into. Shared by the ATS handlers and the generic form agent."""
     try:
@@ -122,12 +124,12 @@ async def fill_in(page: Page, box: Locator, field: Locator, q: Question, value: 
         raise FillError(f"could not fill {q.label!r}: {e}") from e
 
 
-def _inside(page: Page, box: Locator, css: str) -> Locator:
+def _inside(page: Page | Frame, box: Locator, css: str) -> Locator:
     """`css` below `box`, or `box` itself when it is that element."""
     return box.locator(css).or_(box.and_(page.locator(css)))
 
 
-async def _choose(page: Page, box: Any, text: str, role: str) -> None:
+async def _choose(page: Page | Frame, box: Any, text: str, role: str) -> None:
     control = box.get_by_role(role, name=text, exact=True)
     if await control.count():
         await control.first.check()
@@ -138,7 +140,7 @@ async def _choose(page: Page, box: Any, text: str, role: str) -> None:
     await label.first.click()
 
 
-async def _combobox(page: Page, field: Locator, text: str, exact: bool) -> None:
+async def _combobox(page: Page | Frame, field: Locator, text: str, exact: bool) -> None:
     """React-select style: type, then pick the option from the opened list."""
     await field.click()
     await field.fill(text)
@@ -155,7 +157,7 @@ _TEXT_KINDS = {"text", "textarea", "email", "tel", "number", "url", "date"}
 
 
 async def lost_values(
-    page: Page, questions: list[Question], answers: dict[str, Any]
+    page: Page | Frame, questions: list[Question], answers: dict[str, Any]
 ) -> list[Question]:
     """Text fields whose value did not stick (React forms can reset fields while hydrating)."""
     lost = []

@@ -1,4 +1,4 @@
-() => {
+(prefix) => {  // prefix: makes ids unique across the page's frames
   const S = (window.__lkAgent ||= {n: 0, ids: new WeakMap(), groups: new WeakMap(), g: 0});
   const clean = (t) => (t || '').replace(/[*✱]/g, '').replace(/\s+/g, ' ').trim();
   const parent = (n) => n.parentElement || (n.getRootNode() instanceof ShadowRoot ? n.getRootNode().host : null);
@@ -150,7 +150,7 @@
     const name = clean(raw).slice(0, 240);
     if (kind === 'button' && !name) continue;  // nothing to choose it by (hidden helper buttons)
 
-    if (!S.ids.has(first)) S.ids.set(first, 'a' + S.n++);
+    if (!S.ids.has(first)) S.ids.set(first, (prefix || '') + 'a' + S.n++);
     const id = S.ids.get(first);
     tok(tagEl, id);
     first.setAttribute('data-lk-input', id);

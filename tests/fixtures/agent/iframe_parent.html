@@ -1,0 +1,17 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>SYNTHETIC careers page with an embedded form (hand-written test fixture)</title></head>
+<body>
+<!-- Synthetic fixture for tests/e2e/test_agent_iframe.py. Not copied from any real site.
+     __SRC__ and __HIDDEN__ are replaced by the test with the embeds' URLs. -->
+<h1>Backend Engineer</h1>
+<div>
+  <label for="referral">Referral code</label>
+  <input id="referral" name="referral" type="text">
+</div>
+<iframe id="embed" title="Application" src="__SRC__" width="600" height="700"></iframe>
+<!-- helper frames the agent must ignore: hidden, and parked off-screen -->
+<iframe src="__HIDDEN__" style="display:none"></iframe>
+<iframe src="__HIDDEN__" style="position:absolute; left:-9999px" width="300" height="300"></iframe>
+</body>
+</html>

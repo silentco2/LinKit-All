@@ -288,8 +288,7 @@ anywhere; Crawl-delay pacing and per-host rate limits stay. Recorded in CLAUDE.m
    real account creation + IMAP (item 3). Expect to fix handler details found live.
 3. As the maintainer supplies saved pages: write the Workday/iCIMS/Taleo/SuccessFactors/
    SmartRecruiters handlers (plugin + fixture + tests each), then Naukrigulf.
-4. Pay down the debt below, roughly in this order: live-view event per job; iframes in the
-   generic agent; generic sign-up; Arabic server messages; phone
+4. Pay down the debt below, roughly in this order: live-view event per job; generic sign-up; Arabic server messages; phone
    job-title width; the rest.
 5. Release work once the maintainer says go: GitHub repo, CI on three OSes, PyPI.
 
@@ -334,7 +333,7 @@ anywhere; Crawl-delay pacing and per-host rate limits stay. Recorded in CLAUDE.m
   interception. Links it finds on a known ATS board are handed to that ATS plugin (its JSON API
   replaces the generic stubs for the board; a failing board keeps them), tested only with fakes.
   JS-only job pages on unknown sites still keep the listing's title and get no description.
-- Generic agent ignores iframes, and there is no generic sign-up (sign-in pages park).
+- There is no generic sign-up (sign-in pages park).
 - A combobox with no fixed options (city, country) picks the first suggestion after typing.
 - Live submission is untested against real sites (CAPTCHA behavior unknown).
 - `two_factor` and captcha resolution is manual: "Open in app browser", solve, then Retry.

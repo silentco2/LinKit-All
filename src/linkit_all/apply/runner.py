@@ -33,13 +33,15 @@ from linkit_all.apply.accounts import (
     mark_active,
 )
 from linkit_all.apply.agent import (
-    PAGE_TEXT,
     captcha_shown,
     field_map,
+    locate,
     page_errors,
+    page_text,
     press_next,
     snapshot,
     step,
+    wait_for_confirmation,
 )
 from linkit_all.apply.answers import ApplicationAnswers, Context, Missing, Question
 from linkit_all.apply.assist import AnswerBank, answer_questions, profile_summary
@@ -47,7 +49,7 @@ from linkit_all.apply.browser import live_frames, live_shot_path, profile_dir
 from linkit_all.apply.email_verify import EmailLoginError, credentials, wait_for_verification
 from linkit_all.apply.form import FillError, fill, lost_values
 from linkit_all.apply.handlers import HANDLERS, Handler, JobInfo
-from linkit_all.apply.handlers.base import GENERIC_CONFIRMATION, wait_for_text
+from linkit_all.apply.handlers.base import GENERIC_CONFIRMATION
 from linkit_all.apply.vault import Vault, vault_for
 from linkit_all.core.config import Settings
 from linkit_all.core.models import (
@@ -471,10 +473,10 @@ class Applier:
                     _park(s, job, ActionKind.confirm_submit, message, [], filled, shots[-1:])
                     return Outcome("needs_user", "waiting for your confirmation", shots[-1:])
                 transition(s, job, JobState.applying, "submitting")
-            submit = page.locator(f'[data-lk-agent~="{r.button.id}"]')
+            submit = await locate(page, r.button.id)
             await click_submit(page, submit, dry_run=not live)
             done = str(out_dir / "after_submit.png")
-            seen = await wait_for_text(page, GENERIC_CONFIRMATION)
+            seen = await wait_for_confirmation(page, GENERIC_CONFIRMATION)
             confirmed = seen and not await self._form_again(page)
             await page.screenshot(path=done, full_page=True)
             proof = [shots[-1], done]
@@ -503,8 +505,9 @@ class Applier:
             controls = await snapshot(page)
             if not controls:
                 return False
-            text: str = await page.evaluate(PAGE_TEXT)
-            fmap = await field_map(self.provider, controls, await page.title(), text)
+            fmap = await field_map(
+                self.provider, controls, await page.title(), await page_text(page)
+            )
         except Exception:
             return False
         return fmap.page_kind in ("form", "review", "login", "signup")

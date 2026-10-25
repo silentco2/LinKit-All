@@ -8,15 +8,22 @@ page; it never clicks Submit, the runner's guarded `click_submit` path does.
 Controls are tagged on the page: singles carry `data-lk-agent~="<id>"` themselves, groups
 (radios, checkbox lists, yes/no toggles) tag their common wrapper, and the first control also
 gets `data-lk-input="<id>"`, so `form.fill_in` and `form.lost_values` work unchanged.
+
+Forms inside iframes (same- or cross-origin) are read the same way, one frame at a time. Ids
+carry a per-frame prefix so they stay unique page-wide, and `locate` finds the frame a tagged
+control lives in. CAPTCHA frames are never read: they only park the job.
 """
 
+import asyncio
 import re
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
+from weakref import WeakKeyDictionary
 
 from loguru import logger
-from playwright.async_api import Page
+from playwright.async_api import Frame, Locator, Page
 from pydantic import BaseModel
 
 from linkit_all.apply.answers import Context, Kind, Missing, Question
@@ -27,9 +34,13 @@ from linkit_all.providers.base import LLMProvider, render
 
 _SNAPSHOT = (Path(__file__).parent / "snapshot.js").read_text("utf-8")
 
-PAGE_TEXT = (
-    "() => (document.body ? document.body.innerText : '').replace(/\\s+/g, ' ').slice(0, 800)"
-)
+_BODY_TEXT = "() => (document.body ? document.body.innerText : '')"
+
+# ponytail: the page plus 3 levels of iframes, 12 frames in all; deeper or more embeds are not read.
+_MAX_DEPTH = 3
+_MAX_FRAMES = 12
+_CAPTCHA_FRAME = re.compile(r"captcha|turnstile|challenges\.cloudflare\.com", re.I)
+_prefixes: WeakKeyDictionary[Frame, str] = WeakKeyDictionary()
 
 _SUBMIT = re.compile(r"\b(submit|apply|send)\b", re.I)
 _NEXT = re.compile(r"\b(next|continue|proceed|review|forward|save and)\b", re.I)
@@ -63,11 +74,98 @@ class Control:
         )
 
 
+# --- frames ------------------------------------------------------------------------------
+
+
+async def _frame_shown(frame: Frame) -> bool:
+    """The iframe element is rendered and not parked far off-screen (hidden helper frames)."""
+    try:
+        el = await frame.frame_element()
+        box = await el.bounding_box()
+        return (
+            await el.is_visible()
+            and box is not None
+            and box["x"] + box["width"] > 0
+            and box["x"] < 20000
+        )
+    except Exception:  # detached or navigating
+        return False
+
+
+async def _walk(frame: Frame, depth: int, out: list[Frame]) -> None:
+    out.append(frame)
+    if depth >= _MAX_DEPTH:
+        return
+    for child in frame.child_frames:
+        if len(out) >= _MAX_FRAMES:
+            return
+        if child.is_detached() or _CAPTCHA_FRAME.search(child.url) or not await _frame_shown(child):
+            continue
+        await _walk(child, depth + 1, out)
+
+
+async def frames_of(page: Page) -> list[Frame]:
+    """The main frame and the visible child frames worth reading, parents first. CAPTCHA
+    frames are left out: their controls are never ours to touch."""
+    out: list[Frame] = []
+    await _walk(page.main_frame, 0, out)
+    return out
+
+
+def _prefix(frame: Frame) -> str:
+    """Id prefix of a frame: none for the main frame, so single-frame pages are unchanged."""
+    if frame.parent_frame is None:
+        return ""
+    return _prefixes.setdefault(frame, f"f{len(_prefixes) + 1}_")
+
+
 async def snapshot(page: Page) -> list[Control]:
-    """Visible, enabled form controls in page order (open shadow roots included; iframes
-    are not entered). Tags them on the page and keeps ids stable across calls."""
-    raw: list[dict[str, Any]] = await page.evaluate(_SNAPSHOT)
-    return [Control(**r) for r in raw]
+    """Visible, enabled form controls in page order (open shadow roots and iframes included).
+    Tags them on the page and keeps ids stable across calls."""
+    controls: list[Control] = []
+    for frame in await frames_of(page):
+        try:
+            raw: list[dict[str, Any]] = await frame.evaluate(_SNAPSHOT, _prefix(frame))
+        except Exception as e:  # a frame that navigates or detaches mid-read
+            logger.debug("skipping frame {}: {}", frame.url, e)
+            continue
+        controls += [Control(**r) for r in raw]
+    return controls
+
+
+async def locate(page: Page, key: str) -> Locator:
+    """The tagged element for a control id, in whichever frame holds it."""
+    css = f'[data-lk-agent~="{key}"]'
+    for frame in await frames_of(page):
+        loc = frame.locator(css)
+        if await loc.count():
+            return loc.first
+    return page.locator(css).first
+
+
+async def page_text(page: Page, limit: int = 800) -> str:
+    """Rendered text of the page and its frames (a form in an iframe has its words there)."""
+    parts = []
+    for frame in await frames_of(page):
+        try:
+            parts.append(await frame.evaluate(_BODY_TEXT))
+        except Exception as e:  # a frame that navigates or detaches mid-read
+            logger.debug("no text from frame {}: {}", frame.url, e)
+    return " ".join(" ".join(parts).split())[:limit]
+
+
+async def wait_for_confirmation(
+    page: Page, pattern: re.Pattern[str], timeout_ms: int = 25000
+) -> bool:
+    """True once the text of the page or of any frame matches `pattern` (case-insensitive)."""
+    rx = re.compile(pattern.pattern, re.I)
+    end = time.monotonic() + timeout_ms / 1000
+    while True:
+        if rx.search(await page_text(page, 100_000)):
+            return True
+        if time.monotonic() >= end:
+            return False
+        await asyncio.sleep(0.5)
 
 
 # --- the model's field map ---------------------------------------------------------------
@@ -153,38 +251,50 @@ def _norm(text: str) -> str:
 # --- acting on the page ------------------------------------------------------------------
 
 
-async def _fill(page: Page, q: Question, value: Any) -> None:
-    box = page.locator(f'[data-lk-agent~="{q.key}"]').first
-    await fill_in(page, box, page.locator(f'[data-lk-input="{q.key}"]'), q, value)
+async def _frame_of(page: Page, key: str) -> Frame:
+    """The frame holding control `key` (the main frame if it is not found)."""
+    for frame in await frames_of(page):
+        if await frame.locator(f'[data-lk-input="{key}"]').count():
+            return frame
+    return page.main_frame
+
+
+async def _fill(frame: Frame, q: Question, value: Any) -> None:
+    box = frame.locator(f'[data-lk-agent~="{q.key}"]').first
+    await fill_in(frame, box, frame.locator(f'[data-lk-input="{q.key}"]'), q, value)
 
 
 async def fill_page(
     page: Page, questions: list[Question], answers: dict[str, Any]
 ) -> dict[str, str]:
-    """Fill every answered question through `form.fill_in`. Returns {key: why} for failures."""
+    """Fill every answered question through `form.fill_in`, inside its own frame.
+    Returns {key: why} for failures."""
     failed = {}
+    frames = {q.key: await _frame_of(page, q.key) for q in questions if q.key in answers}
     for q in questions:
         if q.key in answers:
             try:
-                await _fill(page, q, answers[q.key])
+                await _fill(frames[q.key], q, answers[q.key])
             except FillError as e:
                 failed[q.key] = str(e)
-    for q in await lost_values(page, questions, answers):  # React forms can reset fields
-        try:
-            await _fill(page, q, answers[q.key])
-            failed.pop(q.key, None)
-        except FillError as e:
-            failed[q.key] = str(e)
+    for frame in dict.fromkeys(frames.values()):
+        mine = [q for q in questions if frames.get(q.key) is frame]
+        for q in await lost_values(frame, mine, answers):  # React forms can reset fields
+            try:
+                await _fill(frame, q, answers[q.key])
+                failed.pop(q.key, None)
+            except FillError as e:
+                failed[q.key] = str(e)
     return failed
 
 
 async def page_errors(page: Page) -> list[str]:
-    """Visible validation messages (same selector the ATS handlers use)."""
-    found = page.locator(ERRORS).locator("visible=true")
-    texts = [
-        " ".join((await found.nth(i).inner_text()).split())
-        for i in range(min(await found.count(), 30))
-    ]
+    """Visible validation messages of the page and its frames (same selector as the handlers)."""
+    texts = []
+    for frame in await frames_of(page):
+        found = frame.locator(ERRORS).locator("visible=true")
+        for i in range(min(await found.count(), 30)):
+            texts.append(" ".join((await found.nth(i).inner_text()).split()))
     return sorted({t for t in texts if t})[:10]
 
 
@@ -250,8 +360,7 @@ async def step(
         return StepResult("other", "stop", reason="no form controls on the page")
     if any(c.kind == "password" for c in controls):
         return StepResult("login", "stop", reason="sign-in or sign-up page: needs the account flow")
-    page_text: str = await page.evaluate(PAGE_TEXT)
-    fmap = await field_map(provider, controls, await page.title(), page_text)
+    fmap = await field_map(provider, controls, await page.title(), await page_text(page))
     if fmap.page_kind not in ("form", "review"):
         return StepResult(fmap.page_kind, "stop", reason=f"page looks like: {fmap.page_kind}")
 
@@ -293,9 +402,13 @@ async def press_next(page: Page, result: StepResult) -> None:
         raise AgentError("only a Next button may be pressed here; Submit goes through click_submit")
     if not result.ready:
         raise AgentError("required answers are still open on this page")
-    await page.locator(f'[data-lk-agent~="{result.button.id}"]').first.click()
+    await (await locate(page, result.button.id)).click()
 
 
 async def captcha_shown(page: Page) -> bool:
-    frames = page.locator(CAPTCHA)
-    return any([await frames.nth(i).is_visible() for i in range(await frames.count())])
+    """A CAPTCHA challenge frame is visible, on the page or inside one of its frames."""
+    for frame in await frames_of(page):
+        found = frame.locator(CAPTCHA)
+        if any([await found.nth(i).is_visible() for i in range(await found.count())]):
+            return True
+    return False
