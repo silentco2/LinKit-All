@@ -713,12 +713,17 @@ def score_scam(
         add("company_missing", 14, "no company name")
 
     trusted = False
-    if apply_url and (host := _host(apply_url)):
+    if (
+        apply_url
+        and not apply_url.strip().lower().startswith("mailto:")
+        and (host := _host(apply_url))
+    ):
         root = _root(host)
         if root in _trusted_roots():
             trusted = True
         elif (
             root not in _KNOWN_BOARDS
+            and root != "linkedin.com"  # a LinkedIn post links out by design
             and _host_matches_company(host, company or "", company_domain_hint) is False
         ):
             add("apply_domain_mismatch", 20, host)

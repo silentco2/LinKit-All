@@ -31,6 +31,14 @@ def codes(v: Verdict) -> set[str]:
 # ---- one test per signal, EN + AR --------------------------------------------------------------
 
 
+def test_apply_domain_mismatch_skips_mailto_and_linkedin_posts() -> None:
+    assert "apply_domain_mismatch" not in codes(run("x", url="mailto:hr@gmail.com"))
+    assert "apply_domain_mismatch" not in codes(
+        run("x", url="https://www.linkedin.com/feed/update/urn:li:activity:1/#2")
+    )
+    assert "apply_domain_mismatch" in codes(run("x", url="https://sites.google.com/view/acme-hr"))
+
+
 @pytest.mark.parametrize(
     "text",
     [
