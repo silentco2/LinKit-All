@@ -1,0 +1,5 @@
+{"pageIndex":0,"pageSize":500,"totalCount":3,"totalPages":1,"jobs":[
+{"jobOfferKey":"3aa5b098-aa6d-4f6c-950a-b92a81363cf8","title":"DevOps Engineer","company":"Sollers Consulting","locations":["Bydgoszcz"],"description":"<p>Build pipelines.</p><script>x()</script>","url":"https://solid.jobs/o/s6evgozq/linkit","isRemote":false,"isHybrid":true,"contractTime":"full_time","experienceLevel":"Junior","validFrom":"2026-08-10T17:45:00.8735683+02:00","skills":[{"level":"Basic","name":"Docker"},{"level":"Basic","name":"Kubernetes"}]},
+{"jobOfferKey":"b1","title":"Remote QA","company":"Acme","locations":["Warsaw","Krakow"],"description":"<p>Test.</p>","url":"https://solid.jobs/o/b1/linkit","isRemote":true,"isHybrid":false,"validFrom":"2026-08-09T10:00:00+02:00","skills":[]},
+{"jobOfferKey":"","title":"NoID","company":"Ghost"}
+]}

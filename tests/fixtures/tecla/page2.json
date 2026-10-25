@@ -1,0 +1,3 @@
+{"success":true,"data":{"jobs":[
+{"id":3400,"name":"Product Designer","company":{"name":"Acme"},"createdAt":"","description":"<p>Design</p>"}
+],"pagination":{"countPages":2,"current":2}}}

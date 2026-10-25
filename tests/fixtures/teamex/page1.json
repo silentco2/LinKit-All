@@ -1,0 +1,5 @@
+{"data":{"paging":{"totalCount":3},"data":[
+{"sequenceId":1506,"title":"Senior Full-Stack Engineer","isActive":true,"isAnonymous":false,"publishedDate":"2026-07-06T13:52:49.765Z","yearsOfExperienceMin":6,"descriptions":[{"title":"Overview","content":"<p>Build systems.</p><script>x()</script>"}],"countries":[{"name":"Argentina","code":"AR"},{"name":"Costa Rica","code":"CR"}],"requiredSkills":[{"skill":{"displayName":"Docker"}},{"skill":{"displayName":"React"}}],"company":{"name":"Acme Health"}},
+{"sequenceId":2,"title":"Closed role","isActive":false,"company":{"name":"B"},"countries":[]},
+{"sequenceId":9,"title":"Hidden Employer","isActive":true,"isAnonymous":true,"company":{"name":"Secret Corp"},"countries":[]}
+]}}

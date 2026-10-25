@@ -1,0 +1,4 @@
+{"success":true,"data":{"jobs":[
+{"id":3301,"name":"Practice / Business Development","company":{"name":"Sliiip"},"createdAt":"2026-05-25T17:02:00.864421","description":"<p>Grow it</p><script>alert(1)</script>"},
+{"id":3308,"name":"Founding Software Engineer","company":{"name":"Psyflo"},"createdAt":"2026-06-09T01:28:17.971898","description":"<p>Own it</p>"}
+],"pagination":{"countPages":2,"current":1}}}
