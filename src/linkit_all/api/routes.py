@@ -371,7 +371,8 @@ def job_detail(request: Request, job_id: int) -> dict[str, Any]:
         salary = {k: job.data.get(f"salary_{k}") for k in ("min", "max", "currency", "interval")}
         history = [
             {"id": e.id, "at": e.at.isoformat(), "from": e.from_state, "to": e.to_state,
-             "message": e.message, "screenshots": len(e.artifacts)}
+             "message": e.message, "code": e.code, "params": e.params,
+             "screenshots": len(e.artifacts)}
             for e in events
         ]  # fmt: skip
         tailored = s.scalars(
@@ -430,7 +431,10 @@ def job_actions(request: Request, body: JobAction) -> dict[str, Any]:
                 errors[job_id] = "not found"
                 continue
             try:
-                transition(s, job, target, f"you chose {body.action} in the UI")
+                transition(
+                    s, job, target, f"you chose {body.action} in the UI",
+                    code=f"chose_{body.action}",
+                )  # fmt: skip
                 done += 1
             except InvalidTransition as e:
                 errors[job_id] = str(e)
@@ -553,6 +557,8 @@ def _action(item: ActionItem, job: Job) -> dict[str, Any]:
         "kind": item.kind,
         "status": item.status,
         "message": item.message,
+        "code": item.code,
+        "params": item.params,
         "questions": item.questions,
         "answers": item.answers,
         "screenshots": len(item.artifacts),
@@ -715,12 +721,17 @@ def resolve_action(request: Request, item_id: int, body: ActionDecision) -> dict
         if body.decision == "confirm":
             job.data = {**job.data, "submit_confirmed": True}
         if body.decision == "skip":
-            transition(s, job, JobState.skipped, "you skipped it in the Action Center")
+            transition(
+                s, job, JobState.skipped, "you skipped it in the Action Center", code="skipped"
+            )
         elif body.decision == "applied_by_hand":
-            transition(s, job, JobState.applying, "you applied by hand")
-            transition(s, job, JobState.applied, "you applied by hand")
+            transition(s, job, JobState.applying, "you applied by hand", code="applied_by_hand")
+            transition(s, job, JobState.applied, "you applied by hand", code="applied_by_hand")
         else:
-            transition(s, job, JobState.queued_apply, f"Action Center: {body.decision}")
+            transition(
+                s, job, JobState.queued_apply, f"Action Center: {body.decision}",
+                code=f"decision_{body.decision}",
+            )  # fmt: skip
         item.status = ActionStatus.dismissed if body.decision == "skip" else ActionStatus.resolved
         item.resolved_at = utcnow()
         return {"job_state": job.state}

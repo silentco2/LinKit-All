@@ -1,6 +1,6 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { Api } from '../api';
-import { I18n, TPipe } from '../i18n';
+import { I18n, MsgPipe, TPipe } from '../i18n';
 import { Live } from '../live';
 import { fmtNum, labelOr, localeOf } from '../locale';
 import { ActionDecision, ActionItem, ActionKind, ActionQuestion, AnswerValue, Status } from '../types';
@@ -18,7 +18,7 @@ const SOURCES: Record<string, string> = {
 
 @Component({
   selector: 'app-actions',
-  imports: [TPipe],
+  imports: [MsgPipe, TPipe],
   template: `
     <h1>{{ 'actions.title' | t }}</h1>
     <p class="mt-1 text-sm text-slate-500">{{ 'actions.intro' | t }}</p>
@@ -38,7 +38,7 @@ const SOURCES: Record<string, string> = {
             </div>
           </header>
 
-          @if (a.message) { <p class="mt-3 text-sm text-slate-700 dark:text-slate-300" dir="auto">{{ a.message }}</p> }
+          @if (a.message) { <p class="mt-3 text-sm text-slate-700 dark:text-slate-300" dir="auto">{{ a | msg }}</p> }
           @if (hasHelp(a.kind)) { <div class="alert alert-info mt-3">{{ 'actions.help.' + a.kind | t }}</div> }
 
           @if (a.screenshots) {

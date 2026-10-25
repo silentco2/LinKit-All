@@ -5,7 +5,7 @@ import {
   LineElement, PointElement, Tooltip,
 } from 'chart.js';
 import { Api } from '../api';
-import { I18n, TPipe } from '../i18n';
+import { I18n, SourcePipe, TPipe } from '../i18n';
 import { Live } from '../live';
 import { fmtNum, labelOr, localeOf } from '../locale';
 import { Report } from '../types';
@@ -41,7 +41,7 @@ const FUNNEL: Record<string, string> = {
 
 @Component({
   selector: 'app-report',
-  imports: [DatePipe, KeyValuePipe, NgTemplateOutlet, TPipe],
+  imports: [DatePipe, KeyValuePipe, NgTemplateOutlet, SourcePipe, TPipe],
   template: `
     <div class="flex flex-wrap items-center justify-between gap-3">
       <h1>{{ 'report.title' | t }}</h1>
@@ -77,8 +77,8 @@ const FUNNEL: Record<string, string> = {
 
       <section class="card mt-6 overflow-x-auto">
         <h2>{{ 'report.platform.title' | t }}</h2>
-        <ng-container *ngTemplateOutlet="outcomes; context: { $implicit: r.per_platform.source, label: 'report.col.source' }" />
-        <ng-container *ngTemplateOutlet="outcomes; context: { $implicit: r.per_platform.ats, label: 'report.col.ats' }" />
+        <ng-container *ngTemplateOutlet="outcomes; context: { $implicit: r.per_platform.source, label: 'report.col.source', names: true }" />
+        <ng-container *ngTemplateOutlet="outcomes; context: { $implicit: r.per_platform.ats, label: 'report.col.ats', names: true }" />
       </section>
 
       <section class="card mt-6 overflow-x-auto">
@@ -95,7 +95,7 @@ const FUNNEL: Record<string, string> = {
           <tbody>
             @for (s of r.sources | keyvalue; track s.key) {
               <tr class="border-t border-slate-100 dark:border-slate-800">
-                <td class="py-2 font-medium"><bdi>{{ s.key }}</bdi></td>
+                <td class="py-2 font-medium"><bdi>{{ s.key | src }}</bdi></td>
                 <td class="text-end">{{ num(s.value['total']) }}</td>
                 <td class="text-end">{{ num(s.value['filtered_out'] ?? 0) }}</td>
                 <td class="text-end">{{ num(s.value['awaiting_review'] ?? 0) }}</td>
@@ -154,7 +154,7 @@ const FUNNEL: Record<string, string> = {
       </section>
     }
 
-    <ng-template #outcomes let-rows let-label="label">
+    <ng-template #outcomes let-rows let-label="label" let-names="names">
       <table class="mt-3 w-full text-sm">
         <thead class="text-start text-xs tracking-wide text-slate-500 uppercase rtl:tracking-normal">
           <tr><th class="py-2">{{ label | t }}</th><th class="text-end">{{ 'report.col.found' | t }}</th><th class="text-end">{{ 'report.col.applied' | t }}</th><th class="text-end">{{ 'report.col.failed' | t }}</th><th class="text-end">{{ 'report.col.skipped' | t }}</th><th class="text-end">{{ 'report.col.needsYou' | t }}</th></tr>
@@ -162,7 +162,7 @@ const FUNNEL: Record<string, string> = {
         <tbody>
           @for (row of rows; track row.name) {
             <tr class="border-t border-slate-100 dark:border-slate-800">
-              <td class="py-2 font-medium"><bdi>{{ row.name }}</bdi></td>
+              <td class="py-2 font-medium"><bdi>{{ names ? (row.name | src) : row.name }}</bdi></td>
               <td class="text-end">{{ num(row.found) }}</td>
               <td class="text-end">{{ num(row.applied) }}</td>
               <td class="text-end">{{ num(row.failed) }}</td>

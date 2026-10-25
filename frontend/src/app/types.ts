@@ -182,7 +182,7 @@ export interface JobDetail extends JobRow {
   ats: string | null;
   apply_url: string | null;
   salary: { min: number | null; max: number | null; currency: string | null; interval: string | null };
-  events: { at: string; from: string | null; to: string; message: string }[];
+  events: { at: string; from: string | null; to: string; message: string; code?: string | null; params?: Record<string, unknown> | null }[];
 }
 
 export interface LiveEvent {
@@ -243,6 +243,9 @@ export interface ActionItem {
   kind: ActionKind;
   status: string;
   message: string;
+  /** Stable id of the park reason (`park.<code>` in the dictionary); null on old rows. */
+  code?: string | null;
+  params?: Record<string, unknown> | null;
   questions: ActionQuestion[];
   /** What was filled: label -> value and where it came from (profile, sensitive, bank, ai, file). */
   answers: Record<string, { value: unknown; source: string }>;

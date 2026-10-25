@@ -1,6 +1,7 @@
 """Job state machine. Every transition writes a `job_events` row (CLAUDE.md §4)."""
 
 from collections.abc import Iterable
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -42,6 +43,8 @@ def transition(
     to: JobState,
     message: str = "",
     artifacts: Iterable[str] = (),
+    code: str | None = None,
+    params: dict[str, Any] | None = None,
 ) -> bool:
     """Move `job` to `to` and log the event. Same state is a no-op (stages are idempotent).
 
@@ -53,7 +56,13 @@ def transition(
         raise InvalidTransition(f"job {job.id}: {job.state} -> {to}")
     session.add(
         JobEvent(
-            job=job, from_state=job.state, to_state=to, message=message, artifacts=list(artifacts)
+            job=job,
+            from_state=job.state,
+            to_state=to,
+            message=message,
+            code=code,
+            params=params or {},
+            artifacts=list(artifacts),
         )
     )
     job.state = to

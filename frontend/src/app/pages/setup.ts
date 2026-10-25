@@ -2,7 +2,7 @@ import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Api } from '../api';
-import { I18n, TPipe } from '../i18n';
+import { I18n, SourcePipe, TPipe } from '../i18n';
 import { ApiKeyProvider, ApplicationAnswers, EmailState, expandQueries, JobSource, lines, Profile, Provider, SearchConfig, Segment, SourceList, Status, unlines, WorkMode } from '../types';
 
 type LocalServer = 'ollama' | 'lmstudio';
@@ -12,7 +12,7 @@ type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_
 // Labels in the arrays below are i18n keys; the template runs them through the `t` pipe.
 @Component({
   selector: 'app-setup',
-  imports: [FormsModule, TPipe],
+  imports: [FormsModule, SourcePipe, TPipe],
   template: `
     <h1>{{ 'setup.title' | t }}</h1>
     <p class="mt-1 text-sm text-slate-500">{{ 'setup.subtitle' | t }}</p>
@@ -190,7 +190,7 @@ type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_
                 <legend class="label">{{ 'setup.search.sites' | t }}</legend>
                 <div class="flex flex-wrap gap-4">
                   @for (site of jobspySites; track site) {
-                    <label class="flex items-center gap-2 text-sm"><input type="checkbox" [checked]="cfg.sources.jobspy.includes(site)" (change)="toggle(cfg.sources.jobspy, site)"><bdi>{{ site }}</bdi></label>
+                    <label class="flex items-center gap-2 text-sm"><input type="checkbox" [checked]="cfg.sources.jobspy.includes(site)" (change)="toggle(cfg.sources.jobspy, site)"><bdi>{{ site | src }}</bdi></label>
                   }
                   @for (site of regionalSites; track site.id) {
                     <label class="flex items-center gap-2 text-sm"><input type="checkbox" [checked]="cfg.sources.regional.includes(site.id)" (change)="toggle(cfg.sources.regional, site.id)"><bdi>{{ site.label }}</bdi></label>

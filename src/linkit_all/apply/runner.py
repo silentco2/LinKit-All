@@ -163,11 +163,25 @@ def site_key(job: Job) -> str:
     return urlparse(job.data.get("apply_url") or job.url or "").netloc.lower() or "unknown"
 
 
-def _event(s: Session, job: Job, message: str, artifacts: list[str]) -> None:
-    """History entry without a state change (e.g. a dry run)."""
+def _event(
+    s: Session,
+    job: Job,
+    message: str,
+    artifacts: list[str],
+    code: str | None = None,
+    params: dict[str, Any] | None = None,
+) -> None:
+    """History entry without a state change (e.g. a dry run). `code`/`params` let the UI show
+    the message in the user's language; the English `message` stays for the CLI and logs."""
     s.add(
         JobEvent(
-            job=job, from_state=job.state, to_state=job.state, message=message, artifacts=artifacts
+            job=job,
+            from_state=job.state,
+            to_state=job.state,
+            message=message,
+            code=code,
+            params=params or {},
+            artifacts=artifacts,
         )
     )
 
@@ -180,20 +194,25 @@ def _park(
     questions: list[dict[str, Any]],
     answers: dict[str, Any],
     artifacts: list[str],
+    code: str,
+    params: dict[str, Any] | None = None,
 ) -> None:
+    params = params or {}
     s.add(
         ActionItem(
             job_id=job.id,
             kind=kind,
             message=message,
+            code=code,
+            params=params,
             questions=questions,
             answers=answers,
             artifacts=artifacts,
         )
     )
     if job.state != JobState.applying:
-        transition(s, job, JobState.applying, "filling the application")
-    transition(s, job, JobState.needs_user, message, artifacts)
+        transition(s, job, JobState.applying, "filling the application", code="filling")
+    transition(s, job, JobState.needs_user, message, artifacts, code, params)
 
 
 def _missing_dict(m: Missing) -> dict[str, Any]:
@@ -387,7 +406,7 @@ class Applier:
             with self.db.begin() as s:
                 job = s.get_one(Job, job_id)
                 if job.state != JobState.applying:
-                    transition(s, job, JobState.applying, "filling the application")
+                    transition(s, job, JobState.applying, "filling the application", code="filling")
                 transition(s, job, JobState.failed, f"{type(e).__name__}: {e}")
             return Outcome("failed", str(e))
         except asyncio.CancelledError:  # another site hit ApplyBlocked and stopped this run
@@ -395,7 +414,13 @@ class Applier:
             with self.db.begin() as s:
                 job = s.get_one(Job, job_id)
                 if job.state == JobState.applying:  # may or may not have been submitted
-                    transition(s, job, JobState.failed, "run stopped mid-application: check site")
+                    transition(
+                        s,
+                        job,
+                        JobState.failed,
+                        "run stopped mid-application: check site",
+                        code="run_stopped",
+                    )
             raise
         finally:
             live.cancel()
@@ -436,19 +461,23 @@ class Applier:
         def park(
             kind: ActionKind,
             message: str,
+            code: str,
+            params: dict[str, Any] | None = None,
             questions: list[dict[str, Any]] | None = None,
             answers: dict[str, Any] | None = None,
         ) -> Outcome:
             with self.db.begin() as s:
                 job = s.get_one(Job, info.id)
-                _park(s, job, kind, message, questions or [], answers or {}, shots[-1:])
+                _park(
+                    s, job, kind, message, questions or [], answers or {}, shots[-1:], code, params
+                )
             return Outcome("needs_user", message, shots[-1:])
 
         def fail(reason: str) -> Outcome:
             with self.db.begin() as s:
                 job = s.get_one(Job, info.id)
                 if job.state != JobState.applying:
-                    transition(s, job, JobState.applying, "filling the application")
+                    transition(s, job, JobState.applying, "filling the application", code="filling")
                 transition(s, job, JobState.failed, reason, shots[-1:])
             return Outcome("failed", reason, shots[-1:])
 
@@ -460,22 +489,32 @@ class Applier:
             await page.screenshot(path=shots[-1], full_page=True)
             filled.update(_summary(r.questions, r.answers, r.sources))
             if await captcha_shown(page):
-                return park(ActionKind.captcha, CAPTCHA_MSG)
+                return park(ActionKind.captcha, CAPTCHA_MSG, "captcha")
             if r.page_kind in ("login", "signup"):
                 return park(
                     ActionKind.login_issue,
                     f"This site needs an account: {hand_off('sign in')}",
+                    "account_needed",
                 )
             if r.missing:
                 return park(
                     ActionKind.unknown_question,
                     f"{len(r.missing)} question(s) need your answer",
+                    "unknown_question",
+                    {"n": len(r.missing)},
                     [_missing_dict(m) for m in r.missing],
                 )
             if r.failed or r.unfilled or r.errors:
                 empty = [f"{label}: still empty" for label in r.unfilled]
                 problems = [*r.failed.values(), *empty, *r.errors]
-                return park(ActionKind.validation_error, "; ".join(problems)[:500], answers=filled)
+                detail = "; ".join(problems)[:500]
+                return park(
+                    ActionKind.validation_error,
+                    detail,
+                    "validation_error",
+                    {"detail": detail},
+                    answers=filled,
+                )
             if r.action == "stop" or r.button is None:
                 return fail(r.reason or "the form agent found no way forward")
             if r.action == "next":
@@ -488,16 +527,32 @@ class Applier:
                 msg = f"{len(filled)} fields filled on {n} pages"
                 with self.db.begin() as s:
                     job = s.get_one(Job, info.id)
-                    _event(s, job, f"dry run: {msg}, not submitted", shots)
+                    _event(
+                        s,
+                        job,
+                        f"dry run: {msg}, not submitted",
+                        shots,
+                        "dry_run_agent",
+                        {"fields": len(filled), "pages": n},
+                    )
                     job.data = {**job.data, "dry_run_at": utcnow().isoformat(), "filled": filled}
                 return Outcome("dry_run", msg, shots)
             with self.db.begin() as s:
                 job = s.get_one(Job, info.id)
                 if not apply_cfg.submit_without_asking and not job.data.get("submit_confirmed"):
                     message = "ready to submit: check the form and confirm"
-                    _park(s, job, ActionKind.confirm_submit, message, [], filled, shots[-1:])
+                    _park(
+                        s,
+                        job,
+                        ActionKind.confirm_submit,
+                        message,
+                        [],
+                        filled,
+                        shots[-1:],
+                        "confirm_submit",
+                    )
                     return Outcome("needs_user", "waiting for your confirmation", shots[-1:])
-                transition(s, job, JobState.applying, "submitting")
+                transition(s, job, JobState.applying, "submitting", code="submitting")
             submit = await locate(page, r.button.id)
             await click_submit(page, submit, dry_run=not live)
             done = str(out_dir / "after_submit.png")
@@ -509,17 +564,22 @@ class Applier:
                 with self.db.begin() as s:
                     job = s.get_one(Job, info.id)
                     job.data = {**job.data, "applied_at": utcnow().isoformat(), "filled": filled}
-                    transition(s, job, JobState.applied, "confirmation page seen", proof)
+                    transition(
+                        s, job, JobState.applied, "confirmation page seen", proof, "confirmed"
+                    )
                 return Outcome("applied", "submitted and confirmed", proof)
             shots.append(done)
             if await captcha_shown(page):
+                return park(ActionKind.captcha, CAPTCHA_MSG, "captcha", answers=filled)
+            if errors := await page_errors(page):
+                detail = "; ".join(errors)[:500]
                 return park(
-                    ActionKind.captcha,
-                    CAPTCHA_MSG,
+                    ActionKind.validation_error,
+                    detail,
+                    "validation_error",
+                    {"detail": detail},
                     answers=filled,
                 )
-            if errors := await page_errors(page):
-                return park(ActionKind.validation_error, "; ".join(errors)[:500], answers=filled)
             return fail("no confirmation page after submitting")
         return fail(f"more than {MAX_AGENT_PAGES} pages: the form agent gave up")
 
@@ -553,30 +613,39 @@ class Applier:
         site = f"{handler.ats} ({tenant})"
         live = self.cfg.apply.live
 
-        async def park(kind: ActionKind, message: str) -> Outcome:
+        async def park(
+            kind: ActionKind, message: str, code: str, params: dict[str, Any] | None = None
+        ) -> Outcome:
             shot = str(out_dir / "account.png")
             await page.screenshot(path=shot)
             with self.db.begin() as s:
-                _park(s, s.get_one(Job, info.id), kind, message, [], {}, [shot])
+                _park(s, s.get_one(Job, info.id), kind, message, [], {}, [shot], code, params)
             return Outcome("needs_user", message, [shot])
 
         vault = self._unlocked_vault()
         if vault is None:
             msg = f"Unlock (or create) the vault so the app can sign in to {site}"
-            return await park(ActionKind.login_issue, msg)
+            return await park(ActionKind.login_issue, msg, "vault_locked", {"site": site})
         account = find_account(vault, handler.ats, tenant)
         if account is None:
             if not live:  # no typing, no clicks: sign-up forms are never touched in a dry run
                 msg = f"would create an account on {site}"
                 with self.db.begin() as s:
                     job = s.get_one(Job, info.id)
-                    _event(s, job, f"dry run: {msg}, not submitted", [])
+                    _event(
+                        s,
+                        job,
+                        f"dry run: {msg}, not submitted",
+                        [],
+                        "dry_run_signup",
+                        {"site": site},
+                    )
                     job.data = {**job.data, "dry_run_at": utcnow().isoformat()}
                 return Outcome("dry_run", msg)
             mail = credentials(self.cfg.email, vault, profile.email)
             if mail is None:
                 msg = "Connect your email in Setup so the app can read the verification email"
-                return await park(ActionKind.login_issue, msg)
+                return await park(ActionKind.login_issue, msg, "email_not_connected")
             account = create_account(  # saved before the sign-up click: a crash never loses it
                 vault, handler.ats, tenant, profile.email, handler.password_rules
             )
@@ -588,10 +657,14 @@ class Applier:
                         self.cfg.email, *mail, handler.site_domains(info), since, self.provider
                     )
                 except EmailLoginError as e:
-                    return await park(ActionKind.login_issue, str(e))
+                    return await park(
+                        ActionKind.login_issue, str(e), "email_login_failed", {"detail": str(e)}
+                    )
                 if found is None or not (found.link or found.code):
                     msg = f"No verification email from {site} arrived in time: check your inbox"
-                    return await park(ActionKind.login_issue, msg)
+                    return await park(
+                        ActionKind.login_issue, msg, "verification_missing", {"site": site}
+                    )
                 if found.link:
                     await handler.follow_link(page, found.link)
                 elif found.code:
@@ -601,10 +674,10 @@ class Applier:
             await handler.login(page, info, account)
             if await handler.two_factor_shown(page):
                 msg = f"{site} wants a sign-in code: {hand_off('enter the code')}"
-                return await park(ActionKind.two_factor, msg)
+                return await park(ActionKind.two_factor, msg, "two_factor", {"site": site})
             if not await handler.signed_in(page):
                 msg = f"{site} rejected the saved login: {hand_off('sign in')}"
-                return await park(ActionKind.login_issue, msg)
+                return await park(ActionKind.login_issue, msg, "login_rejected", {"site": site})
             if account.status != "active":  # e.g. verified by hand after an earlier timeout
                 mark_active(vault, account, handler.ats, tenant)
         await handler.open(page, info)  # back to the application form
@@ -647,6 +720,8 @@ class Applier:
                     [_missing_dict(m) for m in r.missing],
                     {},
                     [shot],
+                    "unknown_question",
+                    {"n": len(r.missing)},
                 )
             return Outcome("needs_user", f"{len(r.missing)} questions need you", [shot])
 
@@ -677,13 +752,22 @@ class Applier:
                     [],
                     filled,
                     [shot],
+                    "validation_error",
+                    {"detail": "; ".join(failed)[:500]},
                 )
             return Outcome("needs_user", "some fields could not be filled", [shot])
 
         with self.db.begin() as s:
             job = s.get_one(Job, info.id)
             if not apply_cfg.live:
-                _event(s, job, f"dry run: {len(filled)} fields filled, not submitted", [shot])
+                _event(
+                    s,
+                    job,
+                    f"dry run: {len(filled)} fields filled, not submitted",
+                    [shot],
+                    "dry_run_filled",
+                    {"fields": len(filled)},
+                )
                 job.data = {**job.data, "dry_run_at": utcnow().isoformat(), "filled": filled}
                 return Outcome("dry_run", f"{len(filled)} fields filled", [shot])
             if not apply_cfg.submit_without_asking and not job.data.get("submit_confirmed"):
@@ -695,9 +779,10 @@ class Applier:
                     [],
                     filled,
                     [shot],
+                    "confirm_submit",
                 )
                 return Outcome("needs_user", "waiting for your confirmation", [shot])
-            transition(s, job, JobState.applying, "submitting")
+            transition(s, job, JobState.applying, "submitting", code="submitting")
 
         await click_submit(page, handler, dry_run=not apply_cfg.live)
         done = str(out_dir / "after_submit.png")
@@ -707,7 +792,9 @@ class Applier:
             job = s.get_one(Job, info.id)
             if confirmed:
                 job.data = {**job.data, "applied_at": utcnow().isoformat(), "filled": filled}
-                transition(s, job, JobState.applied, "confirmation page seen", [shot, done])
+                transition(
+                    s, job, JobState.applied, "confirmation page seen", [shot, done], "confirmed"
+                )
                 return Outcome("applied", "submitted and confirmed", [shot, done])
             if await handler.captcha_shown(page):
                 _park(
@@ -718,15 +805,30 @@ class Applier:
                     [],
                     filled,
                     [done],
+                    "captcha",
                 )
                 return Outcome("needs_user", "captcha", [done])
             if errors := await handler.errors(page):
+                detail = "; ".join(errors)[:500]
                 _park(
-                    s, job, ActionKind.validation_error, "; ".join(errors)[:500], [], filled, [done]
+                    s,
+                    job,
+                    ActionKind.validation_error,
+                    detail,
+                    [],
+                    filled,
+                    [done],
+                    "validation_error",
+                    {"detail": detail},
                 )
                 return Outcome("needs_user", "the form rejected some answers", [done])
             transition(
-                s, job, JobState.failed, "no confirmation page after submitting", [shot, done]
+                s,
+                job,
+                JobState.failed,
+                "no confirmation page after submitting",
+                [shot, done],
+                "no_confirmation",
             )
             return Outcome("failed", "no confirmation seen", [shot, done])
 

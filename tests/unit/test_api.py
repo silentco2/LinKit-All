@@ -24,6 +24,7 @@ from linkit_all.core.models import (
     ActionKind,
     AnswerEntry,
     Job,
+    JobEvent,
     JobState,
     TailoredCV,
     Tier,
@@ -745,3 +746,15 @@ def test_live_frames_writes_then_cleans_up(tmp_path: Path) -> None:
 
     asyncio.run(go())
     assert not out.exists() and not out.with_suffix(".tmp").exists()
+
+
+def test_action_and_event_expose_code_and_params(client: TestClient) -> None:
+    job_id, item_id = park(client, ActionKind.captcha, [])
+    with client.app.state.db.begin() as s:  # type: ignore[attr-defined]
+        item = s.get_one(ActionItem, item_id)
+        item.code, item.params = "two_factor", {"site": "workday (acme)"}
+        s.query(JobEvent).filter_by(job_id=job_id).one().code = "captcha"
+    item_json = client.get("/api/actions").json()[0]
+    assert (item_json["code"], item_json["params"]) == ("two_factor", {"site": "workday (acme)"})
+    event = client.get(f"/api/jobs/{job_id}").json()["events"][-1]
+    assert (event["code"], event["params"]) == ("captcha", {})

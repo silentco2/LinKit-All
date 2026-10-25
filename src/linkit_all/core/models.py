@@ -104,6 +104,8 @@ class JobEvent(Base):
     from_state: Mapped[JobState | None] = mapped_column(_enum(JobState))
     to_state: Mapped[JobState] = mapped_column(_enum(JobState))
     message: Mapped[str] = mapped_column(Text, default="")
+    code: Mapped[str | None] = mapped_column(String(48))  # stable id the UI translates
+    params: Mapped[dict[str, Any]] = mapped_column(default=dict)  # values for that translation
     artifacts: Mapped[list[str]] = mapped_column(default=list)
 
     job: Mapped[Job] = relationship(back_populates="events")
@@ -244,6 +246,8 @@ class ActionItem(Base):
         _enum(ActionStatus), default=ActionStatus.open, index=True
     )
     message: Mapped[str] = mapped_column(Text, default="")
+    code: Mapped[str | None] = mapped_column(String(48))  # stable id the UI translates
+    params: Mapped[dict[str, Any]] = mapped_column(default=dict)  # values for that translation
     questions: Mapped[list[dict[str, Any]]] = mapped_column(default=list)  # asked of the user
     answers: Mapped[dict[str, Any]] = mapped_column(
         default=dict

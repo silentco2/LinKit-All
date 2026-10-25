@@ -1,14 +1,14 @@
 import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { Api } from '../api';
-import { I18n, TPipe } from '../i18n';
+import { I18n, MsgPipe, SourcePipe, TPipe } from '../i18n';
 import { fmtNum, labelOr, localeOf } from '../locale';
 import { JobDetail, TailorPatch } from '../types';
 
 interface Filled { value: unknown; source: string }
 type Detail = Omit<JobDetail, 'events'> & {
   filled?: Record<string, Filled> | null;
-  events: { id: number; at: string; to: string; message: string; screenshots: number }[];
+  events: { id: number; at: string; to: string; message: string; code?: string | null; params?: Record<string, unknown> | null; screenshots: number }[];
 };
 
 interface DiffOp { kind: 'same' | 'del' | 'ins'; word: string }
@@ -41,7 +41,7 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
 
 @Component({
   selector: 'app-job-detail',
-  imports: [DatePipe, NgTemplateOutlet, TPipe],
+  imports: [DatePipe, NgTemplateOutlet, MsgPipe, SourcePipe, TPipe],
   template: `
     @if (error()) {
       <div class="alert alert-error" dir="auto">{{ error() }}</div>
@@ -57,7 +57,7 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
           <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
             @if (j.tier) { <span class="badge tier-{{ j.tier }}">{{ 'detail.tier.' + j.tier | t }}</span> }
             <span class="badge tier-low">{{ 'common.state.' + j.state | t }}</span>
-            <span class="badge tier-low"><bdi>{{ j.source }}</bdi></span>
+            <span class="badge tier-low"><bdi>{{ j.source | src }}</bdi></span>
             @if (j.rank !== null) { <span class="badge tier-low">{{ 'detail.match' | t: { pct: num(j.rank, { style: 'percent', maximumFractionDigits: 0 }) } }}</span> }
             @if (j.posted_at) { <span class="text-slate-500">{{ 'detail.posted' | t }} {{ j.posted_at | date: 'mediumDate' : undefined : loc() }}</span> }
           </div>
@@ -162,7 +162,7 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
           <h3 class="font-semibold">{{ 'detail.history' | t }}</h3>
           <ol class="mt-2 space-y-1 border-s border-slate-200 ps-4 text-xs dark:border-slate-700">
             @for (e of j.events; track $index) {
-              <li><span class="text-slate-500">{{ e.at | date: 'short' : undefined : loc() }}</span> <span class="inline-block rtl:rotate-180">→</span> <span class="font-medium">{{ 'common.state.' + e.to | t }}</span> <span dir="auto">{{ e.message }}</span>
+              <li><span class="text-slate-500">{{ e.at | date: 'short' : undefined : loc() }}</span> <span class="inline-block rtl:rotate-180">→</span> <span class="font-medium">{{ 'common.state.' + e.to | t }}</span> <span dir="auto">{{ e | msg }}</span>
                 @if (e.screenshots) {
                   <span class="ms-1">
                     @for (n of range(e.screenshots); track n) {

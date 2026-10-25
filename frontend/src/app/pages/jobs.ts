@@ -3,7 +3,7 @@ import { Component, computed, DestroyRef, effect, inject, signal } from '@angula
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Api } from '../api';
-import { I18n, TPipe } from '../i18n';
+import { I18n, SourcePipe, TPipe } from '../i18n';
 import { Live } from '../live';
 import { fmtNum, localeOf } from '../locale';
 import { JobRow } from '../types';
@@ -15,7 +15,7 @@ const STATES = ['discovered', 'enriched', 'filtered_out', 'ranked', 'scored', 'b
 @Component({
   selector: 'app-jobs',
   host: { '(document:keydown.escape)': 'selected.set(null)' },
-  imports: [ScrollingModule, FormsModule, RouterLink, JobDetailPanel, TPipe],
+  imports: [ScrollingModule, FormsModule, RouterLink, JobDetailPanel, SourcePipe, TPipe],
   template: `
     <div class="flex items-baseline justify-between">
       <h1>{{ 'jobs.title' | t }}</h1>
@@ -37,7 +37,7 @@ const STATES = ['discovered', 'enriched', 'filtered_out', 'ranked', 'scored', 'b
       </select>
       <select class="input w-40" [attr.aria-label]="'jobs.filter.source' | t" [ngModel]="source()" (ngModelChange)="source.set($event); load()">
         <option value="">{{ 'jobs.filter.allSources' | t }}</option>
-        @for (s of sources(); track s) { <option [value]="s">{{ s }}</option> }
+        @for (s of sources(); track s) { <option [value]="s">{{ s | src }}</option> }
       </select>
     </div>
 
@@ -60,7 +60,7 @@ const STATES = ['discovered', 'enriched', 'filtered_out', 'ranked', 'scored', 'b
               </span>
               <span class="min-w-0">
                 <span [class]="compact() ? 'line-clamp-2' : 'block truncate'" class="text-sm font-medium break-words" dir="auto">{{ j.title }}</span>
-                <span class="block truncate text-xs text-slate-500" dir="auto">@if (compact()) { <span>{{ 'common.state.' + j.state | t }} · </span> }<bdi>{{ j.company }}</bdi> · <bdi>{{ j.location }}</bdi> · <bdi>{{ j.source }}</bdi></span>
+                <span class="block truncate text-xs text-slate-500" dir="auto">@if (compact()) { <span>{{ 'common.state.' + j.state | t }} · </span> }<bdi>{{ j.company }}</bdi> · <bdi>{{ j.location }}</bdi> · <bdi>{{ j.source | src }}</bdi></span>
               </span>
               @if (!compact()) {
                 <span class="truncate text-xs text-slate-600 dark:text-slate-400">{{ 'common.state.' + j.state | t }}</span>
