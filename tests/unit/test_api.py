@@ -826,3 +826,54 @@ def test_filter_ghost_bulk(client: TestClient) -> None:
     assert client.get(f"/api/jobs/{hi}").json()["state"] == "skipped"
     assert client.get(f"/api/jobs/{en}").json()["state"] == "filtered_out"
     assert client.get(f"/api/jobs/{en}").json()["events"][-1]["code"] == "ghost_suspected"
+
+
+def test_email_test_send(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    import smtplib
+
+    sent: list[Any] = []
+    fail = {"auth": False}
+
+    class FakeSMTP:
+        def __init__(self, host: str, port: int, **kw: Any) -> None:
+            sent.append((host, port))
+
+        def __enter__(self) -> "FakeSMTP":
+            return self
+
+        def __exit__(self, *a: object) -> None:
+            return None
+
+        def login(self, user: str, password: str) -> None:
+            if fail["auth"]:
+                raise smtplib.SMTPAuthenticationError(535, b"bad")
+            sent.append((user, password))
+
+        def send_message(self, msg: Any) -> None:
+            sent.append((msg["To"], msg["Subject"]))
+
+    monkeypatch.setattr(smtplib, "SMTP_SSL", FakeSMTP)
+    vault: Vault = client.app.state.vault  # type: ignore[attr-defined]
+
+    def post(path: str, body: object = None) -> Any:
+        return client.post(path, json=body or {}, headers=SAME_ORIGIN)
+
+    assert post("/api/email/test-send").status_code == 423  # vault locked
+    post("/api/vault/create", {"passphrase": PASS})
+    post("/api/vault/unlock", {"passphrase": PASS, "remember": False})
+    client.put("/api/profile", json={"full_name": "Me", "email": "me@x.com"}, headers=SAME_ORIGIN)
+    assert post("/api/email/test-send").status_code == 409  # no credentials
+    assert not sent
+    vault.put("imap", "imap.gmail.com", "me@x.com", "app-secret-pw")
+    ok = post("/api/email/test-send")
+    assert ok.status_code == 200 and ok.json()["ok"] is True and ok.json()["message_id"]
+    assert sent == [
+        ("smtp.gmail.com", 465),
+        ("me@x.com", "app-secret-pw"),
+        ("me@x.com", "LinKit All test"),
+    ]
+    assert "app-secret-pw" not in ok.text
+    fail["auth"] = True
+    bad = post("/api/email/test-send").json()
+    assert bad["ok"] is False and "app password" in bad["error"]
+    assert "app-secret-pw" not in str(bad)

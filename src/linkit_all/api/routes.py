@@ -21,6 +21,13 @@ from linkit_all.api.runner import PipelineRunner, RunBusy
 from linkit_all.apply.answers import ApplicationAnswers
 from linkit_all.apply.assist import AnswerBank
 from linkit_all.apply.browser import UserBrowser, fresh_live_shot, profile_dir
+from linkit_all.apply.email_send import (
+    NoCredentials,
+    OutgoingEmail,
+    SmtpError,
+    build_message,
+    send,
+)
 from linkit_all.apply.email_verify import EmailLoginError, check_login, credentials
 from linkit_all.apply.vault import Vault, VaultError, VaultLocked, WrongPassphrase
 from linkit_all.core.api_keys import KNOWN, delete_keys, get_keys, set_keys
@@ -1005,6 +1012,33 @@ async def test_email(request: Request) -> dict[str, bool]:
     except EmailLoginError as e:
         raise HTTPException(400, str(e)) from None
     return {"ok": True}
+
+
+@router.post("/email/test-send")
+async def test_send_email(request: Request) -> dict[str, Any]:
+    """Send a short test email to the user's own address through SMTP."""
+    vault = _unlocked_vault(request)
+    cfg, _, user = _email_target(request)
+    name = load_fields(_db(request))[0].full_name
+    mail = OutgoingEmail(
+        to=user,
+        subject="LinKit All test",
+        body="This is a test email from LinKit All. Sending works.",
+    )
+    try:
+        msg = build_message(name, user, mail)
+        message_id = await asyncio.to_thread(send, cfg.email, vault, user, msg)
+    except NoCredentials:
+        raise HTTPException(409, "No email connected yet") from None
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from None
+    except VaultLocked:
+        raise HTTPException(423, "The vault is locked") from None
+    except VaultError:
+        raise HTTPException(409, "The vault is not available for that") from None
+    except SmtpError as e:
+        return {"ok": False, "error": str(e)}
+    return {"ok": True, "message_id": message_id}
 
 
 @router.delete("/email", status_code=204)

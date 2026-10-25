@@ -248,8 +248,16 @@ class EmailSection(BaseModel):
 
     imap_host: str = "imap.gmail.com"
     imap_user: str = ""  # empty = the profile email
+    smtp_host: str = "smtp.gmail.com"  # outgoing mail (implicit SSL); same app password as IMAP
+    smtp_port: int = Field(465, ge=1, le=65535)
     timeout_s: int = Field(300, ge=30, le=1800)  # how long to wait for a verification email
     poll_s: int = Field(10, ge=3, le=120)
+
+    def effective_smtp_host(self) -> str:
+        """The SMTP host; an unchanged Gmail default follows a Yahoo IMAP host."""
+        if self.smtp_host == "smtp.gmail.com" and self.imap_host.lower() == "imap.mail.yahoo.com":
+            return "smtp.mail.yahoo.com"
+        return self.smtp_host
 
 
 class ScheduleSection(BaseModel):
