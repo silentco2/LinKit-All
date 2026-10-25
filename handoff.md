@@ -13,7 +13,13 @@ changing a decision in either file.
 - Phase 9 (debt D1-D7) is done; what remains of the debt is in "Known issues and debt".
 - Phase 10 (trust filter: scam and ghost scores, offline, EN + AR, in the rank stage; ATS liveness
   check before apply; optional AI legit flags) is done. See `docs/trust.md`.
-- The unit suite passes (`uv run pytest`: 1640 passed, 2 skipped, the real Tectonic compile),
+- Phase 11 (LinkedIn hiring posts + apply by email) is built except **L2, the Playwright post
+  scraper**: it is blocked until the maintainer captures a LinkedIn search page
+  (`linkit linkedin capture`). Everything else works: sign-in and session check, post filter, ATS
+  routing, batched AI extraction, SMTP sender, email apply (dry-run .eml, confirm, caps), UI.
+  See `docs/linkedin-posts.md` and `plan.md` Phase 11.
+- The unit suite passes (`uv run pytest tests/unit`: 1711 tests collected after Phase 11; 1640 passed, 2 skipped
+  before it, the real Tectonic compile),
   ruff and mypy are clean, `npx ng build` is clean.
 - Nothing has ever been submitted for real. Apply runs in dry-run mode by default and has
   only been exercised as dry runs on live forms plus offline e2e tests with a fake submit.
@@ -129,6 +135,9 @@ src/linkit_all/
   providers/        LLMProvider.complete(prompt, schema); claude_cli, codex_cli, litellm_api;
                     prompts/*.j2 (json_output, json_retry, ping, tailor, score, answer,
                     cover_letter, ...)
+  sources/linkedin_posts/  post (RawPost), extract (hiring/seeker filter, ATS routing, batched AI
+                    extraction -> JobStub), session (linkedin Chrome profile, session check,
+                    page capture); scrape.py (L2) not written yet
   sources/          base (JobStub, Task, Source), http (rate limits + retries + Crawl-delay
                     pacing), text (html->text, URL/company normalization, hash),
                     store (Deduper), runner (discover, enrich), ats_detector,
@@ -163,6 +172,8 @@ src/linkit_all/
     email_verify/   IMAP (Gmail app password from the vault): code/link regex first, AI
                     fallback; matches sender domain + time window
     accounts/       password generator per site rules, save-to-vault-before-sign-up, login reuse
+    email_send/     SMTP sender (Gmail/Yahoo, vault app password), test email
+    email_apply.py  compose cover email (body from the model), caps, recipient dedupe
     runner.py       Applier (persistent Chrome per ATS), pick_jobs (caps), apply(),
                     click_submit() guard, apply_jobs(); handler or generic agent; account gate;
                     ApplyBlocked, DryRunViolation
@@ -286,6 +297,12 @@ re-implemented in Python on plain honest HTTP. Plan and not-ported lists: `plan.
 6. **macOS/Linux LibreOffice bundles** (need those OSes or CI).
 7. **GitHub repo + PyPI release** (outward-facing: needs the maintainer's go-ahead).
 
+8. **A captured LinkedIn page** so the post scraper (L2) can be written:
+   `linkit linkedin capture --keywords "hiring python developer"` after signing in from Setup.
+   Review the file first: it is a copy of your own LinkedIn page.
+9. **A first supervised live email application** (Live on, confirm each; send the test email
+   to yourself first).
+
 ## Resolved: robots.txt scope
 
 Maintainer decision (2026-10-25, replaces the 2026-10-16 one): robots.txt is not enforced
@@ -328,6 +345,11 @@ anywhere; Crawl-delay pacing and per-host rate limits stay. Recorded in CLAUDE.m
   asks US work authorization, an arbitration agreement and a "certify" statement.
 
 ## Known issues and debt
+
+- LinkedIn markup changes often: the post selectors (once L2 exists) will need upkeep. Headless
+  scraping is likelier to be flagged than a visible window. Seeker-tag posts ("open to work")
+  that also contain hiring words are dropped. The email greeting heuristic can misjudge a
+  company address versus a person.
 
 - Trust filter thresholds (scam 65, ghost 50, bands 35) come from the reference projects and
   are untuned; they need tuning on real runs.
