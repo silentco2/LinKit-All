@@ -184,7 +184,9 @@ const SOURCES: Record<string, string> = {
 
           <footer class="mt-5 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
             <button type="button" class="btn" [disabled]="busy()" (click)="send(a, 'retry')">{{ 'actions.retry' | t }}</button>
-            <a class="btn no-underline hover:no-underline" [href]="a.job.apply_url" target="_blank" rel="noopener">{{ 'actions.openPage' | t }}</a>
+            @if (hasPage(a)) {
+              <a class="btn no-underline hover:no-underline" [href]="a.job.apply_url" target="_blank" rel="noopener">{{ 'actions.openPage' | t }}</a>
+            }
             <button type="button" class="btn" [disabled]="busy()" (click)="send(a, 'applied_by_hand')">{{ 'actions.byHand' | t }}</button>
             @if (a.kind !== 'confirm_submit' && a.kind !== 'confirm_email') {
               <button type="button" class="btn btn-danger" [disabled]="busy()" (click)="send(a, 'skip')">{{ 'actions.skip' | t }}</button>
@@ -270,6 +272,8 @@ export class ActionsPage {
     await this.send(a, 'confirm');
   }
 
+  /** Email applications have no page to open: the job's apply_url is a mailto: link. */
+  hasPage = (a: ActionItem): boolean => a.kind !== 'confirm_email' && !a.job.apply_url.toLowerCase().startsWith('mailto:');
   browserKind = (k: ActionKind): boolean => BROWSER_KINDS.includes(k);
   hasHelp = (k: ActionKind): boolean => k !== 'unknown_question' && k !== 'confirm_submit';
   num = (n: number | null): string => fmtNum(this.loc(), n);
