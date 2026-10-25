@@ -1,0 +1,7 @@
+{"success":true,"data":{"page":{"content":[
+{"type":"vacancy_main","data":{"position":"Brand Chef"}},
+{"type":"vacancy_text","data":{"text":"<p>Lead the kitchen.</p>"}},
+{"type":"vacancy_image","data":{"image_url":"x.png"}},
+{"type":"vacancy_expectation","data":{"title":"We expect","text":"<ul><li>5 years</li></ul>"}},
+{"type":"vacancy_you_will","data":{"title":"You will","text":"<ul><li>cook</li></ul>"}},
+{"type":"vacancy_benefits","data":{"title":"Benefits","text":"<ul><li>relocation</li></ul>"}}]}}}

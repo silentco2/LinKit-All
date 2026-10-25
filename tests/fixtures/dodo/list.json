@@ -1,0 +1,5 @@
+{"success":true,"data":[
+{"speciality":"R&D","slug":"r-d","items":[{"id":7805,"position":"Brand Chef","brand":"Dodo Pizza","vacancy_location":"Дубай","work_format":["Гибрид"]}]},
+{"speciality":"IT","slug":"it","items":[
+{"id":42,"position":"Backend","brand":"Engineering","vacancy_location":"Удалённо","work_format":["Удалённо"]},
+{"id":43,"position":"NoBrand","brand":"","vacancy_location":"Москва","work_format":["В офисе"]}]}]}

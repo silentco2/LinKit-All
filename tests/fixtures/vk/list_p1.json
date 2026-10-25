@@ -1,0 +1,1 @@
+{"count":3,"next":"https://team.vk.company/career/api/v2/vacancies/?limit=50&offset=50","previous":null,"results":[{"id":100,"title":"Backend Engineer","town":{"id":1,"name":"Москва"},"remote":false},{"id":200,"title":"Remote SRE","town":{"id":2,"name":"Санкт-Петербург"},"remote":true},{"id":300,"title":"","town":{"id":2,"name":"Казань"},"remote":false}]}

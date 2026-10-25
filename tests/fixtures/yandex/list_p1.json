@@ -1,0 +1,5 @@
+{"results":[
+{"id":111,"publication_slug_url":"data-111","title":"Data Engineer","redirect_url":null,"fast_track":null,"vacancy":{"cities":[{"name":"Москва"},{"name":"Санкт-Петербург"}],"work_modes":[{"name":"Офис","slug":"office"}]}},
+{"id":900,"publication_slug_url":"redir-900","title":"Redirected","redirect_url":"https://elsewhere.example/job","fast_track":null,"vacancy":{"cities":[{"name":"Москва"}],"work_modes":[]}},
+{"id":901,"publication_slug_url":"fast-901","title":"Hiring Event","redirect_url":null,"fast_track":{"id":1},"vacancy":{"cities":[{"name":"Москва"}],"work_modes":[]}}
+],"next":"http://femida.example.internal/_api/jobs/publications/?cursor=ABC&page_size=20","count":4}
