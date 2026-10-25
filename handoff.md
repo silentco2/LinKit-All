@@ -1,6 +1,6 @@
 # Handoff — LinKit All
 
-Written 2026-10-16 for the next agent or developer. Read in this order: `CLAUDE.md` (rules,
+Written 2026-10-16 (updated 2026-10-25) for the next agent or developer. Read in this order: `CLAUDE.md` (rules,
 binding), `plan.md` (roadmap and every decision, including "Decisions made by the
 orchestrator"), then this file (current state and next steps). Ask the maintainer before
 changing a decision in either file.
@@ -10,7 +10,8 @@ changing a decision in either file.
 - Phases 0-8 are built, except the items blocked on the maintainer (see "Needs the
   maintainer"). Every task in `plan.md` is done or marked blocked.
 - Phase 8 (sources ported from freehire) is built too: see "Phase 8 - sources from freehire".
-- The unit suite passes (`uv run pytest`: 1367 passed, 1 skipped, the real Tectonic compile),
+- Phase 9 (debt D1-D7) is done; what remains of the debt is in "Known issues and debt".
+- The unit suite passes (`uv run pytest`: 1389 passed, 1 skipped, the real Tectonic compile),
   ruff and mypy are clean, `npx ng build` is clean.
 - Nothing has ever been submitted for real. Apply runs in dry-run mode by default and has
   only been exercised as dry runs on live forms plus offline e2e tests with a fake submit.
@@ -28,6 +29,9 @@ changing a decision in either file.
   `%LOCALAPPDATA%\linkit-all\tools\libreoffice` (the real data dir). The zip is in
   `build/lo/` (gitignored), built by `scripts/bundle_libreoffice.py`.
 - Tectonic is not installed (the one skipped test is the real LaTeX compile).
+- The project also runs in a Linux cloud container: no Google Chrome or OS keyring there
+  (unit tests use an in-memory keyring); e2e tests can use Playwright's bundled
+  Chromium/headless shell under `/opt/pw-browsers`.
 
 ### Gotchas that cost time
 
@@ -288,8 +292,7 @@ anywhere; Crawl-delay pacing and per-host rate limits stay. Recorded in CLAUDE.m
    real account creation + IMAP (item 3). Expect to fix handler details found live.
 3. As the maintainer supplies saved pages: write the Workday/iCIMS/Taleo/SuccessFactors/
    SmartRecruiters handlers (plugin + fixture + tests each), then Naukrigulf.
-4. Pay down the debt below, roughly in this order: generic sign-up; phone
-   job-title width; the rest.
+4. Remaining debt is listed in "Known issues and debt".
 5. Release work once the maintainer says go: GitHub repo, CI on three OSes, PyPI.
 
 ## Knowledge from the live forms (keep handlers aligned)
@@ -341,6 +344,12 @@ anywhere; Crawl-delay pacing and per-host rate limits stay. Recorded in CLAUDE.m
 - Job-aggregator API keys are in the vault; AI provider keys are still env-only.
 - When `ApplyBlocked` fires (AI limit, LibreOffice missing) the rest of that run's jobs wait
   for the next run.
+- Translated (coded) messages cover apply and Action Center only; matching/rank/score/tailor/
+  source event text, run outcomes ("no form handler"), `ApplyBlocked` and the AI-limit pause
+  reason are still English in the Arabic UI. The generic agent's fail reason is model free text.
+- Parallel apply browsers share one live screenshot file; the latest frame wins (the event
+  names its job).
+- Below 1280px the open job drawer covers the list; close it to pick another job.
 - Starlette's TestClient warns about httpx (`httpx2`); harmless.
 
 ## Conventions

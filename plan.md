@@ -264,7 +264,7 @@ code copied verbatim; NOTICE credits freehire (MIT). Survey: scratchpad freehire
   - ✅ F4.4 selectel staffy tbank telegramcareers tencent tochka uzum vk x5 yandex yandexcrowd
 - ✅ F6 Cleanup: jobboardly is an ATS plugin; `ats` is set from the apply link (ats_detector) for aggregator/board/company stubs so apply handlers route correctly; private helpers merged into `sources/common.py`, `parsing.py`, `tasks.py` and `aggregators/keys.py`; `Http.post_form` + public raw response; per-host slow rates (myworkdaysite 1, higherme 1/3, join 1.5, workstream 1); Common Crawl older-collection fallback; full suite and a browser check of the Setup sources list
 
-### Phase 9 — Debt (offline, fixture-tested) 🟡
+### Phase 9 — Debt (offline, fixture-tested) ✅
 Maintainer (2026-10-25): work the handoff "Known issues" list; generic sign-up is out of scope
 (sign-in/sign-up pages keep parking until a supervised live session). AI provider keys in the
 vault: not started, needs the maintainer.
