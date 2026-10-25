@@ -214,8 +214,8 @@ Execution tasks:
   maintainer's explicit go-ahead.
 
 ### Phase 8 — Sources ported from freehire (MIT) ✅
-Final registry: 124 ATS, 41 aggregators, 18 boards and 48 company plugins, plus Telegram (1),
-jobspy (6 sites), regional (Wuzzuf, Forasna) and the generic careers source. Unit suite: 1356 passed, 1 skipped.
+Final registry: 124 ATS, 42 aggregators, 18 boards and 48 company plugins, plus Telegram (1),
+jobspy (6 sites), regional (Wuzzuf, Forasna) and the generic careers source. Unit suite: 1367 passed, 1 skipped.
 Decisions (maintainer, 2026-10-24): port every adapter that works with honest plain HTTP, in
 batches; adapters that need freehire's bot-protection layer (tls-client fingerprints,
 Scrapling challenge-solving browser, rotating proxies, spoofed Googlebot/app user agents,
@@ -248,13 +248,15 @@ code copied verbatim; NOTICE credits freehire (MIT). Survey: scratchpad freehire
   - ✅ F2.3 getro golangjobs hackernews herkey himalayas jobdanmark jobicy jobnet jobstash jobtech
   - ✅ F2.4 kalibrr landingjobs mycareersfuture nofluffjobs powertofly remoteok remotive remotli schoolspring seek
   - ✅ F2.5 solidjobs teamex tecla themuse topco tyomarkkinatori workingnomads
+  - ✅ F2.6 wttj (Algolia index with the site's public key + Referer, per maintainer 2026-10-25)
   - not ported (bypass-dependent): echojobs fourdayweek habrcareer hhru jobleads naukri startupjobs techinasia wellfound
-  - not ported (other): trudvsem (needs a Russian root CA); workatastartup (login); wttj (key locked to a Referer; maintainer may overrule)
+  - not ported (other): trudvsem (needs a Russian root CA); workatastartup (login)
 - ✅ F5 Setup UI: list every opt-in source (aggregators, boards, company plugins) with toggles, from a /api/sources endpoint
 - F3 Job boards + RSS (sources/boards/, opt-in)
   - ✅ F3.1 builtin instaffo itviec japandev jobboardly jobylon joppy
   - ✅ F3.2 profession pythonorg remotedotcom startupandvc techtree thehub torre work180 + RSS cryptocurrencyjobs jobspresso nodesk weworkremotely
   - not ported (other): aijobs (dead/changed)
+  - ✅ F2.6 wttj (Algolia index with the site's public key + Referer, per maintainer 2026-10-25)
   - not ported (bypass-dependent): bayt catho civilservicejobs djinni energyjobline geekjob gradcracker gulftalent infojobs occ vagas wantapply wuzzuf
 - F4 Single-company plugins (sources/companies/, opt-in); not ported: metacareers onstrider kontur twogis uber (bypass), airswift tenml (no jobs), alfabank tbank tochka ptsecurity (need a Russian root CA)
   - ✅ F4.1 alibaba alignerr amazon apple aviasales avito bairesdev dassault dataart dodo domclick

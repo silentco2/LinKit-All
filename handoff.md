@@ -10,7 +10,7 @@ changing a decision in either file.
 - Phases 0-8 are built, except the items blocked on the maintainer (see "Needs the
   maintainer"). Every task in `plan.md` is done or marked blocked.
 - Phase 8 (sources ported from freehire) is built too: see "Phase 8 - sources from freehire".
-- The unit suite passes (`uv run pytest`: 1356 passed, 1 skipped, the real Tectonic compile),
+- The unit suite passes (`uv run pytest`: 1367 passed, 1 skipped, the real Tectonic compile),
   ruff and mypy are clean, `npx ng build` is clean.
 - Nothing has ever been submitted for real. Apply runs in dry-run mode by default and has
   only been exercised as dry runs on live forms plus offline e2e tests with a fake submit.
@@ -221,7 +221,7 @@ tests/unit, tests/e2e (apply flow on a saved Lever form), tests/fixtures/<ats>/
 | 5 Apply v2 | partly | `474c270` runner checks handler before tailoring; `a6ac0e5`/`34986c6` vault core + UI; `40392b6`/`69a826e` IMAP verification + email step; `65fbc5f` account gate; `d6ff3bd`/`8f8acdf` SmartRecruiters, Recruitee, Workable, Workday discovery; `dfee500` runner uses the server's vault. Handlers for Workday/iCIMS/Taleo/SuccessFactors/SmartRecruiters and LinkedIn/Indeed apply: blocked |
 | 6 Generic | done except Naukrigulf | `93cd3be`/`48c8b27` careers source (batched AI extraction); `ad27af6`/`685bd7c` generic form agent + runner fallback; `4903956` Forasna; `9239b3e` RFC 9309 robots matcher |
 | 7 Later | partly | `276fa96` ODT/PDF CVs + reports; `bf15f7b` scheduler, notifications, LaTeX CVs; `49a422f` local models; `2403f4f`/`0fb0c7c` Arabic RTL UI; `5fd2425` MkDocs docs; `093780f`/`3908a83`/`0353d50` CLAUDE.md gap fixes (app browser, red-line, live view, low-tier opt-in). Outlook OAuth, macOS/Linux bundles, release: pending |
-| 8 freehire sources | done | 124 ATS, 41 aggregators, 18 boards, 48 company plugins, Telegram, board discovery (`F0a`..`F6b`, since `ad1241d`); fixtures only |
+| 8 freehire sources | done | 124 ATS, 42 aggregators, 18 boards, 48 company plugins, Telegram, board discovery (`F0a`..`F6b`, since `ad1241d`); fixtures only |
 
 ## Phase 8 - sources from freehire
 
@@ -229,7 +229,7 @@ Ported from [freehire](https://github.com/strelov1/freehire) (MIT, credited in `
 re-implemented in Python on plain honest HTTP. Plan and not-ported lists: `plan.md` Phase 8.
 
 - **What exists** (`uv run --no-sync python -c "from linkit_all.sources import registry; ..."`):
-  124 ATS plugins (`sources/ats/`), 41 aggregators (`aggregators/`), 18 job boards and RSS feeds
+  124 ATS plugins (`sources/ats/`), 42 aggregators (`aggregators/`), 18 job boards and RSS feeds
   (`boards/`), 48 single-company plugins (`companies/`), `telegram.py`, plus the older jobspy,
   Wuzzuf/Forasna and careers sources. `sources/__init__.py` scans the packages: a new plugin
   needs no registry edit.
@@ -259,8 +259,8 @@ re-implemented in Python on plain honest HTTP. Plan and not-ported lists: `plan.
   and ozon are slow. Some company names are placeholders where the API does not name the
   employer. Adzuna's monthly call cap is not tracked. jobspy and the ATS APIs were never
   robots-checked anyway. Not ported (reasons in `plan.md`): bypass-dependent sources, Russian
-  root-CA sites (trudvsem, alfabank, tbank, tochka, ptsecurity), workatastartup (login), wttj
-  (Referer-locked key, the maintainer may overrule), aijobs (dead).
+  root-CA sites (trudvsem, alfabank, tbank, tochka, ptsecurity), workatastartup (login), aijobs
+  (dead). wttj is ported (public Algolia key + the site's Referer, maintainer 2026-10-25).
 
 ## Needs the maintainer (blockers)
 
