@@ -9,14 +9,10 @@ from typing import Any
 
 from linkit_all.core.search import SearchConfig
 from linkit_all.sources.base import JobStub, Source, Task
-from linkit_all.sources.companies._f43 import (
-    careers_task,
-    distinct,
-    json_or_none,
-    ru_mode,
-    sections,
-)
+from linkit_all.sources.common import json_or_none
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import distinct, ru_mode, sections
+from linkit_all.sources.tasks import careers_task
 
 LIST = "https://magnit.tech/api/v1/vacancy?page={page}&per_page=50"
 DETAIL = "https://magnit.tech/api/v1/vacancy/{id}"

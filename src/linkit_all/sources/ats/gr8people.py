@@ -5,10 +5,10 @@ import re
 from collections.abc import AsyncIterator
 from typing import Any
 
-from linkit_all.sources.ats._f13 import get_page, mode, name_from_host
 from linkit_all.sources.base import JobStub, Source, Task, from_iso, remote_from_text
-from linkit_all.sources.common import strip_html
+from linkit_all.sources.common import get_page, strip_html
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import mode, name_from_host
 
 PAGE = 50
 _TOKEN = re.compile(r'"token"\s*:\s*"(eyJ[^"]+)"')

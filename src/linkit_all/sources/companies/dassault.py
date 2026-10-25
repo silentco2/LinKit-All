@@ -10,11 +10,11 @@ from urllib.parse import urlsplit
 from lxml import etree
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.ats._f13 import get_page
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
-from linkit_all.sources.common import paged, strip_html
-from linkit_all.sources.companies._f41 import ats_of, fresh
+from linkit_all.sources.common import get_page, paged, strip_html
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import ats_of
+from linkit_all.sources.tasks import fresh
 
 # Both refinements matter: without the content-type facet the index is the whole site's cards,
 # without the language facet every posting comes back once per language. hf is the page size.

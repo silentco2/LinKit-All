@@ -12,8 +12,8 @@ from typing import Any
 from linkit_all.core.search import SearchConfig
 from linkit_all.sources.base import JobStub, Source, Task
 from linkit_all.sources.common import paged
-from linkit_all.sources.companies._f41 import limited, query_tasks
 from linkit_all.sources.http import Http
+from linkit_all.sources.tasks import company_query_tasks, limited
 
 API = "https://careers.tencent.com/tencentcareer/api/post"
 JOB = "https://careers.tencent.com/jobdesc.html?postId="
@@ -54,7 +54,7 @@ class Tencent(Source):
     kind = "company"
 
     def tasks(self, cfg: SearchConfig) -> list[Task]:
-        return query_tasks(self.name, cfg)
+        return company_query_tasks(self.name, cfg)
 
     async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:
         async def fetch(offset: int) -> tuple[list[dict[str, Any]], int | None]:

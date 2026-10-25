@@ -9,10 +9,11 @@ from typing import Any
 import httpx
 from selectolax.lexbor import LexborHTMLParser
 
-from linkit_all.sources.ats._f17 import XHR, hydrate, text_of
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
 from linkit_all.sources.careers import Unsupported
+from linkit_all.sources.common import XHR, hydrate
 from linkit_all.sources.http import Http, RetryableStatus
+from linkit_all.sources.parsing import node_text
 from linkit_all.sources.text import html_to_text
 
 HOST = "https://careers.pageuppeople.com"
@@ -35,14 +36,20 @@ def parse_listing(fragment: str, board: str) -> list[JobStub]:
             href = node.attributes.get("href") or ""
             if m := _JOB.search(href):  # other job-links are navigation
                 jobs.append(
-                    {"id": m[1], "title": text_of(node), "url": HOST + href, "loc": "", "text": ""}
+                    {
+                        "id": m[1],
+                        "title": node_text(node),
+                        "url": HOST + href,
+                        "loc": "",
+                        "text": "",
+                    }
                 )
         elif not jobs:
             continue
         elif "location" in classes:
-            jobs[-1]["loc"] = jobs[-1]["loc"] or text_of(node)
+            jobs[-1]["loc"] = jobs[-1]["loc"] or node_text(node)
         elif "summary" in classes or "jobs-summary" in classes or (node.tag == "p" and not classes):
-            jobs[-1]["text"] = jobs[-1]["text"] or text_of(node)
+            jobs[-1]["text"] = jobs[-1]["text"] or node_text(node)
     return [
         JobStub(
             source="pageup",

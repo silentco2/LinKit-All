@@ -78,9 +78,9 @@ def test_missing_fragment_is_skipped_and_paging_resumes(
     load_fixture: Callable[[str], Any],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from linkit_all.sources.ats import _f15
+    from linkit_all.sources import common
 
-    monkeypatch.setattr(_f15, "PAGE", 1)
+    monkeypatch.setattr(common, "PAGE", 1)
     locs = "".join(
         f"<url><loc>https://careers-a.icims.com/jobs/{i}/x/job</loc></url>" for i in (1, 2)
     )

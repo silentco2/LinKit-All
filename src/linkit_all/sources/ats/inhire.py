@@ -6,9 +6,9 @@ import re
 import unicodedata
 from collections.abc import AsyncIterator
 
-from linkit_all.sources.ats._f13 import mode, name_from_slug
 from linkit_all.sources.base import JobStub, Source, Task, from_iso
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import mode, name_from_slug
 from linkit_all.sources.text import html_to_text
 
 LIST = "https://api.inhire.app/job-posts/public/pages"

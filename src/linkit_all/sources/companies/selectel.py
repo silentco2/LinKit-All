@@ -10,11 +10,10 @@ from typing import Any
 from selectolax.lexbor import LexborHTMLParser
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.ats._f13 import get_page
-from linkit_all.sources.ats.huntflow import unflatten
 from linkit_all.sources.base import JobStub, Source, Task, from_iso, remote_from_text
-from linkit_all.sources.common import strip_html
+from linkit_all.sources.common import get_page, strip_html
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import unflatten
 
 LIST = "https://selectel.ru/careers/all/"
 VACANCY = "https://selectel.ru/careers/all/vacancy/{id}/"

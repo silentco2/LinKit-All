@@ -8,15 +8,10 @@ from typing import Any
 
 from linkit_all.core.search import SearchConfig
 from linkit_all.sources.base import JobStub, Source, Task
-from linkit_all.sources.common import paged
-from linkit_all.sources.companies._f43 import (
-    careers_task,
-    json_or_none,
-    ru_mode,
-    rub_month,
-    sections,
-)
+from linkit_all.sources.common import json_or_none, paged
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import ru_mode, rub_month, sections
+from linkit_all.sources.tasks import careers_task
 
 SITE = "https://job.mts.ru/"
 LIST = "https://api.job.mts.ru/v1/vacancies/filtered/career"

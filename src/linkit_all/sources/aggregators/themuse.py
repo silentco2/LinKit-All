@@ -5,10 +5,10 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.aggregators._f22 import feed_task
 from linkit_all.sources.base import JobStub, Source, Task, from_iso, remote_from_text
 from linkit_all.sources.common import strip_html
 from linkit_all.sources.http import Http
+from linkit_all.sources.tasks import feed_task
 
 LIST = "https://www.themuse.com/api/public/jobs"
 MAX_PAGES = 99  # the API refuses pages past ~99 whatever page_count claims

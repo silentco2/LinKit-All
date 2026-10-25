@@ -9,9 +9,10 @@ from urllib.parse import urljoin, urlsplit
 
 from selectolax.lexbor import LexborHTMLParser
 
-from linkit_all.sources.ats._f12 import get_page, name_from_host
 from linkit_all.sources.base import JobStub, Source, Task, from_iso
+from linkit_all.sources.common import get_page
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import name_from_host
 from linkit_all.sources.text import html_to_text
 
 CHUNK = 20  # posting pages fetched per yielded page

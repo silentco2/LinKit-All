@@ -6,11 +6,10 @@ from collections.abc import AsyncIterator
 
 from selectolax.lexbor import LexborHTMLParser
 
-from linkit_all.sources.ats._f13 import get_page, name_from_host
-from linkit_all.sources.ats._f16 import links, page_text
-from linkit_all.sources.ats._f17 import hydrate, text_of
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
+from linkit_all.sources.common import get_page, hydrate, page_text
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import links, name_from_host, node_text
 from linkit_all.sources.text import html_to_text
 
 LIST = "https://{host}/company/careers-search/"
@@ -45,10 +44,10 @@ class Rapyd(Source):
             if html is None:
                 return None
             tree = LexborHTMLParser(html)
-            title = text_of(tree.css_first("h1"))
+            title = node_text(tree.css_first("h1"))
             if not title:  # a page without a heading is a layout or error page
                 return None
-            where = text_of(tree.css_first(".country-term"))
+            where = node_text(tree.css_first(".country-term"))
             body = tree.css_first(".single-career-position__main")
             return JobStub(
                 source="rapyd",

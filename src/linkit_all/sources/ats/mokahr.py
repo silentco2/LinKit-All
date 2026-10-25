@@ -14,10 +14,10 @@ from typing import Any
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-from linkit_all.sources.ats._f13 import name_from_slug
 from linkit_all.sources.base import JobStub, Source, Task
 from linkit_all.sources.common import strip_html
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import name_from_slug
 
 PATH = "/api/outer/ats-apply/website/jobs/v2"
 PAGE_SIZE = 50  # the listing's ceiling: 51 and above answer code 102

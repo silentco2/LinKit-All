@@ -11,8 +11,9 @@ from typing import Any
 from linkit_all.core.search import SearchConfig
 from linkit_all.sources.base import JobStub, Source, Task, from_epoch_ms, remote_from_text
 from linkit_all.sources.common import paged
-from linkit_all.sources.companies._f41 import ats_of, fresh
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import ats_of
+from linkit_all.sources.tasks import fresh
 
 SEARCH = "https://talent.alibaba.com/position/search"
 # talent.alibaba.com sends every deep link to its home page; the holding site renders any id.

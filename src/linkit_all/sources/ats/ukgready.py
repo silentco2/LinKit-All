@@ -6,11 +6,10 @@ import re
 from collections.abc import AsyncIterator
 from typing import Any
 
-from linkit_all.sources.ats._f12 import name_from_slug
-from linkit_all.sources.ats._f16 import GONE
-from linkit_all.sources.ats._f17 import hydrate
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
+from linkit_all.sources.common import GONE, hydrate
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import name_from_slug
 from linkit_all.sources.text import html_to_text
 
 SIZE = 200  # the API's maximum; 250 is refused

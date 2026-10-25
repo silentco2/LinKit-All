@@ -7,9 +7,9 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.aggregators._f22 import all_older, feed_task
 from linkit_all.sources.base import JobStub, Source, Task, from_iso, remote_from_text
 from linkit_all.sources.http import Http
+from linkit_all.sources.tasks import all_older, feed_task
 
 SEARCH = "https://tyomarkkinatori.fi/api/jobpostingfulltext/search/v2/search"
 DETAIL = "https://tyomarkkinatori.fi/api/jobposting-new/v1/public/jobpostings/{}"

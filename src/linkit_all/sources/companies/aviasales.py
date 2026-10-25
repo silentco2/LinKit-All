@@ -9,8 +9,8 @@ from typing import Any
 from linkit_all.core.search import SearchConfig
 from linkit_all.sources.base import JobStub, Source, Task
 from linkit_all.sources.common import strip_html
-from linkit_all.sources.companies._f41 import ats_of, remote_ru
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import ats_of, remote_ru
 
 LIST = "https://vacancies-app.aviasales.ru/api/vacancies"
 # The route id is literal text "(id)" (percent-encoded), not the numeric id.

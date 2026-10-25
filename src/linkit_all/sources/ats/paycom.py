@@ -9,11 +9,10 @@ from typing import Any
 
 import httpx
 
-from linkit_all.sources.ats._f12 import get_page, name_from_slug
-from linkit_all.sources.ats._f16 import when
-from linkit_all.sources.ats._f17 import hydrate
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
+from linkit_all.sources.common import get_page, hydrate
 from linkit_all.sources.http import Http, RetryableStatus
+from linkit_all.sources.parsing import name_from_slug, when
 from linkit_all.sources.text import html_to_text
 
 PORTAL = "https://www.paycomonline.net/v4/ats/web.php/portal"

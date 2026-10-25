@@ -12,13 +12,10 @@ from urllib.parse import urljoin
 from selectolax.lexbor import LexborHTMLParser, LexborNode
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.ats._f13 import get_page
-from linkit_all.sources.ats._f16 import page_text
-from linkit_all.sources.ats._f17 import hydrate, text_of
 from linkit_all.sources.base import JobStub, Source, Task
-from linkit_all.sources.common import strip_html
-from linkit_all.sources.companies._f42 import remote_ru
+from linkit_all.sources.common import get_page, hydrate, page_text, strip_html
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import node_text, remote_ru
 
 HOST = "halykbank.kz"
 LIST = "https://{host}/about/career/vacancies"
@@ -37,9 +34,9 @@ def cards(html: str, base: str) -> list[tuple[str, str, str]]:
     found: list[tuple[str, str, str]] = []
     for a in LexborHTMLParser(html).css("a[href]"):
         href = a.attributes.get("href") or ""
-        title = text_of(a.css_first(".text-lg.font-bold"))
+        title = node_text(a.css_first(".text-lg.font-bold"))
         if _PATH.search(href) and title:
-            found.append((urljoin(base, href), title, text_of(a.css_first(".flex-x"))))
+            found.append((urljoin(base, href), title, node_text(a.css_first(".flex-x"))))
     return found
 
 

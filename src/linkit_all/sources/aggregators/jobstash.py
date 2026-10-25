@@ -6,10 +6,10 @@ from math import ceil
 from typing import Any
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.aggregators._f22 import feed_task
-from linkit_all.sources.ats._f13 import mode
 from linkit_all.sources.base import JobStub, Source, Task, from_epoch_ms, remote_from_text
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import mode
+from linkit_all.sources.tasks import feed_task
 
 API = "https://middleware.jobstash.xyz/jobs/list"
 DETAIL_URL = "https://jobstash.xyz/jobs/{}/details"  # for a gated posting that has no apply link

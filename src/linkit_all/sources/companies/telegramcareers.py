@@ -8,9 +8,8 @@ from collections.abc import AsyncIterator
 from selectolax.lexbor import LexborHTMLParser
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.ats._f13 import get_page
 from linkit_all.sources.base import JobStub, Source, Task
-from linkit_all.sources.common import strip_html
+from linkit_all.sources.common import get_page, strip_html
 from linkit_all.sources.http import Http
 
 PAGE = "https://telegram.org/jobs"

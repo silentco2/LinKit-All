@@ -12,9 +12,8 @@ from typing import Any
 from selectolax.lexbor import LexborHTMLParser
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.ats._f13 import get_page
 from linkit_all.sources.base import JobStub, Source, Task
-from linkit_all.sources.common import paged, strip_html
+from linkit_all.sources.common import get_page, paged, strip_html
 from linkit_all.sources.http import Http
 
 LIST = "https://team.vk.company/career/api/v2/vacancies/?limit={limit}&offset={offset}"

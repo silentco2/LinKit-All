@@ -8,11 +8,11 @@ from collections.abc import AsyncIterator
 
 from selectolax.lexbor import LexborHTMLParser
 
-from linkit_all.sources.ats._f13 import fetch_all, get_page, name_from_slug
 from linkit_all.sources.base import JobStub, Source, Task
-from linkit_all.sources.common import strip_html
+from linkit_all.sources.common import fetch_all, get_page, strip_html
 from linkit_all.sources.http import Http
 from linkit_all.sources.jsonld import job_postings, to_stub
+from linkit_all.sources.parsing import name_from_slug
 
 CHUNK = 15  # posting pages read together per page of stubs
 _SLUG = re.compile(r"/jobs/([^/?#]+)$")

@@ -8,10 +8,10 @@ from typing import Any
 import httpx
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.aggregators._f22 import all_older, feed_task
 from linkit_all.sources.base import JobStub, Source, Task, from_iso, remote_from_text
 from linkit_all.sources.common import strip_html
 from linkit_all.sources.http import Http, RetryableStatus
+from linkit_all.sources.tasks import all_older, feed_task
 
 API = "https://remotli.ch/api/jobs"
 PAGE = 20

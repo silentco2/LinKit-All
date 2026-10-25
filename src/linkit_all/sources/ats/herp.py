@@ -8,10 +8,11 @@ from urllib.parse import urljoin, urlsplit
 
 from selectolax.lexbor import LexborHTMLParser
 
-from linkit_all.sources.ats._f12 import get_page, name_from_slug
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
+from linkit_all.sources.common import get_page
 from linkit_all.sources.http import Http
 from linkit_all.sources.jsonld import job_postings, to_stub
+from linkit_all.sources.parsing import name_from_slug
 
 CHUNK = 20  # job pages fetched per yielded page
 # Single segments under /v1/<board>/ that are the platform's own pages, never a job id.

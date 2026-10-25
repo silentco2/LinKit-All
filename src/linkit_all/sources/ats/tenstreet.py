@@ -11,11 +11,11 @@ from urllib.parse import parse_qs
 
 from selectolax.lexbor import LexborHTMLParser
 
-from linkit_all.sources.ats._f15 import fetch_html
-from linkit_all.sources.ats._f17 import hydrate, text_of
 from linkit_all.sources.base import JobStub, Source, Task
 from linkit_all.sources.careers import Unsupported
+from linkit_all.sources.common import fetch_html, hydrate
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import node_text
 from linkit_all.sources.text import html_to_text
 
 _HOST = "https://pulse.tenstreet.com"
@@ -36,7 +36,7 @@ def listing(page: str, company: str) -> tuple[str, list[str]]:
     """(carrier name, posting ids) of a Pulse profile. Only links naming this company count: a
     posting page is company-scoped, so another carrier's id is not a posting of this board."""
     tree = LexborHTMLParser(page)
-    name = text_of(tree.css_first("#carrier_detail_company_name"))
+    name = node_text(tree.css_first("#carrier_detail_company_name"))
     ids: dict[str, None] = {}
     for m in _LINK.finditer(page):
         query = parse_qs(htmllib.unescape(m[1]))

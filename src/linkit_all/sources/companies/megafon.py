@@ -8,13 +8,10 @@ from urllib.parse import urlsplit
 
 from linkit_all.core.search import SearchConfig
 from linkit_all.sources.base import JobStub, Remote, Source, Task, from_epoch_ms
-from linkit_all.sources.companies._f43 import (
-    careers_task,
-    json_or_none,
-    rub_month,
-    sections,
-)
+from linkit_all.sources.common import json_or_none
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import rub_month, sections
+from linkit_all.sources.tasks import careers_task
 
 CITIES = "https://job.megafon.ru/api/v1/cities/available"
 LIST = "https://job.megafon.ru/api/v1/vacancies?cities={city}&page={page}"

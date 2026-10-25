@@ -5,9 +5,10 @@ from typing import Any
 import httpx
 import pytest
 
-from linkit_all.sources.ats.deel import Deel, bracket_slice, decode_flight, text_rows
+from linkit_all.sources.ats.deel import Deel
 from linkit_all.sources.ats_detector import detect
 from linkit_all.sources.base import JobStub
+from linkit_all.sources.parsing import bracket_slice, decode_flight, text_rows
 
 
 def _serve(html: str) -> Callable[[httpx.Request], httpx.Response]:

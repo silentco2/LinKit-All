@@ -9,11 +9,10 @@ from typing import Any
 
 from selectolax.lexbor import LexborHTMLParser
 
-from linkit_all.sources.ats._f12 import name_from_slug
-from linkit_all.sources.ats._f16 import page_text
-from linkit_all.sources.ats.deel import bracket_slice
 from linkit_all.sources.base import JobStub, Source, Task, from_iso, remote_from_text
+from linkit_all.sources.common import page_text
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import bracket_slice, name_from_slug
 from linkit_all.sources.text import html_to_text
 
 PAGE = 50

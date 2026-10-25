@@ -9,10 +9,11 @@ from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.ats._f16 import GONE
 from linkit_all.sources.base import JobStub, Source, Task, from_iso
-from linkit_all.sources.companies._f41 import limited, remote_ru
+from linkit_all.sources.common import GONE
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import remote_ru
+from linkit_all.sources.tasks import limited
 from linkit_all.sources.text import html_to_text
 
 LIST = "https://yandex.{tld}/jobs/api/publications"

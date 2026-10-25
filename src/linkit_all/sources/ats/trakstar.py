@@ -9,10 +9,10 @@ from email.utils import parsedate_to_datetime
 from lxml import etree
 from lxml.etree import _Element
 
-from linkit_all.sources.ats._f13 import get_page, name_from_slug
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
-from linkit_all.sources.common import strip_html
+from linkit_all.sources.common import get_page, strip_html
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import name_from_slug
 
 FEED = "https://{board}.hire.trakstar.com/jobfeeds/{board}"
 

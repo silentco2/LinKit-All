@@ -6,10 +6,10 @@ import re
 from collections.abc import AsyncIterator
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.ats._f13 import get_page, sitemap_locs
-from linkit_all.sources.ats._f15 import fetch_html, paged_postings, posting_stub
 from linkit_all.sources.base import JobStub, Source, Task
+from linkit_all.sources.common import fetch_html, get_page, paged_postings, sitemap_locs
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import posting_stub
 
 HOST = "itechartgroup.by"
 # The slug is the id; the bare /job-openings listing has none and is not a vacancy.

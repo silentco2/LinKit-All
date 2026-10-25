@@ -6,9 +6,10 @@ import re
 from collections.abc import AsyncIterator
 from typing import Any
 
-from linkit_all.sources.ats._f12 import get_page, mode, name_from_slug
 from linkit_all.sources.base import JobStub, Source, Task, from_iso
+from linkit_all.sources.common import get_page
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import mode, name_from_slug
 from linkit_all.sources.text import html_to_text
 
 PAGE = "https://www.comeet.com/jobs/{board}"

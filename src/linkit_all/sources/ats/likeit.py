@@ -10,11 +10,10 @@ from urllib.parse import parse_qs, urlsplit
 from lxml import etree
 from lxml.etree import _Element
 
-from linkit_all.sources.ats._f13 import get_page, name_from_slug
-from linkit_all.sources.ats._f16 import when
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
-from linkit_all.sources.common import strip_html
+from linkit_all.sources.common import get_page, strip_html
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import name_from_slug, when
 
 FEED = "https://{board}.likeit.fi/jsp/duuni/AdvertRss.jsp"
 _DC_DATE = "{http://purl.org/dc/elements/1.1/}date"

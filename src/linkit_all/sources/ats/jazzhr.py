@@ -7,10 +7,10 @@ from urllib.parse import urljoin
 
 from selectolax.lexbor import LexborHTMLParser
 
-from linkit_all.sources.ats._f13 import get_page, name_from_slug
-from linkit_all.sources.ats._f15 import fetch_html, paged_postings, posting_stub
 from linkit_all.sources.base import JobStub, Source, Task
+from linkit_all.sources.common import fetch_html, get_page, paged_postings
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import name_from_slug, posting_stub
 
 _TOKEN = re.compile(r"/apply/([A-Za-z0-9]+)/")  # the public permalink token of a posting
 

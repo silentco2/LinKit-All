@@ -6,10 +6,10 @@ import re
 from collections.abc import AsyncIterator
 from typing import Any
 
-from linkit_all.sources.ats._f13 import get_page, mode, name_from_slug
-from linkit_all.sources.ats._f16 import GONE
 from linkit_all.sources.base import JobStub, Source, Task, from_iso, remote_from_text
+from linkit_all.sources.common import GONE, get_page
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import mode, name_from_slug
 
 API = "https://join.com/api/public"
 PAGE_SIZE = 5  # the API rejects anything larger with 422

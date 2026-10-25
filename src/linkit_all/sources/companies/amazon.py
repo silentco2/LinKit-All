@@ -8,8 +8,9 @@ from typing import Any
 from linkit_all.core.search import SearchConfig
 from linkit_all.sources.base import JobStub, Source, Task
 from linkit_all.sources.common import paged, strip_html
-from linkit_all.sources.companies._f41 import ats_of, limited, query_tasks
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import ats_of
+from linkit_all.sources.tasks import company_query_tasks, limited
 
 BASE = "https://www.amazon.jobs"
 PAGE = 100
@@ -27,7 +28,7 @@ class Amazon(Source):
     kind = "company"
 
     def tasks(self, cfg: SearchConfig) -> list[Task]:
-        return query_tasks(self.name, cfg)
+        return company_query_tasks(self.name, cfg)
 
     async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:
         async def fetch(offset: int) -> tuple[list[dict[str, Any]], int | None]:

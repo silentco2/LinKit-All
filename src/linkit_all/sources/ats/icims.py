@@ -5,10 +5,10 @@ freehire (MIT)."""
 import re
 from collections.abc import AsyncIterator
 
-from linkit_all.sources.ats._f13 import get_page, name_from_host, name_from_slug, sitemap_locs
-from linkit_all.sources.ats._f15 import fetch_html, paged_postings, posting_stub
 from linkit_all.sources.base import JobStub, Source, Task
+from linkit_all.sources.common import fetch_html, get_page, paged_postings, sitemap_locs
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import name_from_host, name_from_slug, posting_stub
 
 # /jobs/<id>/<slug>/job (classic) or /jobs/<id>?lang=.. (careers-home); /jobs/search has no id
 _JOB = re.compile(r"/jobs/(\d+)(?:[/?#]|$)")

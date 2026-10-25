@@ -8,11 +8,10 @@ from urllib.parse import urlsplit
 
 from selectolax.lexbor import LexborHTMLParser
 
-from linkit_all.sources.ats._f13 import name_from_slug
-from linkit_all.sources.ats._f16 import links, page_text
-from linkit_all.sources.ats._f17 import text_of
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
+from linkit_all.sources.common import page_text
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import links, name_from_slug, node_text
 from linkit_all.sources.text import html_to_text
 
 BASE = "https://{board}.selfrecruit.ge/"
@@ -60,7 +59,7 @@ class SelfRecruit(Source):
         if html is None:
             return None
         tree = LexborHTMLParser(html)
-        title = text_of(tree.css_first(".vacancy_title_inner"))
+        title = node_text(tree.css_first(".vacancy_title_inner"))
         body = tree.css_first(".pub_vac_text_detail")
         if not title or body is None:  # an answer without posting markup is not a posting
             return None

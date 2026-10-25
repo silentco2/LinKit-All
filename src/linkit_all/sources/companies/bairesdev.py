@@ -13,12 +13,10 @@ from typing import Any
 import httpx
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.ats._f13 import get_page
-from linkit_all.sources.ats._f16 import when
 from linkit_all.sources.base import JobStub, Source, Task
-from linkit_all.sources.common import strip_html
-from linkit_all.sources.companies._f41 import ats_of
+from linkit_all.sources.common import get_page, strip_html
 from linkit_all.sources.http import Http, RetryableStatus
+from linkit_all.sources.parsing import ats_of, when
 
 TALENT = "https://talent.bairesdev.com/"
 POSTING = "https://applicants.bairesdev.com/api/JobPosting?JobPostingId={id}"  # title, date, teaser

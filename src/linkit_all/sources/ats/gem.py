@@ -6,10 +6,10 @@ import re
 from collections.abc import AsyncIterator
 from typing import Any
 
-from linkit_all.sources.ats._f13 import mode, name_from_slug
 from linkit_all.sources.base import JobStub, Source, Task, from_epoch_ms, remote_from_text
 from linkit_all.sources.common import strip_html
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import mode, name_from_slug
 
 API = "https://jobs.gem.com/api/public/graphql"
 CHUNK = 20  # postings per page: their detail calls run together (Http paces them per host)

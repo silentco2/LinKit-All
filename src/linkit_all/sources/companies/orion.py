@@ -9,8 +9,8 @@ from typing import Any
 from linkit_all.core.search import SearchConfig
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
 from linkit_all.sources.common import strip_html
-from linkit_all.sources.companies._f43 import careers_task
 from linkit_all.sources.http import Http
+from linkit_all.sources.tasks import careers_task
 
 BASE = "https://www.orionjobs.com"
 LIST = BASE + "/api/recruitment/job/data/?folder=uk&hasexpired=false&page={page}"

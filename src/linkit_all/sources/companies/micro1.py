@@ -9,13 +9,11 @@ from datetime import datetime
 from typing import Any
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.ats._f13 import fetch_all, get_page, sitemap_locs
-from linkit_all.sources.ats._f16 import chunks
-from linkit_all.sources.ats.deel import bracket_slice, decode_flight, text_rows
 from linkit_all.sources.base import JobStub, Remote, Source, Task, remote_from_text
-from linkit_all.sources.common import strip_html
-from linkit_all.sources.companies._f43 import careers_task
+from linkit_all.sources.common import chunks, fetch_all, get_page, sitemap_locs, strip_html
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import bracket_slice, decode_flight, text_rows
+from linkit_all.sources.tasks import careers_task
 
 SITEMAP = "https://jobs.micro1.ai/sitemap.xml"
 CHUNK = 20  # posting pages read together per page of stubs

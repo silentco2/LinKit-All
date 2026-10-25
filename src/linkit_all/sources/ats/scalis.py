@@ -6,10 +6,10 @@ import re
 from collections.abc import AsyncIterator
 from typing import Any
 
-from linkit_all.sources.ats._f13 import get_page, mode, name_from_slug
-from linkit_all.sources.ats.deel import bracket_slice, decode_flight, text_rows
 from linkit_all.sources.base import JobStub, Source, Task, from_iso, remote_from_text
+from linkit_all.sources.common import get_page
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import bracket_slice, decode_flight, mode, name_from_slug, text_rows
 from linkit_all.sources.text import html_to_text
 
 LIST = "https://{board}.scalis.ai/jobs?page={page}&limit=10&sortBy=SORT_BEST_MATCH"

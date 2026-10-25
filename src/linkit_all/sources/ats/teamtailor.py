@@ -7,11 +7,10 @@ from collections.abc import AsyncIterator
 
 from lxml import etree
 
-from linkit_all.sources.ats._f13 import name_from_host
-from linkit_all.sources.ats._f15 import fetch_html, paged_postings, posting_stub
-from linkit_all.sources.ats._f16 import GONE, links
 from linkit_all.sources.base import JobStub, Remote, Source, Task
+from linkit_all.sources.common import GONE, fetch_html, paged_postings
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import links, name_from_host, posting_stub
 
 _ID = re.compile(r"/jobs/(\d+)")
 _MAX_PAGES = 1000

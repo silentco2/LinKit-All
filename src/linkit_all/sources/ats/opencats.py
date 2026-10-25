@@ -8,11 +8,10 @@ from urllib.parse import urljoin
 
 from selectolax.lexbor import LexborHTMLParser
 
-from linkit_all.sources.ats._f12 import get_page, name_from_host
-from linkit_all.sources.ats._f16 import page_text
-from linkit_all.sources.ats._f17 import hydrate, next_element, text_of
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
+from linkit_all.sources.common import get_page, hydrate, page_text
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import name_from_host, next_element, node_text
 from linkit_all.sources.text import html_to_text
 
 CHUNK = 20  # posting pages fetched together per page of stubs
@@ -41,11 +40,11 @@ def listed(html: str, base: str) -> list[Listed]:
     found: dict[str, Listed] = {}
     for node in LexborHTMLParser(html).css("a[href], [onclick]"):
         if node.tag == "a":
-            loc, title = node.attributes.get("href") or "", text_of(node)
+            loc, title = node.attributes.get("href") or "", node_text(node)
         else:
             m = _CLICK.search(node.attributes.get("onclick") or "")
             first = next((c for c in node.iter() if c.tag != "-text"), None)
-            loc, title = (m[1] if m else ""), text_of(first)
+            loc, title = (m[1] if m else ""), node_text(first)
         ident = _ID.search(loc)
         if "p=showJob" not in loc or not ident or ident[1] in found:
             continue
@@ -60,7 +59,7 @@ def _label_value(tree: LexborHTMLParser, label: str) -> str:
         raw = cell.text(deep=True)
         if label in raw.lower() and len(raw) < 60:  # a label cell, not a wrapper around the table
             value = next_element(cell)
-            if value is not None and (text := text_of(value)):
+            if value is not None and (text := node_text(value)):
                 return text
     return ""
 
@@ -72,7 +71,7 @@ def location_of(tree: LexborHTMLParser) -> str:
         return found
     row = tree.css_first("#detailsTable tr")
     first = next((c for c in row.iter() if c.tag != "-text"), None) if row else None
-    return text_of(next_element(first)) if first is not None else ""
+    return node_text(next_element(first)) if first is not None else ""
 
 
 def body_of(tree: LexborHTMLParser) -> str:

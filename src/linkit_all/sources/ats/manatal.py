@@ -6,10 +6,10 @@ from collections.abc import AsyncIterator
 from typing import Any
 from urllib.parse import quote
 
-from linkit_all.sources.ats._f13 import name_from_slug
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
 from linkit_all.sources.common import strip_html
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import name_from_slug
 
 LIST = "https://open.api.manatal.com/open/v3/career-page/{slug}/jobs/"
 MAX_PAGES = 200  # the biggest boards are about ten pages; a feed that never ends must not loop

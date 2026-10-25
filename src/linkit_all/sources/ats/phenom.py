@@ -10,10 +10,10 @@ from typing import Any
 
 import httpx
 
-from linkit_all.sources.ats._f12 import name_from_host
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
 from linkit_all.sources.common import paged
 from linkit_all.sources.http import Http, RetryableStatus
+from linkit_all.sources.parsing import name_from_host
 from linkit_all.sources.text import html_to_text
 
 PAGE = 100

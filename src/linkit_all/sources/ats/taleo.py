@@ -12,11 +12,11 @@ from typing import Any
 import httpx
 from selectolax.lexbor import LexborHTMLParser
 
-from linkit_all.sources.ats._f13 import name_from_host
-from linkit_all.sources.ats._f15 import get_page
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
 from linkit_all.sources.careers import Unsupported
+from linkit_all.sources.common import get_page
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import name_from_host
 from linkit_all.sources.text import html_to_text
 
 _PORTAL = re.compile(r"portalNo:\s*'(\d+)'")  # authorizes the searchjobs call

@@ -8,11 +8,11 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.ats._f16 import ld_stub, page_text
 from linkit_all.sources.base import JobStub, Source, Task
-from linkit_all.sources.boards._f32 import ats_of, posting_pages, sitemap_text, sitemap_urls
+from linkit_all.sources.common import page_text, posting_pages, sitemap_by_date, sitemap_text
 from linkit_all.sources.http import Http
 from linkit_all.sources.jsonld import job_postings
+from linkit_all.sources.parsing import ats_of, ld_stub
 
 BASE = "https://work180.com"
 LOCALES = {"au": "en-au", "uk": "en-gb", "us": "en-us"}
@@ -53,7 +53,7 @@ class Work180(Source):
         if locale is None:
             raise ValueError(f"work180: unknown region {task.board!r} (want au, uk or us)")
         xml = await sitemap_text(http, f"{BASE}/{locale}/jobs-sitemap.xml")
-        urls = sitemap_urls(xml, lambda u: bool((m := _JOB.match(u)) and m[1] == locale))
+        urls = sitemap_by_date(xml, lambda u: bool((m := _JOB.match(u)) and m[1] == locale))
         urls.sort(key=lambda u: int(_JOB.match(u)[3]), reverse=True)  # type: ignore[index]
 
         async def build(url: str) -> JobStub | None:

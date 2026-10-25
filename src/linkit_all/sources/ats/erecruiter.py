@@ -8,10 +8,10 @@ from urllib.parse import parse_qs, urlsplit
 
 from selectolax.lexbor import LexborHTMLParser
 
-from linkit_all.sources.ats._f13 import fetch_all, get_page, name_from_slug
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
-from linkit_all.sources.common import strip_html
+from linkit_all.sources.common import fetch_all, get_page, strip_html
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import name_from_slug
 
 BASE = "https://skk.erecruiter.pl"
 MAX_PAGES = 500

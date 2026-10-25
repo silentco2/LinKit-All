@@ -9,11 +9,11 @@ from collections.abc import AsyncIterator
 import httpx
 from lxml import etree
 
-from linkit_all.sources.ats._f12 import name_from_slug
-from linkit_all.sources.ats._f16 import page_text, when
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
+from linkit_all.sources.common import page_text
 from linkit_all.sources.http import Http, RetryableStatus
 from linkit_all.sources.jsonld import job_postings
+from linkit_all.sources.parsing import name_from_slug, when
 from linkit_all.sources.text import html_to_text
 
 DOMAINS = ("com", "de")  # a tenant is served from one of them

@@ -8,9 +8,9 @@ from typing import Any
 
 from selectolax.lexbor import LexborHTMLParser, LexborNode
 
-from linkit_all.sources.ats._f12 import name_from_slug
 from linkit_all.sources.base import JobStub, Remote, Source, Task
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import name_from_slug
 from linkit_all.sources.text import html_to_text
 
 PAGER = "https://{board}.hiringroom.com/jobs/getVacanciesForPortal/{page}"

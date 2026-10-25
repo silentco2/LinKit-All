@@ -6,11 +6,10 @@ from collections.abc import AsyncIterator
 from typing import Any
 from urllib.parse import quote
 
-from linkit_all.sources.ats._f13 import name_from_slug
-from linkit_all.sources.ats._f16 import when
 from linkit_all.sources.base import JobStub, Remote, Source, Task
 from linkit_all.sources.common import strip_html
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import name_from_slug, when
 
 _API = "https://apigw.solides.com.br/jobs/v3/home/vacancy"
 _OPEN = "em_andamento"  # any other present currentState ("encerrada") is a closed vacancy

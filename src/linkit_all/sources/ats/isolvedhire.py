@@ -5,11 +5,11 @@ JobPosting. Logic adapted from freehire (MIT)."""
 import re
 from collections.abc import AsyncIterator
 
-from linkit_all.sources.ats._f13 import get_page, name_from_slug, sitemap_locs
-from linkit_all.sources.ats._f15 import fetch_html, paged_postings, posting_stub
 from linkit_all.sources.base import JobStub, Source, Task
 from linkit_all.sources.careers import Unsupported
+from linkit_all.sources.common import fetch_html, get_page, paged_postings, sitemap_locs
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import name_from_slug, posting_stub
 
 _JOB = re.compile(r"/jobs/(\d+)")  # the sitemap lists /jobs/<id> and /jobs/<id>.html
 # What the platform answers (HTTP 200, HTML) for a board it does not serve; matched on a stable

@@ -9,14 +9,11 @@ from collections.abc import AsyncIterator
 from selectolax.lexbor import LexborHTMLParser
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.ats._f13 import fetch_all, get_page, sitemap_locs
-from linkit_all.sources.ats._f15 import safe_date
-from linkit_all.sources.ats._f17 import text_of
 from linkit_all.sources.base import JobStub, Source, Task
-from linkit_all.sources.common import strip_html
-from linkit_all.sources.companies._f42 import remote_ru
+from linkit_all.sources.common import fetch_all, get_page, sitemap_locs, strip_html
 from linkit_all.sources.http import Http
 from linkit_all.sources.jsonld import job_postings
+from linkit_all.sources.parsing import node_text, remote_ru, safe_date
 
 HOST = "job.kaspi.kz"
 SITEMAP = "https://{host}/sitemap/vacancies.xml"
@@ -45,10 +42,10 @@ def parse_vacancy(html: str, url: str) -> JobStub | None:
     if not m or not postings:
         return None
     p, tree = postings[0], LexborHTMLParser(html)
-    cities = text_of(tree.css_first(f'[class~="{_HEAD}salary__cities"]'))
+    cities = node_text(tree.css_first(f'[class~="{_HEAD}salary__cities"]'))
     location = _OFFICE.sub("", cities)
-    low, high = salary(text_of(tree.css_first(f'[class~="{_HEAD}salary__label"]')))
-    labels = [text_of(n) for n in tree.css(f'[class~="{_HEAD}filter-items__label"]')]
+    low, high = salary(node_text(tree.css_first(f'[class~="{_HEAD}salary__label"]')))
+    labels = [node_text(n) for n in tree.css(f'[class~="{_HEAD}filter-items__label"]')]
     return JobStub(
         source="kaspi",
         url=url,

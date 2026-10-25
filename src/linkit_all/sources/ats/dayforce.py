@@ -8,10 +8,10 @@ from typing import Any
 
 import httpx
 
-from linkit_all.sources.ats._f12 import name_from_slug
 from linkit_all.sources.base import JobStub, Source, Task, from_iso, remote_from_text
 from linkit_all.sources.common import paged
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import name_from_slug
 
 BASE = "https://jobs.dayforcehcm.com"
 PAGE_SIZE = 25  # fixed by the platform: the request only carries an offset

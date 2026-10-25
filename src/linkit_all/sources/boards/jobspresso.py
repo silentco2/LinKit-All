@@ -6,11 +6,11 @@ from collections.abc import AsyncIterator
 from urllib.parse import parse_qs, urlsplit
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.aggregators._f22 import feed_task
-from linkit_all.sources.ats._f13 import get_page
 from linkit_all.sources.base import JobStub, Source, Task
-from linkit_all.sources.boards._f32 import body_text, feed_items, rfc_date
+from linkit_all.sources.common import get_page
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import body_text, feed_items, rfc_date
+from linkit_all.sources.tasks import feed_task
 
 FEED = "https://jobspresso.co/feed/?post_type=job_listing"
 

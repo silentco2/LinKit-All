@@ -6,10 +6,10 @@ from collections.abc import AsyncIterator
 
 from selectolax.lexbor import LexborHTMLParser
 
-from linkit_all.sources.ats._f13 import get_page, name_from_slug
-from linkit_all.sources.ats._f17 import text_of
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
+from linkit_all.sources.common import get_page
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import name_from_slug, node_text
 from linkit_all.sources.text import html_to_text
 
 LIST = "https://{board}.potok.io/open/jobs/"
@@ -46,10 +46,10 @@ class Potok(Source):
         for row in tree.css(".postings-wrapper .posting"):
             link = row.css_first("a.posting-title")
             m = _HREF.search(link.attributes.get("href") or "") if link else None
-            title = text_of(link.css_first("h5")) if link else ""
+            title = node_text(link.css_first("h5")) if link else ""
             if not (link and m and title):
                 continue
-            where = text_of(link.css_first(".sort-by-location"))
+            where = node_text(link.css_first(".sort-by-location"))
             url = JOB_URL.format(board=board, id=m.group(1))
             stubs.append(
                 JobStub(
@@ -77,7 +77,7 @@ class Potok(Source):
         # remote.
         times = tree.css(".posting-headline .posting-category.sort-by-time")
         remote = (
-            "remote" if len(times) > 1 and text_of(times[1]) == REMOTE_SCHEDULE else stub.remote
+            "remote" if len(times) > 1 and node_text(times[1]) == REMOTE_SCHEDULE else stub.remote
         )
         return stub.model_copy(
             update={"description": html_to_text(body.html or ""), "remote": remote}

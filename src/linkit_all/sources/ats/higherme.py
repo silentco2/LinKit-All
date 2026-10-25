@@ -7,9 +7,9 @@ import re
 from collections.abc import AsyncIterator
 from typing import Any
 
-from linkit_all.sources.ats._f12 import name_from_slug
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import name_from_slug
 from linkit_all.sources.text import html_to_text
 
 API = "https://api.higherme.com/classic/jobs"

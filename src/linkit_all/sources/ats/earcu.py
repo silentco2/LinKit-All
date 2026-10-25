@@ -8,10 +8,11 @@ from email.utils import parsedate_to_datetime
 
 from lxml import etree
 
-from linkit_all.sources.ats._f12 import get_page, name_from_host
 from linkit_all.sources.base import JobStub, Source, Task, from_iso, remote_from_text
+from linkit_all.sources.common import get_page
 from linkit_all.sources.http import Http
 from linkit_all.sources.jsonld import job_postings
+from linkit_all.sources.parsing import name_from_host
 from linkit_all.sources.text import html_to_text
 
 # /jobs/vacancy/<slug>/<id>/description/ ; anchored so an earlier number is not taken for the id

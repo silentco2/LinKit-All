@@ -9,11 +9,10 @@ from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 
 from selectolax.lexbor import LexborHTMLParser, LexborNode
 
-from linkit_all.sources.ats._f13 import get_page, name_from_slug
-from linkit_all.sources.ats._f16 import GONE, chunks
-from linkit_all.sources.ats._f17 import text_of
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
+from linkit_all.sources.common import GONE, chunks, get_page
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import name_from_slug, node_text
 from linkit_all.sources.text import html_to_text
 
 BASE = "https://www.workstream.us"
@@ -51,17 +50,17 @@ def cards_of(page: str) -> list[Card]:
         if link is None:
             continue
         href = link.attributes["href"] or ""
-        tags = [text_of(t) for t in node.css(".tag")]
+        tags = [node_text(t) for t in node.css(".tag")]
         icon = node.css_first('img[data-icon="rate-of-pay"]')
         cards.append(
             Card(
                 id=posting_id(href),
                 url=urljoin(BASE, urlsplit(href).path),  # without the "?locale=en" every link has
-                title=text_of(link),
-                location=text_of(node.css_first(".position-address")),
+                title=node_text(link),
+                location=node_text(node.css_first(".position-address")),
                 # Several schedules at once ("Full-time" and "Part-time") state no single type.
                 employment=tags[0] if len(tags) == 1 else None,
-                pay=text_of(icon.parent) if icon is not None else "",
+                pay=node_text(icon.parent) if icon is not None else "",
             )
         )
     return cards
@@ -118,7 +117,7 @@ class Workstream(Source):
         if base != asked:
             page = await fetch(http, base)
         title = LexborHTMLParser(page).css_first("title")
-        name = _TITLE.sub("", text_of(title)) if title else ""
+        name = _TITLE.sub("", node_text(title)) if title else ""
         total = _TOTAL_PAGES.search(page)
         pages = int(total[1]) if total and 1 <= int(total[1]) <= MAX_PAGES else MAX_PAGES
         found: dict[str, Card] = {}

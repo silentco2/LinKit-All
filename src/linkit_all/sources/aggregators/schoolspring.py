@@ -8,10 +8,10 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.aggregators._f22 import query_tasks
 from linkit_all.sources.base import JobStub, Source, Task, from_iso, remote_from_text
 from linkit_all.sources.common import strip_html
 from linkit_all.sources.http import Http
+from linkit_all.sources.tasks import query_tasks
 
 API = "https://api.schoolspring.com"
 DOMAIN = "www.schoolspring.com"

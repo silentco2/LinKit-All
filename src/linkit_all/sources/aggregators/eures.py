@@ -7,10 +7,10 @@ from math import ceil
 from typing import Any
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.aggregators._f22 import query_tasks
 from linkit_all.sources.base import JobStub, Source, Task, from_epoch_ms
 from linkit_all.sources.common import strip_html
 from linkit_all.sources.http import Http
+from linkit_all.sources.tasks import query_tasks
 
 SEARCH = "https://europa.eu/eures/api/jv-searchengine/public/jv-search/search"
 PORTAL = "https://europa.eu/eures/portal/jv-se/jv-details/"

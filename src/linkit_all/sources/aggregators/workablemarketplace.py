@@ -8,9 +8,9 @@ from typing import Any
 
 from linkit_all.core.models import utcnow
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.ats._f13 import mode
 from linkit_all.sources.base import JobStub, Source, Task, from_iso, remote_from_text
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import mode
 from linkit_all.sources.text import html_to_text
 
 API = "https://jobs.workable.com/api/v1/jobs"

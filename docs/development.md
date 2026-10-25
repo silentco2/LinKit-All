@@ -73,9 +73,24 @@ A source is one module; nothing shared is edited, so many can be written side by
 4. **Aggregators, boards, companies:** implement `tasks(cfg)` returning `Task`s. They are only
    asked when the user lists the `name` under `sources.enabled` in the search config, or when the
    class sets `default_on = True`. ATS plugins run from the company list and need no switch.
-5. **Helpers** in `linkit_all.sources.common`: `retry_while` (backoff that honours `Retry-After`),
-   `paged` (offset paging with resume), `absolute`, `strip_html`. `Http` already rate-limits per
-   host and retries 429 and 5xx.
+5. **Helpers**, so a plugin never copies one from another plugin (`Http` already rate-limits per
+   host and retries 429 and 5xx):
+   - `linkit_all.sources.common`: fetching and paging. `retry_while` (backoff that honours
+     `Retry-After`), `paged` (offset paging with resume), `absolute`, `strip_html`; for pages
+     `get_page`, `fetch_html`, `page_text`, `fetch_all`, `post_form`, `json_or_none`, `XHR`,
+     `GONE`; for resumable lists `chunks`, `hydrate`, `paged_postings`, `posting_pages`; for
+     sitemaps `sitemap_locs`, `sitemap_text`, `sitemap_pages`, `child_sitemap_urls`,
+     `sitemap_by_date`.
+   - `linkit_all.sources.parsing`: turning pages into stubs and text. `posting_stub`, `ld_stub`,
+     `board_stub` (schema.org JobPosting), `next_data`, `decode_flight`, `bracket_slice`,
+     `text_rows` (Next.js), `unflatten` (Nuxt devalue), `feed_items`, `rfc_date`, `body_text`
+     (RSS), `node_text`, `text_of`, `sections`, `links`, `when`, `safe_date`; and the small
+     vocabulary helpers `mode`, `remote_ru`, `ru_mode`, `rub_month`, `name_from_slug`,
+     `name_from_host`, `ats_of`.
+   - `linkit_all.sources.tasks`: `query_tasks`, `company_query_tasks`, `feed_task`,
+     `careers_task`, plus `all_older`, `limited` and `fresh` for the results.
+   - `linkit_all.sources.aggregators.keys`: saved API keys (`get_keys`, `KeyGetter`), `DailyBudget`,
+     `split_location` and `COUNTRIES` for keyed aggregators.
 6. **Tests:** `tests/unit/sources/test_<name>.py` with a trimmed real response in
    `tests/fixtures/<name>/`. The fixtures `load_fixture`, `search_pages`, `fetch_details` and
    `mock_transport` in `tests/unit/sources/conftest.py` do the plumbing. Test the stub fields,

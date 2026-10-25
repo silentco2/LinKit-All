@@ -5,10 +5,10 @@ career widget reads from ats.talentadore.com/positions/<token>/json. Logic adapt
 import re
 from collections.abc import AsyncIterator
 
-from linkit_all.sources.ats._f16 import when
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
 from linkit_all.sources.common import strip_html
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import when
 
 
 class TalentAdore(Source):

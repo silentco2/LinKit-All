@@ -1,4 +1,4 @@
-"""Helpers private to the keyed aggregator plugins (the underscore keeps it out of the registry)."""
+"""Helpers for the keyed aggregator plugins: saved API keys, daily call budgets, countries."""
 
 import json
 import re

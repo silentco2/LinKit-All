@@ -5,7 +5,7 @@ import httpx
 import pytest
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.aggregators._keyed import parse_ids, split_location
+from linkit_all.sources.aggregators.keys import parse_ids, split_location
 from linkit_all.sources.aggregators.whatjobs import WhatJobs
 from linkit_all.sources.base import JobStub
 from linkit_all.sources.careers import Unsupported

@@ -7,10 +7,10 @@ import re
 from collections.abc import AsyncIterator
 from typing import Any
 
-from linkit_all.sources.ats._f13 import mode
 from linkit_all.sources.base import JobStub, Source, Task, from_epoch_ms, remote_from_text
 from linkit_all.sources.common import strip_html
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import mode
 
 SEARCH = "https://api.getro.com/api/v2/collections/{}/search/jobs"
 PAGE = 100

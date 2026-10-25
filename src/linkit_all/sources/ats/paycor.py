@@ -8,10 +8,8 @@ from urllib.parse import parse_qs, urljoin, urlsplit
 
 from selectolax.lexbor import LexborHTMLParser, LexborNode
 
-from linkit_all.sources.ats._f12 import get_page
-from linkit_all.sources.ats._f16 import page_text
-from linkit_all.sources.ats._f17 import hydrate
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
+from linkit_all.sources.common import get_page, hydrate, page_text
 from linkit_all.sources.http import Http
 from linkit_all.sources.text import html_to_text
 

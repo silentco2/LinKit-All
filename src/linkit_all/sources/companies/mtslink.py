@@ -8,8 +8,10 @@ from typing import Any
 
 from linkit_all.core.search import SearchConfig
 from linkit_all.sources.base import JobStub, Source, Task, from_iso
-from linkit_all.sources.companies._f43 import careers_task, json_or_none, ru_mode, sections
+from linkit_all.sources.common import json_or_none
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import ru_mode, sections
+from linkit_all.sources.tasks import careers_task
 
 LIST = "https://mts-link.ru/api/huntflow/vacancies"
 DETAIL = "https://mts-link.ru/api/huntflow/vacancy/{id}"

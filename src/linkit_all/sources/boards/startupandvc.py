@@ -9,14 +9,12 @@ from datetime import datetime
 from selectolax.lexbor import LexborHTMLParser
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.aggregators._f22 import feed_task
-from linkit_all.sources.ats._f13 import get_page
-from linkit_all.sources.ats._f16 import ld_stub, links, page_text
 from linkit_all.sources.base import JobStub, Source, Task
-from linkit_all.sources.boards._f32 import ats_of, posting_pages
-from linkit_all.sources.common import strip_html
+from linkit_all.sources.common import get_page, page_text, posting_pages, strip_html
 from linkit_all.sources.http import Http
 from linkit_all.sources.jsonld import job_postings
+from linkit_all.sources.parsing import ats_of, ld_stub, links
+from linkit_all.sources.tasks import feed_task
 
 LIST = "https://www.startupandvc.com/venture-capital-jobs"
 _SLUG = re.compile(r"/venture-capital-jobs/([a-z0-9][a-z0-9-]*)(?:$|[?#])")

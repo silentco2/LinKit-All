@@ -11,14 +11,12 @@ import httpx
 from selectolax.lexbor import LexborHTMLParser, LexborNode
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.aggregators._f22 import feed_task
-from linkit_all.sources.ats._f13 import sitemap_locs
-from linkit_all.sources.ats._f16 import GONE, ld_stub
 from linkit_all.sources.base import JobStub, Remote, Source, Task
-from linkit_all.sources.boards._f32 import posting_pages, sitemap_urls
-from linkit_all.sources.common import strip_html
+from linkit_all.sources.common import GONE, posting_pages, sitemap_by_date, sitemap_locs, strip_html
 from linkit_all.sources.http import Http
 from linkit_all.sources.jsonld import job_postings
+from linkit_all.sources.parsing import ld_stub
+from linkit_all.sources.tasks import feed_task
 
 INDEX = "https://www.profession.hu/sitemap-listings-index-hu.xml"
 IT_CATEGORIES = ("itdev", "itops")  # the other 21 categories are general-population boards
@@ -102,7 +100,7 @@ class Profession(Source):
             except httpx.HTTPStatusError:
                 continue  # a category the platform dropped
             texts.append(r.text)
-        urls = sitemap_urls("".join(texts), lambda u: bool(_ID.search(u)))
+        urls = sitemap_by_date("".join(texts), lambda u: bool(_ID.search(u)))
 
         async def build(url: str) -> JobStub | None:
             text = await _get(http, url)

@@ -5,8 +5,8 @@ import re
 from collections.abc import AsyncIterator
 from typing import Any
 
-from linkit_all.sources.ats._f12 import get_page
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
+from linkit_all.sources.common import get_page
 from linkit_all.sources.http import Http
 from linkit_all.sources.jsonld import job_postings, to_stub
 

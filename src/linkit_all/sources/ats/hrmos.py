@@ -7,10 +7,10 @@ from urllib.parse import urljoin, urlsplit
 
 from selectolax.lexbor import LexborHTMLParser
 
-from linkit_all.sources.ats._f13 import get_page, name_from_slug
-from linkit_all.sources.ats._f15 import fetch_html, posting_stub
 from linkit_all.sources.base import JobStub, Source, Task
+from linkit_all.sources.common import fetch_html, get_page
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import name_from_slug, posting_stub
 
 MAX_PAGES = 50  # the largest known board needs 5 pages of 100
 LIST = "https://hrmos.co/pages/{board}/jobs"

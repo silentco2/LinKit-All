@@ -8,7 +8,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.aggregators._keyed import (
+from linkit_all.sources.aggregators.keys import (
     COUNTRIES,
     KeyGetter,
     get_keys,

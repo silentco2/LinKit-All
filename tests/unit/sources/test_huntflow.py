@@ -5,10 +5,11 @@ import httpx
 import pytest
 from aiolimiter import AsyncLimiter
 
-from linkit_all.sources.ats.huntflow import Huntflow, find_vacancy, unflatten
+from linkit_all.sources.ats.huntflow import Huntflow, find_vacancy
 from linkit_all.sources.ats_detector import detect
 from linkit_all.sources.base import JobStub
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import unflatten
 
 
 @pytest.fixture(autouse=True)

@@ -8,11 +8,10 @@ from urllib.parse import urljoin, urlsplit
 
 from selectolax.lexbor import LexborHTMLParser
 
-from linkit_all.sources.ats._f12 import get_page, name_from_host
-from linkit_all.sources.ats._f16 import page_text, when
-from linkit_all.sources.ats._f17 import hydrate, text_of
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
+from linkit_all.sources.common import get_page, hydrate, page_text
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import name_from_host, node_text, when
 from linkit_all.sources.text import html_to_text
 
 CHUNK = 20  # posting pages fetched together per page of stubs
@@ -25,11 +24,12 @@ def parse_posting(html: str, url: str, host: str) -> JobStub | None:
     tree = LexborHTMLParser(html)
     body = tree.css_first('[itemprop="description"]')
     description = html_to_text(body.html or "") if body else ""
-    title = text_of(tree.css_first("h1")) or text_of(tree.css_first('[itemprop="title"]'))
+    title = node_text(tree.css_first("h1")) or node_text(tree.css_first('[itemprop="title"]'))
     if not description or not title:  # not a JobPosting page (or an empty stub)
         return None
     place = [
-        text_of(tree.css_first(f'[itemprop="{p}"]')) for p in ("addressLocality", "addressCountry")
+        node_text(tree.css_first(f'[itemprop="{p}"]'))
+        for p in ("addressLocality", "addressCountry")
     ]
     location = ", ".join(p for p in place if p)
     stamp = tree.css_first('[itemprop="datePosted"]')

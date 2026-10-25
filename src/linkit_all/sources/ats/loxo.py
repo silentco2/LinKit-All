@@ -11,11 +11,10 @@ from collections.abc import AsyncIterator
 
 from selectolax.lexbor import LexborHTMLParser
 
-from linkit_all.sources.ats._f13 import get_page, name_from_slug
-from linkit_all.sources.ats._f16 import chunks, links, page_text
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
-from linkit_all.sources.common import strip_html
+from linkit_all.sources.common import chunks, get_page, page_text, strip_html
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import links, name_from_slug
 
 _TOKEN = re.compile(r"/job/([A-Za-z0-9=_-]+)(?:$|[/?#])")
 

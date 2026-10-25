@@ -7,10 +7,10 @@ from typing import Any
 
 import httpx
 
-from linkit_all.sources.ats._f13 import name_from_slug
 from linkit_all.sources.base import JobStub, Source, Task, from_iso, remote_from_text
 from linkit_all.sources.common import strip_html
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import name_from_slug
 
 FULL_TIME = 2  # the portal's own script shows jobType 2 as "Full Time" and any other as part time
 

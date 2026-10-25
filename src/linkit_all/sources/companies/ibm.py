@@ -7,10 +7,10 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.ats._f13 import mode
 from linkit_all.sources.base import JobStub, Source, Task, from_iso
 from linkit_all.sources.common import paged
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import mode
 
 HOST = "www-api.ibm.com"
 PAGE = 100  # the API's ceiling: 101 is a 400

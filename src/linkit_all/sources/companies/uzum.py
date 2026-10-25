@@ -11,13 +11,10 @@ from datetime import datetime
 from typing import Any
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.ats._f13 import get_page, sitemap_locs
-from linkit_all.sources.ats._f16 import CHUNK, page_text
-from linkit_all.sources.ats._f17 import hydrate
-from linkit_all.sources.ats.deel import bracket_slice, decode_flight, text_rows
 from linkit_all.sources.base import JobStub, Remote, Source, Task
-from linkit_all.sources.common import strip_html
+from linkit_all.sources.common import CHUNK, get_page, hydrate, page_text, sitemap_locs, strip_html
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import bracket_slice, decode_flight, text_rows
 
 SITEMAP = "https://people.uzum.com/sitemap.xml"
 _URL = re.compile(r"^https://people\.uzum\.com/career/ru/vacancies/(\d+)/?$")

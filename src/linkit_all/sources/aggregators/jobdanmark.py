@@ -7,11 +7,11 @@ from math import ceil
 from typing import Any
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.aggregators._f22 import all_older, feed_task
 from linkit_all.sources.base import JobStub, Source, Task, from_iso
 from linkit_all.sources.common import absolute
 from linkit_all.sources.http import Http
 from linkit_all.sources.jsonld import job_postings
+from linkit_all.sources.tasks import all_older, feed_task
 from linkit_all.sources.text import html_to_text
 
 BASE = "https://jobdanmark.dk"

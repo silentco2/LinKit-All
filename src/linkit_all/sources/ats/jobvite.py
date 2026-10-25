@@ -5,11 +5,11 @@ import asyncio
 import re
 from collections.abc import AsyncIterator
 
-from linkit_all.sources.ats._f13 import get_page, name_from_slug
-from linkit_all.sources.ats._f16 import chunks, ld_stub, links, page_text
 from linkit_all.sources.base import JobStub, Source, Task
+from linkit_all.sources.common import chunks, get_page, page_text
 from linkit_all.sources.http import Http
 from linkit_all.sources.jsonld import job_postings
+from linkit_all.sources.parsing import ld_stub, links, name_from_slug
 
 _JOB = re.compile(r"/job/([A-Za-z0-9]+)(?:[/?#]|$)")  # /<board>/jobs and /jobAlerts don't match
 

@@ -10,10 +10,11 @@ from urllib.parse import quote
 
 from selectolax.lexbor import LexborHTMLParser
 
-from linkit_all.sources.ats._f12 import get_page, name_from_slug
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
+from linkit_all.sources.common import get_page
 from linkit_all.sources.http import Http
 from linkit_all.sources.jsonld import job_postings
+from linkit_all.sources.parsing import name_from_slug
 from linkit_all.sources.text import html_to_text
 
 BOARD = "https://{board}.hireclick.com/jobboard/jobboard.aspx"

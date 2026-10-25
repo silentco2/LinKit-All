@@ -12,9 +12,8 @@ from urllib.parse import quote_plus
 from selectolax.lexbor import LexborHTMLParser
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.ats._f13 import get_page
 from linkit_all.sources.base import JobStub, Source, Task, from_epoch_ms, remote_from_text
-from linkit_all.sources.common import strip_html
+from linkit_all.sources.common import get_page, strip_html
 from linkit_all.sources.http import Http
 
 HOST = "www.google.com"

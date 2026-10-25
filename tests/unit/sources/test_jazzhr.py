@@ -5,11 +5,11 @@ import httpx
 import pytest
 from aiolimiter import AsyncLimiter
 
-from linkit_all.sources.ats._f15 import posting_stub
 from linkit_all.sources.ats.jazzhr import JazzHR, job_links
 from linkit_all.sources.ats_detector import detect
 from linkit_all.sources.base import JobStub
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import posting_stub
 
 URL = "https://proautomated.applytojob.com/apply/nfHu9c2Sxz/Field-Service-Engineer"
 

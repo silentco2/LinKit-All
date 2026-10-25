@@ -6,12 +6,11 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.ats._f13 import fetch_all, get_page
-from linkit_all.sources.ats._f16 import CHUNK, chunks, ld_stub
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
-from linkit_all.sources.companies._f41 import ats_of, sitemap_urls
+from linkit_all.sources.common import CHUNK, chunks, fetch_all, get_page, sitemap_pages
 from linkit_all.sources.http import Http
 from linkit_all.sources.jsonld import job_postings
+from linkit_all.sources.parsing import ats_of, ld_stub
 
 SITEMAP = "https://www.dataart.team/sitemap.xml"
 # English vacancy pages only: /xx/vacancies/... are translations, /vacancies is the listing.
@@ -63,7 +62,7 @@ class DataArt(Source):
         return [Task(self.name, "dataart:vacancies")]
 
     async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:
-        urls = sorted({u for u in await sitemap_urls(http, SITEMAP) if _VACANCY.match(u)})
+        urls = sorted({u for u in await sitemap_pages(http, SITEMAP) if _VACANCY.match(u)})
         for chunk in chunks(urls, start_page, CHUNK):
             yield await fetch_all(http, list(chunk), parse_vacancy)
 

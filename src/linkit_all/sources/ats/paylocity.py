@@ -10,12 +10,11 @@ from typing import Any
 
 from selectolax.lexbor import LexborHTMLParser
 
-from linkit_all.sources.ats._f12 import get_page
-from linkit_all.sources.ats._f16 import page_text, when
-from linkit_all.sources.ats._f17 import hydrate, next_element, text_of
 from linkit_all.sources.base import JobStub, Remote, Source, Task, remote_from_text
+from linkit_all.sources.common import get_page, hydrate, page_text
 from linkit_all.sources.http import Http
 from linkit_all.sources.jsonld import job_postings
+from linkit_all.sources.parsing import next_element, node_text, when
 from linkit_all.sources.text import html_to_text
 
 BASE = "https://recruiting.paylocity.com"
@@ -37,7 +36,7 @@ def description_of(html_text: str) -> str:
     """The block after the "Description" section header; failing that the JobPosting's body."""
     tree = LexborHTMLParser(html_text)
     for header in tree.css("div.job-listing-header"):
-        if text_of(header).lower() == "description":
+        if node_text(header).lower() == "description":
             block = next_element(header)
             return html_to_text(block.html or "") if block is not None else ""
     found = job_postings(html_text)

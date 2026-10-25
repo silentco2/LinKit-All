@@ -4,11 +4,10 @@ posting page carries a schema.org JobPosting. Logic adapted from freehire (MIT).
 import re
 from collections.abc import AsyncIterator
 
-from linkit_all.sources.ats._f13 import name_from_slug
-from linkit_all.sources.ats._f15 import fetch_html, get_page, paged_postings, posting_stub
-from linkit_all.sources.ats._f16 import links
 from linkit_all.sources.base import JobStub, Source, Task
+from linkit_all.sources.common import fetch_html, get_page, paged_postings
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import links, name_from_slug, posting_stub
 
 _ID = re.compile(r"/job/(\d+)(?:[/?#]|$)")  # /job/<id>/<slug>?jobDbPVId=<n>
 

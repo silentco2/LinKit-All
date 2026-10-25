@@ -6,61 +6,14 @@ import re
 from collections.abc import AsyncIterator
 from typing import Any
 
-from linkit_all.sources.ats._f12 import get_page, name_from_slug
 from linkit_all.sources.base import JobStub, Source, Task, from_iso, remote_from_text
+from linkit_all.sources.common import get_page
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import bracket_slice, decode_flight, name_from_slug, text_rows
 from linkit_all.sources.text import html_to_text
 
 BOARD = "https://jobs.deel.com/{board}"
 JOB = "https://jobs.deel.com/{board}/job-details/{id}/overview"
-# The page pushes its data as self.__next_f.push([1,"..."]) chunks: JS string literals that,
-# joined, form the RSC "flight" stream holding the page's JSON.
-_PUSH = re.compile(r'self\.__next_f\.push\(\[1,("(?:[^"\\]|\\.)*")\]\)')
-# A text row is "<hex id>:T<hex byte length>,<content>"; a posting refers to it as "$<id>".
-_TEXT_ROW = re.compile(rb"[^0-9a-f]([0-9a-f]+):T([0-9a-f]+),")
-
-
-def decode_flight(page: str) -> str:
-    chunks = _PUSH.findall(page)
-    if not chunks:
-        raise ValueError("deel: no Next.js flight payload on the page")
-    return "".join(json.loads(c) for c in chunks)
-
-
-def bracket_slice(text: str, key: str, open_: str, close: str) -> str | None:
-    """The balanced open..close run after `key`, counting brackets outside string literals."""
-    at = text.find(key)
-    start = text.find(open_, at) if at >= 0 else -1
-    if start < 0:
-        return None
-    depth, in_string, i = 0, False, start
-    while i < len(text):
-        c = text[i]
-        if in_string:
-            if c == "\\":
-                i += 1
-            elif c == '"':
-                in_string = False
-        elif c == '"':
-            in_string = True
-        elif c == open_:
-            depth += 1
-        elif c == close:
-            depth -= 1
-            if depth == 0:
-                return text[start : i + 1]
-        i += 1
-    return None
-
-
-def text_rows(flight: str) -> dict[str, str]:
-    """The flight's text rows by id; each row's content is exactly its declared number of bytes."""
-    raw = flight.encode()
-    rows = {}
-    for m in _TEXT_ROW.finditer(raw):
-        start = m.end()
-        rows[m[1].decode()] = raw[start : start + int(m[2], 16)].decode(errors="replace")
-    return rows
 
 
 class Deel(Source):

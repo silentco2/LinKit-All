@@ -9,11 +9,10 @@ from typing import Any
 
 from selectolax.lexbor import LexborHTMLParser
 
-from linkit_all.sources.ats._f13 import get_page, name_from_slug
-from linkit_all.sources.ats._f16 import page_text, when
-from linkit_all.sources.ats._f17 import hydrate
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
+from linkit_all.sources.common import get_page, hydrate, page_text
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import name_from_slug, when
 from linkit_all.sources.text import html_to_text
 
 BASE = "https://careers.werecruit.io"

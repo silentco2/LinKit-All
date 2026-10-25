@@ -6,10 +6,10 @@ from collections.abc import AsyncIterator
 
 from selectolax.lexbor import LexborHTMLParser
 
-from linkit_all.sources.ats._f12 import get_page, name_from_host
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
-from linkit_all.sources.common import absolute
+from linkit_all.sources.common import absolute, get_page
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import name_from_host
 from linkit_all.sources.text import html_to_text
 
 _JOB = re.compile(r"/careers/(\d+)/jobs/(\d+)")

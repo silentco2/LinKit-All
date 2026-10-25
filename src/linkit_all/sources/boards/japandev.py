@@ -10,13 +10,11 @@ from urllib.parse import urlsplit
 from selectolax.lexbor import LexborHTMLParser
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.aggregators._f22 import feed_task
-from linkit_all.sources.ats._f16 import CHUNK, page_text, when
-from linkit_all.sources.ats._f17 import hydrate
 from linkit_all.sources.base import JobStub, Remote, Source, Task
-from linkit_all.sources.boards._f31 import ats_of, sitemap_urls
-from linkit_all.sources.common import strip_html
+from linkit_all.sources.common import CHUNK, child_sitemap_urls, hydrate, page_text, strip_html
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import ats_of, when
+from linkit_all.sources.tasks import feed_task
 
 INDEX = "https://japan-dev.com/sitemap.xml"
 _REMOTE: dict[str, Remote] = {
@@ -125,7 +123,7 @@ class JapanDev(Source):
 
     async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:
         # ponytail: sitemap order, capped at task.limit; the sitemap carries no dates
-        urls = await sitemap_urls(http, INDEX, "/sitemaps/", lambda u: bool(posting_slug(u)))
+        urls = await child_sitemap_urls(http, INDEX, "/sitemaps/", lambda u: bool(posting_slug(u)))
 
         async def build(url: str) -> JobStub | None:
             page = await page_text(http, url)

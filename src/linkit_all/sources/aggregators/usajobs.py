@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.aggregators._keyed import KeyGetter, get_keys, split_location
+from linkit_all.sources.aggregators.keys import KeyGetter, get_keys, split_location
 from linkit_all.sources.base import JobStub, Remote, Source, Task
 from linkit_all.sources.careers import Unsupported
 from linkit_all.sources.http import Http

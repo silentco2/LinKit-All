@@ -7,10 +7,10 @@ from urllib.parse import urljoin, urlsplit
 
 from selectolax.lexbor import LexborHTMLParser
 
-from linkit_all.sources.ats._f13 import fetch_all, get_page, name_from_host
 from linkit_all.sources.base import JobStub, Remote, Source, Task, remote_from_text
-from linkit_all.sources.common import strip_html
+from linkit_all.sources.common import fetch_all, get_page, strip_html
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import name_from_host
 
 CHUNK = 15  # job pages read together per page of stubs
 _ID = re.compile(r"-(\d+)/?$")

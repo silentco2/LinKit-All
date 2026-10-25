@@ -7,12 +7,11 @@ from collections.abc import AsyncIterator
 from selectolax.lexbor import LexborHTMLParser
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.ats._f13 import fetch_all, get_page
-from linkit_all.sources.ats._f16 import CHUNK, chunks, ld_stub
 from linkit_all.sources.base import JobStub, Source, Task
-from linkit_all.sources.companies._f41 import ats_of, remote_ru, sitemap_urls
+from linkit_all.sources.common import CHUNK, chunks, fetch_all, get_page, sitemap_pages
 from linkit_all.sources.http import Http
 from linkit_all.sources.jsonld import job_postings
+from linkit_all.sources.parsing import ats_of, ld_stub, remote_ru
 
 SITEMAP = "https://career.avito.com/sitemap.xml"
 # /vacancies/<category>/<id>/ : the category page has no trailing id
@@ -58,7 +57,7 @@ class Avito(Source):
 
     async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:
         by_id: dict[str, str] = {}  # the same vacancy can sit under several categories
-        for u in await sitemap_urls(http, SITEMAP):
+        for u in await sitemap_pages(http, SITEMAP):
             if m := _VACANCY.search(u):
                 by_id.setdefault(m[1], u)
         for chunk in chunks(sorted(by_id.values()), start_page, CHUNK):

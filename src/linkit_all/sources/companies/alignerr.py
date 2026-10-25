@@ -6,12 +6,10 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.ats._f16 import next_data, page_text, when
-from linkit_all.sources.ats._f17 import hydrate
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
-from linkit_all.sources.common import strip_html
-from linkit_all.sources.companies._f41 import ats_of, first
+from linkit_all.sources.common import hydrate, page_text, strip_html
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import ats_of, first, next_data, when
 
 LIST = "https://www.alignerr.com/jobs"
 JOB = "https://www.alignerr.com/jobs/"

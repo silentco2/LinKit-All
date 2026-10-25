@@ -10,12 +10,11 @@ from datetime import datetime, timedelta
 import httpx
 from selectolax.lexbor import LexborHTMLParser
 
-from linkit_all.sources.ats._f12 import name_from_slug
-from linkit_all.sources.ats._f16 import page_text, when
-from linkit_all.sources.ats._f17 import XHR, hydrate, post_form, text_of
 from linkit_all.sources.base import JobStub, Remote, Source, Task, remote_from_text
+from linkit_all.sources.common import XHR, hydrate, page_text, post_form
 from linkit_all.sources.http import Http
 from linkit_all.sources.jsonld import job_postings, to_stub
+from linkit_all.sources.parsing import name_from_slug, node_text, when
 from linkit_all.sources.text import html_to_text
 
 HOST = "{board}.pandape.infojobs.com.br"
@@ -43,7 +42,7 @@ def parse_cards(fragment: str) -> list[Card]:
     cards = []
     for a in LexborHTMLParser(fragment).css("a.card-vacancy"):
         m = _DETAIL.match(a.attributes.get("href") or "")
-        title = text_of(a.css_first("h3"))
+        title = node_text(a.css_first("h3"))
         if not m or not title:
             continue
         facts = {"location": "", "mode": "", "contract": ""}
@@ -51,13 +50,13 @@ def parse_cards(fragment: str) -> list[Card]:
             holder = icon.parent.parent if icon.parent is not None else None
             classes = (icon.attributes.get("class") or "").split()
             if "icon-location-pin-1" in classes:
-                facts["location"] = text_of(holder)
+                facts["location"] = node_text(holder)
             elif {"icon-buildings", "icon-building-house", "icon-user-with-headphones"} & set(
                 classes
             ):
-                facts["mode"] = text_of(holder)
+                facts["mode"] = node_text(holder)
             elif "icon-sheet" in classes:
-                facts["contract"] = text_of(holder)
+                facts["contract"] = node_text(holder)
         cards.append(Card(m[1], title, facts["location"], facts["mode"], facts["contract"]))
     return cards
 

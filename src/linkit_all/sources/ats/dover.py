@@ -5,10 +5,10 @@ import re
 from collections.abc import AsyncIterator
 from typing import Any
 
-from linkit_all.sources.ats._f12 import mode, name_from_slug
 from linkit_all.sources.base import JobStub, Source, Task
 from linkit_all.sources.common import paged
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import mode, name_from_slug
 from linkit_all.sources.text import html_to_text
 
 API = "https://app.dover.com/api/v1"

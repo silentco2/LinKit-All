@@ -7,12 +7,11 @@ import re
 from collections.abc import AsyncIterator
 from typing import Any
 
-from linkit_all.sources.ats._f13 import get_page, mode, name_from_slug
-from linkit_all.sources.ats._f16 import when
-from linkit_all.sources.ats.deel import bracket_slice
 from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
+from linkit_all.sources.common import get_page
 from linkit_all.sources.http import Http
 from linkit_all.sources.jsonld import job_postings
+from linkit_all.sources.parsing import bracket_slice, mode, name_from_slug, when
 from linkit_all.sources.text import html_to_text
 
 LIST = "https://recruiterflow.com/{board}/jobs"

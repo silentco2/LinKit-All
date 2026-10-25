@@ -10,12 +10,10 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.ats._f13 import get_page
-from linkit_all.sources.ats._f16 import links, next_data, page_text
-from linkit_all.sources.ats._f17 import hydrate
 from linkit_all.sources.base import JobStub, Source, Task
-from linkit_all.sources.common import strip_html
+from linkit_all.sources.common import get_page, hydrate, page_text, strip_html
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import links, next_data
 
 HOST = "www.jettycloud.com"
 PREFIX = "/vacancies/"

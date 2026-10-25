@@ -9,7 +9,7 @@ from typing import Any
 from loguru import logger
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.aggregators._keyed import (
+from linkit_all.sources.aggregators.keys import (
     COUNTRIES,
     DailyBudget,
     KeyGetter,

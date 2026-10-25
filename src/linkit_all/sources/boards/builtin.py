@@ -11,13 +11,12 @@ from aiolimiter import AsyncLimiter
 from selectolax.lexbor import LexborHTMLParser, LexborNode
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.aggregators._f22 import feed_task
-from linkit_all.sources.ats._f15 import fetch_html
-from linkit_all.sources.ats._f16 import ld_stub
 from linkit_all.sources.base import JobStub, Remote, Source, Task
-from linkit_all.sources.boards._f31 import clean
+from linkit_all.sources.common import fetch_html
 from linkit_all.sources.http import Http
 from linkit_all.sources.jsonld import job_postings
+from linkit_all.sources.parsing import clean, ld_stub
+from linkit_all.sources.tasks import feed_task
 
 BASE = "https://builtin.com"
 MAX_PAGES = 1000  # the listing's own ceiling

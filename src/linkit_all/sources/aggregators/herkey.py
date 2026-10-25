@@ -11,10 +11,10 @@ from urllib.parse import parse_qs, urlsplit
 
 from linkit_all.core.models import utcnow
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.aggregators._f22 import feed_task
 from linkit_all.sources.base import JobStub, Remote, Source, Task
 from linkit_all.sources.common import strip_html
 from linkit_all.sources.http import Http
+from linkit_all.sources.tasks import feed_task
 
 API = "https://api-prod.herkey.com/api/v1/herkey/"
 JOB_URL = "https://www.herkey.com/jobs/{}/{}"

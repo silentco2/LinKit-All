@@ -7,11 +7,11 @@ import re
 from collections.abc import AsyncIterator
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.ats._f13 import get_page
-from linkit_all.sources.ats._f16 import ld_stub, links, page_text
 from linkit_all.sources.base import JobStub, Source, Task
+from linkit_all.sources.common import get_page, page_text
 from linkit_all.sources.http import Http
 from linkit_all.sources.jsonld import job_postings
+from linkit_all.sources.parsing import ld_stub, links
 
 HOST = "career.luxoft.com"
 PER_PAGE = 60  # the largest page size the listing offers: about 24 pages for ~1,400 jobs

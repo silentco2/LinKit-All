@@ -7,45 +7,15 @@ import re
 from collections.abc import AsyncIterator
 from typing import Any
 
-from linkit_all.sources.ats._f13 import name_from_slug
 from linkit_all.sources.base import JobStub, Source, Task
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import name_from_slug, unflatten
 from linkit_all.sources.text import html_to_text
 
 LIST = "https://{board}.huntflow.io/_payload.json"
 DETAIL = "https://{board}.huntflow.io/vacancy/{slug}/_payload.json"
 VACANCY = "https://{board}.huntflow.io/vacancy/{slug}"
 _URL = re.compile(r"//([\w-]+)\.huntflow\.io/vacancy/([^/?#]+)", re.I)
-
-
-def unflatten(raw: list[Any]) -> Any:
-    """Resolve a devalue array: an object's values and an array's elements that are integers are
-    indices into `raw`; other values are literal. A string-headed array is a type wrapper
-    (e.g. ["ShallowReactive", 3]) and resolves to the value it wraps."""
-    memo: dict[int, Any] = {}
-
-    def hydrate(i: int) -> Any:
-        if not 0 <= i < len(raw):
-            return None
-        if i in memo:
-            return memo[i]
-        memo[i] = None  # a reference cycle resolves to null instead of recursing forever
-        tok = raw[i]
-        out: Any = tok
-        if isinstance(tok, dict):
-            out = {k: ref(v) for k, v in tok.items()}
-        elif isinstance(tok, list):
-            if tok and isinstance(tok[0], str):
-                out = ref(tok[1]) if len(tok) > 1 else None
-            else:
-                out = [ref(v) for v in tok]
-        memo[i] = out
-        return out
-
-    def ref(v: Any) -> Any:
-        return hydrate(v) if isinstance(v, int) and not isinstance(v, bool) else v
-
-    return hydrate(0)
 
 
 def find_vacancy(node: Any) -> dict[str, Any] | None:

@@ -9,13 +9,18 @@ from typing import Any
 import httpx
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.aggregators._f22 import feed_task
-from linkit_all.sources.ats._f13 import sitemap_locs
-from linkit_all.sources.ats._f16 import ld_stub, page_text
 from linkit_all.sources.base import JobStub, Source, Task
-from linkit_all.sources.boards._f32 import posting_pages, sitemap_text, sitemap_urls
+from linkit_all.sources.common import (
+    page_text,
+    posting_pages,
+    sitemap_by_date,
+    sitemap_locs,
+    sitemap_text,
+)
 from linkit_all.sources.http import Http
 from linkit_all.sources.jsonld import job_postings
+from linkit_all.sources.parsing import ld_stub
+from linkit_all.sources.tasks import feed_task
 
 INDEX = "https://torre.ai/sitemap-index.xml"
 _POST = re.compile(r"^https://torre\.ai/post/([A-Za-z0-9]+)(?:-[^/?#]*)?$")
@@ -62,7 +67,7 @@ class Torre(Source):
                 if e.response.status_code not in (404, 410):  # a retired sitemap is skipped
                     raise
         by_id: dict[str, str] = {}  # one posting can sit in several sitemaps
-        for url in sitemap_urls("".join(texts), lambda u: bool(_POST.match(u))):
+        for url in sitemap_by_date("".join(texts), lambda u: bool(_POST.match(u))):
             by_id.setdefault(_POST.match(url)[1], url)  # type: ignore[index]
 
         async def build(url: str) -> JobStub | None:

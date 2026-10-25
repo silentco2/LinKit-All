@@ -11,10 +11,10 @@ from urllib.parse import unquote
 
 from selectolax.lexbor import LexborHTMLParser
 
-from linkit_all.sources.ats._f13 import name_from_slug
-from linkit_all.sources.ats._f15 import fetch_html, posting_stub
 from linkit_all.sources.base import JobStub, Remote, Source, Task
+from linkit_all.sources.common import fetch_html
 from linkit_all.sources.http import Http
+from linkit_all.sources.parsing import name_from_slug, posting_stub
 
 MAX_PAGES = 50  # a ceiling, never the way a walk ends
 # The same URL with this header answers the listing as JSON, whatever the slug in the path.
