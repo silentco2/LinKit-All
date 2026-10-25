@@ -1,0 +1,80 @@
+{
+ "items": [
+  {
+   "hhId": 136849808,
+   "externalLink": "",
+   "internalUuid": "06570187-117a-467f-8a0c-8160123325f5",
+   "department": "Ozon Офис и Коммерция",
+   "description": "",
+   "matchedTags": [],
+   "employment": "Полная",
+   "experience": "От 3 до 6 лет",
+   "workFormat": [
+    "Гибрид"
+   ],
+   "title": "Associate — M&A and Corporate Development",
+   "city": "Москва",
+   "professionalRoles": [
+    {
+     "ID": "40",
+     "title": "Другое"
+    }
+   ],
+   "vacancyType": "external_vacancy",
+   "grade": ""
+  },
+  {
+   "hhId": 138226239,
+   "externalLink": "",
+   "internalUuid": "8091d8a0-a50b-404e-996a-3faa78d5087a",
+   "department": "Ozon Офис и Коммерция",
+   "description": "",
+   "matchedTags": [],
+   "employment": "Полная",
+   "experience": "От 1 года до 3 лет",
+   "workFormat": [
+    "Удалённо",
+    "Гибрид"
+   ],
+   "title": "ML-инженер",
+   "city": "Москва",
+   "professionalRoles": [
+    {
+     "ID": "165",
+     "title": "Дата-сайентист"
+    }
+   ],
+   "vacancyType": "external_vacancy",
+   "grade": ""
+  },
+  {
+   "hhId": 138612010,
+   "externalLink": "",
+   "internalUuid": "0cb62422-4d77-481f-af12-ed07fe417973",
+   "department": "Ozon Офис и Коммерция",
+   "description": "",
+   "matchedTags": [],
+   "employment": "Полная",
+   "experience": "Нет опыта",
+   "workFormat": [
+    "На месте работодателя"
+   ],
+   "title": "Администратор",
+   "city": "Москва",
+   "professionalRoles": [
+    {
+     "ID": "8",
+     "title": "Администратор"
+    }
+   ],
+   "vacancyType": "internal_vacancy",
+   "grade": ""
+  }
+ ],
+ "meta": {
+  "page": 1,
+  "perPage": 20,
+  "totalItems": 2519,
+  "totalPages": 1
+ }
+}

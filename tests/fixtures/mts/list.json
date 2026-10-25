@@ -1,0 +1,65 @@
+{
+ "data": {
+  "pageInfo": {
+   "limit": 2,
+   "offset": 0,
+   "total": 2435
+  },
+  "similar_vacancies": null,
+  "vacancies": [
+   {
+    "id": "719596607967854689",
+    "info": {
+     "block": "",
+     "brand": "ПАО МТС-Банк",
+     "category": "Работа в IT",
+     "city": "Москва",
+     "date": "25 октября",
+     "experience": "3-6 лет",
+     "forDisabledPerson": false,
+     "invite_it": false,
+     "is_actual": false,
+     "is_internship": false,
+     "is_referal": false,
+     "metro": "",
+     "mode": "Полный день",
+     "reward": null,
+     "salaryMax": null,
+     "salaryMin": null,
+     "startLeto": false,
+     "subcategory": "",
+     "updated_at": "25 октября",
+     "worktype": "В офисе"
+    },
+    "name": "Ведущий разработчик Java"
+   },
+   {
+    "id": "437576019453411448",
+    "info": {
+     "block": "",
+     "brand": "ПАО МТС-Банк",
+     "category": "Финансы",
+     "city": "Рязань",
+     "date": "25 октября",
+     "experience": "1-3 года",
+     "forDisabledPerson": false,
+     "invite_it": false,
+     "is_actual": false,
+     "is_internship": false,
+     "is_referal": false,
+     "metro": "",
+     "mode": "Полный день",
+     "reward": null,
+     "salaryMax": null,
+     "salaryMin": null,
+     "startLeto": false,
+     "subcategory": "",
+     "updated_at": "25 октября",
+     "worktype": "В офисе"
+    },
+    "name": "Персональный менеджер по обслуживанию клиентов состоятельного сегмента"
+   }
+  ]
+ },
+ "success": true
+}

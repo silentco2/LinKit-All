@@ -1,0 +1,56 @@
+{
+ "status": 200,
+ "data": {
+  "items": [
+   {
+    "id": 40961,
+    "name": "Ведущий продюсер",
+    "direction_title": "Дизайн",
+    "direction_role_title": "",
+    "experience_type_title": "От 3 лет",
+    "city_title": "Москва",
+    "employment_types": [
+     {
+      "id": 1,
+      "vacancy_id": 40961,
+      "title": "Гибрид",
+      "description": ""
+     },
+     {
+      "id": 3,
+      "vacancy_id": 40961,
+      "title": "Офис",
+      "description": ""
+     }
+    ]
+   },
+   {
+    "id": 40959,
+    "name": "Коммуникационный дизайнер",
+    "direction_title": "Дизайн",
+    "direction_role_title": "",
+    "experience_type_title": "От 1 года",
+    "city_title": "Москва",
+    "employment_types": [
+     {
+      "id": 1,
+      "vacancy_id": 40959,
+      "title": "Гибрид",
+      "description": ""
+     },
+     {
+      "id": 3,
+      "vacancy_id": 40959,
+      "title": "Офис",
+      "description": ""
+     }
+    ]
+   }
+  ],
+  "range": {
+   "count": 158,
+   "limit": 2,
+   "offset": 0
+  }
+ }
+}

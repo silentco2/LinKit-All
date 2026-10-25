@@ -1,0 +1,46 @@
+[
+ {
+  "id": 4326986,
+  "position": "SDR (COMDI)",
+  "money": "",
+  "hidden": false,
+  "state": "OPEN",
+  "accountDivision": "COMDI ",
+  "additionalFields": [
+   "work_expiriance",
+   "work_format"
+  ],
+  "workFormat": "Удаленный",
+  "workExperience": "1-2",
+  "body": "",
+  "requirements": "",
+  "conditions": "",
+  "created": {
+   "date": "2026-09-03 17:59:10.000000",
+   "timezone_type": 1,
+   "timezone": "+03:00"
+  }
+ },
+ {
+  "id": 4354305,
+  "position": "Видеооператор COMDI",
+  "money": "",
+  "hidden": false,
+  "state": "OPEN",
+  "accountDivision": "COMDI ",
+  "additionalFields": [
+   "work_expiriance",
+   "work_format"
+  ],
+  "workFormat": "Офисный",
+  "workExperience": "2-5",
+  "body": "",
+  "requirements": "",
+  "conditions": "",
+  "created": {
+   "date": "2026-10-20 14:33:31.000000",
+   "timezone_type": 1,
+   "timezone": "+03:00"
+  }
+ }
+]
