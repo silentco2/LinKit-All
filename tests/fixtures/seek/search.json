@@ -1,0 +1,193 @@
+{
+ "data": [
+  {
+   "advertiser": {
+    "id": "23398523",
+    "description": "Mars Recruitment"
+   },
+   "classifications": [
+    {
+     "classification": {
+      "id": "1200",
+      "description": "Accounting"
+     },
+     "subclassification": {
+      "id": "1468",
+      "description": "Payroll"
+     }
+    }
+   ],
+   "companyName": "Mars Recruitment",
+   "companyProfileStructuredDataId": 8375,
+   "displayStyle": {
+    "search": "sourcrProfile"
+   },
+   "displayType": "standard",
+   "employer": {
+    "id": "8375",
+    "name": "Mars Recruitment"
+   },
+   "id": "95478718",
+   "isFeatured": false,
+   "listingDate": "2026-10-25T03:22:45Z",
+   "listingDateDisplay": "Just now",
+   "locations": [
+    {
+     "label": "Epping, Melbourne VIC",
+     "countryCode": "AU",
+     "seoHierarchy": [
+      {
+       "contextualName": "Epping VIC 3076"
+      },
+      {
+       "contextualName": "All Melbourne VIC"
+      }
+     ]
+    }
+   ],
+   "roleId": "payroll-officer",
+   "salaryLabel": "$80k - $90k p.a. + + Super + Bonus + Benefits",
+   "teaser": "Permanent Payroll Officer job opportunity with a national Transport & Logistics business located in Melbourne's Northern Suburbs",
+   "title": "Payroll Officer",
+   "workTypes": [
+    "Full time"
+   ],
+   "workArrangements": {
+    "data": [
+     {
+      "id": "1",
+      "label": {
+       "text": "On-site"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "advertiser": {
+    "id": "14121663",
+    "description": "AXR Recruitment & Search"
+   },
+   "classifications": [
+    {
+     "classification": {
+      "id": "1200",
+      "description": "Accounting"
+     },
+     "subclassification": {
+      "id": "6160",
+      "description": "Taxation"
+     }
+    }
+   ],
+   "companyName": "AXR Recruitment & Search",
+   "companyProfileStructuredDataId": 407444,
+   "displayType": "standard",
+   "employer": {
+    "id": "407444",
+    "name": "AXR Recruitment & Search"
+   },
+   "id": "95478717",
+   "isFeatured": false,
+   "listingDate": "2026-10-25T03:22:24Z",
+   "listingDateDisplay": "1m ago",
+   "locations": [
+    {
+     "label": "Sydney NSW",
+     "countryCode": "AU",
+     "seoHierarchy": [
+      {
+       "contextualName": "All Sydney NSW"
+      },
+      {
+       "contextualName": "New South Wales NSW"
+      }
+     ]
+    }
+   ],
+   "roleId": "tax-advisory",
+   "salaryLabel": "$85 -120,000 + Great Team and Great Future!",
+   "teaser": "Need a Fresh Career Challenge ? High Growth Mid Tier Chartered Firm; Interesting & Complex Tax Advisory; Great Work/Life Balance; Mentoring Program",
+   "title": "PRIVATE CLIENTS TAX - ADVISORY  - \"People Chartered Firm\"",
+   "workTypes": [
+    "Full time"
+   ],
+   "workArrangements": {
+    "data": [
+     {
+      "id": "2",
+      "label": {
+       "text": "Hybrid"
+      }
+     }
+    ],
+    "displayText": "Hybrid"
+   }
+  },
+  {
+   "advertiser": {
+    "id": "39356944",
+    "description": "Subway Shamim Group"
+   },
+   "classifications": [
+    {
+     "classification": {
+      "id": "1212",
+      "description": "Hospitality & Tourism"
+     },
+     "subclassification": {
+      "id": "6054",
+      "description": "Kitchen & Sandwich Hands"
+     }
+    }
+   ],
+   "companyName": "Subway Shamim Group",
+   "companyProfileStructuredDataId": 355637,
+   "displayStyle": {
+    "search": "sourcrProfile"
+   },
+   "displayType": "standard",
+   "employer": {
+    "id": "355637",
+    "name": "Subway Shamim Group",
+    "companyId": "1048659",
+    "companyUrl": "https://au.seek.com/companies/subway-shamim-group-1048659"
+   },
+   "id": "95478715",
+   "isFeatured": false,
+   "listingDate": "2026-10-25T03:21:55Z",
+   "listingDateDisplay": "1m ago",
+   "locations": [
+    {
+     "label": "Albury, Albury Area NSW",
+     "countryCode": "AU",
+     "seoHierarchy": [
+      {
+       "contextualName": "Albury NSW 2640"
+      },
+      {
+       "contextualName": "Albury Area NSW"
+      }
+     ]
+    }
+   ],
+   "roleId": "team-member",
+   "salaryLabel": "$55,000 – $62,000 per year",
+   "teaser": "Team Member (Subway Sandwich Artist)",
+   "title": "Team Member (Subway) Wodonga - Albury",
+   "workTypes": [
+    "Full time"
+   ],
+   "workArrangements": {
+    "data": [
+     {
+      "id": "1",
+      "label": {
+       "text": "On-site"
+      }
+     }
+    ]
+   }
+  }
+ ]
+}

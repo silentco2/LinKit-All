@@ -1,0 +1,420 @@
+{
+ "data": [
+  {
+   "id": 1502923,
+   "title": "Analista di laboratorio - Tempo determinato 12 mesi",
+   "description": "<br><div>Company Description</div><br><p>AbbVie's mission is to discover and deliver innovative medicines and solutions that solve serious health issues today and address the medical challenges of tomorrow. We strive to have a remarkable impact on people's lives across several key therapeutic areas – immunology, oncology, neuroscience, and eye care – and products and services in our Allergan Aesthetics portfolio. For more information about AbbVie, please visit us at www.abbvie.com. Follow @abbvi",
+   "editorial_description": null,
+   "qualifications": null,
+   "no_of_vacancies": null,
+   "headline": "",
+   "location": "Onsite",
+   "location_regions": [
+    "EU"
+   ],
+   "employment_type": "Full Time",
+   "header_image_name": "36.jpg",
+   "expire_on": null,
+   "levels_of_experience": [
+    "Junior",
+    "Mid-Level"
+   ],
+   "auto_renew_override": null,
+   "published": true,
+   "status": "Active",
+   "type": "job",
+   "company": {
+    "id": 648,
+    "name": "AbbVie",
+    "size": "10001-300000",
+    "status": "Approved",
+    "slug": "abbvie",
+    "can_contact_talents": true,
+    "thumbnail": {
+     "id": 7148443,
+     "image_type": "company_logo",
+     "name": "2344fc89b05b416f8ce73f8f6f94399f.png",
+     "path": "thumbnail/2344fc89b05b416f8ce73f8f6f94399f.png",
+     "size": "thumbnail",
+     "url": "https://assets.powertofly.com/thumbnail/2344fc89b05b416f8ce73f8f6f94399f.png",
+     "type": "photos"
+    },
+    "has_powerup_membership": true,
+    "has_community_membership": false,
+    "has_powerhub_membership": true,
+    "country": {
+     "id": "US",
+     "title": "United States",
+     "type": "countries"
+    },
+    "type": "companies"
+   },
+   "timezones": [],
+   "required_skills": [
+    {
+     "id": 43486,
+     "title": "Laboratory Analysis",
+     "type": "skills"
+    },
+    {
+     "id": 224424,
+     "title": "good manufacturing practices",
+     "type": "skills"
+    },
+    {
+     "id": 64348,
+     "title": "data integrity",
+     "type": "skills"
+    },
+    {
+     "id": 79965,
+     "title": "high performance liquid chromatography",
+     "type": "skills"
+    },
+    {
+     "id": 30436,
+     "title": "Laboratory Information Management Systems",
+     "type": "skills"
+    },
+    {
+     "id": 2584995,
+     "title": "Analytical methodology",
+     "type": "skills"
+    }
+   ],
+   "bonus_skills": [
+    {
+     "id": 2648257,
+     "title": "English Language Proficiency",
+     "type": "skills"
+    },
+    {
+     "id": 106868,
+     "title": "empower",
+     "type": "skills"
+    },
+    {
+     "id": 3186629,
+     "title": "Technical Laboratory Diploma",
+     "type": "skills"
+    },
+    {
+     "id": 2918841,
+     "title": "Computer Systems Knowledge",
+     "type": "skills"
+    },
+    {
+     "id": 2980859,
+     "title": "Shift work availability",
+     "type": "skills"
+    }
+   ],
+   "country": {
+    "id": "IT",
+    "title": "Italy",
+    "type": "countries"
+   },
+   "state": {
+    "id": 1390,
+    "title": "Lazio",
+    "code": "07",
+    "country_code": "IT",
+    "type": "states"
+   },
+   "city": {
+    "id": 80411,
+    "title": "Gallicano Nel Lazio",
+    "type": "cities"
+   },
+   "secondary_locations": []
+  },
+  {
+   "id": 1649999,
+   "title": "Event Staff Street Team - Martinsville Speedway",
+   "description": "<br>\nMARTINSVILLE SPEEDWAY<p>Located in southern Virginia near the North Carolina border, Martinsville Speedway was built in 1947 by its founder H. Clay Earles. The track is the only venue to host NASCAR’s top series every year since its inception.  Martinsville Speedway conducts three major race event weekends each year. The track annually hosts the NASCAR Cup Series races in the spring and in the fall, the NASCAR O'Reilly Auto Parts Series in the fall, the NASCAR CRAFTSMAN Truck Series in the ",
+   "editorial_description": null,
+   "qualifications": null,
+   "no_of_vacancies": null,
+   "headline": "",
+   "location": "Onsite",
+   "location_regions": [
+    "USA"
+   ],
+   "employment_type": "Part Time",
+   "header_image_name": "22.jpg",
+   "expire_on": null,
+   "levels_of_experience": null,
+   "auto_renew_override": null,
+   "published": true,
+   "status": "Active",
+   "type": "job",
+   "company": {
+    "id": 12028,
+    "name": "NASCAR",
+    "size": "2001-5000",
+    "status": "Approved",
+    "slug": "nascar",
+    "can_contact_talents": true,
+    "thumbnail": {
+     "id": 6843031,
+     "image_type": "company_logo",
+     "name": "ff93f2ca460c4bd8a6782e54c8fe627a.png",
+     "path": "thumbnail/ff93f2ca460c4bd8a6782e54c8fe627a.png",
+     "size": "thumbnail",
+     "url": "https://assets.powertofly.com/thumbnail/ff93f2ca460c4bd8a6782e54c8fe627a.png",
+     "type": "photos"
+    },
+    "has_powerup_membership": true,
+    "has_community_membership": true,
+    "has_powerhub_membership": true,
+    "country": {
+     "id": "US",
+     "title": "United States",
+     "type": "countries"
+    },
+    "type": "companies"
+   },
+   "timezones": [],
+   "required_skills": [
+    {
+     "id": 39582,
+     "title": "Customer interaction",
+     "type": "skills"
+    },
+    {
+     "id": 2065459,
+     "title": "Event Setup",
+     "type": "skills"
+    },
+    {
+     "id": 3186630,
+     "title": "Promotional Material Management",
+     "type": "skills"
+    },
+    {
+     "id": 35632,
+     "title": "Time management",
+     "type": "skills"
+    },
+    {
+     "id": 36294,
+     "title": "Strong Organizational Skills",
+     "type": "skills"
+    },
+    {
+     "id": 34749,
+     "title": "Verbal communication",
+     "type": "skills"
+    }
+   ],
+   "bonus_skills": [
+    {
+     "id": 34592,
+     "title": "microsoft office",
+     "type": "skills"
+    },
+    {
+     "id": 25241,
+     "title": "Email Communication",
+     "type": "skills"
+    },
+    {
+     "id": 38920,
+     "title": "Public speaking",
+     "type": "skills"
+    },
+    {
+     "id": 177485,
+     "title": "sales techniques",
+     "type": "skills"
+    },
+    {
+     "id": 2897373,
+     "title": "NASCAR knowledge",
+     "type": "skills"
+    },
+    {
+     "id": 140043,
+     "title": "professional appearance",
+     "type": "skills"
+    },
+    {
+     "id": 131698,
+     "title": "dependability",
+     "type": "skills"
+    },
+    {
+     "id": 30794,
+     "title": "Safety & Compliance",
+     "type": "skills"
+    },
+    {
+     "id": 45145,
+     "title": "Team collaboration",
+     "type": "skills"
+    },
+    {
+     "id": 35397,
+     "title": "positive attitude",
+     "type": "skills"
+    }
+   ],
+   "country": {
+    "id": "US",
+    "title": "United States",
+    "type": "countries"
+   },
+   "state": {
+    "id": 3664,
+    "title": "Virginia",
+    "code": "VA",
+    "country_code": "US",
+    "type": "states"
+   },
+   "city": {
+    "id": 128756,
+    "title": "Martinsville",
+    "type": "cities"
+   },
+   "secondary_locations": []
+  },
+  {
+   "id": 1650010,
+   "title": "ZoomCrew Show Car Driver Event Staff - Phoenix Raceway",
+   "description": "<p><b>PHOENIX RACEWAY</b></p><p>Phoenix Raceway has been the premier motorsports venue in the Southwest since 1964 and hosts two NASCAR race weekends each year. In March, the NASCAR Weekend kicks off the race season at Phoenix Raceway.,. Phoenix Raceway also hosts a variety of events throughout the year, including corporate meetings and conferences, charity events, holiday events, sport, and endurance competitions, driving schools and Segway tours.</p><p>Position Purpose</p><p>This position will",
+   "editorial_description": null,
+   "qualifications": null,
+   "no_of_vacancies": null,
+   "headline": "",
+   "location": "Onsite",
+   "location_regions": [
+    "USA"
+   ],
+   "employment_type": "Part Time",
+   "header_image_name": "40.jpg",
+   "expire_on": null,
+   "levels_of_experience": null,
+   "auto_renew_override": null,
+   "published": true,
+   "status": "Active",
+   "type": "job",
+   "company": {
+    "id": 12028,
+    "name": "NASCAR",
+    "size": "2001-5000",
+    "status": "Approved",
+    "slug": "nascar",
+    "can_contact_talents": true,
+    "thumbnail": {
+     "id": 6843031,
+     "image_type": "company_logo",
+     "name": "ff93f2ca460c4bd8a6782e54c8fe627a.png",
+     "path": "thumbnail/ff93f2ca460c4bd8a6782e54c8fe627a.png",
+     "size": "thumbnail",
+     "url": "https://assets.powertofly.com/thumbnail/ff93f2ca460c4bd8a6782e54c8fe627a.png",
+     "type": "photos"
+    },
+    "has_powerup_membership": true,
+    "has_community_membership": true,
+    "has_powerhub_membership": true,
+    "country": {
+     "id": "US",
+     "title": "United States",
+     "type": "countries"
+    },
+    "type": "companies"
+   },
+   "timezones": [],
+   "required_skills": [
+    {
+     "id": 3879,
+     "title": "Transportation",
+     "type": "skills"
+    },
+    {
+     "id": 44332,
+     "title": "Customer Interaction",
+     "type": "skills"
+    },
+    {
+     "id": 2065459,
+     "title": "Event Setup",
+     "type": "skills"
+    },
+    {
+     "id": 113,
+     "title": "Communication",
+     "type": "skills"
+    },
+    {
+     "id": 1043,
+     "title": "Sales",
+     "type": "skills"
+    },
+    {
+     "id": 203949,
+     "title": "commercial driver's license",
+     "type": "skills"
+    }
+   ],
+   "bonus_skills": [
+    {
+     "id": 3055355,
+     "title": "Motorsports Knowledge",
+     "type": "skills"
+    },
+    {
+     "id": 7528,
+     "title": "Reliability",
+     "type": "skills"
+    },
+    {
+     "id": 140043,
+     "title": "professional appearance",
+     "type": "skills"
+    },
+    {
+     "id": 82058,
+     "title": "Dependability",
+     "type": "skills"
+    },
+    {
+     "id": 26713,
+     "title": "Eagerness To Learn",
+     "type": "skills"
+    },
+    {
+     "id": 1196,
+     "title": "Event Management",
+     "type": "skills"
+    }
+   ],
+   "country": {
+    "id": "US",
+    "title": "United States",
+    "type": "countries"
+   },
+   "state": {
+    "id": 3651,
+    "title": "Arizona",
+    "code": "AZ",
+    "country_code": "US",
+    "type": "states"
+   },
+   "city": {
+    "id": 135054,
+    "title": "Phoenix",
+    "type": "cities"
+   },
+   "secondary_locations": []
+  }
+ ],
+ "meta": {
+  "per_page": 50,
+  "total": 35636,
+  "pages": 713,
+  "page": 1,
+  "next_page": 2,
+  "prev_page": null
+ }
+}

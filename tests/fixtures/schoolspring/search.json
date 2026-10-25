@@ -1,0 +1,32 @@
+{
+ "success": true,
+ "message": "",
+ "validationErrors": [],
+ "value": {
+  "page": 1,
+  "size": 3,
+  "jobsList": [
+   {
+    "jobId": 5967360,
+    "employer": "Richmond County School District",
+    "title": "Network Administrator",
+    "location": "Rockingham, North Carolina",
+    "displayDate": "2026-10-21T04:00:00"
+   },
+   {
+    "jobId": 5955739,
+    "employer": "Talbot County Public Schools",
+    "title": "Network Administrator ($82,693.18&#x2B;)",
+    "location": "Easton, Maryland",
+    "displayDate": "2026-10-09T04:00:00"
+   },
+   {
+    "jobId": 5939258,
+    "employer": "Salado Ind School District",
+    "title": "Network Administrator",
+    "location": "Salado, Texas",
+    "displayDate": "2026-09-24T19:00:15"
+   }
+  ]
+ }
+}

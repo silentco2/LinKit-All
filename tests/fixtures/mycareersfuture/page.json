@@ -1,0 +1,681 @@
+{
+ "results": [
+  {
+   "uuid": "0269f9c83cb4f431fd9e380f440f66d4",
+   "sourceCode": "Employer Portal",
+   "title": "Process Control Engineer (Manufacturing/PCS/Python, East Region)",
+   "description": "<p><strong>Responsibilities: </strong></p><ul><li>Identify and implement AI/ML and data-driven solutions to improve wafering performance, productivity, and cost efficiency.</li><li>Develop and integrate Run-to-Run (R2R) control and data collection workflows via EES for advanced process control.</li><li>Translate manufacturing and process requirements into scalable automation workflows using Python",
+   "minimumYearsExperience": 1,
+   "shiftPattern": null,
+   "schemes": [],
+   "skills": [
+    {
+     "skill": "Workflow Automation",
+     "uuid": "16ec70acba751d849e6ef52830926045",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "Manufacturing Automation",
+     "uuid": "30a975b1fdd2bbf0593f04b450033c67",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "Interpersonal Skills",
+     "uuid": "49c78c64822033388a8412b58f2ed113",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "Process Engineering",
+     "uuid": "923f69f142c010fdcf08e372c7079b7f",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "Containerization",
+     "uuid": "a8910baa93be5773b63f12141f0787ee",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "end to end process",
+     "uuid": "af7722b480d987d9436a2bfed50c35ad",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "Wafer Fabrication",
+     "uuid": "ca5e71ffb373370ee13ccac0de63b745",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "updating customer records",
+     "uuid": "cfee959240c0371a963e34917db692ed",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "engineering fundamentals",
+     "uuid": "f644439b70c8e74807e0e42c4ae8f0e9",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "Advanced Process Control",
+     "uuid": "fce9f0252c4066da4f5690af90d6af71",
+     "confidence": null,
+     "isKeySkill": false
+    }
+   ],
+   "flexibleWorkArrangements": [],
+   "otherRequirements": null,
+   "ssocCode": "25121",
+   "occupationId": "OCC002119",
+   "ssocVersion": "2020v3",
+   "workingHours": null,
+   "numberOfVacancies": 1,
+   "psdUrl": null,
+   "categories": [
+    {
+     "id": 11,
+     "category": "Engineering"
+    }
+   ],
+   "employmentTypes": [
+    {
+     "id": 7,
+     "employmentType": "Permanent"
+    },
+    {
+     "id": 8,
+     "employmentType": "Full Time"
+    }
+   ],
+   "positionLevels": [
+    {
+     "id": 9,
+     "position": "Executive"
+    }
+   ],
+   "status": {
+    "id": 103,
+    "jobStatus": "Re-open"
+   },
+   "ssecEqa": "70",
+   "ssecFos": "1151",
+   "postedCompany": {
+    "uen": "200601070E",
+    "description": "<p>HKM HR Management, founded in 1996, is a leading recruiter and executive search company in Singapore.</p>\n<p>We provide a full range of human capital solutions to SMEs and MNCs across all industries as well as offer exciting job opportunities to job seekers.</p>\n<p>Our team of dedicated recruitment professionals serves a varied clientele from industiies such as Semi-conductors, Oil &amp; Gas, M",
+    "name": "HKM HR MANAGEMENT PTE. LTD.",
+    "ssicCode": "78104",
+    "employeeCount": null,
+    "companyUrl": "https://www.hkmhr.com/job",
+    "lastSyncDate": "2026-10-24T04:37:09.000Z",
+    "ssicCode2020": "78104",
+    "_links": {
+     "self": {
+      "href": "https://api.mycareersfuture.gov.sg/v2/companies/200601070E"
+     },
+     "jobs": {
+      "href": "https://api.mycareersfuture.gov.sg/v2/companies/200601070E/jobs"
+     },
+     "addresses": {
+      "href": "https://api.mycareersfuture.gov.sg/v2/companies/200601070E/addresses"
+     },
+     "schemes": {
+      "href": "https://api.mycareersfuture.gov.sg/v2/companies/200601070E/schemes"
+     }
+    },
+    "ssicDescription2020": "EMPLOYMENT AGENCIES (EXCEPT DOMESTIC WORKER EMPLOYMENT PLACEMENT AGENCIES)",
+    "logoFileName": "c3060f04b1dd22c797716e01d433f09e/hkm-hr-management.jpg",
+    "logoUploadPath": "https://static.mycareersfuture.gov.sg/images/company/logos/c3060f04b1dd22c797716e01d433f09e/hkm-hr-management.jpg",
+    "responsiveEmployer": {
+     "isResponsive": false
+    }
+   },
+   "hiringCompany": null,
+   "address": {
+    "overseasCountry": null,
+    "foreignAddress1": null,
+    "foreignAddress2": null,
+    "block": "134",
+    "street": "JURONG GATEWAY ROAD",
+    "floor": null,
+    "unit": null,
+    "building": "",
+    "postalCode": "600134",
+    "isOverseas": false,
+    "districts": [
+     {
+      "id": 22,
+      "location": "D22 Jurong, Jurong Island, Tuas",
+      "region": "West",
+      "sectors": [
+       "60",
+       "61",
+       "62",
+       "63",
+       "64"
+      ],
+      "regionId": "West"
+     }
+    ],
+    "lat": 1.33399413849744,
+    "lng": 103.738819152518
+   },
+   "metadata": {
+    "jobPostId": "MCF-2026-1839256",
+    "deletedAt": "2026-10-23T17:15:05.000Z",
+    "createdBy": "4d942495-fab0-41c5-bf9f-d6e27fbc5eac",
+    "createdAt": "2026-10-16T14:54:42.000Z",
+    "updatedAt": "2026-10-24T16:28:03.000Z",
+    "emailRecipient": "4d942495-fab0-41c5-bf9f-d6e27fbc5eac",
+    "editCount": 0,
+    "repostCount": 1,
+    "totalNumberOfView": 29,
+    "newPostingDate": "2026-10-25",
+    "originalPostingDate": "2026-10-16",
+    "expiryDate": "2026-11-24",
+    "totalNumberJobApplication": 0,
+    "isJdEnhanced": false,
+    "isPostedOnBehalf": false,
+    "isHideSalary": false,
+    "isHideCompanyAddress": false,
+    "isHideHiringEmployerName": false,
+    "isHideEmployerName": false,
+    "jobDetailsUrl": "https://www.mycareersfuture.gov.sg/job/engineering/process-control-engineer-hkm-hr-management-0269f9c83cb4f431fd9e380f440f66d4",
+    "matchedSkillsScore": null
+   },
+   "salary": {
+    "maximum": 5000,
+    "minimum": 4000,
+    "type": {
+     "id": 4,
+     "salaryType": "Monthly"
+    }
+   },
+   "_links": {
+    "self": {
+     "href": "https://api.mycareersfuture.gov.sg/v2/jobs/0269f9c83cb4f431fd9e380f440f66d4"
+    },
+    "screeningQuestions": {
+     "href": "https://api.mycareersfuture.gov.sg/v2/jobs/0269f9c83cb4f431fd9e380f440f66d4/screening-questions"
+    }
+   },
+   "jobTitles": []
+  },
+  {
+   "uuid": "d04cfb1079d55805e08e9337f0aeb3a2",
+   "sourceCode": "Employer Portal",
+   "title": "MNC: AP Executive/Accountant + IT Automation (Python) (With internship/work exp)",
+   "description": "<p><strong>THE COMPANY</strong></p><p>With their international and solid presence, this Commodities MNC is expanding. They are seeking for an AP Executive/Accountant to be part of the Finance/Accounts team.</p><p><strong>JOB RESPONSIBILITIES</strong></p><ul><li><p>Support Accounts Payable operations</p></li><li><p>Prepare invoice and payment runs</p></li><li><p>Check and confirm payment request wi",
+   "minimumYearsExperience": 1,
+   "shiftPattern": null,
+   "schemes": [],
+   "skills": [
+    {
+     "skill": "Accounts Payable",
+     "uuid": "1ed711fc7b4a53484ce612ee65c8e3b8",
+     "confidence": null,
+     "isKeySkill": true
+    },
+    {
+     "skill": "Interdepartmental Communication",
+     "uuid": "322eac122b2722c4a707620c7fdb894f",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "Macro",
+     "uuid": "4374cf34c5d58482ffae982196bd2114",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "Interpersonal Skills",
+     "uuid": "49c78c64822033388a8412b58f2ed113",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "Preparing Invoices",
+     "uuid": "4f601ef891421caad9c4380f84c715b7",
+     "confidence": null,
+     "isKeySkill": true
+    },
+    {
+     "skill": "Reconciliation",
+     "uuid": "5ebcfd4f7b7c439466153455211322e6",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "Advanced Microsoft Excel",
+     "uuid": "6a9e3f643918900fdb0afd547e3b6375",
+     "confidence": null,
+     "isKeySkill": true
+    },
+    {
+     "skill": "Payment Approvals",
+     "uuid": "80d3b378cb3848128e7ee359ee9944b9",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "Data Entry",
+     "uuid": "843ee077b3f74fd22f992c0e2525e141",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "SQL",
+     "uuid": "9778840a0100cb30c982876741b0b5a2",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "Workflow Design",
+     "uuid": "9d35ffd53cc75614a6a8e8d6cf2a801d",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "Python",
+     "uuid": "a7f5f35426b927411fc9231b56382173",
+     "confidence": null,
+     "isKeySkill": true
+    },
+    {
+     "skill": "VBA Macros",
+     "uuid": "bcb8da3c3b1d77b3123e00e1ce212f77",
+     "confidence": null,
+     "isKeySkill": true
+    }
+   ],
+   "flexibleWorkArrangements": [],
+   "otherRequirements": null,
+   "ssocCode": "21222",
+   "occupationId": "OCC013821",
+   "ssocVersion": "2020v3",
+   "workingHours": null,
+   "numberOfVacancies": 1,
+   "psdUrl": null,
+   "categories": [
+    {
+     "id": 1,
+     "category": "Accounting / Auditing / Taxation"
+    },
+    {
+     "id": 5,
+     "category": "Banking and Finance"
+    },
+    {
+     "id": 7,
+     "category": "Consulting"
+    },
+    {
+     "id": 41,
+     "category": "Others"
+    },
+    {
+     "id": 42,
+     "category": "Wholesale Trade"
+    }
+   ],
+   "employmentTypes": [
+    {
+     "id": 7,
+     "employmentType": "Permanent"
+    }
+   ],
+   "positionLevels": [
+    {
+     "id": 10,
+     "position": "Junior Executive"
+    }
+   ],
+   "status": {
+    "id": 102,
+    "jobStatus": "Open"
+   },
+   "ssecEqa": "51",
+   "ssecFos": "0511",
+   "postedCompany": {
+    "uen": "201807250Z",
+    "description": "<p>The Resolute Hunter specializes in Recruitment Search and Advisory Solutions in the sphere of the Financial Services, Banking and other Commercial industries.</p>\n<p><br></p>\n<p>We partner with you to understand your unique and varying organization needs. We endeavour to deliver steadfast recruitment services. With an intricate approach and a fervent focus, we identify, design and execute tailo",
+    "name": "THE RESOLUTE HUNTER PTE. LTD.",
+    "ssicCode": "78104",
+    "employeeCount": null,
+    "companyUrl": "https://resolutehunter.com/opportunities/",
+    "lastSyncDate": "2026-10-24T01:36:14.000Z",
+    "ssicCode2020": "78104",
+    "_links": {
+     "self": {
+      "href": "https://api.mycareersfuture.gov.sg/v2/companies/201807250Z"
+     },
+     "jobs": {
+      "href": "https://api.mycareersfuture.gov.sg/v2/companies/201807250Z/jobs"
+     },
+     "addresses": {
+      "href": "https://api.mycareersfuture.gov.sg/v2/companies/201807250Z/addresses"
+     },
+     "schemes": {
+      "href": "https://api.mycareersfuture.gov.sg/v2/companies/201807250Z/schemes"
+     }
+    },
+    "ssicDescription2020": "EMPLOYMENT AGENCIES (EXCEPT DOMESTIC WORKER EMPLOYMENT PLACEMENT AGENCIES)",
+    "logoFileName": "43cc1a540999c3634af014c22f7fdf53/resolute-hunter.jpg",
+    "logoUploadPath": "https://static.mycareersfuture.gov.sg/images/company/logos/43cc1a540999c3634af014c22f7fdf53/resolute-hunter.jpg",
+    "responsiveEmployer": {
+     "isResponsive": true
+    }
+   },
+   "hiringCompany": null,
+   "address": {
+    "overseasCountry": null,
+    "foreignAddress1": null,
+    "foreignAddress2": null,
+    "block": null,
+    "street": null,
+    "floor": null,
+    "unit": null,
+    "building": null,
+    "postalCode": null,
+    "isOverseas": false,
+    "districts": [
+     {
+      "id": 998,
+      "location": "Islandwide",
+      "region": "Islandwide",
+      "sectors": [],
+      "regionId": "Islandwide"
+     }
+    ]
+   },
+   "metadata": {
+    "jobPostId": "MCF-2026-1887227",
+    "deletedAt": null,
+    "createdBy": "10c647f1-5e15-4625-89e2-760fa15b7678",
+    "createdAt": "2026-10-24T01:45:01.000Z",
+    "updatedAt": "2026-10-24T01:45:02.000Z",
+    "emailRecipient": "10c647f1-5e15-4625-89e2-760fa15b7678",
+    "editCount": 0,
+    "repostCount": 0,
+    "totalNumberOfView": 5,
+    "newPostingDate": "2026-10-24",
+    "originalPostingDate": "2026-10-24",
+    "expiryDate": "2026-11-23",
+    "totalNumberJobApplication": 0,
+    "isJdEnhanced": false,
+    "isPostedOnBehalf": false,
+    "isHideSalary": false,
+    "isHideCompanyAddress": false,
+    "isHideHiringEmployerName": false,
+    "isHideEmployerName": false,
+    "jobDetailsUrl": "https://www.mycareersfuture.gov.sg/job/accounting/mnc-ap-executiveaccountant-automation-resolute-hunter-d04cfb1079d55805e08e9337f0aeb3a2",
+    "matchedSkillsScore": null
+   },
+   "salary": {
+    "maximum": 1,
+    "minimum": 1,
+    "type": {
+     "id": 4,
+     "salaryType": "Monthly"
+    }
+   },
+   "_links": {
+    "self": {
+     "href": "https://api.mycareersfuture.gov.sg/v2/jobs/d04cfb1079d55805e08e9337f0aeb3a2"
+    },
+    "screeningQuestions": {
+     "href": "https://api.mycareersfuture.gov.sg/v2/jobs/d04cfb1079d55805e08e9337f0aeb3a2/screening-questions"
+    }
+   },
+   "jobTitles": []
+  },
+  {
+   "uuid": "932e351d10a09c2e3ecd9fdc186ff88f",
+   "sourceCode": "Employer Portal",
+   "title": "Data Engineer",
+   "description": "<p><strong>ROLE</strong></p><p>We are seeking a Data Engineer (Manager) to support the development, maintenance, and improvement of data pipelines for enterprise data warehouse and AI knowledge base platforms within a banking environment. Working under the guidance of senior engineers, you will help transform structured and unstructured data into reliable, reusable datasets that support use cases ",
+   "minimumYearsExperience": 2,
+   "shiftPattern": null,
+   "schemes": [],
+   "skills": [
+    {
+     "skill": "Cloudera",
+     "uuid": "06915a50d28717172b154d86a3399019",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "Data Reports",
+     "uuid": "09d555bd581f5b765678f315880e75ec",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "Cross-Channel Messaging",
+     "uuid": "1fe853e8e372bd5e7145bee80c3b1dce",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "Cloud Applications",
+     "uuid": "2904d6a6c343ae3edc59debda332aca5",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "Computer Engineering",
+     "uuid": "2a7bd24a3d93d25d37b22f89592fc31a",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "Apache Spark",
+     "uuid": "2a867b5e713285837efabc1785438e91",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "Stream Processing",
+     "uuid": "2c3012d65a8413216f059f22d7afaecc",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "Data Pipeline",
+     "uuid": "44015b690563d24a1b4f17c3e319c61e",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "Pipeline Development",
+     "uuid": "557eb247eba336d0f55afe1af2efd6fd",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "banking services",
+     "uuid": "74457a8da70cf68946d38cec1f099746",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "Data Quality Assurance",
+     "uuid": "88ab3c3a089f2872f4fd23c027c7caf0",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "Document Processing",
+     "uuid": "943914d80788893c87ae70293678e68f",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "Knowledge Base",
+     "uuid": "9d6bc68df898deff926bd4b077e87b8e",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "LLMs",
+     "uuid": "a54750ca93027f5b2c652399259459ab",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "Technical Infrastructure",
+     "uuid": "f147daa365d0412d6c4d14f232c6ce1b",
+     "confidence": null,
+     "isKeySkill": false
+    },
+    {
+     "skill": "Redshift",
+     "uuid": "f52a9d91766886fb3a524dd06d1581cb",
+     "confidence": null,
+     "isKeySkill": false
+    }
+   ],
+   "flexibleWorkArrangements": [],
+   "otherRequirements": null,
+   "ssocCode": "21222",
+   "occupationId": "OCC013822",
+   "ssocVersion": "2020v3",
+   "workingHours": null,
+   "numberOfVacancies": 5,
+   "psdUrl": null,
+   "categories": [
+    {
+     "id": 21,
+     "category": "Information Technology"
+    }
+   ],
+   "employmentTypes": [
+    {
+     "id": 7,
+     "employmentType": "Permanent"
+    }
+   ],
+   "positionLevels": [
+    {
+     "id": 7,
+     "position": "Professional"
+    }
+   ],
+   "status": {
+    "id": 102,
+    "jobStatus": "Open"
+   },
+   "ssecEqa": "70",
+   "ssecFos": "0919",
+   "postedCompany": {
+    "uen": "193200032W",
+    "description": "<p>The longest-established Singapore bank, we’ve been helping people and businesses get what they want from life since 1932. How? By taking the time to truly understand their needs. And it starts with looking after our people. With a motivated, purpose-driven culture. Looking after your well-being. Providing continuous holistic growth.&nbsp;</p>\n<p><br></p>\n<p>Today, we are on a journey of transfo",
+    "name": "OVERSEA-CHINESE BANKING CORPORATION LIMITED",
+    "ssicCode": "64120",
+    "employeeCount": null,
+    "companyUrl": null,
+    "lastSyncDate": "2026-10-24T14:03:44.000Z",
+    "ssicCode2020": "64120",
+    "_links": {
+     "self": {
+      "href": "https://api.mycareersfuture.gov.sg/v2/companies/193200032W"
+     },
+     "jobs": {
+      "href": "https://api.mycareersfuture.gov.sg/v2/companies/193200032W/jobs"
+     },
+     "addresses": {
+      "href": "https://api.mycareersfuture.gov.sg/v2/companies/193200032W/addresses"
+     },
+     "schemes": {
+      "href": "https://api.mycareersfuture.gov.sg/v2/companies/193200032W/schemes"
+     }
+    },
+    "ssicDescription2020": "FULL BANKS",
+    "logoFileName": "9eac322a48526985cd07ce184032eba4/oversea-chinese-banking-corporation.jpg",
+    "logoUploadPath": "https://static.mycareersfuture.gov.sg/images/company/logos/9eac322a48526985cd07ce184032eba4/oversea-chinese-banking-corporation.jpg",
+    "responsiveEmployer": {
+     "isResponsive": true
+    }
+   },
+   "hiringCompany": null,
+   "address": {
+    "overseasCountry": null,
+    "foreignAddress1": null,
+    "foreignAddress2": null,
+    "block": "63",
+    "street": "CHULIA STREET",
+    "floor": null,
+    "unit": null,
+    "building": "OCBC Centre East",
+    "postalCode": "049514",
+    "isOverseas": false,
+    "districts": [
+     {
+      "id": 1,
+      "location": "D01 Marina, Raffles Place, People's Park, Cecil",
+      "region": "Central",
+      "sectors": [
+       "01",
+       "02",
+       "03",
+       "04",
+       "05",
+       "06"
+      ],
+      "regionId": "Central"
+     }
+    ],
+    "lat": 1.28489039050499,
+    "lng": 103.849665569899
+   },
+   "metadata": {
+    "jobPostId": "MCF-2026-1889308",
+    "deletedAt": null,
+    "createdBy": "ca2047d6-10a0-4686-b585-1b4ee6fb8d67",
+    "createdAt": "2026-10-24T14:19:46.000Z",
+    "updatedAt": "2026-10-24T14:19:46.000Z",
+    "emailRecipient": "ca2047d6-10a0-4686-b585-1b4ee6fb8d67",
+    "editCount": 0,
+    "repostCount": 0,
+    "totalNumberOfView": 16,
+    "newPostingDate": "2026-10-24",
+    "originalPostingDate": "2026-10-24",
+    "expiryDate": "2026-11-07",
+    "totalNumberJobApplication": 0,
+    "isJdEnhanced": false,
+    "isPostedOnBehalf": false,
+    "isHideSalary": false,
+    "isHideCompanyAddress": false,
+    "isHideHiringEmployerName": false,
+    "isHideEmployerName": false,
+    "jobDetailsUrl": "https://www.mycareersfuture.gov.sg/job/information-technology/data-engineer-oversea-chinese-banking-corporation-932e351d10a09c2e3ecd9fdc186ff88f",
+    "matchedSkillsScore": null
+   },
+   "salary": {
+    "maximum": 12000,
+    "minimum": 6000,
+    "type": {
+     "id": 4,
+     "salaryType": "Monthly"
+    }
+   },
+   "_links": {
+    "self": {
+     "href": "https://api.mycareersfuture.gov.sg/v2/jobs/932e351d10a09c2e3ecd9fdc186ff88f"
+    },
+    "screeningQuestions": {
+     "href": "https://api.mycareersfuture.gov.sg/v2/jobs/932e351d10a09c2e3ecd9fdc186ff88f/screening-questions"
+    }
+   },
+   "jobTitles": []
+  }
+ ],
+ "total": 2708
+}

@@ -1,0 +1,267 @@
+{
+ "data": [
+  {
+   "id": 1650030,
+   "title": "General Maintenance Event Staff - Phoenix Raceway",
+   "description": "<p><b>PHOENIX RACEWAY</b></p><p>Phoenix Raceway has been the premier motorsports venue in the Southwest since 1964 and hosts two NASCAR race weekends each year. In March, the NASCAR Weekend kicks off the race season at Phoenix Raceway.,. Phoenix Raceway also hosts a variety of events throughout the year, including corporate meetings and conferences, charity events, holiday events, sport, and endurance competitions, driving schools and Segway tours.</p><p><b>Position Description</b></p><p>Perform",
+   "editorial_description": null,
+   "qualifications": null,
+   "no_of_vacancies": null,
+   "headline": "",
+   "location": "Onsite",
+   "location_regions": [
+    "USA"
+   ],
+   "employment_type": "Part Time",
+   "header_image_name": "3.jpg",
+   "expire_on": null,
+   "levels_of_experience": null,
+   "auto_renew_override": null,
+   "published": true,
+   "status": "Active",
+   "type": "job",
+   "company": {
+    "id": 12028,
+    "name": "NASCAR",
+    "size": "2001-5000",
+    "status": "Approved",
+    "slug": "nascar",
+    "can_contact_talents": true,
+    "thumbnail": {
+     "id": 6843031,
+     "image_type": "company_logo",
+     "name": "ff93f2ca460c4bd8a6782e54c8fe627a.png",
+     "path": "thumbnail/ff93f2ca460c4bd8a6782e54c8fe627a.png",
+     "size": "thumbnail",
+     "url": "https://assets.powertofly.com/thumbnail/ff93f2ca460c4bd8a6782e54c8fe627a.png",
+     "type": "photos"
+    },
+    "has_powerup_membership": true,
+    "has_community_membership": true,
+    "has_powerhub_membership": true,
+    "country": {
+     "id": "US",
+     "title": "United States",
+     "type": "countries"
+    },
+    "type": "companies"
+   },
+   "timezones": [],
+   "required_skills": [
+    {
+     "id": 217048,
+     "title": "equipment operation",
+     "type": "skills"
+    },
+    {
+     "id": 2164548,
+     "title": "General Maintenance",
+     "type": "skills"
+    },
+    {
+     "id": 69181,
+     "title": "landscaping",
+     "type": "skills"
+    },
+    {
+     "id": 2548493,
+     "title": "Signage Installation",
+     "type": "skills"
+    },
+    {
+     "id": 31549,
+     "title": "Excellent Communication",
+     "type": "skills"
+    },
+    {
+     "id": 212866,
+     "title": "driving",
+     "type": "skills"
+    }
+   ],
+   "bonus_skills": [
+    {
+     "id": 69440,
+     "title": "forklift operation",
+     "type": "skills"
+    },
+    {
+     "id": 1794284,
+     "title": "heavy equipment operation",
+     "type": "skills"
+    },
+    {
+     "id": 2080211,
+     "title": "Tool repair",
+     "type": "skills"
+    },
+    {
+     "id": 2168187,
+     "title": "groundskeeping",
+     "type": "skills"
+    },
+    {
+     "id": 42679,
+     "title": "painting",
+     "type": "skills"
+    },
+    {
+     "id": 62919,
+     "title": "adaptability",
+     "type": "skills"
+    },
+    {
+     "id": 45145,
+     "title": "Team collaboration",
+     "type": "skills"
+    }
+   ],
+   "country": {
+    "id": "US",
+    "title": "United States",
+    "type": "countries"
+   },
+   "state": {
+    "id": 3651,
+    "title": "Arizona",
+    "code": "AZ",
+    "country_code": "US",
+    "type": "states"
+   },
+   "city": {
+    "id": 135054,
+    "title": "Phoenix",
+    "type": "cities"
+   },
+   "secondary_locations": []
+  },
+  {
+   "id": 1650057,
+   "title": "Martinsville General Maintenance - Event",
+   "description": "<br>\nMARTINSVILLE SPEEDWAY<p>Located in southern Virginia near the North Carolina border, Martinsville Speedway was built in 1947 by its founder H. Clay Earles. The track is the only venue to host NASCAR’s top series every year since its inception.  Martinsville Speedway conducts three major race event weekends each year. The track annually hosts the NASCAR Cup Series races in the spring and in the fall, the NASCAR O'Reilly Auto Parts Series in the fall, the NASCAR CRAFTSMAN Truck Series in the ",
+   "editorial_description": null,
+   "qualifications": null,
+   "no_of_vacancies": null,
+   "headline": "",
+   "location": "Onsite",
+   "location_regions": [
+    "USA"
+   ],
+   "employment_type": "Part Time",
+   "header_image_name": "5.jpg",
+   "expire_on": null,
+   "levels_of_experience": null,
+   "auto_renew_override": null,
+   "published": true,
+   "status": "Active",
+   "type": "job",
+   "company": {
+    "id": 12028,
+    "name": "NASCAR",
+    "size": "2001-5000",
+    "status": "Approved",
+    "slug": "nascar",
+    "can_contact_talents": true,
+    "thumbnail": {
+     "id": 6843031,
+     "image_type": "company_logo",
+     "name": "ff93f2ca460c4bd8a6782e54c8fe627a.png",
+     "path": "thumbnail/ff93f2ca460c4bd8a6782e54c8fe627a.png",
+     "size": "thumbnail",
+     "url": "https://assets.powertofly.com/thumbnail/ff93f2ca460c4bd8a6782e54c8fe627a.png",
+     "type": "photos"
+    },
+    "has_powerup_membership": true,
+    "has_community_membership": true,
+    "has_powerhub_membership": true,
+    "country": {
+     "id": "US",
+     "title": "United States",
+     "type": "countries"
+    },
+    "type": "companies"
+   },
+   "timezones": [],
+   "required_skills": [
+    {
+     "id": 104182,
+     "title": "building maintenance",
+     "type": "skills"
+    },
+    {
+     "id": 93065,
+     "title": "plumbing",
+     "type": "skills"
+    },
+    {
+     "id": 2885656,
+     "title": "Electrical Repair",
+     "type": "skills"
+    },
+    {
+     "id": 411271,
+     "title": "General Cleaning",
+     "type": "skills"
+    },
+    {
+     "id": 34592,
+     "title": "microsoft office",
+     "type": "skills"
+    }
+   ],
+   "bonus_skills": [
+    {
+     "id": 222340,
+     "title": "furniture assembly",
+     "type": "skills"
+    },
+    {
+     "id": 212866,
+     "title": "driving",
+     "type": "skills"
+    },
+    {
+     "id": 42679,
+     "title": "painting",
+     "type": "skills"
+    },
+    {
+     "id": 2957967,
+     "title": "mechanical equipment repair",
+     "type": "skills"
+    },
+    {
+     "id": 93191,
+     "title": "preventive maintenance",
+     "type": "skills"
+    }
+   ],
+   "country": {
+    "id": "US",
+    "title": "United States",
+    "type": "countries"
+   },
+   "state": {
+    "id": 3664,
+    "title": "Virginia",
+    "code": "VA",
+    "country_code": "US",
+    "type": "states"
+   },
+   "city": {
+    "id": 128756,
+    "title": "Martinsville",
+    "type": "cities"
+   },
+   "secondary_locations": []
+  }
+ ],
+ "meta": {
+  "per_page": 50,
+  "total": 35636,
+  "pages": 713,
+  "page": 2,
+  "next_page": null,
+  "prev_page": null
+ }
+}

@@ -1,0 +1,101 @@
+{
+ "success": true,
+ "message": "",
+ "validationErrors": [],
+ "value": {
+  "jobInfo": {
+   "jobId": 5967360,
+   "jobTitle": "Network Administrator",
+   "infoURL": "https://richmondcountync.tedk12.com/hire/ViewJob.aspx?JobID=516",
+   "externalJobCode": "516",
+   "applicationDeadline": null,
+   "displayDate": "2026-10-21T04:00:00",
+   "internalDisplayDate": "2026-10-21T04:00:00",
+   "postDate": "2026-10-21T18:12:27",
+   "startDateShowDay": 1,
+   "startDate": "2027-02-01T05:00:00",
+   "jobStatusID": 30,
+   "unionID": 0,
+   "unionName": null,
+   "jobDescription": "<p style=\"text-align: left;\"><span style=\"font-size: 14pt;\"><strong>Network Administrator</strong></span></p>\r\n<p style=\"text-align: center;\">&nbsp;</p>\r\n<p><strong>Reports To:&nbsp;&nbsp;&nbsp; </strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;Director of Technology</p>\r\n<p><strong>Terms of Employment:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </strong>&nbsp; &nbsp",
+   "jobTypeName": "Full-time",
+   "positions": 1,
+   "payDisplay": 0,
+   "payMin": 0.0,
+   "payMax": 0.0,
+   "payTypeName": "",
+   "employerID": 101512,
+   "employerTypeID": 20,
+   "employerName": "Richmond County Schools",
+   "employerDescription": "",
+   "employerShowImage": 0,
+   "eoeStatement": "x",
+   "requirements": null,
+   "experienceRequired": 0,
+   "degreePreferred": 0,
+   "eligibleRequired": 1,
+   "degreeTypeName": "Not Provided",
+   "instructions": null,
+   "internalQuestionsRequired": 0,
+   "employerAccountTypeID": 21,
+   "contactFirstName": "Katherine Bendell",
+   "contactLastName": null,
+   "contactTitle": "Director of Technology",
+   "contactAddress1": "Technology Department",
+   "contactAddress2": null,
+   "contactCity": null,
+   "contactCountryID": 0,
+   "stateName": null,
+   "countryName": null,
+   "contactPostalCode": null,
+   "contactPhone": "(910) 582-5860 ext. 1220",
+   "contactFax": null,
+   "contactEmail": "hr@example.org",
+   "shiftType": "Full-Time",
+   "salaryCode": "",
+   "contactUserID": 368497,
+   "displayEmployer": "Richmond County School District",
+   "closeDate": "2050-01-01T00:00:00",
+   "timeZone": "Eastern Standard Time",
+   "internalCloseDate": "2050-01-01T00:00:00",
+   "employmentStartDateTBD": false,
+   "activeEmployer": true
+  },
+  "jobCategories": [
+   {
+    "category": "Support Staff",
+    "subCategory": "Network Services"
+   }
+  ],
+  "applicationQuestions": null,
+  "jobBoards": [
+   {
+    "jobBoardName": "North Carolina School Jobs",
+    "jobBoardUrl": "https://northcarolina.schoolspring.com"
+   },
+   {
+    "jobBoardName": "Richmond County School District ",
+    "jobBoardUrl": "https://richmondcountync.schoolspring.com"
+   }
+  ],
+  "jobLocations": [
+   {
+    "locationID": 177385,
+    "locationName": "Technology Department",
+    "displayLocation": "Rockingham, North Carolina",
+    "latitude": 34.9124,
+    "longitude": -79.76,
+    "locationDescription": "",
+    "locationShowImage": 0
+   }
+  ],
+  "baseDomainURL": null,
+  "jobApplicationId": null,
+  "jobApplicationStatusId": null,
+  "jobBoardDistrict": true,
+  "formattedExternalCloseDate": "Posted until filled",
+  "formattedInternalCloseDate": "Posted until filled",
+  "isAtsJob": true,
+  "jobApplicationDate": null
+ }
+}

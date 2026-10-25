@@ -1,0 +1,267 @@
+{
+ "correction_text_search": "",
+ "count": 4,
+ "from_alternative": false,
+ "from_correction": false,
+ "jobs": [
+  {
+   "activation_date": "2026-10-07T06:45:21.195247+00:00",
+   "application_end_date": "2026-11-02T16:00:00+00:00",
+   "apply_redirect_url": null,
+   "base_salary": 100000,
+   "bookmarked": false,
+   "company": {
+    "code": "medgrocer",
+    "name": "MedGrocer"
+   },
+   "company_name": "MedGrocer",
+   "created_at": "2026-01-27T07:15:11.275706+00:00",
+   "description": "<p>MedGrocer’s digitally-enabled corporate healthcare solutions empower our customers to get their medicines, vaccines, and teleconsultations conveniently, cost-effectively, and intelligently.</p>\n\n<p>The <strong>IT Director</strong> is the visionary for MedGrocer’s technological ecosystem. You are responsible for the high-level architecture, data security governance, and digital transformation initiatives that ensure our platform remains the gold standard for patient care.</p>\n\n<p><strong>Why J",
+   "distance_from_user": null,
+   "education_level": 550,
+   "es_is_top_brand": false,
+   "es_recruiter_last_seen": "2026-10-09T09:23:38.380937+00:00",
+   "exam_versions": [],
+   "function": "IT and Software",
+   "google_location": {
+    "address_components": {
+     "address_line_1": "Poblacion",
+     "city": "Makati",
+     "country": "Philippines",
+     "region": "Metro Manila"
+    }
+   },
+   "id": 263258,
+   "is_featured": false,
+   "is_hybrid": false,
+   "is_open_to_fresh_grads": false,
+   "is_work_from_home": false,
+   "maximum_salary": 150000,
+   "name": "IT Director | Makati",
+   "number_of_openings": 1,
+   "perks": {
+    "other": null,
+    "types": []
+   },
+   "photo_urls": [
+    "https://storage.googleapis.com/recruiter-processed-image-uploads.kalibrr.com/job-banner-url/production/6c90fd38-fce1-44e8-b0ca-945f8da2c193.avif"
+   ],
+   "priority_score": 0.5,
+   "qualifications": "<ul>\n\t<li>Bachelor's degree in Computer Science, Information Technology, or a related field.</li>\n\t<li>6-12 years of experience in IT leadership, software architecture, or systems engineering.</li>\n\t<li>Expertise in cloud infrastructure, data security standards, and enterprise digital transformation",
+   "response_rate": 96.875,
+   "salary_currency": "PHP",
+   "salary_interval": "month",
+   "salary_shown": true,
+   "slug": "it-director-makati",
+   "tenure": "Full time",
+   "visibility": "public",
+   "work_experience": 500
+  },
+  {
+   "activation_date": "2026-08-19T02:27:36.899048+00:00",
+   "application_end_date": "2026-10-17T16:00:00+00:00",
+   "apply_redirect_url": "https://forms.gle/21FTq54zj5zSuvPSA",
+   "base_salary": null,
+   "bookmarked": false,
+   "company": {
+    "code": "qne-software-philippines-inc",
+    "name": "QNE Software Philippines, Inc."
+   },
+   "company_name": "QNE Software Philippines, Inc.",
+   "created_at": "2026-08-19T02:24:49.445509+00:00",
+   "description": "<ul>\n\t<li>\n\t<p>Research, evaluate, and implement emerging AI technologies to improve product innovation and internal productivity.</p>\n\t</li>\n\t<li>\n\t<p>Develop rapid prototypes, proofs-of-concept, and lightweight applications using AI-assisted development tools.</p>\n\t</li>\n\t<li>\n\t<p>Build and maintain internal productivity and customer companion applications.</p>\n\t</li>\n\t<li>\n\t<p>Design workflow automations and API integrations using modern development platforms.</p>\n\t</li>\n\t<li>\n\t<p>Collaborate",
+   "distance_from_user": null,
+   "education_level": 550,
+   "es_is_top_brand": false,
+   "es_recruiter_last_seen": "2026-10-06T06:16:28.590091+00:00",
+   "exam_versions": [],
+   "function": "IT and Software",
+   "google_location": {
+    "address_components": {
+     "address_line_1": null,
+     "city": "Makati",
+     "country": "Philippines",
+     "region": "Metro Manila"
+    }
+   },
+   "id": 271382,
+   "is_featured": false,
+   "is_hybrid": false,
+   "is_open_to_fresh_grads": false,
+   "is_work_from_home": false,
+   "job_sds_skills": [
+    {
+     "created_at": "2026-08-19T02:27:33.448095+00:00",
+     "job_id": 271382,
+     "sds_skill": {
+      "created_at": "2015-03-28T20:46:06.245781+00:00",
+      "custom": false,
+      "id": 564,
+      "name": "HTML",
+      "updated_at": "2015-05-03T18:31:43.555932+00:00"
+     },
+     "sds_skill_id": 564
+    },
+    {
+     "created_at": "2026-08-19T02:27:33.448095+00:00",
+     "job_id": 271382,
+     "sds_skill": {
+      "created_at": "2015-03-28T20:46:06.245781+00:00",
+      "custom": false,
+      "id": 709,
+      "name": "JavaScript",
+      "updated_at": "2015-05-03T18:31:43.555932+00:00"
+     },
+     "sds_skill_id": 709
+    },
+    {
+     "created_at": "2026-08-19T02:27:33.448095+00:00",
+     "job_id": 271382,
+     "sds_skill": {
+      "created_at": "2015-03-28T20:46:06.245781+00:00",
+      "custom": false,
+      "id": 720,
+      "name": "CSS",
+      "updated_at": "2015-05-03T18:31:43.555932+00:00"
+     },
+     "sds_skill_id": 720
+    },
+    {
+     "created_at": "2026-08-19T02:27:33.448095+00:00",
+     "job_id": 271382,
+     "sds_skill": {
+      "created_at": "2015-07-04T02:37:19.576302+00:00",
+      "custom": false,
+      "id": 3382,
+      "name": "SQL",
+      "updated_at": "2016-06-30T02:20:01.343690+00:00"
+     },
+     "sds_skill_id": 3382
+    }
+   ],
+   "maximum_salary": null,
+   "name": "Product Solutions Specialist",
+   "number_of_openings": 1,
+   "perks": {
+    "other": "<ul>\n\t<li>Out-of-town Trips</li>\n\t<li>Allowances</li>\n\t<li>Yearly Appraisal</li>\n\t<li>Retirement Plan</li>\n</ul>",
+    "types": []
+   },
+   "photo_urls": [],
+   "priority_score": 0.5,
+   "qualifications": "<ul>\n\t<li>\n\t<p>Open to candidates with a Bachelor's degree in Computer Science, Information Technology, or equivalent.</p>\n\t</li>\n\t<li>\n\t<p>1–3 years’ experience in software development, automation, or AI-assisted development</p>\n\t</li>\n\t<li>\n\t<p>Experience building web apps, workflows, or productiv",
+   "response_rate": null,
+   "salary_currency": null,
+   "salary_interval": null,
+   "salary_shown": true,
+   "slug": "product-solutions-specialist",
+   "tenure": "Full time",
+   "visibility": "public",
+   "work_experience": 200
+  },
+  {
+   "activation_date": "2026-10-02T06:06:15.996531+00:00",
+   "application_end_date": "2027-10-02T02:20:13.243000+00:00",
+   "apply_redirect_url": "https://forms.gle/21FTq54zj5zSuvPSA",
+   "base_salary": null,
+   "bookmarked": false,
+   "company": {
+    "code": "qne-software-philippines-inc",
+    "name": "QNE Software Philippines, Inc."
+   },
+   "company_name": "QNE Software Philippines, Inc.",
+   "created_at": "2026-10-02T06:04:21.256843+00:00",
+   "description": "<ul>\n\t<li>Coordinate with consultants for support, including proposals, approvals, payments, and monitoring.</li>\n\t<li>Send product overviews and company profiles to prospective clients.</li>\n\t<li>Conduct initial qualification and follow-up of leads from marketing activities, referrals, events, and other sources.</li>\n\t<li>Act as custodian for departmental documents, including preparing quotations and maintaining records of sales and after-sales accounts.</li>\n\t<li>Assist with lead inquiries, re",
+   "distance_from_user": null,
+   "education_level": 550,
+   "es_is_top_brand": false,
+   "es_recruiter_last_seen": "2026-10-06T06:16:28.590091+00:00",
+   "exam_versions": [],
+   "function": "IT and Software",
+   "google_location": {
+    "address_components": {
+     "city": "Makati",
+     "country": "Philippines",
+     "region": "Metro Manila"
+    }
+   },
+   "id": 273103,
+   "is_featured": false,
+   "is_hybrid": false,
+   "is_open_to_fresh_grads": true,
+   "is_work_from_home": false,
+   "job_sds_skills": [],
+   "maximum_salary": null,
+   "name": "Sales Associate",
+   "number_of_openings": 1,
+   "perks": {
+    "other": null,
+    "types": []
+   },
+   "photo_urls": [],
+   "priority_score": 0.5,
+   "qualifications": "<ul>\n\t<li>Open to candidates with a Bachelor's degree in Computer Science, Information Technology, Finance, Accountancy, Banking, Marketing, or Mass Communications.</li>\n\t<li>Sales experience in the IT industry is advantageous.</li>\n\t<li>Excellent English and Filipino communication skills, both oral",
+   "response_rate": null,
+   "salary_currency": null,
+   "salary_interval": null,
+   "salary_shown": true,
+   "slug": "sales-associate",
+   "tenure": "Full time",
+   "visibility": "public",
+   "work_experience": 200
+  },
+  {
+   "activation_date": "2026-10-05T17:32:36.694180+00:00",
+   "application_end_date": "2026-12-04T16:00:00+00:00",
+   "apply_redirect_url": null,
+   "base_salary": null,
+   "bookmarked": false,
+   "company": {
+    "code": "stealth",
+    "name": "WAGMI Solutions"
+   },
+   "company_name": "WAGMI Solutions",
+   "created_at": "2026-10-05T17:31:15.080983+00:00",
+   "description": "<p> Cloud Security Project Engineer (Client-Facing Professional Services)</p>\n\n<p> </p>\n\n<p>About the Role</p>\n\n<p>We are looking for a Cloud Security Project Engineer to join our team and support cloud security implementations for enterprise customers in the Australia and New Zealand (ANZ) region.</p>\n\n<p>This is a hands-on technical and client-facing role. You will work with customers, partners, and internal teams to implement, troubleshoot, and support cloud security solutions.</p>\n\n<p>You do",
+   "distance_from_user": -1,
+   "education_level": 550,
+   "es_is_top_brand": false,
+   "es_recruiter_last_seen": "2026-10-08T11:41:34.070302+00:00",
+   "exam_versions": [],
+   "function": "IT and Software",
+   "google_location": {
+    "address_components": {
+     "address_line_1": null,
+     "city": "Makati",
+     "country": "Philippines",
+     "region": "Metro Manila"
+    }
+   },
+   "id": 273204,
+   "is_featured": false,
+   "is_hybrid": false,
+   "is_open_to_fresh_grads": false,
+   "is_work_from_home": true,
+   "maximum_salary": null,
+   "name": "Cloud Security Project Engineer",
+   "number_of_openings": 3,
+   "perks": {
+    "other": null,
+    "types": [
+     "wfh"
+    ]
+   },
+   "photo_urls": [],
+   "priority_score": 0.5,
+   "qualifications": "<ul>\n\t<li>\n\t<p>What We're Looking For</p>\n\n\t<p>Technical Experience</p>\n\n\t<p>3+ years of experience in one or more of the following:</p>\n\n\t<p>Cloud Security</p>\n\n\t<p>Network Security</p>\n\n\t<p>Network Engineering</p>\n\n\t<p>Firewall Administration</p>\n\n\t<p>Proxy / Gateway Technologies</p>\n\n\t<p>Cybersec",
+   "response_rate": 0.0,
+   "salary_currency": null,
+   "salary_interval": null,
+   "salary_shown": true,
+   "slug": "cloud-security-project-engineer-2",
+   "tenure": "Full time",
+   "visibility": "public",
+   "work_experience": 300
+  }
+ ],
+ "search_text": ""
+}
