@@ -242,18 +242,18 @@ code copied verbatim; NOTICE credits freehire (MIT). Survey: scratchpad freehire
 - F2 Aggregators (sources/aggregators/, opt-in via sources.enabled)
   - ✅ F2.1 adzuna reed usajobs whatjobs + API-key wiring into sources
   - ✅ F2.2 arbeitnow arbeitsagentur devglobaljobs edjoin empregos eures functionalworks getmanfred getmatch getonbrd
-  - 🟡 F2.3 getro golangjobs hackernews herkey himalayas jobdanmark jobicy jobnet jobstash jobtech
-  - 🟡 F2.4 kalibrr landingjobs mycareersfuture nofluffjobs powertofly remoteok remotive remotli schoolspring seek
-  - 🟡 F2.5 solidjobs teamex tecla themuse topco trudvsem tyomarkkinatori workatastartup workingnomads wttj
+  - ✅ F2.3 getro golangjobs hackernews herkey himalayas jobdanmark jobicy jobnet jobstash jobtech
+  - ✅ F2.4 kalibrr landingjobs mycareersfuture nofluffjobs powertofly remoteok remotive remotli schoolspring seek
+  - ✅ F2.5 solidjobs teamex tecla themuse topco trudvsem tyomarkkinatori workatastartup workingnomads wttj
   - not ported (bypass-dependent): echojobs fourdayweek habrcareer hhru jobleads naukri startupjobs techinasia wellfound
-- ⬜ F5 Setup UI: list every opt-in source (aggregators, boards, company plugins) with toggles, from a /api/sources endpoint
+- ✅ F5 Setup UI: list every opt-in source (aggregators, boards, company plugins) with toggles, from a /api/sources endpoint
 - F3 Job boards + RSS (sources/boards/, opt-in)
-  - 🟡 F3.1 aijobs builtin instaffo itviec japandev jobboardly jobylon joppy
-  - 🟡 F3.2 profession pythonorg remotedotcom startupandvc techtree thehub torre work180 + RSS cryptocurrencyjobs jobspresso nodesk weworkremotely
+  - ✅ F3.1 aijobs builtin instaffo itviec japandev jobboardly jobylon joppy
+  - ✅ F3.2 profession pythonorg remotedotcom startupandvc techtree thehub torre work180 + RSS cryptocurrencyjobs jobspresso nodesk weworkremotely
   - not ported (bypass-dependent): bayt catho civilservicejobs djinni energyjobline geekjob gradcracker gulftalent infojobs occ vagas wantapply wuzzuf
 - F4 Single-company plugins (sources/companies/, opt-in); not ported: metacareers onstrider kontur twogis uber (bypass), airswift tenml (no jobs)
-  - ⬜ F4.1 alfabank alibaba alignerr amazon apple aviasales avito bairesdev dassault dataart dodo domclick
-  - ⬜ F4.2 emagine garena google halyk ibm jettycloud kaspersky kaspi kuper lamoda lesta lumenalta
-  - ⬜ F4.3 magnit megafon meituan micro1 mts mtslink orion ozon ptsecurity rostelecom rwb sber
-  - ⬜ F4.4 selectel staffy tbank telegramcareers tencent tochka uzum vk x5 yandex yandexcrowd
-- ⬜ F6 Cleanup: merge private helpers (_f12.._f22) into sources/common.py; Http.post_form + public raw response; SLOW_HOSTS (myworkdaysite 1, higherme 1/3, join 1.5, workstream 1); CDX older-collection fallback; flaky wall-clock test; full suite + browser check of Setup sources list
+  - ✅ F4.1 alfabank alibaba alignerr amazon apple aviasales avito bairesdev dassault dataart dodo domclick
+  - ✅ F4.2 emagine garena google halyk ibm jettycloud kaspersky kaspi kuper lamoda lesta lumenalta
+  - ✅ F4.3 magnit megafon meituan micro1 mts mtslink orion ozon ptsecurity rostelecom rwb sber
+  - ✅ F4.4 selectel staffy tbank telegramcareers tencent tochka uzum vk x5 yandex yandexcrowd
+- 🟡 F6 Cleanup: make jobboardly an ATS plugin (url_patterns) instead of reading sources.companies; set ats from apply_url (ats_detector) for aggregator/board/company stubs so apply handlers route correctly; merge private helpers (_f12.._f22) into sources/common.py; Http.post_form + public raw response; SLOW_HOSTS (myworkdaysite 1, higherme 1/3, join 1.5, workstream 1); CDX older-collection fallback; flaky wall-clock test; full suite + browser check of Setup sources list
