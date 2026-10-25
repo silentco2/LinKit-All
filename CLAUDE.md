@@ -82,8 +82,8 @@ Tailoring happens just before applying, never for jobs that will not be applied 
   per-site plugins (Wuzzuf, Forasna) > generic extractor (JSON-LD -> CSS -> AI extraction).
 - Also: Telegram channels (t.me/s preview), discovered boards (Common Crawl,
   `linkit discover-boards`), aggregator API keys from the vault.
-- Never defeat bot challenges: no TLS-fingerprint spoofing, challenge-solving browsers, rotating
-  proxies or fake crawler/app user agents. robots.txt is not enforced (maintainer, 2026-10-25).
+- Never defeat bot challenges (no TLS spoofing, challenge solving, rotating proxies, fake UAs). OK:
+  what the site's own pages send (Referer, XHR header, page CSRF/public key). robots.txt not enforced.
 - ATS detector routes any pasted URL (or careers-page HTML) to the right plugin.
 - Per-domain rate limits, checkpoints every page, dedupe by normalized URL +
   hash(title, company, location) + rapidfuzz near-duplicate check.
