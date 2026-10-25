@@ -275,10 +275,21 @@ class ScheduleSection(BaseModel):
         return sorted(set(v))
 
 
+class TrustSection(BaseModel):
+    """Scam and ghost-job checks run in the rank stage (offline, no AI)."""
+
+    enabled: bool = True
+    scam_threshold: int = Field(65, ge=1, le=100)  # scam score at or above: filtered out
+    ghost_threshold: int = Field(50, ge=1, le=100)  # ghost score at or above: demoted to low tier
+    filter_ghost: bool = False  # filter ghost jobs out instead of demoting them to the low tier
+    allow_companies: list[str] = []  # "Not a scam": these companies skip the scam rule
+
+
 class SearchConfig(BaseModel):
     search: SearchSection = SearchSection()
     sources: SourcesSection = SourcesSection()
     filters: FiltersSection = FiltersSection()
+    trust: TrustSection = TrustSection()
     matching: MatchingSection = MatchingSection()
     apply: ApplySection = ApplySection()
     ai: AISection = AISection()

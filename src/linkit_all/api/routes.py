@@ -12,7 +12,7 @@ from typing import Any, Literal
 import httpx
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse, Response
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -34,6 +34,7 @@ from linkit_all.core.models import (
     JobState,
     Profile,
     Run,
+    SearchConfigRow,
     TailoredCV,
     Tier,
     utcnow,
@@ -48,14 +49,19 @@ from linkit_all.core.profile import (
 )
 from linkit_all.core.scheduler import apply_schedule, next_runs
 from linkit_all.core.search import SearchConfig, load_search, save_search
-from linkit_all.core.state import InvalidTransition, transition
+from linkit_all.core.state import InvalidTransition, can_transition, transition
 from linkit_all.core.tools import soffice_path, tectonic_path
 from linkit_all.pipeline import STAGES, PipelineError, ai_settings
 from linkit_all.reports import build_report, export_csv, export_pdf
 from linkit_all.sources import registry
 from linkit_all.sources.base import OPT_IN_KINDS, Source
+from linkit_all.sources.text import norm_company
 
 router = APIRouter(prefix="/api")
+GHOST_FILTERABLE = (
+    JobState.discovered, JobState.enriched, JobState.ranked, JobState.scored,
+    JobState.below_threshold, JobState.awaiting_review, JobState.queued_apply,
+)  # fmt: skip
 
 
 def _db(request: Request) -> sessionmaker[Session]:
@@ -310,8 +316,15 @@ async def check_ai(request: Request, body: AICheck) -> dict[str, Any]:
 # --- jobs ---------------------------------------------------------------------
 
 
+def _scores(j: Job) -> tuple[int | None, int | None]:
+    trust = j.data.get("trust") or {}
+    return (trust.get("scam") or {}).get("score"), (trust.get("ghost") or {}).get("score")
+
+
 def _row(j: Job) -> dict[str, Any]:
-    return {"id": j.id, "title": j.title, "company": j.company, "location": j.location,
+    scam, ghost = _scores(j)
+    return {"scam_score": scam, "ghost_score": ghost,
+            "id": j.id, "title": j.title, "company": j.company, "location": j.location,
             "source": j.source, "state": j.state, "tier": j.tier, "score": j.score,
             "rank": j.data.get("rank"), "remote": j.data.get("remote"), "ai": j.data.get("ai"),
             "posted_at": j.posted_at.isoformat() if j.posted_at else None}  # fmt: skip
@@ -386,6 +399,7 @@ def job_detail(request: Request, job_id: int) -> dict[str, Any]:
             "ats": job.ats,
             "apply_url": job.data.get("apply_url"),
             "ai": job.data.get("ai"),
+            "trust": job.data.get("trust"),
             "filled": job.data.get("filled"),
             "salary": salary,
             "events": history,
@@ -439,6 +453,76 @@ def job_actions(request: Request, body: JobAction) -> dict[str, Any]:
             except InvalidTransition as e:
                 errors[job_id] = str(e)
     return {"done": done, "errors": errors}
+
+
+class TrustAction(BaseModel):
+    action: Literal["not_scam", "report"]
+
+
+class GhostFilter(BaseModel):
+    threshold: int = Field(ge=1, le=100)
+
+
+def _save_cfg(s: Session, cfg: SearchConfig) -> None:
+    s.merge(SearchConfigRow(id=1, data=cfg.model_dump()))
+
+
+def _add_company(names: list[str], company: str) -> None:
+    if norm_company(company) not in {norm_company(c) for c in names}:
+        names.append(company)
+
+
+@router.post("/jobs/{job_id}/trust")
+def job_trust(request: Request, job_id: int, body: TrustAction) -> dict[str, Any]:
+    """not_scam: allow-list the company, re-check on next rank; report: blacklist the company."""
+    with _db(request).begin() as s:
+        job = s.get(Job, job_id)
+        if job is None:
+            raise HTTPException(404, "Job not found")
+        row = s.get(SearchConfigRow, 1)
+        cfg = SearchConfig.model_validate(row.data) if row else SearchConfig()
+        if body.action == "not_scam":
+            _add_company(cfg.trust.allow_companies, job.company)
+            if job.state == JobState.filtered_out:
+                job.data = {k: v for k, v in job.data.items() if k != "trust_filter"}
+                transition(s, job, JobState.enriched,
+                           "you marked this company as not a scam: checked again",
+                           code="trust_restored")  # fmt: skip
+        else:
+            _add_company(cfg.filters.company_blacklist, job.company)
+            if job.state in (JobState.discovered, JobState.enriched):
+                target = JobState.filtered_out
+            elif job.state in (JobState.applying, JobState.applied):
+                target = job.state  # already being applied to: only the blacklist changes
+            else:
+                target = JobState.skipped
+            if job.state == JobState.filtered_out:
+                job.data = {**job.data, "company_rule": True}  # keep it out on re-checks
+            elif target != job.state:
+                transition(s, job, target, "you reported this posting", code="trust_reported")
+        _save_cfg(s, cfg)
+        return {"state": job.state}
+
+
+@router.post("/jobs/trust/filter-ghost")
+def filter_ghost(request: Request, body: GhostFilter) -> dict[str, int]:
+    """Filter out (or skip, where filtering is not allowed) jobs at or above a ghost score."""
+    count = 0
+    with _db(request).begin() as s:
+        for job in s.scalars(select(Job).where(Job.state.in_(GHOST_FILTERABLE))):
+            ghost = ((job.data.get("trust") or {}).get("ghost") or {}).get("score")
+            if ghost is None or ghost < body.threshold:
+                continue
+            filtered = can_transition(job.state, JobState.filtered_out)
+            if filtered:
+                job.data = {**job.data, "trust_filter": "ghost"}
+            transition(
+                s, job, JobState.filtered_out if filtered else JobState.skipped,
+                f"looks like a ghost job (score {ghost}): you filtered ghost jobs in the UI",
+                code="ghost_suspected", params={"score": ghost},
+            )  # fmt: skip
+            count += 1
+    return {"count": count}
 
 
 # --- runs, report, events -----------------------------------------------------------

@@ -16,7 +16,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from linkit_all.core.models import Job, JobState, Profile, Run, RunStatus, Tier
 from linkit_all.core.search import SearchConfig
 from linkit_all.core.state import transition
-from linkit_all.matching.rank import cv_text
+from linkit_all.matching.rank import LOW_OPT_IN, cv_text
+from linkit_all.matching.trust_stage import add_ai_flag
 from linkit_all.providers.base import LLMProvider, UsageLimitError, render
 
 CV_CHARS = 6000
@@ -31,9 +32,14 @@ class JobScore(BaseModel):
     missing_skills: list[str] = []
     red_flags: list[str] = []
     # Legitimacy is separate from fit. Optional so old cached answers and models that omit it
-    # still validate; an unknown `legit` value fails validation and takes the retry path.
+    # still validate; an unknown `legit` value is read as "ok" rather than failing the batch.
     legit: Literal["ok", "suspicious", "scam"] = "ok"
     trust_flags: list[str] = []
+
+    @field_validator("legit", mode="before")
+    @classmethod
+    def _known_legit(cls, v: Any) -> Any:
+        return v if v in ("ok", "suspicious", "scam") else "ok"
 
     @field_validator("trust_flags")
     @classmethod
@@ -51,7 +57,6 @@ def tier_for(score: int, cfg: SearchConfig) -> Tier:
     return Tier.mid if score >= cfg.matching.tier_mid else Tier.low
 
 
-LOW_OPT_IN = "queued by the low-tier auto-apply opt-in"
 _NEXT = {Tier.high: JobState.queued_apply, Tier.mid: JobState.awaiting_review,
          Tier.low: JobState.below_threshold}  # fmt: skip
 
@@ -117,6 +122,10 @@ async def score_jobs(
                     tier_for(r.score, cfg),
                     {**job.data, "ai": ai},
                 )
+                if add_ai_flag(job, r.legit) and job.tier == Tier.high:
+                    job.tier = (
+                        Tier.mid
+                    )  # the AI calls it a scam: a person decides, never auto-apply
                 transition(s, job, JobState.scored, f"AI score {r.score}")
                 if job.tier == Tier.low and opt_in:
                     transition(s, job, JobState.queued_apply, LOW_OPT_IN)

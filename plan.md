@@ -308,9 +308,9 @@ Execution tasks:
 - ✅ G3 `matching/trust/ghost.py`: age (posted_at, ATS first-published, first sighting), reposts
   and still-open across runs, vagueness port (EN + AR), vague titles, company role surge,
   missing salary (small)
-- ⬜ G4 Wire into rank: thresholds, filtered_out/low with codes, settings section, restore/report API
+- ✅ G4 Wire into rank: thresholds, filtered_out/low with codes, settings section, restore/report API
 - ⬜ G5 UI: badge in the jobs table, signals in the drawer (translated), Not a scam / Report,
   ghost cut-off setting + bulk action
 - ✅ G6 ATS liveness check in the apply runner before tailoring
-- ✅ G7 Optional `red_flags` in the batched score prompt + schema
+- ✅ G7 Optional `legit` (ok/suspicious/scam) and `trust_flags` in the batched score prompt + schema
 - ⬜ G8 Docs: NOTICE, CLAUDE.md §5.3, docs/, handoff

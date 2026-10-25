@@ -758,3 +758,71 @@ def test_action_and_event_expose_code_and_params(client: TestClient) -> None:
     assert (item_json["code"], item_json["params"]) == ("two_factor", {"site": "workday (acme)"})
     event = client.get(f"/api/jobs/{job_id}").json()["events"][-1]
     assert (event["code"], event["params"]) == ("captcha", {})
+
+
+def seed_trust_job(
+    client: TestClient, title: str, company: str, state: JobState, ghost: int | None
+) -> int:
+    db = client.app.state.db  # type: ignore[attr-defined]
+    data: dict[str, Any] = {}
+    if ghost is not None:
+        data = {
+            "trust": {
+                "scam": {"score": 80, "band": "high", "signals": []},
+                "ghost": {"score": ghost, "band": "high", "signals": []},
+            },
+            "trust_filter": "scam",
+        }
+    with db.begin() as s:
+        job = Job(source="t", url=f"https://x/{title}", title=title, company=company,
+                  dedupe_hash=title, data=data)  # fmt: skip
+        s.add(job)
+        s.flush()
+        job.state = JobState.enriched
+        if state != JobState.enriched:
+            transition(
+                s, job, JobState.filtered_out if state == JobState.filtered_out else JobState.ranked
+            )
+        return int(job.id)
+
+
+def test_trust_in_job_list_and_detail(client: TestClient) -> None:
+    jid = seed_trust_job(client, "T", "Co", JobState.ranked, 55)
+    row = next(r for r in client.get("/api/jobs").json() if r["id"] == jid)
+    assert (row["scam_score"], row["ghost_score"]) == (80, 55)
+    assert client.get(f"/api/jobs/{jid}").json()["trust"]["scam"]["band"] == "high"
+
+
+def test_trust_not_scam_allow_lists_and_restores(client: TestClient) -> None:
+    jid = seed_trust_job(client, "T", "Shady Inc.", JobState.filtered_out, 10)
+    r = client.post(f"/api/jobs/{jid}/trust", json={"action": "not_scam"}, headers=SAME_ORIGIN)
+    assert r.json() == {"state": "enriched"}
+    assert client.get(f"/api/jobs/{jid}").json()["events"][-1]["code"] == "trust_restored"
+    assert client.get("/api/search").json()["trust"]["allow_companies"] == ["Shady Inc."]
+    missing = client.post("/api/jobs/999/trust", json={"action": "report"}, headers=SAME_ORIGIN)
+    assert missing.status_code == 404
+
+
+def test_trust_report_blacklists_and_filters_or_skips(client: TestClient) -> None:
+    a = seed_trust_job(client, "A", "Bad Co", JobState.enriched, None)
+    b = seed_trust_job(client, "B", "Worse Co", JobState.ranked, 5)
+    report = {"action": "report"}
+    ra = client.post(f"/api/jobs/{a}/trust", json=report, headers=SAME_ORIGIN)
+    rb = client.post(f"/api/jobs/{b}/trust", json=report, headers=SAME_ORIGIN)
+    assert ra.json() == {"state": "filtered_out"} and rb.json() == {"state": "skipped"}
+    assert client.get(f"/api/jobs/{a}").json()["events"][-1]["code"] == "trust_reported"
+    assert client.get("/api/search").json()["filters"]["company_blacklist"] == [
+        "Bad Co",
+        "Worse Co",
+    ]
+
+
+def test_filter_ghost_bulk(client: TestClient) -> None:
+    hi = seed_trust_job(client, "Hi", "C1", JobState.ranked, 70)
+    seed_trust_job(client, "Lo", "C2", JobState.ranked, 20)
+    en = seed_trust_job(client, "En", "C3", JobState.enriched, 90)
+    r = client.post("/api/jobs/trust/filter-ghost", json={"threshold": 60}, headers=SAME_ORIGIN)
+    assert r.json() == {"count": 2}
+    assert client.get(f"/api/jobs/{hi}").json()["state"] == "skipped"
+    assert client.get(f"/api/jobs/{en}").json()["state"] == "filtered_out"
+    assert client.get(f"/api/jobs/{en}").json()["events"][-1]["code"] == "ghost_suspected"

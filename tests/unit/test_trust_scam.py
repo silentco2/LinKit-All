@@ -1,6 +1,7 @@
 # ruff: noqa: RUF001
 """Offline scam scorer: every signal in English and Arabic, evasion, negation, floors, speed."""
 
+import os
 import time
 
 import pytest
@@ -502,6 +503,8 @@ def test_empty_inputs() -> None:
 # ---- speed -------------------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(not os.environ.get("LINKIT_PERF"), reason="wall-clock check: LINKIT_PERF=1")
+@pytest.mark.skipif(not os.environ.get("LINKIT_PERF"), reason="wall-clock check: LINKIT_PERF=1")
 def test_scores_10k_jobs_fast() -> None:
     para = (
         "We are looking for an engineer to join our platform team. You will build services in "

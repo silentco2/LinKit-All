@@ -18,7 +18,7 @@ from linkit_all.core.search import SearchConfig
 from linkit_all.matching.rank import rank_jobs
 from linkit_all.matching.rules import rule_violation, seniority
 from linkit_all.matching.score import score_jobs
-from linkit_all.providers.base import LLMProvider, ProviderError, UsageLimitError
+from linkit_all.providers.base import LLMProvider, UsageLimitError
 
 
 @pytest.mark.parametrize(
@@ -321,14 +321,150 @@ def test_score_stores_legitimacy_flags_and_defaults(db: sessionmaker[Session]) -
     assert "concrete indicator" in ai.prompts[0]
 
 
-def test_score_invalid_legit_value_retries_then_fails(db: sessionmaker[Session]) -> None:
+def test_score_unknown_legit_value_is_read_as_ok(db: sessionmaker[Session]) -> None:
     ranked_jobs(db, ["A"])
     ai = FakeAI({"A": 9}, extra={"A": {"legit": "maybe"}})
-    with pytest.raises(ProviderError):
-        asyncio.run(score_jobs(db, SearchConfig.model_validate({}), ai))
-    assert ai.calls == 3  # first try plus 2 retries, as for any invalid output
+    asyncio.run(score_jobs(db, SearchConfig.model_validate({}), ai))
+    assert ai.calls == 1  # the batch is not retried or failed
     with db() as s:
-        assert s.query(Job).filter_by(state=JobState.ranked).count() == 1
+        a = s.scalars(select(Job)).one()
+    assert a.data["ai"]["legit"] == "ok" and a.state == JobState.queued_apply
+
+
+def test_score_ai_scam_flag_caps_tier_at_mid_and_adds_signal(db: sessionmaker[Session]) -> None:
+    ranked_jobs(db, ["A", "B", "C"])
+    ai = FakeAI({"A": 9, "B": 9, "C": 9},
+                extra={"A": {"legit": "scam"}, "B": {"legit": "suspicious"}})  # fmt: skip
+    asyncio.run(score_jobs(db, SearchConfig.model_validate({"matching": {"batch_size": 3}}), ai))
+    with db() as s:
+        by = {j.title: j for j in s.scalars(select(Job))}
+    assert (by["A"].state, by["A"].tier) == (JobState.awaiting_review, Tier.mid)
+    scam = by["A"].data["trust"]["scam"]
+    assert scam["score"] == 30 and scam["signals"][-1]["code"] == "ai_flag"
+    assert by["B"].state == JobState.queued_apply  # suspicious: flag only
+    assert by["B"].data["trust"]["scam"]["score"] == 15
+    assert by["C"].state == JobState.queued_apply and "trust" not in by["C"].data
+
+
+SCAM_JD = (
+    "Work from home! Pay a registration fee of $50 to start. Send your ID and bank account "
+    "details. Contact us on WhatsApp or Telegram. No experience needed, earn $5000 weekly."
+)
+GHOST_JD = "We are always hiring. Join our talent pool for future opportunities."
+
+
+def trust_cfg(**kw: Any) -> SearchConfig:
+    return SearchConfig.model_validate({"trust": kw, "search": {"posted_within_days": 400}})
+
+
+def by_title(db: sessionmaker[Session]) -> dict[str, Job]:
+    with db() as s:
+        return {j.title: j for j in s.scalars(select(Job))}
+
+
+def test_rank_filters_scam_with_code(db: sessionmaker[Session]) -> None:
+    add(
+        db,
+        job(title="Scam Engineer", company="Shady", description=SCAM_JD),
+        job(title="Python Engineer", company="Initech", description="Python backend services"),
+    )
+    counts = rank_jobs(db, SearchConfig(), fake_embed)
+    assert counts["scam_filtered"] == 1 and counts["ranked"] == 1
+    with db() as s:
+        scam = s.scalars(select(Job).filter_by(title="Scam Engineer")).one()
+        ev = s.scalars(select(JobEvent).filter_by(job_id=scam.id)).one()
+    score = scam.data["trust"]["scam"]["score"]
+    assert scam.state == JobState.filtered_out and score >= 65
+    assert ev.code == "scam_suspected" and ev.params == {"score": score}
+    assert "scam" in ev.message and len(ev.message.split(": ")[1].split(", ")) <= 3
+    ok = by_title(db)["Python Engineer"]
+    assert ok.state == JobState.ranked and ok.data["trust"]["scam"]["score"] < 65
+
+
+def test_rank_allow_listed_company_skips_scam_rule_and_restores(db: sessionmaker[Session]) -> None:
+    add(db, job(title="Scam Engineer", company="Shady Inc.", description=SCAM_JD))
+    assert rank_jobs(db, SearchConfig(), fake_embed)["scam_filtered"] == 1
+    assert rank_jobs(db, SearchConfig(), fake_embed).get("rechecked") is None  # stays filtered
+    assert by_title(db)["Scam Engineer"].state == JobState.filtered_out
+    counts = rank_jobs(db, trust_cfg(allow_companies=["Shady"]), fake_embed)
+    assert counts["rechecked"] == 1 and counts["ranked"] == 1
+    j = by_title(db)["Scam Engineer"]
+    assert j.state == JobState.ranked and j.data["trust"]["scam"]["score"] >= 65  # still scored
+
+
+def test_rank_turning_trust_off_restores_scam_filtered(db: sessionmaker[Session]) -> None:
+    add(db, job(title="Scam Engineer", company="Shady", description=SCAM_JD))
+    rank_jobs(db, SearchConfig(), fake_embed)
+    counts = rank_jobs(db, trust_cfg(enabled=False), fake_embed)
+    assert counts["rechecked"] == 1
+    assert by_title(db)["Scam Engineer"].state == JobState.ranked
+
+
+def test_rank_disabled_trust_does_nothing(db: sessionmaker[Session]) -> None:
+    add(db, job(title="Scam Engineer", company="Shady", description=SCAM_JD))
+    assert rank_jobs(db, trust_cfg(enabled=False), fake_embed) == {"ranked": 1, "filtered_out": 0}
+    assert "trust" not in by_title(db)["Scam Engineer"].data
+
+
+def ghost_job() -> Job:
+    return job(
+        title="Talent Pool",
+        company="Ghosty",
+        description=GHOST_JD,
+        posted_at=utcnow() - timedelta(days=200),
+    )
+
+
+def test_rank_demotes_ghost_to_low_and_ai_never_sees_it(db: sessionmaker[Session]) -> None:
+    add(db, ghost_job(), job(title="Python Engineer", company="Initech", description="Python"))
+    cfg = trust_cfg(ghost_threshold=30)
+    counts = rank_jobs(db, cfg, fake_embed)
+    assert counts["ghost_demoted"] == 1 and counts["ranked"] == 1
+    g = by_title(db)["Talent Pool"]
+    assert (g.state, g.tier) == (JobState.below_threshold, Tier.low)
+    assert g.data["trust"]["ghost_demoted"] is True and "rank" not in g.data
+    with db() as s:
+        ev = s.scalars(select(JobEvent).filter_by(job_id=g.id)).all()[-1]
+    assert ev.code == "ghost_likely" and ev.to_state == JobState.below_threshold
+    ai = FakeAI({"Python Engineer": 9, "Talent Pool": 9})
+    asyncio.run(score_jobs(db, cfg, ai))
+    assert ai.calls == 1 and "Talent Pool" not in "".join(ai.prompts)
+    assert by_title(db)["Talent Pool"].state == JobState.below_threshold
+
+
+def test_ghost_demoted_follows_low_tier_opt_in(db: sessionmaker[Session]) -> None:
+    add(db, ghost_job())
+    cfg = SearchConfig.model_validate(
+        {
+            "trust": {"ghost_threshold": 30},
+            "matching": {"auto_apply_low": True},
+            "search": {"posted_within_days": 400},
+        }
+    )
+    rank_jobs(db, cfg, fake_embed)
+    g = by_title(db)["Talent Pool"]
+    assert (g.state, g.tier) == (JobState.queued_apply, Tier.low)
+
+
+def test_rank_filter_ghost_on_filters_out(db: sessionmaker[Session]) -> None:
+    add(db, ghost_job())
+    counts = rank_jobs(db, trust_cfg(ghost_threshold=30, filter_ghost=True), fake_embed)
+    assert counts["ghost_filtered"] == 1 and "ghost_demoted" not in counts
+    g = by_title(db)["Talent Pool"]
+    assert g.state == JobState.filtered_out
+    with db() as s:
+        ev = s.scalars(select(JobEvent).filter_by(job_id=g.id)).one()
+    assert ev.code == "ghost_suspected"
+    # filtering switched off: revived on the next rank, then demoted instead
+    counts = rank_jobs(db, trust_cfg(ghost_threshold=30), fake_embed)
+    assert counts["rechecked"] == 1 and counts["ghost_demoted"] == 1
+
+
+def test_old_search_config_without_trust_loads() -> None:
+    cfg = SearchConfig.model_validate({"filters": {"company_blacklist": ["x"]}})
+    assert cfg.trust.enabled and cfg.trust.scam_threshold == 65
+    assert (cfg.trust.ghost_threshold, cfg.trust.filter_ghost) == (50, False)
+    assert cfg.trust.allow_companies == []
 
 
 def test_score_pauses_run_on_usage_limit(db: sessionmaker[Session]) -> None:
