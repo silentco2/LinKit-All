@@ -665,6 +665,7 @@ export const ar: Record<string, string> = {
   'park.submitting': 'جارٍ الإرسال',
   'park.confirmed': 'ظهرت صفحة التأكيد',
   'park.no_confirmation': 'لم تظهر صفحة تأكيد بعد الإرسال',
+  'park.job_closed': 'لم يعد الإعلان مفتوحًا على {ats}',
   'park.run_stopped': 'توقف التشغيل أثناء التقديم: تحقق من الموقع',
   'park.chose_approve': 'وافقت عليه في الواجهة',
   'park.chose_reject': 'رفضته في الواجهة',

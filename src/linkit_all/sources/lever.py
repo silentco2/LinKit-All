@@ -4,7 +4,9 @@ import re
 from collections.abc import AsyncIterator
 from typing import Any
 
-from linkit_all.sources.base import JobStub, Remote, Source, Task, from_epoch_ms
+import httpx
+
+from linkit_all.sources.base import JobStub, Remote, Source, Task, from_epoch_ms, status_live
 from linkit_all.sources.http import Http
 from linkit_all.sources.text import html_to_text
 
@@ -32,6 +34,22 @@ class Lever(Source):
                 yield [self.stub(j, task.board) for j in resp.json()]
                 return
         resp.raise_for_status()
+
+    async def is_live(self, http: Http, stub: JobStub) -> bool | None:
+        board, job_id = stub.extra.get("board"), stub.extra.get("id")
+        if not board or not job_id:
+            return None
+        verdicts: list[bool | None] = []
+        for host in HOSTS:  # the posting lives on one instance; the other answers 404
+            try:
+                resp = await http.get(f"{host}/v0/postings/{board}/{job_id}")
+            except httpx.HTTPError:
+                verdicts.append(None)
+                continue
+            verdicts.append(status_live(resp.status_code))
+        if True in verdicts:
+            return True
+        return False if verdicts == [False] * len(HOSTS) else None
 
     @staticmethod
     def stub(j: dict[str, Any], board: str) -> JobStub:

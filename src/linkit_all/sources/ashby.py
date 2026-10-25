@@ -4,6 +4,8 @@ import re
 from collections.abc import AsyncIterator
 from typing import Any
 
+import httpx
+
 from linkit_all.sources.base import JobStub, Remote, Source, Task, from_iso
 from linkit_all.sources.http import Http
 from linkit_all.sources.text import html_to_text
@@ -26,6 +28,19 @@ class Ashby(Source):
             API.format(board=task.board), params={"includeCompensation": "true"}
         )
         yield [self.stub(j, task.board) for j in data["jobs"] if j.get("isListed", True)]
+
+    async def is_live(self, http: Http, stub: JobStub) -> bool | None:
+        board, job_id = stub.extra.get("board"), stub.extra.get("id")
+        if not board or not job_id:
+            return None
+        try:
+            resp = await http.get(API.format(board=board))
+            if resp.status_code != 200:
+                return None  # a missing board says nothing certain about this job
+            jobs = resp.json()["jobs"]
+        except (httpx.HTTPError, ValueError, KeyError, TypeError):
+            return None
+        return any(j.get("id") == job_id and j.get("isListed", True) for j in jobs)
 
     @staticmethod
     def stub(j: dict[str, Any], board: str) -> JobStub:

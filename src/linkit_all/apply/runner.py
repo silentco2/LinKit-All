@@ -67,7 +67,10 @@ from linkit_all.core.search import SearchConfig
 from linkit_all.core.state import transition
 from linkit_all.matching.rank import Embed, cv_text
 from linkit_all.providers.base import LLMProvider, UsageLimitError
+from linkit_all.sources import registry
 from linkit_all.sources.ats_detector import detect
+from linkit_all.sources.base import JobStub, Source
+from linkit_all.sources.http import Http, make_client
 from linkit_all.tailor.pipeline import TailorError, tailor_job
 from linkit_all.tailor.render.libreoffice import RenderError
 
@@ -251,8 +254,11 @@ class Applier:
         embed: Embed,
         vault: Vault | None = None,  # the server's shared vault; the CLI passes none
         publish: Callable[[dict[str, Any]], None] | None = None,  # live events; the CLI passes none
+        http: Http | None = None,  # liveness checks; tests pass a mock-transport client
     ) -> None:
         self.db, self.settings, self.cfg, self.provider = db, settings, cfg, provider
+        self._http = http
+        self._sources: dict[str, Source] | None = None
         self._publish = publish
         self._vault = vault
         self.bank = AnswerBank(db, embed)
@@ -352,6 +358,47 @@ class Applier:
                 break
         return picked
 
+    async def _posting_closed(self, job: Job, info: JobInfo) -> bool:
+        """Ask the job's ATS plugin whether the posting still exists. Only a clear "gone" counts;
+        an unknown ATS, a network error or any odd answer means carry on. Marks the job skipped."""
+        if not job.ats:
+            return False
+        try:
+            if self._sources is None:
+                self._sources = registry()
+            source = self._sources.get(job.ats)
+            if source is None:
+                return False
+            stub = JobStub(
+                source=job.source,
+                url=job.url,
+                title=job.title,
+                company=job.company,
+                ats=job.ats,
+                extra=info.extra,
+            )
+            if self._http is not None:
+                live = await source.is_live(self._http, stub)
+            else:
+                async with make_client() as client:
+                    live = await source.is_live(Http(client), stub)
+        except Exception as e:  # our own failure never blocks an application
+            logger.warning("job {}: liveness check failed: {}", job.id, e)
+            return False
+        if live is not False:
+            return False
+        with self.db.begin() as s:
+            row = s.get_one(Job, job.id)
+            transition(
+                s,
+                row,
+                JobState.skipped,
+                f"The posting is no longer open on {job.ats}",
+                code="job_closed",
+                params={"ats": job.ats},
+            )
+        return True
+
     async def apply(self, job_id: int) -> Outcome:
         with self.db() as s:  # decide first: never tailor a job we won't apply to (CLAUDE.md §4)
             job = s.get_one(Job, job_id)
@@ -360,6 +407,8 @@ class Applier:
         generic = self.cfg.apply.generic_agent
         if info is None or (handler is None and not (generic and _web_url(info.apply_url))):
             return Outcome("skipped", f"no form handler for this posting ({job.ats})")
+        if await self._posting_closed(job, info):  # a read-only check; costs no AI
+            return Outcome("skipped", f"the posting is no longer open on {job.ats}")
         try:
             cv = await tailor_job(self.db, job_id, self.provider, self.settings)
         except (RenderError, UsageLimitError, TailorError) as e:

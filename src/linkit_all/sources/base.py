@@ -86,6 +86,18 @@ class Source(ABC):
         """Fill in the description when the listing did not include it."""
         return stub
 
+    async def is_live(self, http: Http, stub: JobStub) -> bool | None:
+        """Is the posting still open? False only on a clear "gone" answer from the ATS; None =
+        unknown (no way to ask, network error, 5xx, 429...). Never raises for a failed request."""
+        return None
+
+
+def status_live(status: int) -> bool | None:
+    """Detail-page status -> live? 200 yes, 404/410 gone, anything else unknown."""
+    if status == 200:
+        return True
+    return False if status in (404, 410) else None
+
 
 def remote_from_text(*texts: str | None) -> Remote | None:
     joined = " ".join(t for t in texts if t).lower()

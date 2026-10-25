@@ -4,7 +4,16 @@ import re
 from collections.abc import AsyncIterator
 from typing import Any
 
-from linkit_all.sources.base import JobStub, Source, Task, from_iso, remote_from_text
+import httpx
+
+from linkit_all.sources.base import (
+    JobStub,
+    Source,
+    Task,
+    from_iso,
+    remote_from_text,
+    status_live,
+)
 from linkit_all.sources.http import Http
 from linkit_all.sources.text import html_to_text
 
@@ -27,6 +36,16 @@ class Greenhouse(Source):
             return
         data = await http.get_json(API.format(board=task.board), params={"content": "true"})
         yield [self.stub(j, task.board) for j in data["jobs"]]
+
+    async def is_live(self, http: Http, stub: JobStub) -> bool | None:
+        board, job_id = stub.extra.get("board"), stub.extra.get("id")
+        if not board or not job_id:
+            return None
+        try:
+            resp = await http.get(f"{API.format(board=board)}/{job_id}")
+        except httpx.HTTPError:
+            return None
+        return status_live(resp.status_code)
 
     @staticmethod
     def stub(j: dict[str, Any], board: str) -> JobStub:

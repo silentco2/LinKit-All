@@ -661,6 +661,7 @@ export const en: Record<string, string> = {
   'park.dry_run_signup': 'Dry run: would create an account on {site}, not submitted',
   'park.dry_run_agent': 'Dry run: {fields} fields filled on {pages} pages, not submitted',
   'park.dry_run_filled': 'Dry run: {fields} fields filled, not submitted',
+  'park.job_closed': 'The posting is no longer open on {ats}',
   'park.filling': 'Filling the application',
   'park.submitting': 'Submitting',
   'park.confirmed': 'Confirmation page seen',
