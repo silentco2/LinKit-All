@@ -707,6 +707,40 @@ async def close_app_browser(request: Request, item_id: int) -> None:
     await _user_browser(request).close()
 
 
+@router.post("/linkedin/signin", status_code=201)
+async def linkedin_signin(request: Request) -> dict[str, Any]:
+    """Open the LinkedIn login page in the app browser (its own `linkedin` profile) so the user
+    signs in themselves. Nothing is typed or clicked by the app."""
+    browser = _user_browser(request)
+    if _runner(request).state.running:  # a run may be using the profile
+        raise HTTPException(409, "A run is in progress: wait for it, or cancel it")
+    if browser.is_open:
+        raise HTTPException(409, "The app browser is already open: close its window first")
+    try:
+        await browser.open(
+            profile_dir(_settings(request), "linkedin"), "https://www.linkedin.com/login", 0
+        )
+    except Exception as e:
+        raise HTTPException(503, f"Could not open Chrome: {str(e).splitlines()[0][:200]}") from e
+    return {"open": True, "item_id": 0}
+
+
+@router.get("/linkedin/session")
+async def linkedin_session(request: Request) -> dict[str, str]:
+    """Is the saved LinkedIn sign-in still good? Looks at the feed in a headless Chrome."""
+    from linkit_all.sources.linkedin_posts.session import SessionError, check_session
+
+    if _runner(request).state.running:
+        raise HTTPException(409, "A run is in progress: wait for it, or cancel it")
+    try:
+        state = await check_session(_settings(request), True, _user_browser(request))
+    except SessionError as e:
+        raise HTTPException(409, str(e)) from e
+    except Exception as e:
+        raise HTTPException(503, f"Could not open Chrome: {str(e).splitlines()[0][:200]}") from e
+    return {"state": state}
+
+
 def _entry(e: AnswerEntry) -> dict[str, Any]:
     return {
         "id": e.id,

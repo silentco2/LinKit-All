@@ -339,7 +339,7 @@ dataclass: urn, url, author, author_url, headline, posted_text, text, links, ema
 scraped_at), `extract.py` (RawPost list -> JobStub list), `scrape.py` (Playwright -> RawPost),
 `__init__.py` Source (kind "social", opt-in). Email apply: `apply/email_send/`.
 Execution tasks:
-- ⬜ L1 `linkedin` profile key, sign-in (headed app browser) + session check API, `linkit linkedin capture`
+- ✅ L1 `linkedin` profile key, sign-in (headed app browser) + session check API, `linkit linkedin capture`
 - ⬜ L2 Scraper: search URL, scroll caps, per-post extraction, login/checkpoint stop, zero-post HTML dump (needs the maintainer's captured page)
 - ✅ L3 RawPost model, hiring/seeker filter, ATS routing, batched AI extraction prompt, stubs, trust tweaks
 - ✅ L4 SMTP sender (vault creds) + "send test email to myself" API

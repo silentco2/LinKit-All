@@ -36,6 +36,9 @@ app.add_typer(search_app, name="search")
 run_app = typer.Typer(no_args_is_help=True, help="Run one pipeline stage.")
 app.add_typer(run_app, name="run")
 
+linkedin_app = typer.Typer(no_args_is_help=True, help="LinkedIn hiring posts.")
+app.add_typer(linkedin_app, name="linkedin")
+
 ProviderOpt = Annotated[str | None, typer.Option(help="codex_cli | claude_cli | litellm")]
 ModelOpt = Annotated[str | None, typer.Option(help="Model name; default = provider's own.")]
 
@@ -279,6 +282,41 @@ def discover_boards_cmd(
         typer.secho(
             f"{line} (stopped: {r.error})" if r.error else line, fg="yellow" if r.error else None
         )
+
+
+@linkedin_app.command("capture")
+def linkedin_capture(
+    keywords: Annotated[str, typer.Option(help="Search words, e.g. 'hiring python developer'.")],
+    out: Annotated[Path | None, typer.Option(help="HTML file to write.")] = None,
+    headed: Annotated[bool, typer.Option(help="Show the Chrome window.")] = False,
+) -> None:
+    """Save a LinkedIn post-search page as HTML (for building the post scraper)."""
+    from linkit_all.sources.linkedin_posts.session import (
+        SessionError,
+        capture_search,
+        default_capture_path,
+    )
+
+    settings = _settings()
+    path = out or default_capture_path(settings)
+    try:
+        state = asyncio.run(capture_search(settings, keywords, path, headed))
+    except SessionError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1) from e
+    except Exception as e:
+        typer.echo(f"Could not open Chrome: {str(e).splitlines()[0][:200]}", err=True)
+        raise typer.Exit(1) from e
+    if state != "ok":
+        why = "Not signed in to LinkedIn" if state == "logged_out" else "LinkedIn security check"
+        typer.echo(f"{why}: sign in from the app (Setup -> LinkedIn) and try again.", err=True)
+        raise typer.Exit(1)
+    typer.echo(f"Saved {path}")
+    typer.secho(
+        "This file is a copy of YOUR LinkedIn page (it can contain your name, connections and "
+        "account data). Review it before sharing it with anyone.",
+        fg="yellow",
+    )
 
 
 @run_app.command("enrich")
