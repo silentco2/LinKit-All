@@ -58,6 +58,7 @@ nav:
   - Using LinKit All:
       - Sources: sources.md
       - Matching: matching.md
+      - Job trust check: trust.md
       - Tailoring your CV: tailoring.md
       - Applying: applying.md
       - Action Center: action-center.md

@@ -26,19 +26,18 @@ Users bring their own AI: ChatGPT plan via Codex CLI, API keys, and later local 
 - Never click a final Submit in dry-run mode.
 
 ## 3. Tech stack (do not swap without approval)
-- Python 3.11+ (dev pinned to 3.12), uv, hatchling. FastAPI + Uvicorn. Pydantic v2,
-  pydantic-settings. Typer for the `linkit` CLI.
+- Python 3.11+ (dev 3.12), uv, hatchling. FastAPI + Uvicorn. Pydantic v2, pydantic-settings. Typer CLI.
 - SQLite (WAL) via SQLAlchemy 2 typed `Mapped` models + Alembic; API schemas are separate
   Pydantic models (no SQLModel). Vectors: numpy cosine; sqlite-vec only if measured slow.
 - Background work: asyncio worker pool inside the FastAPI process; `jobs.state` is the queue.
 - APScheduler (SQLAlchemy job store), aiolimiter, tenacity, loguru (redaction filter), platformdirs.
 - AI: LiteLLM (API keys, Ollama/LM Studio); subprocess adapters for `codex exec --json` and `claude -p --output-format json`.
-- Scraping: httpx (async), python-jobspy, Playwright, selectolax, extruct, trafilatura,
-  rapidfuzz, lingua-py. Embeddings: fastembed.
+- Scraping: httpx (async), python-jobspy, Playwright, selectolax, extruct, trafilatura, rapidfuzz,
+  lingua-py. Embeddings: fastembed.
 - CV: python-docx + lxml, pylatexenc/TexSoup + Tectonic, pdf2docx, LibreOffice headless
   (DOCX->PDF, ODT<->DOCX), PyMuPDF, pdfplumber, Pillow/scikit-image (layout diff).
-- Apply: Playwright (installed Chrome, persistent context per site), imap-tools, vault via
-  cryptography (AES-GCM) + argon2-cffi + keyring.
+- Apply: Playwright (installed Chrome, persistent context per site), imap-tools, vault via cryptography
+  (AES-GCM) + argon2-cffi + keyring.
 - Frontend: Angular + TypeScript + Tailwind, Chart.js, ngx-fast-diff; built into the wheel.
 - Tooling: ruff, mypy, pre-commit, pytest (+ HTML fixtures), GitHub Actions, MkDocs Material.
 
@@ -53,30 +52,28 @@ scored -> below_threshold (low) | awaiting_review (mid) | queued_apply (high/app
 queued_apply -> tailored -> applying -> needs_user -> applied | failed | skipped
 ```
 Tailoring happens just before applying, never for jobs that will not be applied to.
-- Every transition writes a row to `job_events` (timestamp, state, message, artifact paths).
-- Every stage is idempotent and resumable after crash or pause.
-- Stages are independently runnable (CLI + API) for debugging.
+- Every transition writes a `job_events` row (timestamp, state, message, artifact paths).
+- Every stage is idempotent, resumable after crash or pause, and runnable alone (CLI + API).
 
 ## 5. Module logic
 
 ### 5.1 AI provider layer (`providers/`)
 - One `LLMProvider` interface: `complete(prompt, schema) -> validated Pydantic object`.
-- Providers: `codex_cli`, `claude_cli`, `litellm` (module `litellm_api`; local servers via
+  Providers: `codex_cli`, `claude_cli`, `litellm` (module `litellm_api`; local servers via
   `api_base`, wizard's Local model option). Pick with `LINKIT_PROVIDER`; test: `linkit ai-check`.
 - CLI adapters (`codex_cli`, `claude_cli`): detect binary on PATH + version; verify sign-in with
   a tiny test prompt; run in an empty temp dir with the CLI's own tools disabled (check
   `--help` of the installed version for flags); prompt via stdin, parse JSON output; 1 call
-  at a time by default; map usage-limit errors to a clean run pause. Setup shows a note that
-  usage counts against the user's own plan limits (vendor policy can change: keep swappable).
+  at a time by default; map usage-limit errors to a clean run pause. Setup notes that usage
+  counts against the user's plan limits (vendor policy can change: keep swappable).
 - All outputs are JSON validated against schemas; retry on invalid output (max 2).
-- The model only decides; our code executes. Never let a model drive the browser directly.
-- Cache responses in SQLite by prompt hash. Track quota; pause cleanly on limit errors.
-- CLI concurrency cap: 1–3. Prompts live in `prompts/*.j2`, not in code.
+- The model only decides; our code executes (never let it drive the browser).
+  Cache responses in SQLite by prompt hash; track quota. CLI concurrency cap: 1–3. Prompts: `prompts/*.j2`.
 
 ### 5.2 Discovery (`sources/`)
-- Plugin per source with `search(query) -> JobStub[]` and `fetch_details(stub) -> Job`.
-- Plugins live in `sources/ats|aggregators|boards|companies` (auto-registry; helpers in
-  `sources/common.py`, `parsing.py`, `tasks.py`). Aggregators/boards/companies/Telegram are opt-in.
+- Plugin per source: `search(query) -> JobStub[]`, `fetch_details(stub) -> Job`. Plugins live in
+  `sources/ats|aggregators|boards|companies` (auto-registry; helpers in `sources/common.py`,
+  `parsing.py`, `tasks.py`). Aggregators/boards/companies/Telegram are opt-in.
 - Priority: public ATS JSON APIs (Greenhouse, Lever, Ashby, Workday cxs, 100+ more) >
   python-jobspy (LinkedIn, Indeed, Glassdoor, ZipRecruiter, Google, Bayt) > aggregators and
   per-site plugins (Wuzzuf, Forasna) > generic extractor (JSON-LD -> CSS -> AI extraction).
@@ -85,16 +82,20 @@ Tailoring happens just before applying, never for jobs that will not be applied 
 - Never defeat bot challenges (no TLS spoofing, challenge solving, rotating proxies, fake UAs). OK:
   what the site's own pages send (Referer, XHR header, page CSRF/public key). robots.txt not enforced.
 - ATS detector routes any pasted URL (or careers-page HTML) to the right plugin.
-- Per-domain rate limits, checkpoints every page, dedupe by normalized URL +
-  hash(title, company, location) + rapidfuzz near-duplicate check.
+- Per-domain rate limits, page checkpoints, dedupe by normalized URL + hash(title, company,
+  location) + rapidfuzz near-duplicate check.
 
 ### 5.3 Matching (`matching/`)
 1. Hard rules: titles include/exclude, location, remote mode, seniority, posted date,
    salary floor, company blacklist, one application per company (default on).
 2. Local rank: 0.8 cosine(CV, JD) + 0.2 skills overlap; fastembed multilingual MiniLM-L12
    (Arabic + English, chunked). Free, no AI calls.
-3. AI score only jobs that survive 1–2 (dropped ones become tier `low`), batched 10–20
-   short job summaries per call: `{score 1-10, reasons, missing_skills, red_flags}` per job.
+3. Trust check (offline, no AI): scam score (fees, off-platform contact, mule/crypto/ID requests,
+   domain mismatch; EN+AR, evasion-proof) and ghost score (age, repeat sightings across runs,
+   vague/evergreen text). Scam >= 65 -> filtered_out; ghost >= 50 -> tier low (or filtered out
+   if the user opts in).
+4. AI score only jobs that survive 1–3 (dropped ones become `low`), batched 10–20 short summaries
+   per call: `{score 1-10, reasons, missing_skills, red_flags, legit, trust_flags}`; AI can raise, never clear.
 
 ### 5.4 Tailoring (`tailor/`)
 - CV is split into numbered text segments; AI returns patches only:
@@ -107,26 +108,25 @@ Tailoring happens just before applying, never for jobs that will not be applied 
   PDF input: convert once via pdf2docx, user approves the base, then treat as DOCX.
 - Output: LibreOffice -> PDF (submitted file). Verify: same page count, pixel/SSIM diff vs
   original within tolerance, pdfplumber text extract succeeds. On failure roll back patches.
-- Store every tailored version + patch list per job; UI shows a red-line diff.
-- Debug: `linkit tailor jd.txt` prints the red-line. Numbers/dates/contacts are auto-locked.
+- Store every tailored version + patch list per job (UI red-line diff). Debug: `linkit tailor jd.txt`.
+  Numbers/dates/contacts are auto-locked.
 
 ### 5.5 Apply (`apply/`)
 - Order: per-ATS handler -> generic AI form agent (accessibility-tree snapshot -> field map
   JSON -> fill -> validate -> next) -> Action Center. Handlers today: Greenhouse, Lever, Ashby;
   every other site (Workday, iCIMS, Taleo, ...) falls back to the generic agent.
-- Headed Chrome by default, persistent profile per site, randomized human pacing,
-  per-site daily caps, 1–3 parallel browsers.
+- Headed Chrome by default, persistent profile per site, human pacing, per-site daily caps,
+  1–3 parallel browsers. Jobs closed on Greenhouse/Lever/Ashby are skipped before tailoring.
 - Account gate: generate unique password (`secrets`, honoring site rules), save to vault
   BEFORE submitting signup, then verify via IMAP (code/link by regex, AI fallback).
-  Dry run never touches sign-up; live mode creates accounts when needed (password in the
-  vault before the click); the application still waits for confirmation unless 'submit without asking'.
-- Screening questions: answer bank (embedding match) -> AI draft from profile ->
-  Action Center. Sensitive categories (section 2) never go to the AI.
+  Dry run never touches sign-up; live mode creates accounts when needed; the application
+  still waits for confirmation unless 'submit without asking'.
+- Screening questions: answer bank (embedding match) -> AI draft from profile -> Action Center.
+  Sensitive categories (section 2) never go to the AI.
 - LinkedIn Easy Apply and Indeed Apply break those sites' ToS: off by default, explicit opt-in
   with a ban-risk warning, low daily caps. No CAPTCHA solving: CAPTCHAs park for the user.
 - Cover letter only if the form has a field. Screenshot before submit and on confirmation; trace on failure.
-- Success = confirmation page text and/or confirmation email. Otherwise state = failed
-  with reason, never assumed applied.
+- Success = confirmation page text and/or email. Otherwise state = failed with reason, never assumed.
 
 ### 5.6 Tiers (review)
 Defaults, editable in settings: score 8+ = `high` -> auto-apply; 5–7 = `mid` -> user approval
@@ -137,7 +137,6 @@ user may opt in to auto-apply low too.
 Parked jobs: unknown_question, confirm_submit, captcha, validation_error, login_issue, two_factor.
 Parked jobs reopen via "Open in app browser" (same Chrome profile), then Retry.
 Notify via WebSocket + optional desktop notification.
-
 ### 5.8 Reports
 Applied / failed / skipped / needs_user per platform and career page, per run and over time;
 funnel (found -> ... -> applied); CSV/PDF export.
@@ -147,7 +146,7 @@ funnel (found -> ... -> applied); CSV/PDF export.
 - Vault: AES-GCM, key from master passphrase via Argon2id, cached with keyring; export re-asks it.
 - IMAP: app passwords (Gmail first, Yahoo). Outlook needs an OAuth path (later).
 - External tools: LibreOffice required (DOCX->PDF), Chrome for applying, Tectonic for LaTeX.
-  `linkit doctor` checks them. Install for end users: `uv tool install linkit-all`.
+  `linkit doctor` checks them. End-user install: `uv tool install linkit-all`.
 - LibreOffice: minimal portable bundle (Win 1.6 GB -> 439 MB) from `scripts/bundle_libreoffice.py`
   (removals kept only if renders stay identical); `linkit install-libreoffice <zip>` installs it
   to the data dir, ahead of any system install. Keep its MPL-2.0 license files.
@@ -182,7 +181,7 @@ docs/
 - Update this file when a decision in it changes (max 200 lines). Unsure? Ask; don't guess.
 
 ## 10. Build order
-Phases 1-8 are built; blocked items are listed in handoff.md.
+Phases 1-10 are built; blocked items: handoff.md.
 1. Core: models, SQLite, state machine, providers (Claude/Codex CLI, API keys), DOCX tailoring.
 2. Discovery + matching: ATS APIs, jobspy, Wuzzuf, Forasna, careers pages, dedupe, AI tiering.
 3. UI v1: setup wizard, jobs, review queue, live run, report.
@@ -194,6 +193,7 @@ Phases 1-8 are built; blocked items are listed in handoff.md.
    OAuth, macOS/Linux LO bundles, GitHub/PyPI release: pending.
 8. Sources ported from freehire (MIT): ATS feeds, aggregators, boards, companies, Telegram,
    board discovery: built.
+9. Debt (D1-D7) and 10. Trust filter: built.
 
 ## 11. License
 AGPL-3.0-or-later (code is reused from ApplyPilot/AIHawk). Reused files keep their

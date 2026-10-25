@@ -276,7 +276,7 @@ vault: not started, needs the maintainer.
 - ✅ D6 Careers browser fallback: links to a known ATS are re-routed to that ATS plugin
 - ✅ D7 Unit tests use an in-memory keyring (failed without an OS keyring backend)
 
-### Phase 10 — Trust filter: ghost and scam jobs 🟡
+### Phase 10 — Trust filter: ghost and scam jobs ✅
 Goal: stop spending the user's time and AI tokens on scam postings and ghost jobs (real
 company, stale or never-filled opening), with no extra AI calls. Research (2026-10-25, code
 read, not READMEs): tobiasverified/ghost-job-detector (MIT: vagueness score, ATS first-published
@@ -313,4 +313,4 @@ Execution tasks:
   ghost cut-off setting + bulk action
 - ✅ G6 ATS liveness check in the apply runner before tailoring
 - ✅ G7 Optional `legit` (ok/suspicious/scam) and `trust_flags` in the batched score prompt + schema
-- ⬜ G8 Docs: NOTICE, CLAUDE.md §5.3, docs/, handoff
+- ✅ G8 Docs: NOTICE, CLAUDE.md §5.3, docs/, handoff

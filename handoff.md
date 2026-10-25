@@ -11,7 +11,9 @@ changing a decision in either file.
   maintainer"). Every task in `plan.md` is done or marked blocked.
 - Phase 8 (sources ported from freehire) is built too: see "Phase 8 - sources from freehire".
 - Phase 9 (debt D1-D7) is done; what remains of the debt is in "Known issues and debt".
-- The unit suite passes (`uv run pytest`: 1389 passed, 1 skipped, the real Tectonic compile),
+- Phase 10 (trust filter: scam and ghost scores, offline, EN + AR, in the rank stage; ATS liveness
+  check before apply; optional AI legit flags) is done. See `docs/trust.md`.
+- The unit suite passes (`uv run pytest`: 1640 passed, 2 skipped, the real Tectonic compile),
   ruff and mypy are clean, `npx ng build` is clean.
 - Nothing has ever been submitted for real. Apply runs in dry-run mode by default and has
   only been exercised as dry runs on live forms plus offline e2e tests with a fake submit.
@@ -133,7 +135,11 @@ src/linkit_all/
                     greenhouse, lever, ashby, smartrecruiters, recruitee, workable, workday
                     (cxs), jobspy_sites, wuzzuf, forasna, careers (generic careers pages),
                     jsonld
-  matching/         rules (hard filters, seniority), rank (Embedder, rank_jobs), score (AI tiers)
+  core/sightings.py job_sightings table: a row per time a job is seen in a run (age, repeats)
+  matching/         rules (hard filters, seniority), rank (Embedder, rank_jobs), score (AI tiers,
+                    legit/trust_flags), trust_stage (runs the trust check in rank)
+    trust/          normalize (NFKC, homoglyphs, leetspeak, Arabic variants), scam, ghost:
+                    offline scores 0-100 with {code, weight, evidence} signals in jobs.data["trust"]
   tailor/           docx/segments, latex/ (TexSoup text nodes), patches (rules),
                     render/{libreoffice,latex}.py (Tectonic), verify/layout,
                     pipeline (tailor_docx, tailor_for, tailor_job; ODT/PDF/LaTeX entry; reuses an
@@ -323,6 +329,16 @@ anywhere; Crawl-delay pacing and per-host rate limits stay. Recorded in CLAUDE.m
 
 ## Known issues and debt
 
+- Trust filter thresholds (scam 65, ghost 50, bands 35) come from the reference projects and
+  are untuned; they need tuning on real runs.
+- Greenhouse `posted_at` may be `updated_at` when `first_published` is missing, so a job's age
+  is under-counted.
+- `company_domain_hint` (`data["company_url"]`) is not populated by most sources, so the
+  domain-mismatch check compares with the company name only.
+- The bulk ghost cut-off ("Filter out ghost jobs now") skips already-scored jobs, and that
+  cannot be reversed automatically.
+- The Report confirm dialog was not exercised in a browser test.
+- ghostbust.us was unreachable (DNS) during the trust research, so it was not reviewed.
 - CLAUDE.md is at its 200-line cap (tighten something else rather than grow it).
 - `SearchConfig` also holds `ai`, `apply` and `schedule` settings (it's really "preferences");
   renaming would touch the API, UI and saved data, so it was left.

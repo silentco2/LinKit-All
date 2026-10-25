@@ -104,6 +104,22 @@ page call `await http.allowed(url)` before fetching: it always returns `True` an
 request to a host, reads that host's `Crawl-delay` so the host is paced. If a site blocks us, the
 source reports an error and the maintainer decides; it does not get a workaround.
 
+## Adding a trust signal
+
+Trust signals live in `src/linkit_all/matching/trust/`: `scam.py` (scam score), `ghost.py`
+(ghost score) and `normalize.py` (text clean-up shared by both). Each signal has a `code`, a
+weight and the evidence text. To add one:
+
+1. Add the rule with a new snake_case `code` in `scam.py` or `ghost.py`. Match on normalized
+   text and write the phrase lists for English and Arabic. Add a score floor only if one signal
+   alone should reach a band.
+2. Add `trust.<code>` to both `frontend/src/app/i18n/en.ts` and `ar.ts`. The drawer shows the
+   translated label for each signal.
+3. Add unit tests in `tests/unit/test_trust_scam.py` or `test_trust_ghost.py`: one English and
+   one Arabic positive case, an evasion case (spacing or look-alike letters) and a negative
+   case that must not fire.
+4. Keep it offline: no network or AI call in the trust modules.
+
 ## Frontend
 
 The UI is an Angular app in `frontend/` (signals, Tailwind, Chart.js). It builds into
