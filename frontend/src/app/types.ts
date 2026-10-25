@@ -81,12 +81,37 @@ export interface SearchConfig {
     company_blacklist: string[];
     one_per_company: boolean;
   };
+  trust: TrustSection;
   matching: { ai_max_jobs: number; tier_high: number; tier_mid: number; batch_size: number; auto_apply_low: boolean };
   ai: { provider: Provider | null; model: string | null; api_base: string | null };
   apply: ApplySection;
   email: { imap_host: string; imap_user: string; timeout_s: number; poll_s: number };
   schedule: ScheduleSection;
 }
+
+export interface TrustSection {
+  enabled: boolean;
+  scam_threshold: number;
+  ghost_threshold: number;
+  filter_ghost: boolean;
+  allow_companies: string[];
+}
+
+export type TrustBand = 'low' | 'medium' | 'high';
+
+export interface TrustSignal { code: string; weight: number; evidence: string }
+export interface TrustVerdict { score: number; band: TrustBand; signals: TrustSignal[] }
+export interface Trust {
+  scam: TrustVerdict;
+  ghost: TrustVerdict;
+  ghost_demoted?: boolean;
+  checked_at?: string;
+}
+
+export const SCAM_MEDIUM = 35;
+export const SCAM_HIGH = 65;
+export const GHOST_MEDIUM = 35;
+export const GHOST_HIGH = 50;
 
 export interface ScheduleSection {
   enabled: boolean;
@@ -150,6 +175,8 @@ export interface JobRow {
   remote: string | null;
   posted_at: string | null;
   ai: AIScore | null;
+  scam_score?: number | null;
+  ghost_score?: number | null;
 }
 
 export interface AIScore {
@@ -157,6 +184,8 @@ export interface AIScore {
   reasons: string[];
   missing_skills: string[];
   red_flags: string[];
+  legit?: 'ok' | 'suspicious' | 'scam';
+  trust_flags?: string[];
 }
 
 export interface TailorPatch {
@@ -177,6 +206,7 @@ export interface Tailoring {
 
 export interface JobDetail extends JobRow {
   tailoring: Tailoring | null;
+  trust?: Trust | null;
   url: string;
   description: string;
   ats: string | null;

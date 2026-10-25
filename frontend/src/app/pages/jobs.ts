@@ -6,7 +6,23 @@ import { Api } from '../api';
 import { I18n, SourcePipe, TPipe } from '../i18n';
 import { Live } from '../live';
 import { fmtNum, localeOf } from '../locale';
-import { JobRow } from '../types';
+import { GHOST_HIGH, GHOST_MEDIUM, JobRow, SCAM_HIGH, SCAM_MEDIUM } from '../types';
+
+interface Risk { key: string; cls: string }
+const RISK_RED = 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300';
+const RISK_AMBER = 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300';
+const RISK_GREY = 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
+
+/** The one trust badge a row shows: scam outranks ghost, high outranks medium. */
+function riskOf(j: JobRow): Risk | null {
+  const scam = j.scam_score ?? 0;
+  const ghost = j.ghost_score ?? 0;
+  if (scam >= SCAM_HIGH) return { key: 'scam.high', cls: RISK_RED };
+  if (scam >= SCAM_MEDIUM) return { key: 'scam.medium', cls: RISK_AMBER };
+  if (ghost >= GHOST_HIGH) return { key: 'ghost.high', cls: RISK_AMBER };
+  if (ghost >= GHOST_MEDIUM) return { key: 'ghost.medium', cls: RISK_GREY };
+  return null;
+}
 import { JobDetailPanel } from './job-detail';
 
 const STATES = ['discovered', 'enriched', 'filtered_out', 'ranked', 'scored', 'below_threshold', 'awaiting_review',
@@ -39,6 +55,7 @@ const STATES = ['discovered', 'enriched', 'filtered_out', 'ranked', 'scored', 'b
         <option value="">{{ 'jobs.filter.allSources' | t }}</option>
         @for (s of sources(); track s) { <option [value]="s">{{ s | src }}</option> }
       </select>
+      <label class="flex items-center gap-2 text-sm"><input type="checkbox" [ngModel]="hideRisky()" (ngModelChange)="hideRisky.set($event)">{{ 'jobs.filter.hideRisky' | t }}</label>
     </div>
 
     @if (error()) { <div class="alert alert-error mt-4" dir="auto">{{ error() }}</div> }
@@ -60,7 +77,7 @@ const STATES = ['discovered', 'enriched', 'filtered_out', 'ranked', 'scored', 'b
               </span>
               <span class="min-w-0">
                 <span [class]="compact() ? 'line-clamp-2' : 'block truncate'" class="text-sm font-medium break-words" dir="auto">{{ j.title }}</span>
-                <span class="block truncate text-xs text-slate-500" dir="auto">@if (compact()) { <span>{{ 'common.state.' + j.state | t }} · </span> }<bdi>{{ j.company }}</bdi> · <bdi>{{ j.location }}</bdi> · <bdi>{{ j.source | src }}</bdi></span>
+                <span class="block truncate text-xs text-slate-500" dir="auto">@if (risk(j); as r) { <span class="badge me-1.5 px-1.5 py-0 text-[11px] leading-4 {{ r.cls }}">{{ 'trust.badge.' + r.key | t }}</span> }@if (compact()) { <span>{{ 'common.state.' + j.state | t }} · </span> }<bdi>{{ j.company }}</bdi> · <bdi>{{ j.location }}</bdi> · <bdi>{{ j.source | src }}</bdi></span>
               </span>
               @if (!compact()) {
                 <span class="truncate text-xs text-slate-600 dark:text-slate-400">{{ 'common.state.' + j.state | t }}</span>
@@ -89,7 +106,12 @@ export class JobsPage {
   private readonly i18n = inject(I18n);
   private readonly loc = computed(() => localeOf(this.i18n.lang()));
   protected readonly states = STATES;
-  protected readonly rows = signal<JobRow[]>([]);
+  private readonly all = signal<JobRow[]>([]);
+  protected readonly hideRisky = signal(false);
+  /** "Hide likely ghost/scam" drops the high bands only (a medium band is a hint, not a verdict). */
+  protected readonly rows = computed(() =>
+    this.hideRisky() ? this.all().filter((j) => (j.scam_score ?? 0) < SCAM_HIGH && (j.ghost_score ?? 0) < GHOST_HIGH) : this.all());
+  protected readonly risk = riskOf;
   protected readonly q = signal('');
   protected readonly state = signal('');
   protected readonly tier = signal('');
@@ -138,7 +160,7 @@ export class JobsPage {
     }
     this.loading.set(true);
     try {
-      this.rows.set(await this.api.get<JobRow[]>(`/jobs?${params}`));
+      this.all.set(await this.api.get<JobRow[]>(`/jobs?${params}`));
       this.error.set('');
     } catch (e) {
       this.error.set((e as Error).message);

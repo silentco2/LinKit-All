@@ -29,6 +29,14 @@ export class Api {
   delete<T = void>(path: string): Promise<T> {
     return this.request<T>('DELETE', path);
   }
+  /** "Not a scam" allow-lists the company; "report" blacklists it. Returns the job's new state. */
+  jobTrust(id: number, action: 'not_scam' | 'report'): Promise<{ state: string }> {
+    return this.post(`/jobs/${id}/trust`, { action });
+  }
+  /** Filter out every stored job whose ghost score is at or above `threshold`. */
+  filterGhost(threshold: number): Promise<{ count: number }> {
+    return this.post('/jobs/trust/filter-ghost', { threshold });
+  }
   /** POST a JSON body and get the response as a file (the body may hold a passphrase: never a URL). */
   async postForBlob(path: string, body: unknown): Promise<Blob> {
     const res = await fetch(`/api${path}`, {

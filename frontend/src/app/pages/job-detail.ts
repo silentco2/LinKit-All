@@ -3,7 +3,7 @@ import { Component, computed, effect, inject, input, output, signal } from '@ang
 import { Api } from '../api';
 import { I18n, MsgPipe, SourcePipe, TPipe } from '../i18n';
 import { fmtNum, labelOr, localeOf } from '../locale';
-import { JobDetail, TailorPatch } from '../types';
+import { JobDetail, SCAM_MEDIUM, TailorPatch, TrustVerdict } from '../types';
 
 interface Filled { value: unknown; source: string }
 type Detail = Omit<JobDetail, 'events'> & {
@@ -84,6 +84,45 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
             @if (ai.red_flags.length) {
               <p class="mt-1 text-sm text-rose-700 dark:text-rose-300"><span class="font-medium">{{ 'detail.ai.redFlags' | t }}</span> <bdi>{{ ai.red_flags.join(', ') }}</bdi></p>
             }
+          </section>
+        }
+
+        @if (j.trust; as tr) {
+          <section class="rounded-lg border border-slate-200 p-4 dark:border-slate-700" [attr.aria-label]="'trust.title' | t">
+            <h3 class="font-semibold">{{ 'trust.title' | t }}</h3>
+            <div class="mt-2 grid gap-3 sm:grid-cols-2">
+              @for (kind of kinds; track kind) {
+                @let v = verdict(tr, kind);
+                <div>
+                  <p class="flex flex-wrap items-center gap-2 text-sm">
+                    <span class="font-medium">{{ 'trust.' + kind | t }}</span>
+                    <span class="badge {{ bandClass(v.band) }}"><bdi dir="ltr">{{ num(v.score) }}/{{ num(100) }}</bdi> · {{ 'trust.band.' + v.band | t }}</span>
+                  </p>
+                  <ul class="mt-1 space-y-1 text-sm">
+                    @for (sg of v.signals; track sg.code) {
+                      <li>
+                        <span class="font-medium">{{ signalLabel(sg.code) }}</span>
+                        <span class="text-xs text-slate-500"> · {{ 'trust.weight' | t: { w: sgn(sg.weight) } }}</span>
+                        @if (sg.evidence) { <span class="block text-xs break-words text-slate-500" dir="auto">{{ sg.evidence }}</span> }
+                      </li>
+                    } @empty {
+                      <li class="text-xs text-slate-500">{{ 'trust.noSignals' | t }}</li>
+                    }
+                  </ul>
+                </div>
+              }
+            </div>
+            @if (tr.ghost_demoted) { <p class="alert alert-info mt-3" role="note">{{ 'trust.demoted' | t }}</p> }
+            @if (aiNoticed(j); as note) { <p class="mt-3 text-sm text-rose-700 dark:text-rose-300" dir="auto">{{ 'trust.aiNoticed' | t: { text: note } }}</p> }
+            @if (notice()) { <p class="alert alert-ok mt-3" role="status">{{ notice() }}</p> }
+            <div class="mt-3 flex flex-wrap gap-2">
+              @if (tr.scam.score >= scamMedium || j.state === 'filtered_out') {
+                <button type="button" class="btn" (click)="trust('not_scam')" [disabled]="busy()">{{ 'trust.notScam' | t }}</button>
+              }
+              @if (j.state !== 'applied') {
+                <button type="button" class="btn btn-danger" (click)="trust('report')" [disabled]="busy()">{{ 'trust.report' | t }}</button>
+              }
+            </div>
           </section>
         }
 
@@ -202,6 +241,9 @@ export class JobDetailPanel {
   protected readonly job = signal<Detail | null>(null);
   protected readonly busy = signal(false);
   protected readonly error = signal('');
+  protected readonly notice = signal('');
+  protected readonly kinds = ['scam', 'ghost'] as const;
+  protected readonly scamMedium = SCAM_MEDIUM;
 
   constructor() {
     effect(() => {
@@ -217,6 +259,21 @@ export class JobDetailPanel {
     return ops;
   }
   protected tailorClass = (s: string): string => ({ tailored: 'tier-high', rolled_back: 'tier-mid' })[s] ?? 'tier-low';
+
+  protected verdict = (tr: NonNullable<Detail['trust']>, kind: 'scam' | 'ghost'): TrustVerdict => tr[kind] ?? { score: 0, band: 'low', signals: [] };
+  protected bandClass = (b: string): string => ({ high: 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300', medium: 'tier-mid' })[b] ?? 'tier-low';
+  protected signalLabel = (code: string): string => labelOr(this.i18n, 'trust.', code);
+  protected sgn = (w: number): string => '\u2066' + (w > 0 ? '+' : '') + fmtNum(this.loc(), w) + '\u2069';
+
+  /** What the batched AI score said about legitimacy, shown beside the offline signals. */
+  protected aiNoticed(j: Detail): string {
+    const ai = j.ai;
+    if (!ai) return '';
+    const parts: string[] = [];
+    if (ai.legit === 'scam' || ai.legit === 'suspicious') parts.push(this.i18n.t('trust.aiVerdict.' + ai.legit));
+    parts.push(...(ai.trust_flags ?? []));
+    return parts.join('; ');
+  }
 
   protected num = (n: number | null, o?: Intl.NumberFormatOptions): string => fmtNum(this.loc(), n, o);
   protected sourceLabel = (s: string): string => labelOr(this.i18n, 'common.answerSource.', s || 'unknown');
@@ -251,12 +308,31 @@ export class JobDetailPanel {
   async load(id: number): Promise<void> {
     const seq = ++this.loadSeq; // a newer load supersedes this one, so a slow reply cannot overwrite it
     this.error.set('');
+    this.notice.set('');
     if (this.job()?.id !== id) this.job.set(null); // never show the previous job under the new selection
     try {
       const d = await this.api.get<Detail>(`/jobs/${id}`);
       if (seq === this.loadSeq) this.job.set(d);
     } catch (e) {
       if (seq === this.loadSeq) this.error.set((e as Error).message);
+    }
+  }
+
+  async trust(action: 'not_scam' | 'report'): Promise<void> {
+    const j = this.job();
+    if (!j) return;
+    if (action === 'report' && !confirm(this.i18n.t('trust.reportConfirm', { company: j.company }))) return;
+    this.busy.set(true);
+    this.error.set('');
+    try {
+      await this.api.jobTrust(j.id, action);
+      await this.load(j.id);
+      this.notice.set(this.i18n.t('trust.done.' + action));
+      this.changed.emit();
+    } catch (e) {
+      this.error.set((e as Error).message);
+    } finally {
+      this.busy.set(false);
     }
   }
 

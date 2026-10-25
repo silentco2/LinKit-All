@@ -333,6 +333,25 @@ type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_
               </div>
               <button class="btn btn-primary" (click)="saveSearch('setup.filters.saved')" [disabled]="busy()">{{ 'setup.filters.save' | t }}</button>
             </section>
+            <section class="card space-y-4">
+              <h2>{{ 'setup.trust.title' | t }}</h2>
+              <p class="text-sm text-slate-600 dark:text-slate-400">{{ 'setup.trust.intro' | t }}</p>
+              <label class="flex items-center gap-2 text-sm font-medium"><input type="checkbox" role="switch" [(ngModel)]="cfg.trust.enabled">{{ 'setup.trust.enabled' | t }}</label>
+              <div class="grid gap-4 sm:grid-cols-2">
+                <div><label class="label" for="scamt">{{ 'setup.trust.scam' | t }}</label><input id="scamt" type="number" min="1" max="100" class="input" [(ngModel)]="cfg.trust.scam_threshold"><p class="hint">{{ 'setup.trust.scamHint' | t }}</p></div>
+                <div><label class="label" for="ghostt">{{ 'setup.trust.ghost' | t }}</label><input id="ghostt" type="number" min="1" max="100" class="input" [(ngModel)]="cfg.trust.ghost_threshold"><p class="hint">{{ 'setup.trust.ghostHint' | t }}</p></div>
+              </div>
+              <label class="flex items-center gap-2 text-sm font-medium"><input type="checkbox" role="switch" [(ngModel)]="cfg.trust.filter_ghost">{{ 'setup.trust.filterGhost' | t }}</label>
+              <div>
+                <label class="label" for="allow">{{ 'setup.trust.allow' | t }}</label>
+                <textarea id="allow" class="input h-24" [value]="unlines(cfg.trust.allow_companies)" (change)="cfg.trust.allow_companies = lines(val($event))"></textarea>
+                <p class="hint">{{ 'setup.trust.allowHint' | t }}</p>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <button class="btn btn-primary" (click)="saveSearch('setup.trust.saved')" [disabled]="busy()">{{ 'setup.filters.save' | t }}</button>
+                <button class="btn btn-danger" (click)="filterGhostNow()" [disabled]="busy()">{{ 'setup.trust.bulk' | t }}</button>
+              </div>
+            </section>
           }
 
           @case ('answers') {
@@ -792,6 +811,16 @@ export class SetupPage implements OnInit {
       this.profile = { ...(await this.api.post<Profile>('/profile/cv/approve', {})) };
       this.status.set(await this.api.get<Status>('/status'));
       return this.i18n.t('setup.cv.approved');
+    });
+  }
+
+  /** Bulk-filter stored jobs at the current ghost threshold, after a confirmation; shows how many were filtered. */
+  filterGhostNow(): Promise<void> {
+    const n = this.cfg!.trust.ghost_threshold;
+    if (!confirm(this.i18n.t('setup.trust.bulkConfirm', { n }))) return Promise.resolve();
+    return this.run(async () => {
+      const r = await this.api.filterGhost(n);
+      return this.i18n.t('setup.trust.bulkDone', { n: r.count });
     });
   }
 
