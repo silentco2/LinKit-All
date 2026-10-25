@@ -1,0 +1,11 @@
+2:["$","div",null,{"section":["$","$Le",null,{}],"children":[["$","$L16",null,{"jobsData":{"totalCount":4,"currentPage":1,"totalPages":2,"jobs":[
+{"status":"published","title":"Senior Backend Developer","slug":"senior-backend-developer-j1a","publishedAt":"2026-08-14T07:55:01Z","employmentType":"full_time","seniority":["senior"],
+ "companyProfile":{"name":"Proxify","slug":"proxify-c114"},"workplaceLocation":{"type":"remote"},
+ "hiringLocation":{"type":"location","timezone":null,"timezoneRange":null,"includedLocations":[{"type":"country","value":{"code":"ZAF","name":"South Africa","alpha2Code":"ZA"}},{"type":"region","value":{"code":"north-america","name":"North America"}}]},
+ "compensation":{"minimum":300000,"maximum":600000,"frequency":"monthly","currency":{"code":"EUR","name":"Euro","symbol":"€"}}},
+{"status":"published","title":"Tax Analyst {Remote} [LATAM]","slug":"tax-analyst-j1b","publishedAt":"2026-08-10T09:00:00Z","employmentType":"contractor","seniority":["manager"],
+ "companyProfile":{"name":"Colibri Group","slug":"colibri-c1xd"},
+ "workplaceLocation":{"type":"hybrid","country":{"code":"ROU","name":"Romania","alpha2Code":"RO"},"city":"Iasi","frequency":"weekly","onSiteNumberOfDays":1},
+ "hiringLocation":null,"compensation":null},
+{"status":"draft","title":"Not Live","slug":"not-live-j1c","companyProfile":{"name":"Ghost Co","slug":"ghost-c1"}}
+]}}],["$","footer",null,{}]]}]

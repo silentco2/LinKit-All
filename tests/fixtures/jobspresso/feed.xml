@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/">
+<channel>
+	<title>Jobs &#8211; Jobspresso</title>
+	<link>https://jobspresso.co</link>
+	<item>
+		<title>Mitarbeiter/in (m/w/d) f&#252;r Datenanalysen &#124; Remote</title>
+		<link>https://jobspresso.co/job/wet-germany-various-mitarbeiter-in-fur-datenanalysen-remote/</link>
+		<dc:creator><![CDATA[WET Beratungs- und Beteiligungsgesellschaft mbH<br>⚲&nbsp;Germany , Austria, Luxemburg]]></dc:creator>
+		<pubDate>Thu, 16 Jul 2026 15:15:16 +0000</pubDate>
+		<guid isPermaLink="false">https://jobspresso.co/?post_type=job_listing&#038;p=163363</guid>
+		<description><![CDATA[<p>Wir suchen Sie als Mitarbeiter/in f&uuml;r Datenanalysen im Minijob.</p>]]></description>
+		<content:encoded><![CDATA[<p>Wir suchen Sie als Mitarbeiter/in f&uuml;r Datenanalysen.</p><p>Komplett remote &#8211; arbeiten Sie von zu Hause aus.</p>]]></content:encoded>
+	</item>
+	<item>
+		<title>No employer here</title>
+		<link>https://jobspresso.co/job/orphan/</link>
+		<dc:creator><![CDATA[]]></dc:creator>
+		<guid isPermaLink="false">https://jobspresso.co/?post_type=job_listing&#038;p=1</guid>
+	</item>
+</channel>
+</rss>

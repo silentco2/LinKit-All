@@ -1,0 +1,6 @@
+2:["$","div",null,{"section":["$","$Le",null,{}],"children":[["$","$L16",null,{"jobsData":{"totalCount":4,"currentPage":2,"totalPages":2,"jobs":[
+{"status":"published","title":"Support Engineer","slug":"support-engineer-j1d","publishedAt":"2026-08-01T00:00:00Z","employmentType":"full_time","seniority":["entry_level"],
+ "companyProfile":{"name":"Welo","slug":"welo-c1iw"},"workplaceLocation":{"type":"remote"},
+ "hiringLocation":{"type":"global","timezone":null,"includedLocations":null,"timezoneRange":null},
+ "compensation":{"minimum":1000000,"maximum":1500000,"frequency":"yearly","currency":{"code":"USD","name":"United States Dollar","symbol":"$$"}}}
+]}}],["$","footer",null,{}]]}]
