@@ -314,3 +314,35 @@ Execution tasks:
 - ✅ G6 ATS liveness check in the apply runner before tailoring
 - ✅ G7 Optional `legit` (ok/suspicious/scam) and `trust_flags` in the batched score prompt + schema
 - ✅ G8 Docs: NOTICE, CLAUDE.md §5.3, docs/, handoff
+
+### Phase 11 — LinkedIn hiring posts 🟡
+Goal: find jobs announced as LinkedIn posts (HR/company profiles) and apply through the
+email or form link they give. Reference: pritamdharme/linkedin-hiring-post (no license: ideas
+only — saved session, content-search URL, post markers, HTML dump on zero posts).
+Decisions (maintainer, 2026-10-25):
+- Opt-in source, off by default, ToS/ban-risk warning, low caps (5 keywords, ~60 posts each,
+  past week, one run a day). Dedicated `linkedin` Chrome profile; the user signs in once in a
+  visible window, scraping then runs headless (Setup switch to run headed). Logged out or a
+  security check -> stop the source for that run and notify; never automate login, never
+  bypass a challenge, never comment, DM or react.
+- Posts with an ATS link -> that ATS (no AI); others -> batched AI extraction (10 per call):
+  role, company, location, apply method (email | form | link), email, link. Posts without an
+  email or link ("DM me", "comment") and job-seeker posts are dropped.
+- Email applications via Gmail SMTP with the app password already in the vault: short cover
+  email grounded only in CV/profile + tailored CV PDF. Dry run writes an .eml preview only.
+  Live follows "Submit without asking" (else confirm in the Action Center, editable).
+  Caps: 15 emails/day, never the same address twice. A sent email = applied (by email); the
+  sent message is the proof.
+- Form/link posts go through the existing generic form agent.
+Interface (orchestrator): `sources/linkedin_posts/` package — `post.py::RawPost` (frozen
+dataclass: urn, url, author, author_url, headline, posted_text, text, links, emails,
+scraped_at), `extract.py` (RawPost list -> JobStub list), `scrape.py` (Playwright -> RawPost),
+`__init__.py` Source (kind "social", opt-in). Email apply: `apply/email_send/`.
+Execution tasks:
+- ⬜ L1 `linkedin` profile key, sign-in (headed app browser) + session check API, `linkit linkedin capture`
+- ⬜ L2 Scraper: search URL, scroll caps, per-post extraction, login/checkpoint stop, zero-post HTML dump (needs the maintainer's captured page)
+- ⬜ L3 RawPost model, hiring/seeker filter, ATS routing, batched AI extraction prompt, stubs, trust tweaks
+- ⬜ L4 SMTP sender (vault creds) + "send test email to myself" API
+- ⬜ L5 Email apply channel in the runner: compose, dry-run .eml, confirm park, caps, recipient dedupe, evidence
+- ⬜ L6 UI: Setup LinkedIn posts section, Action Center email preview/edit, post info in drawer
+- ⬜ L7 Docs, CLAUDE.md §5.2/§5.5, handoff
