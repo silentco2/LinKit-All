@@ -18,7 +18,7 @@ from linkit_all.core.search import SearchConfig
 from linkit_all.matching.rank import rank_jobs
 from linkit_all.matching.rules import rule_violation, seniority
 from linkit_all.matching.score import score_jobs
-from linkit_all.providers.base import LLMProvider, UsageLimitError
+from linkit_all.providers.base import LLMProvider, ProviderError, UsageLimitError
 
 
 @pytest.mark.parametrize(
@@ -242,17 +242,26 @@ def test_rank_rechecks_rule_drops_when_filters_change(db: sessionmaker[Session])
 class FakeAI(LLMProvider):
     name = "fake"
 
-    def __init__(self, scores: dict[str, int], fail_after: int | None = None) -> None:
+    def __init__(
+        self,
+        scores: dict[str, int],
+        fail_after: int | None = None,
+        extra: dict[str, dict[str, Any]] | None = None,
+    ) -> None:
         super().__init__("fake")
         self.scores, self.calls, self.fail_after = scores, 0, fail_after
+        self.extra = extra or {}  # per-title extra result fields
+        self.prompts: list[str] = []
 
     async def _call(self, prompt: str) -> str:
         self.calls += 1
+        self.prompts.append(prompt)
         if self.fail_after is not None and self.calls > self.fail_after:
             raise UsageLimitError("usage limit reached")
         assert "--- cv start ---" in prompt and "Built scalable" in prompt  # CV text included
         ids = re.findall(r"=== job_id (\d+) ===\n(.+?) at ", prompt)
-        results = [{"job_id": int(i), "score": self.scores[title], "reasons": ["fit"]}
+        results = [{"job_id": int(i), "score": self.scores[title], "reasons": ["fit"],
+                    **self.extra.get(title, {})}
                    for i, title in ids if title in self.scores]  # fmt: skip
         import json
 
@@ -289,6 +298,37 @@ def test_score_tiers_and_low_rank_cutoff(db: sessionmaker[Session]) -> None:
         Tier.low,
         None,
     )
+
+
+def test_score_stores_legitimacy_flags_and_defaults(db: sessionmaker[Session]) -> None:
+    ranked_jobs(db, ["A", "B", "C"])
+    ai = FakeAI(
+        {"A": 9, "B": 9, "C": 9},
+        extra={
+            "A": {"legit": "scam", "trust_flags": ["asks for a fee", "off-platform", "pay", "x"]},
+            "B": {"legit": "suspicious", "trust_flags": ["evergreen posting"]},
+        },
+    )
+    asyncio.run(score_jobs(db, SearchConfig.model_validate({"matching": {"batch_size": 3}}), ai))
+    assert ai.calls == 1  # no extra calls
+    with db() as s:
+        data = {j.title: j.data["ai"] for j in s.scalars(select(Job))}
+    assert data["A"]["legit"] == "scam" and data["A"]["trust_flags"] == [
+        "asks for a fee", "off-platform", "pay"]  # fmt: skip
+    assert data["B"]["legit"] == "suspicious" and data["B"]["trust_flags"] == ["evergreen posting"]
+    assert data["C"]["legit"] == "ok" and data["C"]["trust_flags"] == []  # fields omitted
+    assert data["C"]["red_flags"] == [] and data["C"]["reasons"] == ["fit"]
+    assert "concrete indicator" in ai.prompts[0]
+
+
+def test_score_invalid_legit_value_retries_then_fails(db: sessionmaker[Session]) -> None:
+    ranked_jobs(db, ["A"])
+    ai = FakeAI({"A": 9}, extra={"A": {"legit": "maybe"}})
+    with pytest.raises(ProviderError):
+        asyncio.run(score_jobs(db, SearchConfig.model_validate({}), ai))
+    assert ai.calls == 3  # first try plus 2 retries, as for any invalid output
+    with db() as s:
+        assert s.query(Job).filter_by(state=JobState.ranked).count() == 1
 
 
 def test_score_pauses_run_on_usage_limit(db: sessionmaker[Session]) -> None:

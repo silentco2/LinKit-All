@@ -6,10 +6,10 @@ With `matching.auto_apply_low` the low tier is queued for apply instead, and exi
 below_threshold jobs are re-queued on the next score run.
 """
 
-from typing import Any
+from typing import Any, Literal
 
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -20,6 +20,7 @@ from linkit_all.matching.rank import cv_text
 from linkit_all.providers.base import LLMProvider, UsageLimitError, render
 
 CV_CHARS = 6000
+MAX_TRUST_FLAGS = 3
 JD_CHARS = 1500  # per job; enough for the role, stack and requirements
 
 
@@ -29,6 +30,15 @@ class JobScore(BaseModel):
     reasons: list[str] = []
     missing_skills: list[str] = []
     red_flags: list[str] = []
+    # Legitimacy is separate from fit. Optional so old cached answers and models that omit it
+    # still validate; an unknown `legit` value fails validation and takes the retry path.
+    legit: Literal["ok", "suspicious", "scam"] = "ok"
+    trust_flags: list[str] = []
+
+    @field_validator("trust_flags")
+    @classmethod
+    def _cap_trust_flags(cls, v: list[str]) -> list[str]:
+        return v[:MAX_TRUST_FLAGS]
 
 
 class ScoreBatch(BaseModel):

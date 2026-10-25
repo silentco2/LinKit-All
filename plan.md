@@ -312,5 +312,5 @@ Execution tasks:
 - ⬜ G5 UI: badge in the jobs table, signals in the drawer (translated), Not a scam / Report,
   ghost cut-off setting + bulk action
 - ✅ G6 ATS liveness check in the apply runner before tailoring
-- ⬜ G7 Optional `red_flags` in the batched score prompt + schema
+- ✅ G7 Optional `red_flags` in the batched score prompt + schema
 - ⬜ G8 Docs: NOTICE, CLAUDE.md §5.3, docs/, handoff
