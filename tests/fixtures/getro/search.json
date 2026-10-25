@@ -1,0 +1,51 @@
+{
+ "results": {
+  "count": 3,
+  "jobs": [
+   {
+    "id": 101,
+    "slug": "101-desktop-analyst",
+    "title": "Desktop Analyst",
+    "url": "https://boards.greenhouse.io/acme/jobs/1",
+    "work_mode": "on_site",
+    "locations": [
+     "Zürich, Switzerland",
+     "Zürich, Switzerland"
+    ],
+    "created_at": 1700000000,
+    "organization": {
+     "name": "Acme",
+     "slug": "acme-1"
+    }
+   },
+   {
+    "id": 102,
+    "slug": "102-backend",
+    "title": "Backend Engineer",
+    "url": "https://jobs.lever.co/beta/2",
+    "work_mode": "remote",
+    "locations": [
+     "Anywhere"
+    ],
+    "created_at": 1700000000,
+    "organization": {
+     "name": "Beta",
+     "slug": "beta-2"
+    }
+   },
+   {
+    "id": 103,
+    "slug": "103-drop",
+    "title": "No Company",
+    "url": "https://x/3",
+    "work_mode": "on_site",
+    "locations": [],
+    "created_at": 1700000000,
+    "organization": {
+     "name": "",
+     "slug": ""
+    }
+   }
+  ]
+ }
+}

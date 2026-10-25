@@ -1,0 +1,43 @@
+{
+ "page": 1,
+ "count": 2,
+ "total": 300,
+ "data": [
+  {
+   "shortUUID": "Z2IGg7",
+   "title": "Associate Tech Lead",
+   "organization": {
+    "name": "KAST"
+   },
+   "url": "https://kastcard.pinpointhq.com/en/postings/abc",
+   "location": "Remote",
+   "locationType": "HYBRID",
+   "timestamp": 1781521356188,
+   "description": "Build things.",
+   "responsibilities": [
+    "Design back-end components"
+   ],
+   "requirements": [
+    "6+ years experience"
+   ],
+   "benefits": []
+  },
+  {
+   "shortUUID": "PqCopo",
+   "title": "Head of Capital",
+   "organization": {
+    "name": "Symbiotic"
+   },
+   "url": null,
+   "location": "New York",
+   "locationType": "REMOTE",
+   "timestamp": 1746057600000,
+   "description": "Build things.",
+   "responsibilities": [
+    "Lead fundraising"
+   ],
+   "requirements": [],
+   "benefits": []
+  }
+ ]
+}

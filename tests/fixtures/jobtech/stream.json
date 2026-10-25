@@ -1,0 +1,52 @@
+[
+ {
+  "id": "31223446",
+  "removed": false,
+  "webpage_url": "https://arbetsformedlingen.se/platsbanken/annonser/31223446",
+  "headline": "Junior Test Automation Engineer",
+  "publication_date": "2026-06-10T12:00:00",
+  "description": {
+   "text": "plain",
+   "text_formatted": "<p>About the <b>Role</b></p><script>evil()</script>"
+  },
+  "employer": {
+   "name": "Miro 461704 AB",
+   "workplace": "Tatvanord"
+  },
+  "workplace_address": {
+   "municipality": "Göteborg",
+   "region": "Västra Götalands län",
+   "country": "Sverige"
+  }
+ },
+ {
+  "id": "555",
+  "removed": true,
+  "employer": {
+   "name": ""
+  }
+ },
+ {
+  "id": "999",
+  "removed": false,
+  "webpage_url": "https://x.example/999",
+  "headline": "No employer",
+  "publication_date": "2026-06-10T11:00:00",
+  "employer": {
+   "name": ""
+  }
+ },
+ {
+  "id": "1000",
+  "removed": false,
+  "webpage_url": "https://x.example/1000",
+  "headline": "Older ad",
+  "publication_date": "2026-06-01T11:00:00",
+  "description": {
+   "text": "old"
+  },
+  "employer": {
+   "name": "Legal AB"
+  }
+ }
+]

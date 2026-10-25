@@ -1,0 +1,29 @@
+{
+ "totalJobAdCount": 3,
+ "jobAds": [
+  {
+   "jobAdId": "c1dc33fa-9c57-4592-a050-36ecda5bdfc1",
+   "title": "IT-supportelev",
+   "hiringOrgName": "ipnordic A/S",
+   "postalDistrictName": "Gråsten",
+   "country": "Danmark",
+   "publicationDate": "2026-07-07T00:00:00+02:00",
+   "jobAdUrl": "",
+   "description": "<p>Er du nysgerrig</p><script>x()</script>"
+  },
+  {
+   "jobAdId": "abc",
+   "title": "Dev",
+   "hiringOrgName": "Acme",
+   "country": "Danmark",
+   "jobAdUrl": "https://acme.example/jobs/1",
+   "description": "<p>x</p>"
+  },
+  {
+   "jobAdId": "",
+   "title": "No id",
+   "hiringOrgName": "Acme",
+   "description": "x"
+  }
+ ]
+}

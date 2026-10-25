@@ -1,0 +1,17 @@
+{
+ "totalPages": 2,
+ "items": [
+  {
+   "title": "Backend Developer",
+   "companyName": "Acme A/S",
+   "companyAddress": "Storegade 25, 6261 Bredebro",
+   "url": "/job/acme-dev",
+   "publishedDate": "05-07-2026"
+  },
+  {
+   "title": "",
+   "companyName": "Skip",
+   "url": "/job/skip"
+  }
+ ]
+}

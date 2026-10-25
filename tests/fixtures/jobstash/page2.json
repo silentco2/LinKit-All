@@ -1,0 +1,22 @@
+{
+ "page": 2,
+ "count": 1,
+ "total": 300,
+ "data": [
+  {
+   "shortUUID": "Abc123",
+   "title": "Solidity Dev",
+   "organization": {
+    "name": "Acme"
+   },
+   "url": "https://acme.example/jobs/1",
+   "location": "Berlin",
+   "locationType": "ONSITE",
+   "timestamp": 1746057600000,
+   "description": "Build things.",
+   "responsibilities": [],
+   "requirements": [],
+   "benefits": []
+  }
+ ]
+}
