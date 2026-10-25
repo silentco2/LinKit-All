@@ -170,6 +170,11 @@ class SourcesSection(BaseModel):
 
     use_discovered_boards: bool = False  # also crawl stored boards (`linkit discover-boards`)
     boards_per_run: int = Field(300, ge=0, le=20000)  # stored boards crawled per run, oldest first
+    # LinkedIn hiring posts; read when "linkedin_posts" is in `enabled`.
+    linkedin_keywords: list[str] = []
+    linkedin_window: Literal["day", "week"] = "week"
+    linkedin_max_posts: int = Field(60, ge=1, le=200)  # posts read per keyword
+    linkedin_headless: bool = True
 
 
 class FiltersSection(BaseModel):

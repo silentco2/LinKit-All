@@ -94,6 +94,27 @@ def test_search_config_validation(client: TestClient) -> None:
     assert client.get("/api/ai").json()["provider"] == "claude_cli"
 
 
+def test_linkedin_search_fields_default_and_round_trip(client: TestClient) -> None:
+    from linkit_all.core.search import SearchConfig
+
+    old = SearchConfig.model_validate({"sources": {"enabled": ["telegram"]}}).sources
+    assert (old.linkedin_keywords, old.linkedin_window) == ([], "week")
+    assert (old.linkedin_max_posts, old.linkedin_headless) == (60, True)
+    fields = {"linkedin_keywords": ["python dev", "مهندس"], "linkedin_window": "day",
+              "linkedin_max_posts": 25, "linkedin_headless": False}  # fmt: skip
+    body = {"sources": {"enabled": ["linkedin_posts"], **fields}}
+    assert client.put("/api/search", json=body, headers=SAME_ORIGIN).status_code == 200
+    got = client.get("/api/search").json()["sources"]
+    assert {k: got[k] for k in fields} == fields
+    for bad in (
+        {"linkedin_max_posts": 0},
+        {"linkedin_max_posts": 201},
+        {"linkedin_window": "month"},
+    ):
+        r = client.put("/api/search", json={"sources": bad}, headers=SAME_ORIGIN)
+        assert r.status_code == 422
+
+
 def seed_jobs(client: TestClient) -> dict[str, int]:
     db = client.app.state.db  # type: ignore[attr-defined]
     ids = {}

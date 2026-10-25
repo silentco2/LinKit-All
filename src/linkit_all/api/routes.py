@@ -408,6 +408,8 @@ def job_detail(request: Request, job_id: int) -> dict[str, Any]:
             "ai": job.data.get("ai"),
             "trust": job.data.get("trust"),
             "filled": job.data.get("filled"),
+            "extra": job.data.get("extra") or {},
+            "email_sent": job.data.get("email_sent"),
             "salary": salary,
             "events": history,
         }

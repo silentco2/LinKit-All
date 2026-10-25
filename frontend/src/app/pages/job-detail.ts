@@ -72,6 +72,27 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
           </div>
         </header>
 
+        @if (j.source === 'linkedin_posts') {
+          <section class="rounded-lg border border-slate-200 p-4 text-sm dark:border-slate-700" [attr.aria-label]="'source.linkedin_posts' | t">
+            <p dir="auto">
+              {{ 'detail.linkedin.from' | t: { author: post(j).author } }}@if (post(j).headline) { (<bdi>{{ post(j).headline }}</bdi>) }
+            </p>
+            <p class="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+              @if (post(j).postUrl; as u) { <a [href]="u" target="_blank" rel="noopener noreferrer">{{ 'detail.linkedin.post' | t }} ↗</a> }
+            </p>
+            <p class="mt-2"><span class="font-medium">{{ 'detail.linkedin.method' | t }}:</span>
+              @if (post(j).method === 'email' && post(j).email) {
+                {{ 'detail.linkedin.method.email' | t: { email: '\u2066' + post(j).email + '\u2069' } }}
+              } @else {
+                {{ 'detail.linkedin.method.' + (post(j).method === 'form' ? 'form' : 'link') | t }}
+              }
+            </p>
+            @if (j.email_sent; as sent) {
+              <p class="alert alert-ok mt-3" role="status">{{ 'detail.emailed' | t: { to: sent.to, date: sentOn(sent.sent_at) } }}</p>
+            }
+          </section>
+        }
+
         @if (j.ai; as ai) {
           <section class="rounded-lg bg-slate-50 p-4 dark:bg-slate-950">
             <h3 class="font-semibold">{{ 'detail.ai.score' | t: { score: num(ai.score) } }}</h3>
@@ -275,6 +296,20 @@ export class JobDetailPanel {
     return parts.join('; ');
   }
 
+  /** The facts a linkedin_posts job carries in `extra`; the post link is the job URL without its `#n` suffix. */
+  protected post(j: Detail): { author: string; headline: string; method: string; email: string; postUrl: string } {
+    const x = j.extra ?? {};
+    const str = (k: string): string => (typeof x[k] === 'string' ? (x[k] as string) : '');
+    const url = j.url.split('#')[0];
+    return {
+      author: str('author') || j.company,
+      headline: str('headline'),
+      method: str('apply_method'),
+      email: str('apply_email'),
+      postUrl: /^https?:\/\//i.test(url) ? url : '',
+    };
+  }
+  protected sentOn = (iso: string): string => new Date(iso).toLocaleDateString(this.loc(), { dateStyle: 'medium' });
   protected num = (n: number | null, o?: Intl.NumberFormatOptions): string => fmtNum(this.loc(), n, o);
   protected sourceLabel = (s: string): string => labelOr(this.i18n, 'common.answerSource.', s || 'unknown');
 

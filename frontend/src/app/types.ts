@@ -69,7 +69,7 @@ export function expandQueries(queries: string[]): string[] {
 
 export interface SearchConfig {
   search: { queries: string[]; locations: string[]; posted_within_days: number; max_results_per_query: number };
-  sources: { companies: string[]; jobspy: string[]; jobspy_country: string; regional: string[]; enabled: string[]; telegram_channels: string[]; use_discovered_boards: boolean; boards_per_run: number };
+  sources: { companies: string[]; jobspy: string[]; jobspy_country: string; regional: string[]; enabled: string[]; telegram_channels: string[]; use_discovered_boards: boolean; boards_per_run: number; linkedin_keywords: string[]; linkedin_window: 'day' | 'week'; linkedin_max_posts: number; linkedin_headless: boolean };
   filters: {
     title_include: string[];
     title_exclude: string[];
@@ -132,6 +132,7 @@ export interface ApplySection {
   max_pause_s: number;
   parallel_sites: number;
   generic_agent: boolean;
+  email_daily_cap: number;
 }
 
 /** Null / empty means "ask me in the Action Center" for the sensitive fields. */
@@ -209,6 +210,9 @@ export interface JobDetail extends JobRow {
   trust?: Trust | null;
   url: string;
   description: string;
+  /** Source-specific facts; for linkedin_posts: urn, author, author_url, headline, apply_method, apply_email. */
+  extra?: Record<string, unknown>;
+  email_sent?: { to: string; message_id: string; sent_at: string } | null;
   ats: string | null;
   apply_url: string | null;
   salary: { min: number | null; max: number | null; currency: string | null; interval: string | null };
@@ -268,6 +272,8 @@ export interface ActionQuestion {
   sensitive: boolean;
 }
 
+export interface EmailDraft { to: string; subject: string; body: string; attachment: string }
+
 export interface ActionItem {
   id: number;
   kind: ActionKind;
@@ -281,6 +287,7 @@ export interface ActionItem {
   answers: Record<string, { value: unknown; source: string }>;
   screenshots: number;
   created_at: string;
+  email_draft?: EmailDraft;
   job: { id: number; title: string; company: string; location: string; score: number | null; url: string; apply_url: string };
 }
 

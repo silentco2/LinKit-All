@@ -5,6 +5,15 @@ import { Api } from '../api';
 import { I18n, SourcePipe, TPipe } from '../i18n';
 import { ApiKeyProvider, ApplicationAnswers, EmailState, expandQueries, JobSource, lines, Profile, Provider, SearchConfig, Segment, SourceList, Status, unlines, WorkMode } from '../types';
 
+const LI_ACK = 'linkit.linkedinAck';
+function readAck(): boolean {
+  try {
+    return localStorage.getItem(LI_ACK) === '1';
+  } catch {
+    return false;
+  }
+}
+
 type LocalServer = 'ollama' | 'lmstudio';
 type Step = 'profile' | 'ai' | 'search' | 'filters' | 'answers' | 'apply' | 'vault' | 'email' | 'keys' | 'finish';
 type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_disability';
@@ -263,6 +272,46 @@ type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_
                 <p class="hint">{{ 'setup.sources.discoveredHint' | t }}</p>
                 <label class="label mt-2" for="boards">{{ 'setup.sources.perRun' | t }}</label>
                 <input id="boards" type="number" min="0" max="20000" class="input max-w-xs" [disabled]="!cfg.sources.use_discovered_boards" [(ngModel)]="cfg.sources.boards_per_run">
+              </div>
+              <div class="space-y-3 rounded-lg border border-slate-200 p-4 dark:border-slate-700">
+                <h3 class="font-semibold">{{ 'setup.linkedin.title' | t }}</h3>
+                <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'setup.linkedin.intro' | t }}</p>
+                <div class="alert alert-error" role="alert">{{ 'setup.linkedin.warn' | t }}</div>
+                @if (!liOn()) {
+                  <label class="flex items-center gap-2 text-sm"><input type="checkbox" [checked]="liAck()" (change)="setLiAck($event)">{{ 'setup.linkedin.ack' | t }}</label>
+                }
+                <label class="flex items-center gap-2 text-sm font-medium" [class.opacity-50]="!liOn() && !liAck()">
+                  <input type="checkbox" role="switch" id="li-enable" [checked]="liOn()" [disabled]="!liOn() && !liAck()" (change)="toggle(cfg.sources.enabled, 'linkedin_posts')">{{ 'setup.linkedin.enable' | t }}
+                </label>
+                @if (!liOn() && !liAck()) { <p class="hint">{{ 'setup.linkedin.needAck' | t }}</p> }
+                <div class="flex flex-wrap gap-3">
+                  <button type="button" class="btn" (click)="liSignin()" [disabled]="liBusy()">{{ 'setup.linkedin.signin' | t }}</button>
+                  <button type="button" class="btn" (click)="liCheck()" [disabled]="liBusy()">{{ 'setup.linkedin.check' | t }}</button>
+                </div>
+                <p class="hint">{{ 'setup.linkedin.checkHint' | t }}</p>
+                @if (liNote(); as n) { <div class="alert" [class.alert-ok]="n.kind === 'ok'" [class.alert-info]="n.kind === 'info'" [class.alert-error]="n.kind === 'error'" role="status" dir="auto">{{ n.text }}</div> }
+                <div>
+                  <label class="label" for="li-keywords">{{ 'setup.linkedin.keywords' | t }}</label>
+                  <textarea id="li-keywords" dir="auto" class="input h-28" [value]="unlines(cfg.sources.linkedin_keywords)" (change)="cfg.sources.linkedin_keywords = lines(val($event))"
+                            placeholder="python developer hiring&#10;مطلوب مهندس برمجيات"></textarea>
+                  <p class="hint">{{ 'setup.linkedin.keywordsHint' | t }}</p>
+                </div>
+                <div class="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label class="label" for="li-window">{{ 'setup.linkedin.window' | t }}</label>
+                    <select id="li-window" class="input" [(ngModel)]="cfg.sources.linkedin_window">
+                      <option value="day">{{ 'setup.linkedin.window.day' | t }}</option>
+                      <option value="week">{{ 'setup.linkedin.window.week' | t }}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="label" for="li-max">{{ 'setup.linkedin.maxPosts' | t }}</label>
+                    <input id="li-max" type="number" min="1" max="200" class="input" [(ngModel)]="cfg.sources.linkedin_max_posts">
+                  </div>
+                </div>
+                <label class="flex items-center gap-2 text-sm"><input type="checkbox" role="switch" [(ngModel)]="cfg.sources.linkedin_headless">{{ 'setup.linkedin.headless' | t }}</label>
+                <p class="hint">{{ 'setup.linkedin.headlessHint' | t }}</p>
+                <button type="button" class="btn btn-primary" (click)="saveSearch('setup.linkedin.saved')" [disabled]="busy()">{{ 'setup.linkedin.save' | t }}</button>
               </div>
               <button class="btn btn-primary" (click)="saveSearch('setup.search.saved')" [disabled]="busy()">{{ 'setup.search.save' | t }}</button>
             </section>
@@ -535,6 +584,18 @@ type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_
                   }
                 </div>
               </form>
+              <div class="space-y-3 border-t border-slate-100 pt-4 dark:border-slate-800">
+                <div class="flex flex-wrap gap-3">
+                  <button type="button" class="btn" (click)="emailTestSend()" [disabled]="busy()">{{ 'setup.email.testSend' | t }}</button>
+                </div>
+                <p class="hint">{{ 'setup.email.testSendHint' | t }}</p>
+                <div class="max-w-xs">
+                  <label class="label" for="e-cap">{{ 'setup.email.cap' | t }}</label>
+                  <input id="e-cap" type="number" min="1" max="100" class="input" [(ngModel)]="cfg.apply.email_daily_cap">
+                  <p class="hint">{{ 'setup.email.capHint' | t }}</p>
+                </div>
+                <button type="button" class="btn" (click)="saveSearch('setup.email.capSaved')" [disabled]="busy()">{{ 'setup.email.saveCap' | t }}</button>
+              </div>
             </section>
           }
 
@@ -848,6 +909,49 @@ export class SetupPage implements OnInit {
     });
   }
 
+  // LinkedIn hiring posts: the risk is acknowledged once per browser (a per-viewer convenience, so localStorage is enough).
+  protected readonly liAck = signal(readAck());
+  protected readonly liBusy = signal(false);
+  protected readonly liNote = signal<{ kind: 'ok' | 'info' | 'error'; text: string } | null>(null);
+  protected liOn = (): boolean => !!this.cfg?.sources.enabled.includes('linkedin_posts');
+
+  setLiAck(event: Event): void {
+    const on = (event.target as HTMLInputElement).checked;
+    this.liAck.set(on);
+    try {
+      if (on) localStorage.setItem(LI_ACK, '1');
+      else localStorage.removeItem(LI_ACK);
+    } catch {
+      // storage blocked: the box still works for this visit
+    }
+  }
+
+  async liSignin(): Promise<void> {
+    this.liBusy.set(true);
+    this.liNote.set(null);
+    try {
+      await this.api.post('/linkedin/signin');
+      this.liNote.set({ kind: 'info', text: this.i18n.t('setup.linkedin.signinHint') });
+    } catch (e) {
+      this.liNote.set({ kind: 'error', text: (e as Error).message });
+    } finally {
+      this.liBusy.set(false);
+    }
+  }
+
+  async liCheck(): Promise<void> {
+    this.liBusy.set(true);
+    this.liNote.set(null);
+    try {
+      const r = await this.api.get<{ state: 'ok' | 'logged_out' | 'challenge' }>('/linkedin/session');
+      this.liNote.set({ kind: r.state === 'ok' ? 'ok' : 'error', text: this.i18n.t('setup.linkedin.session.' + r.state) });
+    } catch (e) {
+      this.liNote.set({ kind: 'error', text: (e as Error).message });
+    } finally {
+      this.liBusy.set(false);
+    }
+  }
+
   eUser = '';
   eHost = 'imap.gmail.com';
   ePass = '';
@@ -871,6 +975,15 @@ export class SetupPage implements OnInit {
     return this.run(async () => {
       await this.api.post('/email/test');
       return this.i18n.t('setup.email.works');
+    });
+  }
+
+  /** Send one short test message to the user's own address through SMTP. */
+  emailTestSend(): Promise<void> {
+    return this.run(async () => {
+      const r = await this.api.post<{ ok: boolean; message_id?: string; error?: string }>('/email/test-send');
+      if (!r.ok) throw new Error(this.i18n.t('setup.email.testFailed', { error: r.error ?? '' }));
+      return this.i18n.t('setup.email.testSent');
     });
   }
 

@@ -139,6 +139,32 @@ const SOURCES: Record<string, string> = {
             </div>
           }
 
+          @if (a.kind === 'confirm_email' && a.email_draft; as d) {
+            <dl class="mt-4 grid gap-x-4 gap-y-2 text-sm sm:grid-cols-[auto_1fr]">
+              <dt class="font-medium text-slate-600 dark:text-slate-400">{{ 'actions.email.to' | t }}</dt>
+              <dd class="break-words" dir="ltr"><bdi>{{ d.to }}</bdi></dd>
+              <dt class="font-medium text-slate-600 dark:text-slate-400">{{ 'actions.email.attachment' | t }}</dt>
+              <dd class="break-words"><bdi>{{ d.attachment }}</bdi></dd>
+            </dl>
+            <div class="mt-4 space-y-4">
+              <div>
+                <label class="label" [attr.for]="'es' + a.id">{{ 'actions.email.subject' | t }}</label>
+                <input class="input" [id]="'es' + a.id" dir="auto" maxlength="200" [value]="subjectOf(a)" (input)="editEmail(a, 'subject', val($event))">
+              </div>
+              <div>
+                <label class="label" [attr.for]="'eb' + a.id">{{ 'actions.email.body' | t }}</label>
+                <textarea class="input" rows="10" dir="auto" maxlength="10000" [id]="'eb' + a.id" [value]="bodyOf(a)" (input)="editEmail(a, 'body', val($event))"></textarea>
+              </div>
+            </div>
+            @if (emailSaved()[a.id]) { <div class="alert alert-ok mt-3" role="status">{{ 'actions.email.saved' | t }}</div> }
+            <div class="mt-4 flex flex-wrap gap-3">
+              <button type="button" class="btn" [disabled]="busy() || !emailDirty(a) || !emailValid(a)" (click)="saveDraft(a)">{{ 'actions.email.save' | t }}</button>
+              <button type="button" class="btn !border-emerald-700 !bg-emerald-600 !font-semibold !text-white hover:!bg-emerald-700"
+                      [disabled]="busy() || !emailValid(a)" (click)="confirmEmail(a)">{{ 'actions.email.send' | t }}</button>
+              <button type="button" class="btn btn-danger" [disabled]="busy()" (click)="send(a, 'skip')">{{ 'actions.skip' | t }}</button>
+            </div>
+          }
+
           @if (browserKind(a.kind)) {
             <div class="mt-4">
               @if (browser().open && browser().item_id === a.id) {
@@ -148,6 +174,7 @@ const SOURCES: Record<string, string> = {
                 </div>
               } @else {
                 <button type="button" class="btn" [disabled]="browserBusy() || browser().open" (click)="openBrowser(a)">{{ 'actions.browser.openBtn' | t }}</button>
+                @if (browser().open) { <p class="hint mt-1">{{ 'actions.browser.other' | t }}</p> }
               }
               <p class="hint mt-1">{{ 'actions.browser.hint' | t }}</p>
             </div>
@@ -159,7 +186,7 @@ const SOURCES: Record<string, string> = {
             <button type="button" class="btn" [disabled]="busy()" (click)="send(a, 'retry')">{{ 'actions.retry' | t }}</button>
             <a class="btn no-underline hover:no-underline" [href]="a.job.apply_url" target="_blank" rel="noopener">{{ 'actions.openPage' | t }}</a>
             <button type="button" class="btn" [disabled]="busy()" (click)="send(a, 'applied_by_hand')">{{ 'actions.byHand' | t }}</button>
-            @if (a.kind !== 'confirm_submit') {
+            @if (a.kind !== 'confirm_submit' && a.kind !== 'confirm_email') {
               <button type="button" class="btn btn-danger" [disabled]="busy()" (click)="send(a, 'skip')">{{ 'actions.skip' | t }}</button>
             }
           </footer>
@@ -180,6 +207,9 @@ export class ActionsPage {
   protected readonly busy = signal(false);
   protected readonly browserBusy = signal(false);
   protected readonly browser = signal<Status['app_browser']>({ open: false, item_id: null });
+  /** Edited email subject / body per action id; absent until the user types. */
+  protected readonly emailEdits = signal<Record<number, { subject?: string; body?: string }>>({});
+  protected readonly emailSaved = signal<Record<number, boolean>>({});
   protected readonly errors = signal<Record<number, string>>({});
   /** Typed-in answers per action id, then question label. Survives reloads of the list. */
   protected readonly draft = signal<Record<number, Record<string, AnswerValue>>>({});
@@ -207,8 +237,41 @@ export class ActionsPage {
     }
   }
 
+  subjectOf = (a: ActionItem): string => this.emailEdits()[a.id]?.subject ?? a.email_draft?.subject ?? '';
+  bodyOf = (a: ActionItem): string => this.emailEdits()[a.id]?.body ?? a.email_draft?.body ?? '';
+  emailDirty = (a: ActionItem): boolean => this.subjectOf(a) !== (a.email_draft?.subject ?? '') || this.bodyOf(a) !== (a.email_draft?.body ?? '');
+  emailValid = (a: ActionItem): boolean => !!this.subjectOf(a).trim() && !!this.bodyOf(a).trim();
+  editEmail(a: ActionItem, field: 'subject' | 'body', value: string): void {
+    this.emailEdits.update((m) => ({ ...m, [a.id]: { ...m[a.id], [field]: value } }));
+    this.emailSaved.update(({ [a.id]: _drop, ...rest }) => rest);
+  }
+
+  /** PUT the edited subject and body; the server keeps them as the text that will be sent. */
+  async saveDraft(a: ActionItem): Promise<boolean> {
+    this.busy.set(true);
+    this.errors.update(({ [a.id]: _drop, ...rest }) => rest);
+    try {
+      await this.api.put(`/actions/${a.id}/email-draft`, { subject: this.subjectOf(a).trim(), body: this.bodyOf(a) });
+      this.emailEdits.update(({ [a.id]: _drop, ...rest }) => rest);
+      this.emailSaved.update((m) => ({ ...m, [a.id]: true }));
+      await this.load();
+      return true;
+    } catch (e) {
+      this.errors.update((m) => ({ ...m, [a.id]: e instanceof Error ? e.message : String(e) }));
+      return false;
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  /** Confirming sends the stored draft, so unsaved edits are saved first. */
+  async confirmEmail(a: ActionItem): Promise<void> {
+    if (this.emailDirty(a) && !(await this.saveDraft(a))) return;
+    await this.send(a, 'confirm');
+  }
+
   browserKind = (k: ActionKind): boolean => BROWSER_KINDS.includes(k);
-  hasHelp = (k: ActionKind): boolean => k !== 'unknown_question' && k !== 'confirm_submit' && k !== 'confirm_email';
+  hasHelp = (k: ActionKind): boolean => k !== 'unknown_question' && k !== 'confirm_submit';
   num = (n: number | null): string => fmtNum(this.loc(), n);
   sourceLabel = (s: string): string => labelOr(this.i18n, 'common.answerSource.', s || 'unknown');
   range = (n: number): number[] => Array.from({ length: n }, (_, i) => i);
