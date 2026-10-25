@@ -3,12 +3,14 @@
 * UserBrowser: a headed Chrome window the USER drives (sign in, solve a CAPTCHA, enter a 2FA
   code) on the same persistent profile the apply runner used, so the session carries over to
   Retry. The app never types or clicks in it (CLAUDE.md §5.7).
-* live_frames: a JPEG of the page the apply stage is working on, polled by the Live Run screen.
+* live_frames: a JPEG of the page the apply stage is working on, announced to the Live Run screen
+  (via `on_frame`) each time a new one is written.
 """
 
 import asyncio
 import contextlib
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 from playwright.async_api import BrowserContext, Page, Playwright, async_playwright
@@ -39,10 +41,12 @@ def fresh_live_shot(settings: Settings) -> Path | None:
 _live_active: dict[Path, int] = {}  # pages currently writing each frame file
 
 
-async def live_frames(page: Page, path: Path, every: float = 3.0) -> None:
+async def live_frames(
+    page: Page, path: Path, every: float = 3.0, on_frame: Callable[[], None] | None = None
+) -> None:
     """Save a viewport JPEG every `every` seconds until cancelled. Several pages may share
     `path` (latest frame wins; ponytail: no per-page view); the file is removed when the last
-    one stops."""
+    one stops. `on_frame` is called after each frame is on disk, never otherwise."""
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(f".{id(page)}.tmp")  # per page: writers never share a temp file
     _live_active[path] = _live_active.get(path, 0) + 1
@@ -51,6 +55,8 @@ async def live_frames(page: Page, path: Path, every: float = 3.0) -> None:
             with contextlib.suppress(Exception):  # page mid-navigation, closed, or file in use
                 tmp.write_bytes(await page.screenshot(type="jpeg", quality=60))
                 tmp.replace(path)  # atomic: the endpoint never serves half a frame
+                if on_frame is not None:
+                    on_frame()
             await asyncio.sleep(every)
     finally:
         _live_active[path] -= 1

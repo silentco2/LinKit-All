@@ -288,7 +288,7 @@ anywhere; Crawl-delay pacing and per-host rate limits stay. Recorded in CLAUDE.m
    real account creation + IMAP (item 3). Expect to fix handler details found live.
 3. As the maintainer supplies saved pages: write the Workday/iCIMS/Taleo/SuccessFactors/
    SmartRecruiters handlers (plugin + fixture + tests each), then Naukrigulf.
-4. Pay down the debt below, roughly in this order: live-view event per job; generic sign-up; Arabic server messages; phone
+4. Pay down the debt below, roughly in this order: generic sign-up; Arabic server messages; phone
    job-title width; the rest.
 5. Release work once the maintainer says go: GitHub repo, CI on three OSes, PyPI.
 
@@ -337,7 +337,6 @@ anywhere; Crawl-delay pacing and per-host rate limits stay. Recorded in CLAUDE.m
 - A combobox with no fixed options (city, country) picks the first suggestion after typing.
 - Live submission is untested against real sites (CAPTCHA behavior unknown).
 - `two_factor` and captcha resolution is manual: "Open in app browser", solve, then Retry.
-- The Live run screenshot is file-polled every 3 s (no per-job event).
 - ODT/PDF/LaTeX CV path skips LaTeX `\input` projects and package macros like `\cventry`.
 - Server park messages and source keys are English in the Arabic UI (raw `zip_recruiter`, ...).
 - Job-aggregator API keys are in the vault; AI provider keys are still env-only.

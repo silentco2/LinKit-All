@@ -17,6 +17,7 @@ class EventBus:
         self._subscribers: set[asyncio.Queue[Event]] = set()
         self._loop: asyncio.AbstractEventLoop | None = None
         self.recent: deque[Event] = deque(maxlen=history)  # replayed to new viewers
+        self.last_shot: Event | None = None  # newest live_shot: replayed, but not in `recent`
 
     def bind(self, loop: asyncio.AbstractEventLoop) -> None:
         self._loop = loop
@@ -32,7 +33,10 @@ class EventBus:
     def publish(self, event: Event) -> None:
         """Call on the event loop thread (see publish_threadsafe)."""
         event = {"at": utcnow().isoformat(timespec="seconds") + "Z", **event}
-        self.recent.append(event)
+        if event.get("type") == "live_shot":  # every ~3 s: keep only the newest, not the log
+            self.last_shot = event
+        else:
+            self.recent.append(event)
         for q in list(self._subscribers):
             if not q.full():  # a stalled browser tab drops events instead of blocking runs
                 q.put_nowait(event)

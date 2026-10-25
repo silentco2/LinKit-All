@@ -505,6 +505,7 @@ export const en: Record<string, string> = {
   'live.empty': 'Nothing yet. Start a run to see live progress.',
   'live.view.title': 'Browser view',
   'live.view.alt': 'Current view of the browser that is applying',
+  'live.view.job': 'Applying to {title} at {company}',
   'live.view.waiting': 'Waiting for the first picture from the browser…',
   'live.view.caption': 'Read-only view, refreshed every few seconds.',
 

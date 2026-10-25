@@ -73,7 +73,7 @@ class PipelineRunner:
                 self.bus.publish({"type": "stage", "stage": stage, "status": "started"})
                 try:
                     result = await run_stage(
-                        stage, self.db, self.settings, run_id, None, self.vault
+                        stage, self.db, self.settings, run_id, None, self.vault, self.bus.publish
                     )
                 except PipelineError as e:
                     self.state.error, status = str(e), "failed"
@@ -94,4 +94,5 @@ class PipelineRunner:
             self.state.error, status = f"{type(e).__name__}: {e}", "failed"
         finally:
             self.state.running, self.state.stage = False, None
+            self.bus.last_shot = None  # the browser is gone: new viewers get no stale frame
             self.bus.publish({"type": "run", "status": status, **self.state.as_dict()})

@@ -187,13 +187,28 @@ export interface JobDetail extends JobRow {
 
 export interface LiveEvent {
   at: string;
-  type: 'log' | 'stage' | 'run';
+  type: 'log' | 'stage' | 'run' | 'live_shot';
   level?: string;
   message?: string;
   stage?: Stage;
   status?: string;
   error?: string;
   result?: Record<string, unknown>;
+  /** live_shot only: the job the newest browser frame belongs to. */
+  job_id?: number;
+  title?: string;
+  company?: string;
+  version?: number;
+  url?: string;
+}
+
+/** The newest frame of the browser that is applying, and the job it shows. */
+export interface LiveShot {
+  job_id: number;
+  title: string;
+  company: string;
+  version: number;
+  url: string;
 }
 
 /** "a\nb" <-> ["a", "b"] for one-per-line list fields. */

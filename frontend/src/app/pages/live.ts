@@ -1,10 +1,10 @@
 import { DatePipe } from '@angular/common';
-import { Component, computed, DestroyRef, effect, ElementRef, inject, signal, viewChild } from '@angular/core';
+import { Component, computed, effect, ElementRef, inject, signal, viewChild } from '@angular/core';
 import { Api } from '../api';
 import { I18n, TPipe } from '../i18n';
 import { Live } from '../live';
 import { fmtNum, labelOr, localeOf } from '../locale';
-import { LiveEvent, ScheduleSection, SearchConfig, Stage, STAGES, Status } from '../types';
+import { LiveEvent, ScheduleSection, SearchConfig, Stage, STAGES } from '../types';
 
 const STAGE_KEY: Record<Exclude<Stage, 'apply'>, string> = {
   discover: 'live.stage.discover',
@@ -131,8 +131,9 @@ interface RecentRun {
     @if (applyRunning()) {
       <section class="card mt-6 space-y-3">
         <h2>{{ 'live.view.title' | t }}</h2>
-        @if (shot() !== null) {
-          <img class="w-full rounded-lg border border-slate-200 dark:border-slate-700" [src]="'/api/live/screenshot?t=' + shot()" [alt]="'live.view.alt' | t">
+        @if (live.shot(); as s) {
+          <p class="text-sm font-medium" dir="auto">{{ 'live.view.job' | t: { title: s.title, company: s.company } }}</p>
+          <img class="w-full rounded-lg border border-slate-200 dark:border-slate-700" [src]="s.url" [alt]="'live.view.alt' | t">
         } @else {
           <p class="text-sm text-slate-500">{{ 'live.view.waiting' | t }}</p>
         }
@@ -175,27 +176,10 @@ export class LivePage {
   protected readonly running = computed(() => !!this.live.run()?.running);
   private readonly log = viewChild<ElementRef<HTMLElement>>('log');
   protected readonly applyRunning = computed(() => !!this.live.run()?.running && this.live.run()?.stage === 'apply');
-  /** Modified time of the newest browser frame; changing it busts the image cache. */
-  protected readonly shot = signal<number | null>(null);
-  private readonly visible = signal(!document.hidden);
 
   constructor() {
     this.api.get<{ apply_live: boolean }>('/status').then((st) => this.applyLive.set(st.apply_live)).catch(() => undefined);
     this.loadSchedule();
-    const onVisibility = (): void => this.visible.set(!document.hidden);
-    document.addEventListener('visibilitychange', onVisibility);
-    inject(DestroyRef).onDestroy(() => document.removeEventListener('visibilitychange', onVisibility));
-    // Poll for a fresh frame only while the apply stage runs and this tab is visible; the cleanup stops it otherwise and on destroy.
-    effect((onCleanup) => {
-      if (!this.applyRunning() || !this.visible()) return;
-      const poll = (): void => void this.api.get<Status>('/status').then((s) => this.shot.set(s.live_shot)).catch(() => undefined);
-      poll();
-      const timer = setInterval(poll, 3000);
-      onCleanup(() => clearInterval(timer));
-    });
-    effect(() => {
-      if (!this.applyRunning()) this.shot.set(null);
-    });
     effect(() => {
       this.live.events(); // keep the log scrolled to the newest line
       const el = this.log()?.nativeElement;

@@ -508,6 +508,8 @@ async def events(ws: WebSocket) -> None:
     try:
         for event in list(bus.recent):
             await ws.send_json(event)
+        if bus.last_shot is not None:
+            await ws.send_json(bus.last_shot)
         while True:
             await ws.send_json(await q.get())
     except WebSocketDisconnect:

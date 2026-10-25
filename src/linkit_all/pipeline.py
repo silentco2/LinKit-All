@@ -74,6 +74,7 @@ async def run_stage(
     run_id: int,
     ai_override: dict[str, Any] | None = None,  # CLI --provider/--model beat the wizard
     vault: "Vault | None" = None,  # the server's unlocked vault; the CLI leaves it to the keyring
+    publish: Callable[[dict[str, Any]], None] | None = None,  # live events (server only)
 ) -> dict[str, Any]:
     cfg = load_search(db)
     if cfg is None:
@@ -119,7 +120,7 @@ async def run_stage(
         try:
             provider = get_provider(ai_settings(settings, cfg, ai_override), cache=db)
             stats = await apply_jobs(
-                db, settings, cfg, provider, await _get_embedder(settings), vault
+                db, settings, cfg, provider, await _get_embedder(settings), vault, publish
             )
         except (ApplyBlocked, ProviderError) as e:
             raise PipelineError(str(e)) from e

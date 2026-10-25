@@ -505,6 +505,7 @@ export const ar: Record<string, string> = {
   'live.empty': 'لا شيء بعد. ابدأ تشغيلًا لمشاهدة التقدم مباشرة.',
   'live.view.title': 'عرض المتصفح',
   'live.view.alt': 'العرض الحالي للمتصفح الذي يقدّم الطلبات',
+  'live.view.job': 'التقديم على {title} لدى {company}',
   'live.view.waiting': 'بانتظار أول صورة من المتصفح…',
   'live.view.caption': 'عرض للقراءة فقط، يُحدَّث كل بضع ثوانٍ.',
 

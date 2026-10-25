@@ -10,6 +10,8 @@ import contextlib
 import random
 import re
 import shutil
+import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -229,8 +231,10 @@ class Applier:
         provider: LLMProvider,
         embed: Embed,
         vault: Vault | None = None,  # the server's shared vault; the CLI passes none
+        publish: Callable[[dict[str, Any]], None] | None = None,  # live events; the CLI passes none
     ) -> None:
         self.db, self.settings, self.cfg, self.provider = db, settings, cfg, provider
+        self._publish = publish
         self._vault = vault
         self.bank = AnswerBank(db, embed)
         self._pw: Playwright | None = None
@@ -360,7 +364,13 @@ class Applier:
         await self._trace_start(key, browser)
         page = await browser.new_page()
         # ponytail: pages of parallel sites all write the one current.jpg, latest frame wins
-        live = asyncio.create_task(live_frames(page, live_shot_path(self.settings)))
+        live = asyncio.create_task(
+            live_frames(
+                page,
+                live_shot_path(self.settings),
+                on_frame=lambda: self._announce_frame(job_id, job.title, job.company),
+            )
+        )
         keep_trace = False
         try:
             if handler is not None:
@@ -392,6 +402,21 @@ class Applier:
             await asyncio.gather(live, return_exceptions=True)  # removes the frame file if last
             await self._trace_stop(key, browser, out_dir if keep_trace else None)
             await page.close()
+
+    def _announce_frame(self, job_id: int, title: str, company: str) -> None:
+        """Tell the Live Run screen which job the newest frame shows (no CV text or answers)."""
+        if self._publish is not None:
+            version = time.time_ns() // 1_000_000
+            self._publish(
+                {
+                    "type": "live_shot",
+                    "job_id": job_id,
+                    "title": title,
+                    "company": company,
+                    "version": version,
+                    "url": f"/api/live/screenshot?v={version}",
+                }
+            )
 
     async def _agent_apply(
         self, page: Page, info: JobInfo, ctx: Context, profile: Profile, out_dir: Path
@@ -713,13 +738,14 @@ async def apply_jobs(
     provider: LLMProvider,
     embed: Embed,
     vault: Vault | None = None,
+    publish: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, int]:
     """Different sites in parallel (up to `parallel_sites`); on one site, one job at a time with
     a random pause between two of them (shorter when nothing is submitted)."""
     counts = {"dry_run": 0, "applied": 0, "needs_user": 0, "failed": 0, "skipped": 0}
     live = cfg.apply.live
     lo, hi = (cfg.apply.min_pause_s, cfg.apply.max_pause_s) if live else (2, 5)
-    async with Applier(db, settings, cfg, provider, embed, vault) as applier:
+    async with Applier(db, settings, cfg, provider, embed, vault, publish) as applier:
         sites: dict[str, list[int]] = {}  # best-scored site first; jobs keep pick order
         for job_id in applier.pick_jobs():
             sites.setdefault(applier.site_of(job_id), []).append(job_id)
