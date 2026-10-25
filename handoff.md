@@ -7,10 +7,11 @@ changing a decision in either file.
 
 ## TL;DR
 
-- Phases 0-7 are built, except the items blocked on the maintainer (see "Needs the
+- Phases 0-8 are built, except the items blocked on the maintainer (see "Needs the
   maintainer"). Every task in `plan.md` is done or marked blocked.
-- 300 tests pass (`uv run pytest`; 1 skipped: the real Tectonic compile), ruff and mypy are
-  clean, `npx ng build` is clean. The work sits in 30 commits since `0561687`.
+- Phase 8 (sources ported from freehire) is built too: see "Phase 8 - sources from freehire".
+- The unit suite passes (`uv run pytest`: 1356 passed, 1 skipped, the real Tectonic compile),
+  ruff and mypy are clean, `npx ng build` is clean.
 - Nothing has ever been submitted for real. Apply runs in dry-run mode by default and has
   only been exercised as dry runs on live forms plus offline e2e tests with a fake submit.
 - User docs are in `docs/` (MkDocs Material); `uv run mkdocs serve` previews them.
@@ -220,6 +221,46 @@ tests/unit, tests/e2e (apply flow on a saved Lever form), tests/fixtures/<ats>/
 | 5 Apply v2 | partly | `474c270` runner checks handler before tailoring; `a6ac0e5`/`34986c6` vault core + UI; `40392b6`/`69a826e` IMAP verification + email step; `65fbc5f` account gate; `d6ff3bd`/`8f8acdf` SmartRecruiters, Recruitee, Workable, Workday discovery; `dfee500` runner uses the server's vault. Handlers for Workday/iCIMS/Taleo/SuccessFactors/SmartRecruiters and LinkedIn/Indeed apply: blocked |
 | 6 Generic | done except Naukrigulf | `93cd3be`/`48c8b27` careers source (batched AI extraction); `ad27af6`/`685bd7c` generic form agent + runner fallback; `4903956` Forasna; `9239b3e` RFC 9309 robots matcher |
 | 7 Later | partly | `276fa96` ODT/PDF CVs + reports; `bf15f7b` scheduler, notifications, LaTeX CVs; `49a422f` local models; `2403f4f`/`0fb0c7c` Arabic RTL UI; `5fd2425` MkDocs docs; `093780f`/`3908a83`/`0353d50` CLAUDE.md gap fixes (app browser, red-line, live view, low-tier opt-in). Outlook OAuth, macOS/Linux bundles, release: pending |
+| 8 freehire sources | done | 124 ATS, 41 aggregators, 18 boards, 48 company plugins, Telegram, board discovery (`F0a`..`F6b`, since `ad1241d`); fixtures only |
+
+## Phase 8 - sources from freehire
+
+Ported from [freehire](https://github.com/strelov1/freehire) (MIT, credited in `NOTICE`),
+re-implemented in Python on plain honest HTTP. Plan and not-ported lists: `plan.md` Phase 8.
+
+- **What exists** (`uv run --no-sync python -c "from linkit_all.sources import registry; ..."`):
+  124 ATS plugins (`sources/ats/`), 41 aggregators (`aggregators/`), 18 job boards and RSS feeds
+  (`boards/`), 48 single-company plugins (`companies/`), `telegram.py`, plus the older jobspy,
+  Wuzzuf/Forasna and careers sources. `sources/__init__.py` scans the packages: a new plugin
+  needs no registry edit.
+- **Telegram**: public `t.me/s/<channel>` previews, 95 default channels plus the user's own,
+  Arabic hiring words in the prefilter, links to a known ATS skip the AI, other posts go to the
+  AI in batches.
+- **Discovered boards**: `boards` table; `linkit discover-boards` asks Common Crawl's index for
+  boards on each ATS (falls back to older collections when the newest answers 404);
+  `sources.use_discovered_boards` + `boards_per_run` crawl the oldest-crawled ones each run.
+- **API keys** (Adzuna, Reed, USAJobs, WhatJobs): stored in the vault (`core/api_keys.py`),
+  edited in Setup, read by plugins through `sources/aggregators/keys.py`.
+- **Workday**: facet splitting around the 2,000-result cap, 403/429 backoff, details fetched only
+  for unseen jobs.
+- **ATS routing**: a stub from an aggregator, board, company plugin or Telegram whose apply link
+  is on a known ATS gets that `ats`, so the right apply handler runs; `source` keeps the origin.
+- **Enabling**: ATS plugins run from the companies list (or discovered boards) and need no switch.
+  Aggregators, boards, company plugins and Telegram are opt-in: Setup, "More job sources" (backed
+  by `GET /api/sources`), or `sources.enabled` in `search.toml`.
+- **Writing one**: `docs/development.md` ("Adding a job source"), with the shared helpers in
+  `sources/common.py`, `parsing.py`, `tasks.py` and `aggregators/keys.py`.
+- **Safety**: no bot-protection bypass (no TLS spoofing, challenge solvers, rotating proxies or
+  fake crawler/app user agents); robots.txt is not enforced by maintainer decision, Crawl-delay
+  and per-host rate limits are. Slow hosts: Wuzzuf/Forasna 1 per 10 s, LinkedIn 1 per 2 s,
+  HigherMe 1 per 3 s, Workable/Workday/Workstream 1 per s, Join 1.5 per s.
+- **Gaps and debt**: every source is tested with fixtures only, and many fixtures were built by
+  hand from freehire's test samples, so the first live runs may show API drift. megafon, yandex
+  and ozon are slow. Some company names are placeholders where the API does not name the
+  employer. Adzuna's monthly call cap is not tracked. jobspy and the ATS APIs were never
+  robots-checked anyway. Not ported (reasons in `plan.md`): bypass-dependent sources, Russian
+  root-CA sites (trudvsem, alfabank, tbank, tochka, ptsecurity), workatastartup (login), wttj
+  (Referer-locked key, the maintainer may overrule), aijobs (dead).
 
 ## Needs the maintainer (blockers)
 
@@ -302,7 +343,7 @@ anywhere; Crawl-delay pacing and per-host rate limits stay. Recorded in CLAUDE.m
 - Server park messages and source keys are English in the Arabic UI (raw `zip_recruiter`, ...).
 - Job titles are very narrow at phone width.
 - Jobs clicked while the drawer is open don't switch the drawer.
-- API keys are env-only (not stored in the vault).
+- Job-aggregator API keys are in the vault; AI provider keys are still env-only.
 - When `ApplyBlocked` fires (AI limit, LibreOffice missing) the rest of that run's jobs wait
   for the next run.
 - Starlette's TestClient warns about httpx (`httpx2`); harmless.

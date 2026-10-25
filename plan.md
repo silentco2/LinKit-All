@@ -213,7 +213,9 @@ Execution tasks:
 - Live checks only read or dry-run: never submit a real application without the
   maintainer's explicit go-ahead.
 
-### Phase 8 — Sources ported from freehire (MIT) 🟡
+### Phase 8 — Sources ported from freehire (MIT) ✅
+Final registry: 124 ATS, 41 aggregators, 18 boards and 48 company plugins, plus Telegram (1),
+jobspy (6 sites), regional (Wuzzuf, Forasna) and the generic careers source. Unit suite: 1356 passed, 1 skipped.
 Decisions (maintainer, 2026-10-24): port every adapter that works with honest plain HTTP, in
 batches; adapters that need freehire's bot-protection layer (tls-client fingerprints,
 Scrapling challenge-solving browser, rotating proxies, spoofed Googlebot/app user agents,
@@ -224,36 +226,39 @@ user-added (Arabic hiring words in the prefilter). Logic is re-implemented in Py
 code copied verbatim; NOTICE credits freehire (MIT). Survey: scratchpad freehire-survey.md.
 - ✅ F0a Source framework: auto-registry (no shared registry edits), per-module detector
   patterns, shared helpers (403/429 retry-with-backoff, paging), per-source test files
-- ✅ F0b Boards (Common Crawl reachable now; newest CDX collection answered 404 — fallback to older collections in cleanup) table + `linkit discover-boards` (Common Crawl CDX per ATS) + per-run rotation caps
+- ✅ F0b Boards table + `linkit discover-boards` (Common Crawl CDX per ATS) + per-run rotation caps
 - ✅ F0c API keys in the vault + Setup section + `api_key()` helper for sources
 - ✅ F0d Workday: 2,000-cap facet split, 403/429 backoff, details only for unseen jobs
 - ✅ F0e Telegram reader, channel table + Setup, Arabic prefilter, link-out to ATS, batched AI extraction
 - F1 ATS feed adapters (sources/ats/), shared brief: scratchpad brief-adapters.md
   - ✅ F1.1 adp adpmyjobs applicantstack applitrack appone avature bamboohr beesite betterteam breezy briefhq bullhorn careerplug
-  - ✅ F1.2 careerspage catsone cleverstaff clinch comeet compleo cornerstone crelate dayforce deel dover earcu eightfold
-  - ✅ F1.3 emply enlizt epam eploy erecruiter factorial feishujobs freshteam friendwork geekhunter gem gethired gr8people
+  - ✅ F1.2 catsone comeet compleo cornerstone crelate dayforce deel dover earcu
+  - ✅ F1.3 emply epam eploy erecruiter factorial freshteam friendwork geekhunter gem gethired gr8people
   - ✅ F1.4 gupy gusto harri hcshiring herp hibob higherme hireclick hireology hiringroom hiringthing hrmanager hrmdirect
   - ✅ F1.5 hrmos humanbit huntflow hurma icims idealtraits inhire ismartrecruit isolvedhire itechart jazzhr jibe jobappnetwork
-  - ✅ F1.6 jobscore jobspage jobvite join keka likeit loxo luxoft manatal mindsight mokahr neogov northstone
-  - ✅ F1.7 odoo opencats oracle pageup pandape paradox paycom paycor paylocity peopleforce peoplesoft personio phenom
+  - ✅ F1.6 jobscore jobspage jobvite join keka likeit loxo luxoft manatal mindsight mokahr northstone
+  - ✅ F1.7 odoo opencats oracle pageup pandape paradox paycom paycor paylocity peoplesoft personio phenom
   - ✅ F1.8 pinpoint potok pyjamahr quickin radancy rapyd recruiterflow recruitingsolutions recrutei rippling scalis selfrecruit senior
   - ✅ F1.9 softgarden solides spark speedrun successfactors talentadore talenthr talentlyft taleo taleobe teamtailor tenstreet traffit
   - ✅ F1.10 trakstar ukg ukgready vention vouch werecruit workablemarketplace workstream wpyoast zoho ashbygraphql
+  - not ported (proxy-only, would need a spoofed client): careerspage eightfold enlizt peopleforce cleverstaff clinch neogov, feishujobs (needs a spoofed UA).
 - F2 Aggregators (sources/aggregators/, opt-in via sources.enabled)
   - ✅ F2.1 adzuna reed usajobs whatjobs + API-key wiring into sources
   - ✅ F2.2 arbeitnow arbeitsagentur devglobaljobs edjoin empregos eures functionalworks getmanfred getmatch getonbrd
   - ✅ F2.3 getro golangjobs hackernews herkey himalayas jobdanmark jobicy jobnet jobstash jobtech
   - ✅ F2.4 kalibrr landingjobs mycareersfuture nofluffjobs powertofly remoteok remotive remotli schoolspring seek
-  - ✅ F2.5 solidjobs teamex tecla themuse topco trudvsem tyomarkkinatori workatastartup workingnomads wttj
+  - ✅ F2.5 solidjobs teamex tecla themuse topco tyomarkkinatori workingnomads
   - not ported (bypass-dependent): echojobs fourdayweek habrcareer hhru jobleads naukri startupjobs techinasia wellfound
+  - not ported (other): trudvsem (needs a Russian root CA); workatastartup (login); wttj (key locked to a Referer; maintainer may overrule)
 - ✅ F5 Setup UI: list every opt-in source (aggregators, boards, company plugins) with toggles, from a /api/sources endpoint
 - F3 Job boards + RSS (sources/boards/, opt-in)
-  - ✅ F3.1 aijobs builtin instaffo itviec japandev jobboardly jobylon joppy
+  - ✅ F3.1 builtin instaffo itviec japandev jobboardly jobylon joppy
   - ✅ F3.2 profession pythonorg remotedotcom startupandvc techtree thehub torre work180 + RSS cryptocurrencyjobs jobspresso nodesk weworkremotely
+  - not ported (other): aijobs (dead/changed)
   - not ported (bypass-dependent): bayt catho civilservicejobs djinni energyjobline geekjob gradcracker gulftalent infojobs occ vagas wantapply wuzzuf
-- F4 Single-company plugins (sources/companies/, opt-in); not ported: metacareers onstrider kontur twogis uber (bypass), airswift tenml (no jobs)
-  - ✅ F4.1 alfabank alibaba alignerr amazon apple aviasales avito bairesdev dassault dataart dodo domclick
+- F4 Single-company plugins (sources/companies/, opt-in); not ported: metacareers onstrider kontur twogis uber (bypass), airswift tenml (no jobs), alfabank tbank tochka ptsecurity (need a Russian root CA)
+  - ✅ F4.1 alibaba alignerr amazon apple aviasales avito bairesdev dassault dataart dodo domclick
   - ✅ F4.2 emagine garena google halyk ibm jettycloud kaspersky kaspi kuper lamoda lesta lumenalta
-  - ✅ F4.3 magnit megafon meituan micro1 mts mtslink orion ozon ptsecurity rostelecom rwb sber
+  - ✅ F4.3 magnit megafon meituan micro1 mts mtslink orion ozon rostelecom rwb sber
   - ✅ F4.4 selectel staffy tbank telegramcareers tencent tochka uzum vk x5 yandex yandexcrowd
-- 🟡 F6 Cleanup: make jobboardly an ATS plugin (url_patterns) instead of reading sources.companies; set ats from apply_url (ats_detector) for aggregator/board/company stubs so apply handlers route correctly; merge private helpers (_f12.._f22) into sources/common.py; Http.post_form + public raw response; SLOW_HOSTS (myworkdaysite 1, higherme 1/3, join 1.5, workstream 1); CDX older-collection fallback; flaky wall-clock test; full suite + browser check of Setup sources list
+- ✅ F6 Cleanup: jobboardly is an ATS plugin; `ats` is set from the apply link (ats_detector) for aggregator/board/company stubs so apply handlers route correctly; private helpers merged into `sources/common.py`, `parsing.py`, `tasks.py` and `aggregators/keys.py`; `Http.post_form` + public raw response; per-host slow rates (myworkdaysite 1, higherme 1/3, join 1.5, workstream 1); Common Crawl older-collection fallback; full suite and a browser check of the Setup sources list

@@ -1,6 +1,6 @@
 # Sources
 
-LinKit All reads jobs from four kinds of place. You choose them in the wizard's **Search**
+LinKit All reads jobs from several kinds of place. You choose them in the wizard's **Search**
 step, or in a `search.toml` file ([example](search.example.toml)).
 
 ```toml
@@ -99,6 +99,34 @@ Glassdoor is searched without a country.
     responsible for how you use them. Company boards and sitemaps are the gentlest options.
 
 Naukrigulf is planned but not built.
+
+## More job sources (opt-in)
+
+Beyond the sources above, LinKit All ships many more plugins, ported from the open-source
+[freehire](https://github.com/strelov1/freehire) project (MIT, see `NOTICE`). They fall into
+families:
+
+- **ATS feeds** (about 120 vendors such as BambooHR, Teamtailor, Personio, iCIMS, Jobvite):
+  paste a company link or `name:slug` in `companies`, as in section 1. No switch is needed.
+- **Aggregators** (Adzuna, Reed, USAJobs, Remotive, RemoteOK, Arbeitnow, Himalayas and others):
+  APIs that list many employers. Some need a free API key (Adzuna, Reed, USAJobs, WhatJobs).
+  Keys are stored in the vault, never in the config file.
+- **Job boards and RSS feeds** (for example Built In, The Hub, We Work Remotely).
+- **Single-company career sites** (for example Amazon, Google, Yandex, Sber).
+- **Telegram channels** (section 4 below) and **discovered boards** (next section).
+
+Aggregators, boards, company sites and Telegram are off until you switch them on. In the web
+app go to **Setup, More job sources**, tick the ones you want and add API keys in the API keys
+section. In `search.toml` the same switch is `sources.enabled`:
+
+```toml
+[sources]
+enabled = ["remotive", "arbeitnow", "adzuna"]
+```
+
+A job found this way is still applied through its real ATS handler when its apply link is on a
+known ATS. Sources that need bot-protection tricks (spoofed browsers, proxies, solving
+challenges) are not included.
 
 ## Discovered company boards
 

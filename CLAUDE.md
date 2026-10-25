@@ -31,19 +31,16 @@ Users bring their own AI: ChatGPT plan via Codex CLI, API keys, and later local 
 - SQLite (WAL) via SQLAlchemy 2 typed `Mapped` models + Alembic; API schemas are separate
   Pydantic models (no SQLModel). Vectors: numpy cosine; sqlite-vec only if measured slow.
 - Background work: asyncio worker pool inside the FastAPI process; `jobs.state` is the queue.
-- APScheduler (SQLAlchemy job store, scheduler phase only). aiolimiter. tenacity. loguru
-  (with a redaction filter). platformdirs.
+- APScheduler (SQLAlchemy job store), aiolimiter, tenacity, loguru (redaction filter), platformdirs.
 - AI: LiteLLM (API keys, Ollama/LM Studio); subprocess adapters for `codex exec --json` and `claude -p --output-format json`.
 - Scraping: httpx (async), python-jobspy, Playwright, selectolax, extruct, trafilatura,
-  rapidfuzz, lingua-py. Embeddings: fastembed (small bge model).
+  rapidfuzz, lingua-py. Embeddings: fastembed.
 - CV: python-docx + lxml, pylatexenc/TexSoup + Tectonic, pdf2docx, LibreOffice headless
   (DOCX->PDF, ODT<->DOCX), PyMuPDF, pdfplumber, Pillow/scikit-image (layout diff).
-- Apply: Playwright (installed Chrome, persistent context per site), imap-tools,
-  cryptography (AES-GCM) + argon2-cffi + keyring for the vault.
-- Frontend: Angular + TypeScript + Tailwind, Chart.js, ngx-fast-diff.
-  Built frontend ships inside the Python wheel; end users never need Node for the UI.
-- Tooling: ruff, mypy, pre-commit, pytest (+ saved HTML fixtures), GitHub Actions
-  (Win/macOS/Linux), MkDocs Material.
+- Apply: Playwright (installed Chrome, persistent context per site), imap-tools, vault via
+  cryptography (AES-GCM) + argon2-cffi + keyring.
+- Frontend: Angular + TypeScript + Tailwind, Chart.js, ngx-fast-diff; built into the wheel.
+- Tooling: ruff, mypy, pre-commit, pytest (+ HTML fixtures), GitHub Actions, MkDocs Material.
 
 ## 4. Pipeline flow
 Sources -> Discover -> Enrich -> Filter/Rank -> AI Score -> Tailor -> Review (optional)
@@ -78,10 +75,13 @@ Tailoring happens just before applying, never for jobs that will not be applied 
 
 ### 5.2 Discovery (`sources/`)
 - Plugin per source with `search(query) -> JobStub[]` and `fetch_details(stub) -> Job`.
-- Priority: public ATS JSON APIs (Greenhouse, Lever, Ashby, SmartRecruiters, Recruitee,
-  Workable, Workday cxs) > python-jobspy (LinkedIn, Indeed, Glassdoor, ZipRecruiter,
-  Google, Bayt) > per-site plugins (Wuzzuf, Forasna)
-  > generic extractor (JSON-LD -> CSS heuristics -> AI extraction).
+- Plugins live in `sources/ats|aggregators|boards|companies` (auto-registry; helpers in
+  `sources/common.py`, `parsing.py`, `tasks.py`). Aggregators/boards/companies/Telegram are opt-in.
+- Priority: public ATS JSON APIs (Greenhouse, Lever, Ashby, Workday cxs, 100+ more) >
+  python-jobspy (LinkedIn, Indeed, Glassdoor, ZipRecruiter, Google, Bayt) > aggregators and
+  per-site plugins (Wuzzuf, Forasna) > generic extractor (JSON-LD -> CSS -> AI extraction).
+- Also: Telegram channels (t.me/s preview), discovered boards (Common Crawl,
+  `linkit discover-boards`), aggregator API keys from the vault.
 - Never defeat bot challenges: no TLS-fingerprint spoofing, challenge-solving browsers, rotating
   proxies or fake crawler/app user agents. robots.txt is not enforced (maintainer, 2026-10-25).
 - ATS detector routes any pasted URL (or careers-page HTML) to the right plugin.
@@ -168,8 +168,7 @@ src/linkit_all/
   matching/   rules, embeddings, scoring
   tailor/     docx/, latex/, odt/, pdf_in/, render/, verify/
   apply/      handlers/<ats>.py, agent/, accounts/, vault/, email_verify/, answers/
-  reports/
-  cli.py      `linkit` (serve), `linkit doctor`, `linkit run <stage>`
+  reports/ · cli.py  `linkit` (serve), `linkit doctor`, `linkit run <stage>`
 frontend/     Angular 21 app -> src/linkit_all/static (Angular 22 needs Node >= 24.15)
 tests/        unit, fixtures/<ats>/*.html, e2e (dry-run only)
 docs/
@@ -178,13 +177,12 @@ docs/
 ## 9. Working rules for agents
 - Small, focused changes; one module per task when possible. Don't refactor unrelated code.
 - Type hints everywhere; ruff + mypy clean; tests for every new logic path.
-- New source or ATS handler = plugin + fixture HTML + tests. No live-site calls in CI.
-- E2E apply tests run in dry-run mode only. Never submit real applications in tests.
-- Update this file when a decision in it changes (keep it under 200 lines).
-- Unsure about scope, a constraint, or a dependency? Ask; don't guess.
+- New source or ATS handler = plugin + fixture + tests. No live-site calls in CI; E2E apply
+  tests are dry-run only, never submit real applications.
+- Update this file when a decision in it changes (max 200 lines). Unsure? Ask; don't guess.
 
 ## 10. Build order
-Phases 1-7 are built; blocked items are listed in handoff.md.
+Phases 1-8 are built; blocked items are listed in handoff.md.
 1. Core: models, SQLite, state machine, providers (Claude/Codex CLI, API keys), DOCX tailoring.
 2. Discovery + matching: ATS APIs, jobspy, Wuzzuf, Forasna, careers pages, dedupe, AI tiering.
 3. UI v1: setup wizard, jobs, review queue, live run, report.
@@ -194,6 +192,8 @@ Phases 1-7 are built; blocked items are listed in handoff.md.
 6. Generic careers extractor and AI form agent: built. Naukrigulf blocked.
 7. Local models, LaTeX/ODT/PDF CVs, scheduler, reports, Arabic UI, docs: built. Outlook
    OAuth, macOS/Linux LO bundles, GitHub/PyPI release: pending.
+8. Sources ported from freehire (MIT): ATS feeds, aggregators, boards, companies, Telegram,
+   board discovery: built.
 
 ## 11. License
 AGPL-3.0-or-later (code is reused from ApplyPilot/AIHawk). Reused files keep their
