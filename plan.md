@@ -275,3 +275,42 @@ vault: not started, needs the maintainer.
 - ✅ D5 Gmail IMAP: find the spam folder by the \Junk special-use flag, not the English name
 - ✅ D6 Careers browser fallback: links to a known ATS are re-routed to that ATS plugin
 - ✅ D7 Unit tests use an in-memory keyring (failed without an OS keyring backend)
+
+### Phase 10 — Trust filter: ghost and scam jobs 🟡
+Goal: stop spending the user's time and AI tokens on scam postings and ghost jobs (real
+company, stale or never-filled opening), with no extra AI calls. Research (2026-10-25, code
+read, not READMEs): tobiasverified/ghost-job-detector (MIT: vagueness score, ATS first-published
+age), Iron-Mark/Hackathon-HireProof (ISC: scam vocabulary, text normalizer, domain mismatch,
+floors + signal trace), Farhan89082 (age tiers, fuzzy repost, vague titles; ideas only),
+Arya185 (MIT: fee/contact phrase lists). Rejected: every ML model (English-only 2014 EMSCAD,
+scam-only), aliabdm (one LLM call per job, no rules), paid/search APIs. ghostbust.us: DNS fails.
+Decisions (maintainer, 2026-10-25):
+- Two separate scores per job, `scam` and `ghost` (0-100), each with a signal list
+  `{code, weight, evidence}`, stored in `jobs.data["trust"]`; EN + AR rules.
+- Scam high (>= 65) -> `filtered_out` with a coded reason; "Not a scam" restores and
+  allow-lists the company; "Report" adds it to the blacklist.
+- Ghost likely (>= 50) -> tier `low` (never AI-scored or auto-applied unless low opt-in).
+  Setting "Also filter out ghost jobs above N" (default off, N = 50) plus a bulk action on the
+  jobs page.
+- Network: only the ATS liveness re-check before applying (vanished -> skipped). No RDAP/DNS.
+- AI: optional `red_flags` field in the existing batched score prompt; can raise, never clear.
+- Runs inside the rank stage after hard rules and before embeddings, so dropped jobs cost nothing.
+- Reused MIT/ISC files keep their notices in NOTICE; lists are rewritten, not pasted.
+Decisions made by the orchestrator: verdict bands scam 35/65, ghost 35/50 (from the
+references, untuned); repeat sightings go in a new `job_sightings` table (store_page drops
+duplicates today); salary outlier = >= 2.5x the median of stored jobs with the same title family
+and currency.
+Execution tasks:
+- ⬜ G1 Sightings: `job_sightings` (job_id, run_id, seen_at, url) + migration; store_page records
+  a sighting for every duplicate; first_seen/seen_runs helpers
+- ⬜ G2 `matching/trust/normalize.py` (NFKC, homoglyphs, leetspeak, Arabic letter variants,
+  clause negation with coercion override) + `scam.py` rules, floors and trace (EN + AR)
+- ⬜ G3 `matching/trust/ghost.py`: age (posted_at, ATS first-published, first sighting), reposts
+  and still-open across runs, vagueness port (EN + AR), vague titles, company role surge,
+  missing salary (small)
+- ⬜ G4 Wire into rank: thresholds, filtered_out/low with codes, settings section, restore/report API
+- ⬜ G5 UI: badge in the jobs table, signals in the drawer (translated), Not a scam / Report,
+  ghost cut-off setting + bulk action
+- ⬜ G6 ATS liveness check in the apply runner before tailoring
+- ⬜ G7 Optional `red_flags` in the batched score prompt + schema
+- ⬜ G8 Docs: NOTICE, CLAUDE.md §5.3, docs/, handoff
