@@ -1,0 +1,10 @@
+{"items":[
+{"id":178956,"title":"Senior AI Platform Engineer","isPartTime":false,
+ "jobAdWorkLocation":{"workLocationType":"Remote","city":null,"region":null,"country":"Portugal"},
+ "area":{"id":2140,"name":"Data & Analytics"}},
+{"id":178953,"title":"Junior Business Analyst","isPartTime":false,
+ "jobAdWorkLocation":{"workLocationType":"Hybrid","city":"Warsaw","region":"Mazovia","country":"Poland"},
+ "area":{"id":2133,"name":"Project Delivery"}},
+{"id":178950,"title":"Part-time Tester","isPartTime":true,
+ "jobAdWorkLocation":null,"area":{"id":2141,"name":"Test & QA"}}
+],"totalCount":3}

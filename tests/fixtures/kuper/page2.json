@@ -1,0 +1,7 @@
+{"result":[
+{"category":"pagination","data":{"totalCount":2,"pages":2}},
+{"category":"vacancies","data":[
+{"id":"uuid-2","title":"Оператор","city":"Орел","friendlyUrl":"Operator-v-Kuper","idForUrl":1273,
+ "description":"<p>Answer calls.</p>","wf":["Офисный"]}
+]}
+]}

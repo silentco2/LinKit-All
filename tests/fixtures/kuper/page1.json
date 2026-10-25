@@ -1,0 +1,7 @@
+{"result":[
+{"category":"pagination","data":{"totalCount":2,"pages":2}},
+{"category":"vacancies","data":[
+{"id":"uuid-1","title":"Курьер","city":"Москва","friendlyUrl":"Kurer-v-Kuper","idForUrl":1272,
+ "description":"<p>Deliver things.</p><script>alert(1)</script>","wf":["Удалённый"]}
+]}
+]}
