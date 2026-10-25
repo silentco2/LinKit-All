@@ -130,6 +130,9 @@ boards_per_run = 300           # 0 to 20000; the oldest-crawled boards go first
   `Crawl-delay` still slows the requests.
 - A new ATS plugin takes part by setting `cdx_hosts` (a list of Common Crawl URL patterns) next
   to its `url_patterns`.
+- The newest Common Crawl collection is sometimes listed before its index is fully served (a
+  query answers 404). Such a collection is dropped and the next newest is used, up to three;
+  the log says which one each ATS used.
 
 ## 4. Telegram channels
 
@@ -177,7 +180,11 @@ telegram_channels = ["hrlunapark", "@job_python", "https://t.me/zrabota"]
   rate is followed. A missing or failing `robots.txt` changes nothing.
 - **Rate limits per host.** Normally 2 requests per second per host. Slower for some:
   LinkedIn 1 request per 2 seconds, Wuzzuf and Forasna 1 request per 10 seconds, Workable
-  and Workday 1 per second.
+  and Workday (`myworkdayjobs.com`, `myworkdaysite.com`) 1 per second, Workstream 1 per second,
+  Join 1.5 per second, HigherMe 1 request per 3 seconds.
+- **Which ATS applies.** A job found through a job site, aggregator, company plugin or Telegram
+  channel is labelled with that source, but when its apply link is on a known ATS (Greenhouse,
+  Lever, Workday...) the job is routed to that ATS's apply handler. The source name is kept.
 - **Retries.** A 429, a 5xx or a network error is retried up to 4 times with growing waits.
 - **No bot-challenge tricks.** Nothing here defeats a CAPTCHA or a bot check.
 

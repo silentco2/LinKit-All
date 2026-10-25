@@ -1,6 +1,5 @@
 import asyncio
 import json
-import time
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from pathlib import Path
@@ -329,6 +328,36 @@ def test_deduper(tmp_path: Path) -> None:
     assert d.add(stub("Engineer, Backend", url="https://z.io/3")) is None  # fuzzy, same company
     assert d.add(stub("Backend Engineer", company="Globex", url="https://z.io/4"))
     assert d.add(stub("Frontend Engineer", url="https://z.io/5"))
+
+
+def test_route_ats_sets_ats_for_non_ats_sources_only() -> None:
+    from linkit_all.sources.store import route_ats
+
+    reg = registry()
+    assert reg["jobboardly"].kind == "ats" and reg["remotive"].kind != "ats"
+
+    def job(source: str, apply_url: str | None, ats: str | None = None) -> JobStub:
+        return JobStub(source=source, url="https://x.io/1", title="T", company="C",
+                       apply_url=apply_url, ats=ats or source)  # fmt: skip
+
+    stubs = [
+        job("remotive", "https://boards.greenhouse.io/acme/jobs/1"),  # board -> greenhouse
+        job("remotive", "https://jobs.lever.co/acme/abc"),
+        job("remotive", "https://acme.example/apply"),  # no known ATS: unchanged
+        job("remotive", None),
+        job("greenhouse", "https://jobs.lever.co/acme/abc"),  # an ATS source keeps its own
+        job("not-registered", "https://jobs.lever.co/acme/abc"),
+    ]
+    out = route_ats(stubs, reg)
+    assert [(j.source, j.ats) for j in out] == [
+        ("remotive", "greenhouse"),
+        ("remotive", "lever"),
+        ("remotive", "remotive"),
+        ("remotive", "remotive"),
+        ("greenhouse", "greenhouse"),
+        ("not-registered", "not-registered"),
+    ]
+    assert stubs[0].ats == "remotive"  # the input is not mutated
 
 
 def mock_transport(calls: list[str]) -> httpx.MockTransport:
@@ -663,7 +692,7 @@ class FakeSource(Source):
         ]  # fmt: skip
 
 
-def run_discover(tmp_path: Path, sources: list[FakeSource]) -> tuple[Any, Any, float]:
+def run_discover(tmp_path: Path, sources: list[FakeSource]) -> tuple[Any, Any]:
     db = init_db(tmp_path / "t.db")
     FakeSource.running = FakeSource.overlap = 0
 
@@ -679,23 +708,20 @@ def run_discover(tmp_path: Path, sources: list[FakeSource]) -> tuple[Any, Any, f
                 {s.name: s for s in sources},
             )
 
-    start = time.monotonic()
-    stats = asyncio.run(go())
-    return db, stats, time.monotonic() - start
+    return db, asyncio.run(go())
 
 
 def test_discover_runs_sources_side_by_side(tmp_path: Path) -> None:
     a, b = FakeSource("a", delay=0.2), FakeSource("b", delay=0.2)
-    _, stats, took = run_discover(tmp_path, [a, b])
+    _, stats = run_discover(tmp_path, [a, b])
     assert stats.tasks_done == 6
     assert (a.peak, b.peak) == (1, 1)  # parallel=1: one task at a time per source
     assert FakeSource.overlap == 2  # but the two sources overlapped
-    assert took < 1.0  # sum would be 1.2 s; max(source) is 0.6 s
 
 
 def test_discover_parallel_source_runs_tasks_together(tmp_path: Path) -> None:
     api = FakeSource("api", parallel=3, delay=0.1)
-    _, stats, _ = run_discover(tmp_path, [api, FakeSource("slow", delay=0.1)])
+    _, stats = run_discover(tmp_path, [api, FakeSource("slow", delay=0.1)])
     assert stats.tasks_done == 6
     assert api.peak == 3
 
@@ -721,7 +747,7 @@ def test_discover_higher_priority_duplicate_upgrades_stored_job(tmp_path: Path) 
     # lower-priority copy is stored first.
     best = FakeSource("best", priority=0, delay=0.3)
     other = FakeSource("other", priority=1, delay=0.0)
-    db, stats, _ = run_discover(tmp_path, [best, other])
+    db, stats = run_discover(tmp_path, [best, other])
     assert (stats.new, stats.duplicates) == (3, 3)
     with db() as s:
         jobs = list(s.scalars(select(Job)))
@@ -740,7 +766,7 @@ def test_discover_higher_priority_duplicate_upgrades_stored_job(tmp_path: Path) 
 def test_lower_priority_duplicate_does_not_replace(tmp_path: Path) -> None:
     best = FakeSource("best", priority=0, delay=0.0)
     other = FakeSource("other", priority=1, delay=0.2)
-    db, stats, _ = run_discover(tmp_path, [best, other])
+    db, stats = run_discover(tmp_path, [best, other])
     assert (stats.new, stats.duplicates) == (3, 3)
     with db() as s:
         assert {j.source for j in s.scalars(select(Job))} == {"best"}

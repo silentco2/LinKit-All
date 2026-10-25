@@ -15,7 +15,6 @@ COOK = "/j/965a796b/moxies/pickering-79247/line-cook-09eacfc8"
 
 @pytest.fixture(autouse=True)
 def no_pacing(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("linkit_all.sources.ats.workstream.GAP", 0)
     monkeypatch.setattr(Http, "_limiter", lambda self, host: AsyncLimiter(1000, 1))  # fast Http
 
 

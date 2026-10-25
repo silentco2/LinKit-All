@@ -16,7 +16,7 @@ from linkit_all.sources.base import JobStub, Source, Task
 from linkit_all.sources.careers import Unsupported
 from linkit_all.sources.discovery import board_tasks, note_crawl, upsert_boards
 from linkit_all.sources.http import Http
-from linkit_all.sources.store import Deduper, mark_task, store_page
+from linkit_all.sources.store import Deduper, mark_task, route_ats, store_page
 
 
 @dataclass
@@ -104,7 +104,9 @@ async def discover(
             try:
                 async for stubs in registry[task.source].search(http, task, start):
                     seen += len(stubs)
-                    new = store_page(db, run_id, task.key, page, stubs, deduper)
+                    new = store_page(
+                        db, run_id, task.key, page, route_ats(stubs, registry), deduper
+                    )
                     stats.new += new
                     stats.duplicates += len(stubs) - new
                     logger.info("{} page {}: {} new of {}", task.key, page, new, len(stubs))

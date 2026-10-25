@@ -67,8 +67,7 @@ class HiringRoom(Source):
             url = PAGER.format(board=board, page=page)
             await http.allowed(url)
             form = {"selectedPage": str(page), "typePortal": "external"}
-            # ponytail: Http has no public form POST; its private _send is the one retry path.
-            resp = await http._send("POST", url, data=form)
+            resp = await http.post_form(url, form)
             resp.raise_for_status()
             data = resp.json()
             total = (data.get("data") or {}).get("total_vacancies")

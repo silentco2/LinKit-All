@@ -1,7 +1,7 @@
 """Dedupe and persist job stubs; a page and its checkpoint commit together."""
 
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -11,7 +11,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from linkit_all.core.models import Job, JobState, SourceCheckpoint
-from linkit_all.sources.base import JobStub
+from linkit_all.sources.ats_detector import detect
+from linkit_all.sources.base import JobStub, Source
 from linkit_all.sources.text import job_hash, norm, norm_company, normalize_url
 
 
@@ -80,6 +81,20 @@ class Deduper:
             return None
         url, h, _ = self.register(stub)
         return url, h
+
+
+def route_ats(stubs: list[JobStub], registry: Mapping[str, Source]) -> list[JobStub]:
+    """Aggregators, boards, company plugins and Telegram label their jobs with their own name, but
+    the application often lives on a known ATS. When a non-ATS source's `apply_url` is on a
+    registered ATS, set `ats` to it (`source` stays), so the apply stage picks that handler."""
+    out = []
+    for st in stubs:
+        src = registry.get(st.source)
+        found = None
+        if src and src.kind != "ats" and st.apply_url:
+            found = detect(st.apply_url, registry.values())
+        out.append(st.model_copy(update={"ats": found[0]}) if found else st)
+    return out
 
 
 def _apply_data(stub: JobStub) -> dict[str, Any]:

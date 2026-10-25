@@ -8,7 +8,7 @@ and `note_crawl` records how each went (boards that fail 5 times in a row are sw
 
 import asyncio
 import json
-from collections.abc import AsyncIterator, Awaitable, Callable, Collection
+from collections.abc import AsyncIterator, Awaitable, Callable, Collection, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -27,6 +27,7 @@ from linkit_all.sources.http import Http, RetryableStatus
 COLLINFO = "https://index.commoncrawl.org/collinfo.json"
 CC_HOST = "index.commoncrawl.org"
 CC_RATE = 1.0  # requests per second to the index
+MAX_COLLECTIONS = 3  # newest collections tried before giving up
 MAX_FAILURES = 5  # failed crawls in a row before a board is switched off
 # Path segments that look like a slug but are the vendor's own pages or crawler leftovers.
 NOT_SLUGS = frozenset(
@@ -37,6 +38,12 @@ NOT_SLUGS = frozenset(
 
 class DiscoveryError(Exception):
     """Common Crawl could not be used (network, unexpected answer)."""
+
+
+class CollectionGone(DiscoveryError):
+    """A collection's index answered 404. The newest one is sometimes listed before it is fully
+    served (it states 2 pages and 404s the second); a live index answers "no captures" with a
+    200 and 0 pages, never a 404."""
 
 
 @dataclass
@@ -63,17 +70,19 @@ async def _get(
         raise DiscoveryError(f"{url}: {e}") from e
 
 
-async def latest_index(http: Http, sleep: Callable[[float], Awaitable[None]]) -> str:
-    """CDX API root of the newest collection. Same host as COLLINFO, so one allowed() call reads
-    the host's Crawl-delay for both requests."""
+async def recent_indexes(http: Http, sleep: Callable[[float], Awaitable[None]]) -> list[str]:
+    """CDX API roots of the newest `MAX_COLLECTIONS` collections, newest first. Same host as
+    COLLINFO, so one allowed() call reads the host's Crawl-delay for all of the requests."""
     await http.allowed(COLLINFO)
     resp = await _get(http, COLLINFO, sleep)
     try:
         resp.raise_for_status()
-        index = f"https://{CC_HOST}/{resp.json()[0]['id']}-index"
-    except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError) as e:
+        ids = [str(c["id"]) for c in resp.json()[:MAX_COLLECTIONS]]
+    except (httpx.HTTPError, ValueError, KeyError, TypeError) as e:
         raise DiscoveryError(f"unexpected answer from {COLLINFO}: {e}") from e
-    return index
+    if not ids:
+        raise DiscoveryError(f"{COLLINFO} lists no collection")
+    return [f"https://{CC_HOST}/{i}-index" for i in ids]
 
 
 async def cdx_urls(
@@ -82,8 +91,8 @@ async def cdx_urls(
     """Every crawled URL (status 200) matching `pattern`, page by page."""
     query = {"url": pattern, "output": "json", "fl": "url", "filter": "status:200"}
     resp = await _get(http, index, sleep, params={**query, "showNumPages": "true"})
-    if resp.status_code == 404:  # "No Captures found"
-        return
+    if resp.status_code == 404:
+        raise CollectionGone(f"{pattern}: 404")
     try:
         resp.raise_for_status()
         pages = int(resp.json().get("pages", 0))
@@ -91,6 +100,8 @@ async def cdx_urls(
         raise DiscoveryError(f"page count for {pattern}: {e}") from e
     for page in range(pages):
         resp = await _get(http, index, sleep, params={**query, "page": page})
+        if resp.status_code == 404:
+            raise CollectionGone(f"{pattern} page {page}: 404")
         try:
             resp.raise_for_status()
         except httpx.HTTPError as e:
@@ -128,11 +139,38 @@ async def discover_ats(
                     seen[slug.lower()] = slug
                     if len(seen) >= cap:
                         return list(seen.values())
+    except CollectionGone:
+        raise  # not a partial result: the caller starts over on an older collection
     except DiscoveryError:
         if not seen:
             raise
         logger.warning("{}: index stopped early after {} boards", src.name, len(seen))
     return list(seen.values())
+
+
+async def discover_ats_any(
+    http: Http,
+    indexes: Sequence[str],
+    src: Source,
+    cap: int,
+    sleep: Callable[[float], Awaitable[None]],
+    gone: set[str],
+) -> list[str]:
+    """`discover_ats` on the first of `indexes` that is not gone (404), newest first. Indexes
+    found gone are added to `gone`, so the next ATS skips them."""
+    for index in indexes:
+        if index in gone:
+            continue
+        try:
+            slugs = await discover_ats(http, index, src, cap, sleep)
+        except CollectionGone as e:
+            gone.add(index)
+            logger.warning("{}: {} answered 404 ({}); trying the next collection", src.name,
+                           index.rsplit("/", 1)[-1], e)  # fmt: skip
+            continue
+        logger.info("{}: Common Crawl collection {} used", src.name, index.rsplit("/", 1)[-1])
+        return slugs
+    raise DiscoveryError(f"none of the newest {len(indexes)} Common Crawl collections answered")
 
 
 def upsert_boards(db: sessionmaker[Session], ats: str, slugs: Collection[str], source: str) -> int:
@@ -162,12 +200,13 @@ async def discover_boards(
     ready = {n: s for n, s in registry.items() if s.kind == "ats" and s.cdx_hosts}
     if bad := [n for n in ats if n not in ready]:
         raise ValueError(f"cannot discover boards for: {', '.join(bad)} (try {', '.join(ready)})")
-    index = await latest_index(http, sleep)
+    indexes = await recent_indexes(http, sleep)
+    gone: set[str] = set()
     out: dict[str, AtsResult] = {}
     for name in ats or ready:
         result = out[name] = AtsResult()
         try:
-            slugs = await discover_ats(http, index, ready[name], max_per_ats, sleep)
+            slugs = await discover_ats_any(http, indexes, ready[name], max_per_ats, sleep, gone)
         except DiscoveryError as e:
             result.error = str(e)
             logger.warning("{}: {}", name, e)

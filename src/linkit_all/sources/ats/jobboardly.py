@@ -6,7 +6,6 @@ import re
 from collections.abc import AsyncIterator
 from typing import Any
 
-from linkit_all.core.search import SearchConfig
 from linkit_all.sources.ats._f13 import mode
 from linkit_all.sources.base import JobStub, Source, Task, from_iso
 from linkit_all.sources.boards._f31 import ats_of, last_segment
@@ -14,34 +13,22 @@ from linkit_all.sources.common import strip_html
 from linkit_all.sources.http import Http
 
 LIST = "https://{}.jobboardly.com/jobs.json"
-_BOARD = re.compile(
-    r"(?:https?://|^jobboardly:)([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)(?:\.jobboardly\.com|$)", re.I
-)
 _PERIODS = {"yearly": "year", "monthly": "month", "daily": "day", "hourly": "hour"}
 
 
 class Jobboardly(Source):
-    name = "jobboardly"
-    kind = "board"
+    """The board is the subdomain: `hire-mamas` for hire-mamas.jobboardly.com."""
 
-    def tasks(self, cfg: SearchConfig) -> list[Task]:
-        """One task per Jobboardly board named in the company list."""
-        s = cfg.search
-        boards = dict.fromkeys(
-            m[1].lower()
-            for e in cfg.sources.companies
-            if (m := _BOARD.match(e)) and m[1].lower() != "www"
-        )
-        return [
-            Task(self.name, f"{self.name}:{b}", board=b, limit=s.max_results_per_query * 5,
-                 posted_within_days=s.posted_within_days)
-            for b in boards
-        ]  # fmt: skip
+    name = "jobboardly"
+    kind = "ats"
+    url_patterns = (re.compile(r"(?<![\w.-])(?!(?:www|app)\.)([\w-]+)\.jobboardly\.com", re.I),)
+    cdx_hosts = ("*.jobboardly.com",)
+    parallel = 3
 
     async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:
         if start_page:
             return  # the whole board comes in one page
-        rows = await http.get_json(LIST.format(task.board))
+        rows = await http.get_json(LIST.format(task.board.lower()))
         stubs = [s for r in rows[: task.limit] if (s := self.stub(r, task.board))]
         if stubs:
             yield stubs

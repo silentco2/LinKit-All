@@ -30,9 +30,8 @@ def next_element(node: LexborNode) -> LexborNode | None:
 async def post_form(
     http: Http, url: str, data: Mapping[str, Any], headers: Mapping[str, str] | None = None
 ) -> httpx.Response:
-    """POST an urlencoded form through Http's per-host limiter and retries (it has no helper for
-    forms yet). HTTP errors raise."""
-    resp = await http._send("POST", url, data=dict(data), headers=dict(headers or {}))
+    """`Http.post_form`, with HTTP errors raised."""
+    resp = await http.post_form(url, data, headers)
     resp.raise_for_status()
     return resp
 

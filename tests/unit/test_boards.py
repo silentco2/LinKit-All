@@ -46,9 +46,14 @@ async def no_sleep(_: float) -> None:
 
 
 def cdx_handler(
-    pages: dict[str, list[list[str]]], seen: list[httpx.Request] | None = None
+    pages: dict[str, list[list[str]]],
+    seen: list[httpx.Request] | None = None,
+    dead: tuple[str, ...] = (),
+    broken: tuple[str, ...] = (),
 ) -> Callable[[httpx.Request], httpx.Response]:
-    """Fake Common Crawl: `pages[pattern]` is a list of pages, each a list of URLs."""
+    """Fake Common Crawl: `pages[pattern]` is a list of pages, each a list of URLs. Collections
+    in `dead` answer every query 404; in `broken` only the second page 404s, as the real newest
+    one did. Like the real index, an unknown pattern is 200 / 0 pages."""
 
     def handle(req: httpx.Request) -> httpx.Response:
         if seen is not None:
@@ -56,13 +61,17 @@ def cdx_handler(
         if req.url.path == "/robots.txt":
             return httpx.Response(404)
         if req.url.path == "/collinfo.json":
-            return httpx.Response(200, json=[{"id": "CC-MAIN-2026-43"}, {"id": "CC-MAIN-2026-39"}])
+            ids = ["CC-MAIN-2026-43", "CC-MAIN-2026-39", "CC-MAIN-2026-34", "CC-MAIN-2026-30"]
+            return httpx.Response(200, json=[{"id": i} for i in ids])
         q = req.url.params
-        assert str(req.url).startswith(INDEX) and q["output"] == "json" and q["fl"] == "url"
-        assert q["filter"] == "status:200"
-        data = pages.get(q["url"])
-        if data is None:
-            return httpx.Response(404, text="No Captures found")
+        collection = req.url.path.strip("/").removesuffix("-index")
+        if collection in dead:
+            return httpx.Response(404, text="Not Found")
+        assert str(req.url).startswith(f"https://index.commoncrawl.org/{collection}-index")
+        assert q["output"] == "json" and q["fl"] == "url" and q["filter"] == "status:200"
+        data = pages.get(q["url"], [])
+        if collection in broken and q.get("page") == "1":
+            return httpx.Response(404, text="Not Found")
         if "showNumPages" in q:
             return httpx.Response(200, json={"pages": len(data), "pageSize": 5})
         lines = [json.dumps({"url": u}) for u in data[int(q["page"])]]
@@ -133,6 +142,36 @@ def test_cap_stops_paging(tmp_path: Path) -> None:
     seen.clear()
     res = run(cdx_handler({GH: GH_URLS}, seen), db, ats=["greenhouse"], max_per_ats=2)
     assert res["greenhouse"].found == 2 and pages_asked(seen) == ["0", "1"]
+
+
+def test_dead_newest_collection_falls_back_to_the_next(tmp_path: Path) -> None:
+    db = init_db(tmp_path / "t.db")
+    seen: list[httpx.Request] = []
+    pages = {GH: GH_URLS, "jobs.lever.co/*": [["https://jobs.lever.co/palantir/x"]]}
+    res = run(cdx_handler(pages, seen, dead=("CC-MAIN-2026-43",)), db, ats=["greenhouse", "lever"])
+    assert res["greenhouse"].found == 3 and res["lever"].found == 1
+    assert {r.url.path for r in seen if r.url.params.get("page")} == {"/CC-MAIN-2026-39-index"}
+    assert sum(r.url.path == "/CC-MAIN-2026-43-index" for r in seen) == 1  # tried once, not per ATS
+
+
+def test_collection_that_404s_a_page_is_dropped_whole(tmp_path: Path) -> None:
+    db = init_db(tmp_path / "t.db")
+    seen: list[httpx.Request] = []
+    res = run(cdx_handler({GH: GH_URLS}, seen, broken=("CC-MAIN-2026-43",)), db, ats=["greenhouse"])
+    assert res["greenhouse"].found == 3 and not res["greenhouse"].error
+    assert any(str(r.url).startswith(INDEX) for r in seen)  # the newest was tried first
+    assert [r.url.path for r in seen if r.url.params.get("page") == "0"][-1] == (
+        "/CC-MAIN-2026-39-index"
+    )
+
+
+def test_gives_up_after_three_dead_collections(tmp_path: Path) -> None:
+    db = init_db(tmp_path / "t.db")
+    seen: list[httpx.Request] = []
+    dead = ("CC-MAIN-2026-43", "CC-MAIN-2026-39", "CC-MAIN-2026-34")
+    res = run(cdx_handler({GH: GH_URLS}, seen, dead=dead), db, ats=["greenhouse"])
+    assert "none of the newest 3" in res["greenhouse"].error and res["greenhouse"].found == 0
+    assert not any("2026-30" in r.url.path for r in seen)  # the fourth is never tried
 
 
 def test_all_ats_with_hosts_are_asked_and_empty_ones_reported(tmp_path: Path) -> None:

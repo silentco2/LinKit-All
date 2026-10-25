@@ -2,7 +2,6 @@
 employer-wide positions listing is server-rendered cards and each posting page carries the body.
 Logic adapted from freehire (MIT)."""
 
-import asyncio
 import re
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
@@ -18,9 +17,6 @@ from linkit_all.sources.http import Http
 from linkit_all.sources.text import html_to_text
 
 BASE = "https://www.workstream.us"
-# The origin refuses by request rate per IP (about 1 req/s is accepted, 1.4 req/s is refused
-# half the time), so every request waits this long and the postings are read one by one.
-GAP = 1.0
 CHUNK = 10  # postings per yielded page (also the listing's cards per page)
 MAX_PAGES = 200  # backstop for a page that states no page count
 _POSTING = re.compile(r"^/j/[0-9a-f]{8}/[^/]+/[^/]+/[^/]+-([0-9a-f]{8})$")  # ends in the posting id
@@ -83,7 +79,6 @@ def body_of(page: str) -> str:
 
 
 async def fetch(http: Http, url: str) -> str:
-    await asyncio.sleep(GAP)
     return (await get_page(http, url)).text
 
 

@@ -1,30 +1,47 @@
+import asyncio
 from collections.abc import Callable
 from typing import Any
 
 import httpx
 
 from linkit_all.core.search import SearchConfig
-from linkit_all.sources.base import JobStub
-from linkit_all.sources.boards.jobboardly import Jobboardly
+from linkit_all.sources import registry
+from linkit_all.sources.ats.jobboardly import Jobboardly
+from linkit_all.sources.ats_detector import detect
+from linkit_all.sources.base import JobStub, Task
+from linkit_all.sources.http import Http
+from linkit_all.sources.runner import company_tasks
 
 
-def test_tasks_come_from_the_company_list() -> None:
-    cfg = SearchConfig.model_validate(
-        {
-            "sources": {
-                "companies": [
-                    "https://hire-mamas.jobboardly.com/jobs",
-                    "jobboardly:Remote-Dev",
-                    "https://www.jobboardly.com",
-                    "https://example.com/careers",
-                    "greenhouse:stripe",
-                    "https://hire-mamas.jobboardly.com",
-                ]
-            }
-        }
-    )
-    assert [t.board for t in Jobboardly().tasks(cfg)] == ["hire-mamas", "remote-dev"]
-    assert Jobboardly().tasks(SearchConfig()) == []
+def test_boards_come_from_the_company_list() -> None:
+    entries = [
+        "https://hire-mamas.jobboardly.com/jobs",
+        "jobboardly:Remote-Dev",
+        "https://www.jobboardly.com",
+        "https://example.com/careers",
+        "greenhouse:stripe",
+    ]
+    assert [detect(e) for e in entries] == [
+        ("jobboardly", "hire-mamas"),
+        ("jobboardly", "Remote-Dev"),
+        None,
+        None,
+        ("greenhouse", "stripe"),
+    ]
+    cfg = SearchConfig.model_validate({"sources": {"companies": entries}})
+
+    async def resolve() -> tuple[list[Task], list[str]]:
+        transport = httpx.MockTransport(lambda req: httpx.Response(404))
+        async with httpx.AsyncClient(transport=transport) as client:
+            return await company_tasks(cfg, Http(client, default_rate=1000, attempts=1), registry())
+
+    tasks, unsupported = asyncio.run(resolve())
+    assert [t.key for t in tasks if t.source == "jobboardly"] == [
+        "jobboardly:hire-mamas",
+        "jobboardly:Remote-Dev",
+    ]
+    assert not [u for u in unsupported if "jobboardly" in u]
+    assert Jobboardly.cdx_hosts == ("*.jobboardly.com",)
 
 
 def test_search(

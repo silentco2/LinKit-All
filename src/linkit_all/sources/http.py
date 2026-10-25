@@ -2,6 +2,7 @@
 
 import asyncio
 import contextlib
+from collections.abc import Mapping
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -22,8 +23,12 @@ SLOW_HOSTS = {
     "wuzzuf.net": 0.1,  # robots.txt Crawl-delay 10
     "forasna.com": 0.1,  # robots.txt Crawl-delay 10
     "apply.workable.com": 1.0,
+    "api.higherme.com": 1 / 3,
+    "join.com": 1.5,
+    "www.workstream.us": 1.0,  # refuses ~1.4 req/s per IP
 }
-SLOW_SUFFIXES = {".myworkdayjobs.com": 1.0}  # one host per Workday tenant
+# One host per tenant (Workday).
+SLOW_SUFFIXES = {".myworkdayjobs.com": 1.0, ".myworkdaysite.com": 1.0}
 
 
 def crawl_delay(text: str, token: str = ROBOTS_TOKEN) -> float | None:
@@ -83,9 +88,17 @@ class Http:
 
     async def get(self, url: str, **kwargs: Any) -> httpx.Response:
         """GET with rate limit + retries. 4xx (except 429) is returned to the caller."""
-        return await self._send("GET", url, **kwargs)
+        return await self.request("GET", url, **kwargs)
 
-    async def _send(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
+    async def post_form(
+        self, url: str, data: Mapping[str, Any], headers: Mapping[str, str] | None = None
+    ) -> httpx.Response:
+        """POST an urlencoded form, like `get`: 4xx (except 429) is returned to the caller."""
+        return await self.request("POST", url, data=dict(data), headers=dict(headers or {}))
+
+    async def request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
+        """Any method, rate-limited and retried on 429/5xx/network errors. A 4xx other than 429
+        (403, say) is returned, not raised, so the caller can look at it."""
         limiter = self._limiter(urlsplit(url).hostname or "")
         retrying = AsyncRetrying(
             stop=stop_after_attempt(self._attempts),
@@ -132,7 +145,7 @@ class Http:
         return resp.json()
 
     async def post_json(self, url: str, body: Any, **kwargs: Any) -> Any:
-        resp = await self._send("POST", url, json=body, **kwargs)
+        resp = await self.request("POST", url, json=body, **kwargs)
         resp.raise_for_status()
         return resp.json()
 

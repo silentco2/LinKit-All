@@ -55,7 +55,7 @@ async def _send(http: Http, method: str, url: str, **kwargs: Any) -> httpx.Respo
 
     async def once() -> httpx.Response:
         try:
-            return await http._send(method, url, **kwargs)
+            return await http.request(method, url, **kwargs)
         except RetryableStatus as e:  # Http gave up on a 429; our longer backoff takes over
             if e.response.status_code != 429:
                 raise
