@@ -69,7 +69,7 @@ export function expandQueries(queries: string[]): string[] {
 
 export interface SearchConfig {
   search: { queries: string[]; locations: string[]; posted_within_days: number; max_results_per_query: number };
-  sources: { companies: string[]; jobspy: string[]; jobspy_country: string; regional: string[]; enabled: string[]; telegram_channels: string[] };
+  sources: { companies: string[]; jobspy: string[]; jobspy_country: string; regional: string[]; enabled: string[]; telegram_channels: string[]; use_discovered_boards: boolean; boards_per_run: number };
   filters: {
     title_include: string[];
     title_exclude: string[];
@@ -257,6 +257,23 @@ export interface EmailState {
   imap_user: string;
   connected: boolean;
   vault: { initialized: boolean; unlocked: boolean };
+}
+
+/** One opt-in job source from GET /sources; `enabled` there is the saved state, the page edits `sources.enabled`. */
+export interface JobSource {
+  name: string;
+  kind: 'aggregator' | 'board' | 'company' | 'telegram';
+  label: string;
+  region: string;
+  needs_key: string | null;
+  key_configured: boolean;
+  description: string;
+  enabled: boolean;
+}
+
+export interface SourceList {
+  ats_count: number;
+  sources: JobSource[];
 }
 
 export interface ApiKeyProvider {

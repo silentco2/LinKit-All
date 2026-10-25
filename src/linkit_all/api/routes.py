@@ -1,7 +1,9 @@
 """REST API for the local UI. Everything lives under /api."""
 
 import asyncio
+import re
 import shutil
+import sys
 from datetime import date
 from functools import partial
 from pathlib import Path
@@ -50,6 +52,8 @@ from linkit_all.core.state import InvalidTransition, transition
 from linkit_all.core.tools import soffice_path, tectonic_path
 from linkit_all.pipeline import STAGES, PipelineError, ai_settings
 from linkit_all.reports import build_report, export_csv, export_pdf
+from linkit_all.sources import registry
+from linkit_all.sources.base import OPT_IN_KINDS, Source
 
 router = APIRouter(prefix="/api")
 
@@ -952,6 +956,43 @@ def list_keys(request: Request) -> list[dict[str, Any]]:
             }
         )
     return out
+
+
+# --- job sources (what Setup lets the user switch on) ---------------------------------
+
+
+def _describe(source: Source) -> str:
+    """First sentence of the plugin module's docstring."""
+    doc = " ".join((sys.modules[type(source).__module__].__doc__ or "").split("\n\n")[0].split())
+    first = re.match(r".+?[.!?](?=\s|$)", doc)
+    return (first.group() if first else doc)[:200]
+
+
+@router.get("/sources")
+def list_sources(request: Request) -> dict[str, Any]:
+    """The opt-in sources (names go in `sources.enabled`) plus how many ATS platforms are known."""
+    cfg = load_search(_db(request)) or SearchConfig()
+    vault = _vault(request)
+    found = registry(None, _settings(request).data_dir)
+    out = []
+    for s in found.values():
+        if s.kind not in OPT_IN_KINDS:
+            continue
+        key = s.name if s.name in KNOWN else None  # keyed plugins are named after their provider
+        out.append(
+            {
+                "name": s.name,
+                "kind": s.kind,
+                "label": getattr(s, "label", "") or s.name.replace("_", " ").title(),
+                "region": getattr(s, "region", ""),
+                "needs_key": key,
+                "key_configured": bool(key and _vault_errors(partial(get_keys, vault, key))),
+                "description": _describe(s),
+                "enabled": s.is_enabled(cfg),
+            }
+        )
+    out.sort(key=lambda o: (o["kind"], str(o["label"]).lower()))
+    return {"ats_count": sum(s.kind == "ats" for s in found.values()), "sources": out}
 
 
 @router.put("/keys/{name}")

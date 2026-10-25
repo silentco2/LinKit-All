@@ -50,6 +50,13 @@ For an API key, set `LINKIT_API_KEY` in your environment. The wizard does not ta
 - **Job sites**: LinkedIn, Indeed, Glassdoor, Google, ZipRecruiter, Wuzzuf, Bayt and Forasna.
 - **Country for Indeed.** Glassdoor is searched without a country.
 - **Company career pages**, one per line. Paste any careers page link. See [Sources](sources.md).
+- **More job sources**: job aggregators, job boards and single-company career sites, in three
+  tabs with a search box and **Enable all in this group** / **Disable all** (they act on the rows
+  shown). Every source is off until ticked. A source marked **Needs an API key** links to step 9.
+  Company job-board platforms (Greenhouse, Lever and so on) need no ticking: they work
+  automatically for any company you add.
+- **Also search discovered company boards**, with **Boards per run**: crawls the boards that
+  `linkit discover-boards` has stored (see [Sources](sources.md)).
 
 ## 4. Filters
 

@@ -1,9 +1,9 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Api } from '../api';
 import { I18n, TPipe } from '../i18n';
-import { ApiKeyProvider, ApplicationAnswers, EmailState, expandQueries, lines, Profile, Provider, SearchConfig, Segment, Status, unlines, WorkMode } from '../types';
+import { ApiKeyProvider, ApplicationAnswers, EmailState, expandQueries, JobSource, lines, Profile, Provider, SearchConfig, Segment, SourceList, Status, unlines, WorkMode } from '../types';
 
 type LocalServer = 'ollama' | 'lmstudio';
 type Step = 'profile' | 'ai' | 'search' | 'filters' | 'answers' | 'apply' | 'vault' | 'email' | 'keys' | 'finish';
@@ -214,6 +214,55 @@ type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_
                 <textarea id="telegram" dir="ltr" class="input h-32 font-mono text-xs" [disabled]="!cfg.sources.enabled.includes('telegram')" [value]="unlines(cfg.sources.telegram_channels)" (change)="cfg.sources.telegram_channels = lines(val($event))"
                           placeholder="@channel_name&#10;https://t.me/another_channel"></textarea>
                 <p class="hint">{{ 'setup.search.telegramHint' | t }}</p>
+              </div>
+              <div class="space-y-3">
+                <h3 class="font-semibold">{{ 'setup.sources.title' | t }}</h3>
+                <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'setup.sources.intro' | t }}</p>
+                @if (sourceList().ats_count) {
+                  <p class="hint">{{ 'setup.sources.ats' | t: { n: sourceList().ats_count } }}</p>
+                }
+                <div class="flex flex-wrap gap-2">
+                  @for (g of sourceGroups; track g) {
+                    <button type="button" class="btn" [class.btn-primary]="sourceGroup() === g" [attr.aria-pressed]="sourceGroup() === g" (click)="sourceGroup.set(g)">
+                      {{ 'setup.sources.group.' + g | t }} ({{ groupCount(g) }})
+                    </button>
+                  }
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <input type="search" class="input max-w-xs" [value]="sourceQuery()" (input)="sourceQuery.set(val($event))" [attr.aria-label]="'setup.sources.search' | t" [placeholder]="'setup.sources.search' | t">
+                  <button type="button" class="btn" (click)="setShown(true)">{{ 'setup.sources.enableAll' | t }}</button>
+                  <button type="button" class="btn" (click)="setShown(false)">{{ 'setup.sources.disableAll' | t }}</button>
+                  <span class="text-xs text-slate-500">{{ 'setup.sources.count' | t: { on: shownOn(), n: shownSources().length } }}</span>
+                </div>
+                <ul class="max-h-96 divide-y divide-slate-200 overflow-y-auto rounded border border-slate-200 dark:divide-slate-700 dark:border-slate-700">
+                  @for (s of shownSources(); track s.name) {
+                    <li class="px-3 py-2">
+                      <label class="flex items-start gap-2 text-sm">
+                        <input type="checkbox" class="mt-1" [checked]="cfg.sources.enabled.includes(s.name)" (change)="toggle(cfg.sources.enabled, s.name)">
+                        <span class="min-w-0 flex-1">
+                          <span class="font-medium"><bdi>{{ s.label }}</bdi></span>
+                          @if (s.region) { <span class="text-xs text-slate-500"> · <bdi>{{ s.region }}</bdi></span> }
+                          <span class="block text-xs text-slate-500 dark:text-slate-400" dir="auto">{{ s.description }}</span>
+                        </span>
+                      </label>
+                      @if (s.needs_key) {
+                        @if (keyOk(s)) {
+                          <span class="badge tier-high ms-6">{{ 'setup.sources.keyReady' | t }}</span>
+                        } @else {
+                          <button type="button" class="badge tier-mid ms-6 underline" (click)="step.set('keys')">{{ 'setup.sources.needsKey' | t }}</button>
+                        }
+                      }
+                    </li>
+                  } @empty {
+                    <li class="px-3 py-2 text-sm text-slate-500">{{ 'setup.sources.empty' | t }}</li>
+                  }
+                </ul>
+              </div>
+              <div>
+                <label class="flex items-center gap-2 text-sm font-medium"><input type="checkbox" [(ngModel)]="cfg.sources.use_discovered_boards">{{ 'setup.sources.discovered' | t }}</label>
+                <p class="hint">{{ 'setup.sources.discoveredHint' | t }}</p>
+                <label class="label mt-2" for="boards">{{ 'setup.sources.perRun' | t }}</label>
+                <input id="boards" type="number" min="0" max="20000" class="input max-w-xs" [disabled]="!cfg.sources.use_discovered_boards" [(ngModel)]="cfg.sources.boards_per_run">
               </div>
               <button class="btn btn-primary" (click)="saveSearch('setup.search.saved')" [disabled]="busy()">{{ 'setup.search.save' | t }}</button>
             </section>
@@ -587,6 +636,15 @@ export class SetupPage implements OnInit {
     { id: 'bayt', label: 'Bayt' },
     { id: 'forasna', label: 'Forasna' },
   ];
+  protected readonly sourceGroups = ['aggregator', 'board', 'company'] as const;
+  protected readonly sourceList = signal<SourceList>({ ats_count: 0, sources: [] });
+  protected readonly sourceGroup = signal<(typeof this.sourceGroups)[number]>('aggregator');
+  protected readonly sourceQuery = signal('');
+  /** The rows of the open group that match the search box (name, label or description). */
+  protected readonly shownSources = computed(() => {
+    const q = this.sourceQuery().trim().toLowerCase();
+    return this.sourceList().sources.filter((s) => s.kind === this.sourceGroup() && (!q || `${s.name} ${s.label} ${s.region} ${s.description}`.toLowerCase().includes(q)));
+  });
   protected readonly workModes: WorkMode[] = ['remote', 'hybrid', 'onsite'];
   protected readonly currencies = ['EGP', 'SAR', 'AED', 'QAR', 'KWD', 'BHD', 'OMR', 'JOD', 'USD', 'EUR', 'GBP'];
   protected readonly seniorities = ['intern', 'junior', 'mid', 'senior', 'lead', 'manager', 'executive'];
@@ -609,6 +667,7 @@ export class SetupPage implements OnInit {
     this.ans = ans;
     this.setEmail(email);
     this.setKeys(await this.api.get<ApiKeyProvider[]>('/keys'));
+    this.api.get<SourceList>('/sources').then((l) => this.sourceList.set(l)).catch(() => this.message.set({ ok: false, text: this.i18n.t('setup.sources.loadFailed') }));
     this.status.set(status);
     this.available.set(ai.available);
     if (profile.cv_name) this.api.get<Segment[]>('/profile/cv/segments').then((s) => this.segments.set(s)).catch(() => {});
@@ -633,6 +692,25 @@ export class SetupPage implements OnInit {
       return;
     }
     this.toggle(modes, mode);
+  }
+
+  groupCount(kind: JobSource['kind']): number {
+    return this.sourceList().sources.filter((s) => s.kind === kind).length;
+  }
+
+  shownOn(): number {
+    return this.shownSources().filter((s) => this.cfg!.sources.enabled.includes(s.name)).length;
+  }
+
+  /** Tick or untick every row now shown (the open group, after the search box). */
+  setShown(on: boolean): void {
+    const enabled = this.cfg!.sources.enabled;
+    const shown = new Set(this.shownSources().map((s) => s.name));
+    this.cfg!.sources.enabled = on ? [...new Set([...enabled, ...shown])] : enabled.filter((n) => !shown.has(n));
+  }
+
+  keyOk(s: JobSource): boolean {
+    return !!this.keys().find((k) => k.name === s.needs_key)?.configured;
   }
 
   toggle(list: string[], item: string): void {
