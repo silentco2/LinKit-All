@@ -154,6 +154,7 @@ class FakeBox:
     current: str = "INBOX"
     password_ok: bool = True
     spam: bool = True
+    folders: list[SimpleNamespace] | None = None  # LIST result; None = no flags anywhere
 
     def __call__(self, host: str) -> "FakeBox":
         self.host = host
@@ -174,6 +175,9 @@ class FakeBox:
     @property
     def folder(self) -> "FakeBox":
         return self
+
+    def list(self) -> list[SimpleNamespace]:
+        return self.folders or []
 
     def exists(self, name: str) -> bool:
         return self.spam
@@ -230,6 +234,32 @@ def test_wait_polls_until_mail_arrives_and_checks_spam(monkeypatch: pytest.Monke
     assert box.polls == 3
     box2 = FakeBox([[spam]], spam=False)  # no spam folder: skipped, nothing found
     assert run_wait(box2, monkeypatch, timeout_s=0.05) is None
+
+
+def test_wait_uses_folder_flagged_junk_with_localized_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    name = "[Gmail]/البريد العشوائي"
+    folders = [
+        SimpleNamespace(name="INBOX", flags=()),
+        SimpleNamespace(name=name, flags=("\\HasNoChildren", "\\Junk")),
+    ]
+    spam = msg("9", "Confirm your email", html=WORKDAY_HTML, folder=name)
+    box = FakeBox([[spam]], spam=False, folders=folders)  # `[Gmail]/Spam` does not exist
+    assert run_wait(box, monkeypatch) == Verification(link=WORKDAY_LINK)
+
+
+def test_wait_no_flagged_folder_falls_back_to_gmail_spam(monkeypatch: pytest.MonkeyPatch) -> None:
+    folders = [SimpleNamespace(name="INBOX", flags=())]
+    spam = msg("9", "Confirm your email", html=WORKDAY_HTML, folder="[Gmail]/Spam")
+    box = FakeBox([[spam]], folders=folders)
+    assert run_wait(box, monkeypatch) == Verification(link=WORKDAY_LINK)
+
+
+def test_wait_no_spam_folder_reads_inbox_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    hit = msg("1", "Your code", "code: 123456")
+    box = FakeBox([[hit]], spam=False)
+    assert run_wait(box, monkeypatch) == Verification(code="123456")
 
 
 def test_wait_ai_fallback_only_when_regex_fails(monkeypatch: pytest.MonkeyPatch) -> None:

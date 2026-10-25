@@ -272,5 +272,5 @@ vault: not started, needs the maintainer.
 - ⬜ D2 Generic form agent: controls inside same-origin and cross-origin iframes
 - ⬜ D3 Arabic UI: server park messages and source keys shown translated/labelled
 - ⬜ D4 Jobs page: readable titles at phone width; clicking a job while the drawer is open switches it
-- ⬜ D5 Gmail IMAP: find the spam folder by the \Junk special-use flag, not the English name
+- ✅ D5 Gmail IMAP: find the spam folder by the \Junk special-use flag, not the English name
 - ✅ D6 Careers browser fallback: links to a known ATS are re-routed to that ATS plugin

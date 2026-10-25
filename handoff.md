@@ -339,7 +339,6 @@ anywhere; Crawl-delay pacing and per-host rate limits stay. Recorded in CLAUDE.m
 - Live submission is untested against real sites (CAPTCHA behavior unknown).
 - `two_factor` and captcha resolution is manual: "Open in app browser", solve, then Retry.
 - The Live run screenshot is file-polled every 3 s (no per-job event).
-- Gmail spam folder is matched by the English name `[Gmail]/Spam` only.
 - ODT/PDF/LaTeX CV path skips LaTeX `\input` projects and package macros like `\cventry`.
 - Server park messages and source keys are English in the Arabic UI (raw `zip_recruiter`, ...).
 - Job titles are very narrow at phone width.

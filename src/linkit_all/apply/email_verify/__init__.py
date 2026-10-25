@@ -26,7 +26,8 @@ from linkit_all.providers.base import LLMProvider, ProviderError, UsageLimitErro
 
 AI_MAX_CHARS = 4000
 SLACK = timedelta(minutes=2)  # clock skew between us and the mail server
-FOLDERS = ("INBOX", "[Gmail]/Spam")  # verification mails sometimes land in spam
+INBOX = "INBOX"
+SPAM_FALLBACK = "[Gmail]/Spam"  # verification mails sometimes land in spam
 MAX_PER_POLL = 50
 
 # English first; add words here (other languages) to widen matching.
@@ -123,6 +124,17 @@ class _Mail:
     html: str
 
 
+def _spam_folder(mb: MailBox) -> str | None:
+    """The spam folder: the one flagged \\Junk (RFC 6154, any language), else `[Gmail]/Spam`."""
+    try:
+        for info in mb.folder.list():
+            if any(f.lower() == "\\junk" for f in info.flags):
+                return str(info.name)
+    except ImapToolsError as e:  # no LIST support: use the fallback
+        logger.warning("IMAP folder list failed ({})", type(e).__name__)
+    return SPAM_FALLBACK if mb.folder.exists(SPAM_FALLBACK) else None
+
+
 def _fetch(
     host: str, user: str, password: str, site_domains: list[str], since: datetime
 ) -> list[_Mail]:
@@ -133,9 +145,8 @@ def _fetch(
     domains = [d.lower().lstrip(".") for d in site_domains]
     found: list[tuple[datetime, _Mail]] = []
     with MailBox(host).login(user, password) as mb:
-        for folder in FOLDERS:
-            if folder != "INBOX" and not mb.folder.exists(folder):
-                continue
+        spam = _spam_folder(mb)
+        for folder in (INBOX, spam) if spam else (INBOX,):
             mb.folder.set(folder)
             # IMAP SINCE is date-only and server-timezone: widen by a day, filter exactly below.
             crit = AND(date_gte=(floor - timedelta(days=1)).date())
