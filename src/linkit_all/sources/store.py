@@ -10,7 +10,7 @@ from rapidfuzz import fuzz
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from linkit_all.core.models import Job, JobState, SourceCheckpoint
+from linkit_all.core.models import Job, JobSighting, JobState, SourceCheckpoint
 from linkit_all.sources.ats_detector import detect
 from linkit_all.sources.base import JobStub, Source
 from linkit_all.sources.text import job_hash, norm, norm_company, normalize_url
@@ -121,6 +121,27 @@ def _upgrade(s: Session, deduper: Deduper, known: Known, st: JobStub) -> None:
     deduper.urls[url] = known  # the old URL stays registered: it is still a duplicate
 
 
+def _record_sightings(s: Session, run_id: int, seen: dict[int, JobStub]) -> None:
+    """One sighting per (job, run): skip jobs already recorded for this run by an earlier page."""
+    if not seen:
+        return
+    ids = list(seen)
+    have: set[int] = set()
+    for i in range(0, len(ids), 500):  # stay under SQLite's bound-variable limit
+        have.update(
+            s.scalars(
+                select(JobSighting.job_id).where(
+                    JobSighting.run_id == run_id, JobSighting.job_id.in_(ids[i : i + 500])
+                )
+            )
+        )
+    s.add_all(
+        JobSighting(job_id=j, run_id=run_id, url=normalize_url(st.url), source=st.source[:64])
+        for j, st in seen.items()
+        if j not in have
+    )
+
+
 def store_page(
     db: sessionmaker[Session],
     run_id: int,
@@ -132,10 +153,13 @@ def store_page(
     """Insert new jobs and advance the checkpoint in one transaction. Returns new count.
     A duplicate from a higher-priority source upgrades the stored copy (not counted as new)."""
     new = 0
+    seen: dict[int, JobStub] = {}  # job id -> first stub of this page that returned it
     with db.begin() as s:
         for st in stubs:
             known = deduper.lookup(st)
             if known is not None:
+                if known.job_id is not None:
+                    seen.setdefault(known.job_id, st)
                 if deduper.priority(st.source) < known.priority:
                     _upgrade(s, deduper, known, st)
                 continue
@@ -156,7 +180,9 @@ def store_page(
             s.add(job)
             s.flush()  # the id lets a later, better duplicate find this row
             known.job_id = job.id
+            seen.setdefault(job.id, st)
             new += 1
+        _record_sightings(s, run_id, seen)
         cp = s.scalars(select(SourceCheckpoint).filter_by(run_id=run_id, key=key)).first()
         if cp is None:
             cp = SourceCheckpoint(run_id=run_id, key=key)

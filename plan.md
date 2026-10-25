@@ -301,7 +301,7 @@ references, untuned); repeat sightings go in a new `job_sightings` table (store_
 duplicates today); salary outlier = >= 2.5x the median of stored jobs with the same title family
 and currency.
 Execution tasks:
-- ⬜ G1 Sightings: `job_sightings` (job_id, run_id, seen_at, url) + migration; store_page records
+- ✅ G1 Sightings: `job_sightings` (job_id, run_id, seen_at, url) + migration; store_page records
   a sighting for every duplicate; first_seen/seen_runs helpers
 - ⬜ G2 `matching/trust/normalize.py` (NFKC, homoglyphs, leetspeak, Arabic letter variants,
   clause negation with coercion override) + `scam.py` rules, floors and trace (EN + AR)

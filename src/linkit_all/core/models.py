@@ -95,6 +95,20 @@ class Job(Base):
     )
 
 
+class JobSighting(Base):
+    """One row per (job, run) where a source returned the job: repost history."""
+
+    __tablename__ = "job_sightings"
+    __table_args__ = (UniqueConstraint("job_id", "run_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    job_id: Mapped[int] = mapped_column(ForeignKey("jobs.id", ondelete="CASCADE"), index=True)
+    run_id: Mapped[int | None] = mapped_column(ForeignKey("runs.id"))
+    seen_at: Mapped[datetime] = mapped_column(default=utcnow)
+    url: Mapped[str] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(String(64))
+
+
 class JobEvent(Base):
     __tablename__ = "job_events"
 
