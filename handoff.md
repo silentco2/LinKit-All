@@ -340,8 +340,6 @@ anywhere; Crawl-delay pacing and per-host rate limits stay. Recorded in CLAUDE.m
 - The Live run screenshot is file-polled every 3 s (no per-job event).
 - ODT/PDF/LaTeX CV path skips LaTeX `\input` projects and package macros like `\cventry`.
 - Server park messages and source keys are English in the Arabic UI (raw `zip_recruiter`, ...).
-- Job titles are very narrow at phone width.
-- Jobs clicked while the drawer is open don't switch the drawer.
 - Job-aggregator API keys are in the vault; AI provider keys are still env-only.
 - When `ApplyBlocked` fires (AI limit, LibreOffice missing) the rest of that run's jobs wait
   for the next run.

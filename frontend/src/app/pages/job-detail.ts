@@ -246,12 +246,17 @@ export class JobDetailPanel {
     return FINAL.includes(state);
   }
 
+  private loadSeq = 0;
+
   async load(id: number): Promise<void> {
+    const seq = ++this.loadSeq; // a newer load supersedes this one, so a slow reply cannot overwrite it
     this.error.set('');
+    if (this.job()?.id !== id) this.job.set(null); // never show the previous job under the new selection
     try {
-      this.job.set(await this.api.get<Detail>(`/jobs/${id}`));
+      const d = await this.api.get<Detail>(`/jobs/${id}`);
+      if (seq === this.loadSeq) this.job.set(d);
     } catch (e) {
-      this.error.set((e as Error).message);
+      if (seq === this.loadSeq) this.error.set((e as Error).message);
     }
   }
 
