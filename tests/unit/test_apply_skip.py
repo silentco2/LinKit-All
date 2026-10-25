@@ -31,7 +31,9 @@ class NoAI(LLMProvider):
         ("greenhouse", {"apply_url": "https://careers.acme.com/jobs/1"}, "https://x/1", True),
         ("workday", {}, "https://x/1", False),  # no handler, generic agent off
         ("workday", {}, "", True),  # no handler, nothing to open
-        ("workday", {"apply_url": "mailto:jobs@acme.com"}, "", True),  # not a web page
+        ("workday", {"apply_url": "tel:+20100000000"}, "", True),  # not a web page
+        ("workday", {"apply_url": "mailto:a@acme.com,b@acme.com"}, "", True),  # two addresses
+        ("workday", {"apply_url": "mailto:"}, "", True),
     ],
 )
 def test_unappliable_job_is_skipped_without_tailoring(
@@ -74,10 +76,18 @@ def test_pick_jobs_includes_handlerless_jobs_only_with_the_generic_agent(tmp_pat
         ("workday", "", 10),  # nothing to open
         ("icims", "ftp://acme.com/1", 10),  # not a web page
     ]
+    mails = [  # (apply_url, score): mailto jobs need no handler and no generic agent
+        ("mailto:hr@acme.com", 7),
+        ("mailto:a@acme.com,b@acme.com", 10),  # not a single address
+    ]
     with db.begin() as s:
         for i, (ats, url, score) in enumerate(rows):
             s.add(Job(source="x", url=url, title="Dev", company=f"C{i}", location="", description="",
                       ats=ats, dedupe_hash=str(i), score=score, state=JobState.queued_apply, data={}))  # fmt: skip
+        for i, (mail, score) in enumerate(mails, start=10):
+            s.add(Job(source="x", url=f"https://post/{i}", title="Dev", company=f"M{i}", location="", description="",
+                      ats=None, dedupe_hash=str(i), score=score, state=JobState.queued_apply,
+                      data={"apply_url": mail}))  # fmt: skip
 
     def picked(generic: bool) -> list[str]:
         cfg = SearchConfig.model_validate({"apply": {"generic_agent": generic}})
@@ -85,5 +95,5 @@ def test_pick_jobs_includes_handlerless_jobs_only_with_the_generic_agent(tmp_pat
         with db() as s:
             return [s.get_one(Job, i).company for i in applier.pick_jobs()]
 
-    assert picked(True) == ["C1", "C2", "C0"]  # best score first
-    assert picked(False) == ["C0"]
+    assert picked(True) == ["C1", "C2", "M10", "C0"]  # best score first
+    assert picked(False) == ["M10", "C0"]

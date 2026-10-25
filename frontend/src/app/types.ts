@@ -245,7 +245,7 @@ export interface LiveShot {
 export const lines = (text: string): string[] => text.split('\n').map((l) => l.trim()).filter(Boolean);
 export const unlines = (list: string[]): string => list.join('\n');
 
-export type ActionKind = 'unknown_question' | 'confirm_submit' | 'captcha' | 'validation_error' | 'login_issue' | 'two_factor';
+export type ActionKind = 'unknown_question' | 'confirm_submit' | 'confirm_email' | 'captcha' | 'validation_error' | 'login_issue' | 'two_factor';
 export type ActionDecision = 'answer' | 'confirm' | 'retry' | 'applied_by_hand' | 'skip';
 export type AnswerValue = string | boolean | string[];
 

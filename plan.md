@@ -343,6 +343,6 @@ Execution tasks:
 - ⬜ L2 Scraper: search URL, scroll caps, per-post extraction, login/checkpoint stop, zero-post HTML dump (needs the maintainer's captured page)
 - ✅ L3 RawPost model, hiring/seeker filter, ATS routing, batched AI extraction prompt, stubs, trust tweaks
 - ✅ L4 SMTP sender (vault creds) + "send test email to myself" API
-- ⬜ L5 Email apply channel in the runner: compose, dry-run .eml, confirm park, caps, recipient dedupe, evidence
+- ✅ L5 Email apply channel in the runner: compose, dry-run .eml, confirm park, caps, recipient dedupe, evidence
 - ⬜ L6 UI: Setup LinkedIn posts section, Action Center email preview/edit, post info in drawer
 - ⬜ L7 Docs, CLAUDE.md §5.2/§5.5, handoff

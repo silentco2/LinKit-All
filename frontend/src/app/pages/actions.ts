@@ -208,7 +208,7 @@ export class ActionsPage {
   }
 
   browserKind = (k: ActionKind): boolean => BROWSER_KINDS.includes(k);
-  hasHelp = (k: ActionKind): boolean => k !== 'unknown_question' && k !== 'confirm_submit';
+  hasHelp = (k: ActionKind): boolean => k !== 'unknown_question' && k !== 'confirm_submit' && k !== 'confirm_email';
   num = (n: number | null): string => fmtNum(this.loc(), n);
   sourceLabel = (s: string): string => labelOr(this.i18n, 'common.answerSource.', s || 'unknown');
   range = (n: number): number[] => Array.from({ length: n }, (_, i) => i);

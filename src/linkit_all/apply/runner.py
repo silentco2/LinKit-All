@@ -48,6 +48,21 @@ from linkit_all.apply.agent import (
 from linkit_all.apply.answers import ApplicationAnswers, Context, Missing, Question
 from linkit_all.apply.assist import AnswerBank, answer_questions, profile_summary
 from linkit_all.apply.browser import live_frames, live_shot_path, profile_dir
+from linkit_all.apply.email_apply import (
+    attachment_copy,
+    compose,
+    is_mailto,
+    mailto_address,
+)
+from linkit_all.apply.email_send import (
+    NoCredentials,
+    OutgoingEmail,
+    SmtpError,
+    build_message,
+    save_eml,
+    send,
+    valid_address,
+)
 from linkit_all.apply.email_verify import EmailLoginError, credentials, wait_for_verification
 from linkit_all.apply.form import FillError, fill, lost_values
 from linkit_all.apply.handlers import HANDLERS, Handler, JobInfo
@@ -161,6 +176,8 @@ def job_info(job: Job) -> JobInfo | None:
 
 def site_key(job: Job) -> str:
     """What "one site" means for pacing: a handler's ATS (all its boards), else the apply host."""
+    if mailto_address(job.data.get("apply_url")):
+        return "email"  # one worker, so emails go out one at a time with a pause between
     if job.ats in HANDLERS:
         return str(job.ats)
     return urlparse(job.data.get("apply_url") or job.url or "").netloc.lower() or "unknown"
@@ -325,6 +342,11 @@ class Applier:
         live = self.cfg.apply.live
         since = utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         with self.db() as s:
+            emails_today = s.scalar(
+                select(func.count())
+                .select_from(JobEvent)
+                .where(JobEvent.code == "applied_by_email", JobEvent.at >= since)
+            )
             applied_today = dict(
                 s.execute(
                     select(Job.ats, func.count())
@@ -342,17 +364,24 @@ class Applier:
         jobs = [
             j
             for j in jobs
-            if (j.ats in HANDLERS or (generic and _web_url(j.data.get("apply_url") or j.url)))
+            if (
+                mailto_address(j.data.get("apply_url"))
+                or j.ats in HANDLERS
+                or (generic and _web_url(j.data.get("apply_url") or j.url))
+            )
             and (live or not j.data.get("dry_run_at"))
         ]
         jobs.sort(key=lambda j: (-(j.score or 0), -(j.data.get("rank") or 0)))
         picked: list[int] = []
         per_site: dict[str, int] = {}
         for j in jobs:
-            used = applied_today.get(j.ats, 0) + per_site.get(j.ats or "", 0)
-            if live and used >= self.cfg.apply.daily_cap_per_site:
+            by_email = mailto_address(j.data.get("apply_url")) is not None
+            key = "email" if by_email else j.ats or ""
+            done = (emails_today or 0) if by_email else applied_today.get(j.ats, 0)
+            cap = self.cfg.apply.email_daily_cap if by_email else self.cfg.apply.daily_cap_per_site
+            if live and done + per_site.get(key, 0) >= cap:
                 continue
-            per_site[j.ats or ""] = per_site.get(j.ats or "", 0) + 1
+            per_site[key] = per_site.get(key, 0) + 1
             picked.append(j.id)
             if len(picked) >= self.cfg.apply.max_per_run:
                 break
@@ -403,6 +432,11 @@ class Applier:
         with self.db() as s:  # decide first: never tailor a job we won't apply to (CLAUDE.md §4)
             job = s.get_one(Job, job_id)
             info = job_info(job)
+        if is_mailto(job.data.get("apply_url")):
+            addr = mailto_address(job.data.get("apply_url"))
+            if addr is None:
+                return Outcome("skipped", "the apply link is not a single valid email address")
+            return await self._apply_email(job_id, addr)
         handler = HANDLERS.get(job.ats or "")
         generic = self.cfg.apply.generic_agent
         if info is None or (handler is None and not (generic and _web_url(info.apply_url))):
@@ -476,6 +510,184 @@ class Applier:
             await asyncio.gather(live, return_exceptions=True)  # removes the frame file if last
             await self._trace_stop(key, browser, out_dir if keep_trace else None)
             await page.close()
+
+    async def _apply_email(self, job_id: int, addr: str) -> Outcome:
+        """A `mailto:` posting: tailored CV + short cover email. Dry run only writes an .eml;
+        live waits for the user's confirm (draft editable) unless told not to. Sent = applied."""
+        apply_cfg = self.cfg.apply
+        with self.db() as s:
+            already = any(
+                (o.data.get("email_sent") or {}).get("to", "").lower() == addr.lower()
+                for o in s.scalars(
+                    select(Job).where(Job.state == JobState.applied, Job.id != job_id)
+                )
+            )
+        if already:
+            with self.db.begin() as s:
+                transition(
+                    s,
+                    s.get_one(Job, job_id),
+                    JobState.skipped,
+                    f"An application was already emailed to {addr}",
+                    code="email_already_sent",
+                    params={"to": addr},
+                )
+            return Outcome("skipped", f"already emailed {addr}")
+        try:
+            cv = await tailor_job(self.db, job_id, self.provider, self.settings)
+        except (RenderError, UsageLimitError, TailorError) as e:
+            raise ApplyBlocked(str(e)) from e
+        with self.db() as s:
+            job = s.get_one(Job, job_id)
+            profile = s.get_one(Profile, 1)
+        out_dir = self.settings.data_dir / "applications" / f"job_{job_id}"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        answers = ApplicationAnswers.model_validate(profile.answers)
+
+        def fail(reason: str, params: dict[str, Any]) -> Outcome:
+            with self.db.begin() as s:
+                row = s.get_one(Job, job_id)
+                if row.state != JobState.applying:
+                    transition(s, row, JobState.applying, "sending the email", code="submitting")
+                transition(s, row, JobState.failed, reason, code="email_failed", params=params)
+            return Outcome("failed", reason)
+
+        def park(kind: ActionKind, message: str, code: str, params: dict[str, Any]) -> Outcome:
+            with self.db.begin() as s:
+                _park(s, s.get_one(Job, job_id), kind, message, [], {}, [], code, params)
+            return Outcome("needs_user", message)
+
+        draft = job.data.get("email_draft")
+        if not (isinstance(draft, dict) and draft.get("to") == addr and draft.get("attachment")):
+            draft = None  # nothing usable saved yet (or the address changed)
+        if draft is None:
+            ctx = Context(
+                full_name=profile.full_name,
+                email=profile.email,
+                phone=profile.phone,
+                location=profile.location,
+                answers=answers,
+                job_location=job.location,
+                job_source=job.source,
+                resume_path=cv.pdf_path,
+            )
+            try:
+                made = await compose(
+                    self.provider,
+                    to=addr,
+                    job={
+                        "title": job.title,
+                        "company": job.company,
+                        "description": job.description,
+                    },
+                    cv=cv_text(profile),
+                    profile_facts=profile_summary(ctx),
+                    full_name=profile.full_name,
+                    phone=profile.phone,
+                    linkedin=answers.linkedin,
+                    author=(job.data.get("extra") or {}).get("author"),
+                )
+                attachment = attachment_copy(cv.pdf_path, out_dir, profile.full_name)
+            except UsageLimitError as e:
+                raise ApplyBlocked(str(e)) from e
+            except Exception as e:
+                logger.warning("job {}: could not write the email: {}", job_id, type(e).__name__)
+                return fail(
+                    f"could not write the email ({type(e).__name__})", {"error": type(e).__name__}
+                )
+            draft = {
+                "to": addr,
+                "subject": made.subject,
+                "body": made.body,
+                "attachment": str(attachment),
+            }
+            if apply_cfg.live:  # the UI edits this copy; a retry or confirm reuses it
+                with self.db.begin() as s:
+                    row = s.get_one(Job, job_id)
+                    row.data = {**row.data, "email_draft": draft}
+
+        sender = (self.cfg.email.imap_user or profile.email).strip()
+        try:
+            msg = build_message(
+                profile.full_name,
+                sender,
+                OutgoingEmail(
+                    draft["to"],
+                    draft["subject"],
+                    draft["body"],
+                    [Path(draft["attachment"])],
+                    reply_to=(
+                        profile.email
+                        if valid_address(profile.email)
+                        and profile.email.strip().lower() != sender.lower()
+                        else None
+                    ),
+                ),
+            )
+        except (ValueError, OSError) as e:
+            return fail(f"the email could not be built: {e}", {"error": type(e).__name__})
+
+        if not apply_cfg.live:
+            eml = str(save_eml(msg, out_dir / "application.eml"))
+            note = f"dry run: email to {addr} prepared, not sent"
+            with self.db.begin() as s:
+                row = s.get_one(Job, job_id)
+                _event(s, row, note, [eml], "email_preview", {"to": addr})
+                row.data = {**row.data, "dry_run_at": utcnow().isoformat()}
+            return Outcome("dry_run", note, [eml])
+
+        if not apply_cfg.submit_without_asking and not job.data.get("submit_confirmed"):
+            return park(
+                ActionKind.confirm_email,
+                f"ready to email {addr}: check the message and confirm",
+                "confirm_email",
+                {"to": addr, "subject": draft["subject"]},
+            )
+        vault = self._unlocked_vault()
+        if vault is None:
+            return park(
+                ActionKind.login_issue,
+                "Unlock (or create) the vault so the app can sign in to your email",
+                "vault_locked",
+                {"site": "your email"},
+            )
+        with self.db.begin() as s:
+            row = s.get_one(Job, job_id)
+            if row.state != JobState.applying:
+                transition(s, row, JobState.applying, "sending the email", code="submitting")
+        try:
+            message_id = await asyncio.to_thread(send, self.cfg.email, vault, profile.email, msg)
+        except NoCredentials:
+            return park(
+                ActionKind.login_issue,
+                "Connect your email in Setup so the app can send applications",
+                "email_not_connected",
+                {},
+            )
+        except SmtpError as e:
+            return fail(
+                f"the email was not sent ({type(e).__name__}): {e}",
+                {"error": type(e).__name__, "detail": str(e)},
+            )
+        eml = str(save_eml(msg, out_dir / "sent.eml"))
+        now = utcnow().isoformat()
+        with self.db.begin() as s:
+            row = s.get_one(Job, job_id)
+            row.data = {
+                **row.data,
+                "email_sent": {"to": addr, "message_id": message_id, "sent_at": now},
+                "applied_at": now,
+            }
+            transition(
+                s,
+                row,
+                JobState.applied,
+                f"application emailed to {addr}",
+                [eml],
+                "applied_by_email",
+                {"to": addr, "message_id": message_id},
+            )
+        return Outcome("applied", f"emailed {addr}", [eml])
 
     def _announce_frame(self, job_id: int, title: str, company: str) -> None:
         """Tell the Live Run screen which job the newest frame shows (no CV text or answers)."""

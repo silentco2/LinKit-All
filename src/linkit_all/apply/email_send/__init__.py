@@ -54,6 +54,11 @@ def _address(name: str, value: str) -> str:
     return value
 
 
+def valid_address(value: str) -> bool:
+    """True for exactly one plain address (no names, lists or line breaks)."""
+    return bool(_ADDRESS.match(value.strip())) and "\r" not in value and "\n" not in value
+
+
 def build_message(sender_name: str, sender: str, mail: OutgoingEmail) -> EmailMessage:
     sender = _address("sender", sender)
     to = _address("to", mail.to)

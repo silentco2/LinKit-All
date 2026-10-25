@@ -655,6 +655,7 @@ def _action(item: ActionItem, job: Job) -> dict[str, Any]:
         "screenshots": len(item.artifacts),
         "created_at": item.created_at.isoformat(),
         "job": job_summary,
+        **({"email_draft": job.data.get("email_draft")} if item.kind == "confirm_email" else {}),
     }
 
 
@@ -816,6 +817,44 @@ class ActionAnswers(BaseModel):
 class ActionDecision(BaseModel):
     decision: Literal["answer", "confirm", "retry", "applied_by_hand", "skip"]
     answers: dict[str, Any] = {}
+
+
+class EmailDraftEdit(BaseModel):
+    subject: str = Field(min_length=1, max_length=200)
+    body: str = Field(min_length=1, max_length=10000)
+
+    @field_validator("subject")
+    @classmethod
+    def _one_line(cls, v: str) -> str:
+        if "\r" in v or "\n" in v:
+            raise ValueError("the subject must be a single line")
+        if not v.strip():
+            raise ValueError("the subject is empty")
+        return v.strip()
+
+    @field_validator("body")
+    @classmethod
+    def _not_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("the body is empty")
+        return v
+
+
+@router.put("/actions/{item_id}/email-draft")
+def edit_email_draft(request: Request, item_id: int, body: EmailDraftEdit) -> dict[str, Any]:
+    """Edit the application email waiting in the Action Center; confirming sends this text."""
+    with _db(request).begin() as s:
+        item = s.get(ActionItem, item_id)
+        if item is None or item.status != ActionStatus.open or item.kind != "confirm_email":
+            raise HTTPException(404, "No open email confirmation with that id")
+        job = s.get_one(Job, item.job_id)
+        draft = job.data.get("email_draft")
+        if not isinstance(draft, dict):
+            raise HTTPException(409, "This job has no email draft")
+        draft = {**draft, "subject": body.subject, "body": body.body}
+        job.data = {**job.data, "email_draft": draft}
+        item.params = {**item.params, "subject": body.subject}
+        return draft
 
 
 @router.post("/actions/{item_id}")

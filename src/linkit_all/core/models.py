@@ -236,6 +236,7 @@ class AnswerEntry(Base):
 class ActionKind(StrEnum):
     unknown_question = "unknown_question"
     confirm_submit = "confirm_submit"
+    confirm_email = "confirm_email"
     captcha = "captcha"
     validation_error = "validation_error"
     login_issue = "login_issue"
