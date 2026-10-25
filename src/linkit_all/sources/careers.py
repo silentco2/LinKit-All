@@ -7,11 +7,12 @@ batches of AI_BATCH pages per call when a provider is available, else the page t
 A page with no jobs in its HTML is then opened in Chrome when a provider is available
 (browser_extract: the AI picks JSON-LD, a background JSON response or CSS selectors, our code
 runs it). Pages that still give nothing, or answer with a bot challenge, are reported as
-unsupported, never worked around.
+unsupported, never worked around. Links that read reveals on a known ATS board are not read as
+pages: the board goes to that ATS plugin (its JSON API) and replaces those generic stubs.
 """
 
 import re
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from pathlib import Path
 from typing import Literal
 from urllib.parse import urljoin, urlsplit
@@ -22,6 +23,7 @@ from pydantic import BaseModel
 from selectolax.lexbor import LexborHTMLParser
 
 from linkit_all.providers.base import LLMProvider, ProviderError, UsageLimitError, render
+from linkit_all.sources.ats_detector import detect
 from linkit_all.sources.base import JobStub, Source, Task, from_iso, remote_from_text
 from linkit_all.sources.browser_extract import (
     BrowserError,
@@ -143,8 +145,10 @@ class Careers(Source):
         provider: LLMProvider | None = None,
         data_dir: Path | None = None,
         route: Callable[[Route, Request], Awaitable[None]] | None = None,
+        plugins: Mapping[str, Source] | None = None,
     ) -> None:
         self.provider = provider
+        self._plugins = plugins  # ATS plugins by name; the registry's when None (_ats_plugins)
         # The browser fallback needs a provider (it picks the extraction method) and a folder for
         # the recipe cache. `route` answers the browser's requests in tests.
         self._browser = (
@@ -168,7 +172,8 @@ class Careers(Source):
             return
         links = await self._job_links(http, url, html, task.limit)
         if not links:
-            found = (await self._rendered(http, url))[: task.limit]
+            rendered = await self._rendered(http, url)
+            found = (await self._reroute(http, rendered, task))[: task.limit]
             if not found:
                 raise Unsupported(
                     "needs a browser; not supported yet"
@@ -191,6 +196,39 @@ class Careers(Source):
             raise Unsupported(CHALLENGE_MESSAGE) from None
         except BrowserError:
             return []
+
+    def _ats_plugins(self) -> Mapping[str, Source]:
+        if self._plugins is None:
+            from linkit_all.sources import registry  # late: the registry imports this module
+
+            self._plugins = {n: s for n, s in registry().items() if s.kind == "ats"}
+        return self._plugins
+
+    async def _reroute(self, http: Http, found: list[JobStub], task: Task) -> list[JobStub]:
+        """Boards of a known ATS behind the listing's links are read by that ATS plugin (title and
+        description from its API) and replace the listing's own stubs for them. A board whose
+        plugin fails or lists nothing keeps its generic stubs. Other stubs keep their order,
+        ahead of the plugin's."""
+        plugins = self._ats_plugins()
+        boards: dict[tuple[str, str], list[JobStub]] = {}
+        for stub in found:
+            hit = detect(stub.url, plugins.values())
+            if hit:
+                boards.setdefault(hit, []).append(stub)
+        routed: list[JobStub] = []
+        covered: set[str] = set()
+        for (ats, board), stubs in boards.items():
+            sub = Task(ats, f"{ats}:{board}", board=board, limit=task.limit)
+            got: list[JobStub] = []
+            try:
+                async for page in plugins[ats].search(http, sub, 0):
+                    got += page
+            except (httpx.HTTPError, RetryableStatus):
+                continue  # keep the generic stubs; the listing still has these links
+            if got:
+                routed += got[: task.limit]
+                covered.update(s.url for s in stubs)
+        return [s for s in found if s.url not in covered] + routed
 
     async def _finish(self, http: Http, found: list[JobStub], company: str) -> list[JobStub]:
         """Listing entries with a description are done; the rest go through the normal per-job

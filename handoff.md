@@ -331,8 +331,9 @@ anywhere; Crawl-delay pacing and per-host rate limits stay. Recorded in CLAUDE.m
 - Workday: `postedOn` is relative text ("Posted 3 Days Ago"), and the list may cap the total
   at 2,000.
 - Careers browser fallback (`sources/browser_extract.py`) is live-untested: only fixtures via route
-  interception. Links to a known ATS found there set `JobStub.ats` but are not re-routed to that
-  ATS plugin; job pages are still read over httpx, so a JS-only job page keeps the listing's title.
+  interception. Links it finds on a known ATS board are handed to that ATS plugin (its JSON API
+  replaces the generic stubs for the board; a failing board keeps them), tested only with fakes.
+  JS-only job pages on unknown sites still keep the listing's title and get no description.
 - Generic agent ignores iframes, and there is no generic sign-up (sign-in pages park).
 - A combobox with no fixed options (city, country) picks the first suggestion after typing.
 - Live submission is untested against real sites (CAPTCHA behavior unknown).
