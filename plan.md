@@ -256,7 +256,6 @@ code copied verbatim; NOTICE credits freehire (MIT). Survey: scratchpad freehire
   - ✅ F3.1 builtin instaffo itviec japandev jobboardly jobylon joppy
   - ✅ F3.2 profession pythonorg remotedotcom startupandvc techtree thehub torre work180 + RSS cryptocurrencyjobs jobspresso nodesk weworkremotely
   - not ported (other): aijobs (dead/changed)
-  - ✅ F2.6 wttj (Algolia index with the site's public key + Referer, per maintainer 2026-10-25)
   - not ported (bypass-dependent): bayt catho civilservicejobs djinni energyjobline geekjob gradcracker gulftalent infojobs occ vagas wantapply wuzzuf
 - F4 Single-company plugins (sources/companies/, opt-in); not ported: metacareers onstrider kontur twogis uber (bypass), airswift tenml (no jobs), alfabank tbank tochka ptsecurity (need a Russian root CA)
   - ✅ F4.1 alibaba alignerr amazon apple aviasales avito bairesdev dassault dataart dodo domclick
@@ -264,3 +263,14 @@ code copied verbatim; NOTICE credits freehire (MIT). Survey: scratchpad freehire
   - ✅ F4.3 magnit megafon meituan micro1 mts mtslink orion ozon rostelecom rwb sber
   - ✅ F4.4 selectel staffy tbank telegramcareers tencent tochka uzum vk x5 yandex yandexcrowd
 - ✅ F6 Cleanup: jobboardly is an ATS plugin; `ats` is set from the apply link (ats_detector) for aggregator/board/company stubs so apply handlers route correctly; private helpers merged into `sources/common.py`, `parsing.py`, `tasks.py` and `aggregators/keys.py`; `Http.post_form` + public raw response; per-host slow rates (myworkdaysite 1, higherme 1/3, join 1.5, workstream 1); Common Crawl older-collection fallback; full suite and a browser check of the Setup sources list
+
+### Phase 9 — Debt (offline, fixture-tested) 🟡
+Maintainer (2026-10-25): work the handoff "Known issues" list; generic sign-up is out of scope
+(sign-in/sign-up pages keep parking until a supervised live session). AI provider keys in the
+vault: not started, needs the maintainer.
+- ⬜ D1 Live run: per-job screenshot event over the WebSocket instead of 3 s file polling
+- ⬜ D2 Generic form agent: controls inside same-origin and cross-origin iframes
+- ⬜ D3 Arabic UI: server park messages and source keys shown translated/labelled
+- ⬜ D4 Jobs page: readable titles at phone width; clicking a job while the drawer is open switches it
+- ⬜ D5 Gmail IMAP: find the spam folder by the \Junk special-use flag, not the English name
+- ⬜ D6 Careers browser fallback: links to a known ATS are re-routed to that ATS plugin
