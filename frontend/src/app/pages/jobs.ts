@@ -43,26 +43,29 @@ const STATES = ['discovered', 'enriched', 'filtered_out', 'ranked', 'scored', 'b
 
     @if (error()) { <div class="alert alert-error mt-4" dir="auto">{{ error() }}</div> }
 
-    <div class="mt-4" [class]="selected() !== null ? '2xl:pe-[36rem]' : ''">
+    <div class="mt-4" [class]="selected() !== null ? 'xl:pe-[36rem]' : ''">
       <div class="card p-0">
-        <div class="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-3 border-b border-slate-200 px-4 py-2 text-xs sm:grid-cols-[3rem_minmax(0,1fr)_7rem_5rem] font-medium tracking-wide text-slate-500 uppercase rtl:tracking-normal dark:border-slate-800">
-          <span>{{ 'jobs.col.score' | t }}</span><span>{{ 'jobs.col.job' | t }}</span><span class="hidden sm:inline">{{ 'jobs.col.state' | t }}</span><span class="hidden text-end sm:inline">{{ 'jobs.col.match' | t }}</span>
+        <div [class]="compact() ? 'grid-cols-[2.5rem_minmax(0,1fr)]' : 'grid-cols-[3rem_minmax(0,1fr)_7rem_5rem]'" class="grid gap-3 border-b border-slate-200 px-4 py-2 text-xs font-medium tracking-wide text-slate-500 uppercase rtl:tracking-normal dark:border-slate-800">
+          <span>{{ 'jobs.col.score' | t }}</span><span>{{ 'jobs.col.job' | t }}</span>@if (!compact()) { <span>{{ 'jobs.col.state' | t }}</span><span class="text-end">{{ 'jobs.col.match' | t }}</span> }
         </div>
         @if (rows().length) {
           <cdk-virtual-scroll-viewport [itemSize]="rowHeight()" class="h-[calc(100vh-260px)]">
             <button *cdkVirtualFor="let j of rows(); trackBy: trackId" type="button" (click)="selected.set(j.id)"
                     [style.height.px]="rowHeight()"
-                    class="grid w-full grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3 sm:grid-cols-[3rem_minmax(0,1fr)_7rem_5rem] border-b border-slate-100 px-4 text-start hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                    [class]="compact() ? 'grid-cols-[2.5rem_minmax(0,1fr)]' : 'grid-cols-[3rem_minmax(0,1fr)_7rem_5rem]'"
+                    class="grid w-full items-center gap-3 border-b border-slate-100 px-4 text-start hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
                     [class.bg-brand-50]="selected() === j.id" [attr.aria-pressed]="selected() === j.id">
               <span>
                 @if (j.score) { <span class="badge tier-{{ j.tier }}">{{ num(j.score) }}</span> } @else { <span class="text-slate-400">–</span> }
               </span>
               <span class="min-w-0">
-                <span class="line-clamp-2 text-sm font-medium break-words sm:block sm:truncate" dir="auto">{{ j.title }}</span>
-                <span class="block truncate text-xs text-slate-500" dir="auto"><span class="sm:hidden">{{ 'common.state.' + j.state | t }} · </span><bdi>{{ j.company }}</bdi> · <bdi>{{ j.location }}</bdi> · <bdi>{{ j.source }}</bdi></span>
+                <span [class]="compact() ? 'line-clamp-2' : 'block truncate'" class="text-sm font-medium break-words" dir="auto">{{ j.title }}</span>
+                <span class="block truncate text-xs text-slate-500" dir="auto">@if (compact()) { <span>{{ 'common.state.' + j.state | t }} · </span> }<bdi>{{ j.company }}</bdi> · <bdi>{{ j.location }}</bdi> · <bdi>{{ j.source }}</bdi></span>
               </span>
-              <span class="hidden truncate text-xs text-slate-600 sm:block dark:text-slate-400">{{ 'common.state.' + j.state | t }}</span>
-              <span class="hidden text-end text-xs text-slate-500 sm:block">{{ j.rank === null ? '' : num(j.rank, { style: 'percent', maximumFractionDigits: 0 }) }}</span>
+              @if (!compact()) {
+                <span class="truncate text-xs text-slate-600 dark:text-slate-400">{{ 'common.state.' + j.state | t }}</span>
+                <span class="text-end text-xs text-slate-500">{{ j.rank === null ? '' : num(j.rank, { style: 'percent', maximumFractionDigits: 0 }) }}</span>
+              }
             </button>
           </cdk-virtual-scroll-viewport>
         } @else if (!loading()) {
@@ -71,7 +74,7 @@ const STATES = ['discovered', 'enriched', 'filtered_out', 'ranked', 'scored', 'b
       </div>
 
       @if (selected(); as id) {
-        <button type="button" tabindex="-1" aria-hidden="true" class="fixed inset-0 z-10 cursor-default bg-slate-900/30 2xl:hidden" (click)="selected.set(null)"></button>
+        <button type="button" tabindex="-1" aria-hidden="true" class="fixed inset-0 z-10 cursor-default bg-slate-900/30 xl:hidden" (click)="selected.set(null)"></button>
         <aside class="fixed inset-y-0 end-0 z-20 w-full max-w-xl overflow-auto border-s border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900" [attr.aria-label]="'common.drawer.label' | t">
           <button type="button" class="btn float-end ms-3 px-2 py-1" [attr.aria-label]="'common.drawer.close' | t" (click)="selected.set(null)">✕</button>
           <app-job-detail [jobId]="id" (changed)="load()" />
@@ -95,18 +98,22 @@ export class JobsPage {
   protected readonly loading = signal(false);
   protected readonly error = signal('');
   protected readonly sources = signal<string[]>([]);
-  /** Phone rows hold a two-line title, so they are taller; the virtual-scroll item size follows. */
+  /** Phones, and the list narrowed beside the open drawer (xl+), show title + score only on two-line rows. */
   private readonly wide = signal(true);
-  protected readonly rowHeight = computed(() => (this.wide() ? 60 : 76));
+  private readonly xl = signal(true);
+  protected readonly compact = computed(() => !this.wide() || (this.xl() && this.selected() !== null));
+  protected readonly rowHeight = computed(() => (this.compact() ? 76 : 60));
   private timer?: ReturnType<typeof setTimeout>;
 
   constructor() {
     if (typeof matchMedia === 'function') {
-      const mq = matchMedia('(min-width: 640px)');
-      this.wide.set(mq.matches);
-      const onChange = (e: MediaQueryListEvent) => this.wide.set(e.matches);
-      mq.addEventListener('change', onChange);
-      inject(DestroyRef).onDestroy(() => mq.removeEventListener('change', onChange));
+      for (const [query, sig] of [['(min-width: 640px)', this.wide], ['(min-width: 1280px)', this.xl]] as const) {
+        const mq = matchMedia(query);
+        sig.set(mq.matches);
+        const onChange = (e: MediaQueryListEvent) => sig.set(e.matches);
+        mq.addEventListener('change', onChange);
+        inject(DestroyRef).onDestroy(() => mq.removeEventListener('change', onChange));
+      }
     }
     effect(() => {
       this.live.changed(); // new jobs or new scores after each stage
