@@ -123,37 +123,41 @@ def test_capture_command(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     assert r.exit_code == 1 and "Not signed in" in r.output and calls[-1][2] is True
 
 
-def test_linkedin_context_applies_stealth(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_linkedin_context_uses_real_chrome_and_closes_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     calls: list[object] = []
 
     class FakeCtx:
+        pass
+
+    class FakeChrome:
         async def close(self) -> None:
             calls.append("closed")
 
-    class FakeChromium:
-        async def launch_persistent_context(self, *args: object, **kwargs: object) -> FakeCtx:
-            calls.append(("launch", kwargs.get("channel")))
-            return FakeCtx()
-
     class FakePW:
-        chromium = FakeChromium()
-
         async def __aenter__(self) -> "FakePW":
             return self
 
         async def __aexit__(self, *exc: object) -> None:
             return None
 
-    class FakeStealth:
-        async def apply_stealth_async(self, ctx: object) -> None:
-            calls.append(("stealth", type(ctx).__name__))
+    async def fake_open(pw: object, profile: Path, *, headless: bool) -> tuple[FakeChrome, FakeCtx]:
+        calls.append(("open", profile, headless))
+        return FakeChrome(), FakeCtx()
 
     monkeypatch.setattr(sess, "async_playwright", lambda: FakePW())
-    monkeypatch.setattr(sess, "Stealth", FakeStealth)
+    monkeypatch.setattr(sess, "open_context", fake_open)
+    settings = Settings(data_dir=tmp_path)
 
-    async def run() -> None:
-        async with sess.linkedin_context(Settings(data_dir=tmp_path), headless=True) as ctx:
+    async def run(fail: bool) -> None:
+        async with sess.linkedin_context(settings, headless=True) as ctx:
             assert isinstance(ctx, FakeCtx)
+            if fail:
+                raise ValueError("boom")
 
-    asyncio.run(run())
-    assert calls == [("launch", "chrome"), ("stealth", "FakeCtx"), "closed"]
+    asyncio.run(run(False))
+    with pytest.raises(ValueError):
+        asyncio.run(run(True))
+    expected = ("open", profile_dir(settings, "linkedin"), True)
+    assert calls == [expected, "closed", expected, "closed"]

@@ -31,10 +31,10 @@ Users bring their own AI: ChatGPT plan via Codex CLI, API keys, and later local 
 - APScheduler (SQLAlchemy job store), aiolimiter, tenacity, loguru (redaction filter), platformdirs.
 - AI: LiteLLM (API keys, Ollama/LM Studio); subprocess adapters for `codex exec --json` and `claude -p --output-format json`.
 - Scraping: httpx (async), python-jobspy, Playwright, selectolax, extruct, trafilatura, rapidfuzz,
-  lingua-py, playwright-stealth (LinkedIn posts only). Embeddings: fastembed.
+  lingua-py. Embeddings: fastembed.
 - CV: python-docx + lxml, pylatexenc/TexSoup + Tectonic, pdf2docx, LibreOffice headless
   (DOCX->PDF, ODT<->DOCX), PyMuPDF, pdfplumber, Pillow/scikit-image (layout diff).
-- Apply: Playwright (installed Chrome, persistent context per site), imap-tools, vault via cryptography
+- Apply: Playwright (real installed Chrome launched without automation flags, attached over CDP, persistent profile per site), imap-tools, vault via cryptography
   (AES-GCM) + argon2-cffi + keyring.
 - Frontend: Angular + TypeScript + Tailwind, Chart.js, ngx-fast-diff; built into the wheel.
 - Tooling: ruff, mypy, pre-commit, pytest (+ HTML fixtures), GitHub Actions, MkDocs Material.
@@ -76,14 +76,14 @@ Tailoring happens just before applying, never for jobs that will not be applied 
   extractor (JSON-LD -> CSS -> AI extraction).
 - Also: Telegram channels (t.me/s preview), discovered boards (Common Crawl, `linkit discover-boards`),
   aggregator API keys from the vault.
-- Never defeat bot challenges (no TLS spoofing, challenge solving, rotating proxies, fake UAs). OK: what the
-  site's own pages send (Referer, XHR header, page CSRF/public key). robots.txt not enforced. (exception: LinkedIn posts stealth)
+- All browser automation runs real installed Chrome launched without automation flags (stealth-browser-mcp approach,
+  maintainer 2026-10-26); still never solve CAPTCHAs/challenges, automate login, use rotating proxies, TLS or fingerprint spoofing. OK: what the site's own pages send (Referer, XHR header, CSRF key).
+  robots.txt not enforced.
 - ATS detector routes any pasted URL (or careers-page HTML) to the right plugin.
 - LinkedIn hiring posts (`sources/linkedin_posts/`): opt-in, off by default, ban-risk warning, low caps.
   Dedicated `linkedin` Chrome profile (user signs in once, headed); scraping headless by default. Logged out or
   security check -> stop and notify. Never automate login, bypass challenges, comment, DM or react.
-  playwright-stealth allowed for this source only (maintainer 2026-10-26); still never solve challenges or
-  automate login. ATS links -> that ATS; other posts -> batched AI extraction; no email/link -> dropped.
+  ATS links -> that ATS; other posts -> batched AI extraction; no email/link -> dropped.
 - Per-domain rate limits, page checkpoints, dedupe by normalized URL + hash(title, company, location) +
   rapidfuzz near-duplicate check.
 

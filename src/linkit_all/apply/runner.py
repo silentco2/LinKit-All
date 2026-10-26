@@ -68,6 +68,7 @@ from linkit_all.apply.form import FillError, fill, lost_values
 from linkit_all.apply.handlers import HANDLERS, Handler, JobInfo
 from linkit_all.apply.handlers.base import GENERIC_CONFIRMATION
 from linkit_all.apply.vault import Vault, vault_for
+from linkit_all.core.chrome import RunningChrome, open_context
 from linkit_all.core.config import Settings
 from linkit_all.core.models import (
     ActionItem,
@@ -281,6 +282,7 @@ class Applier:
         self.bank = AnswerBank(db, embed)
         self._pw: Playwright | None = None
         self._contexts: dict[str, BrowserContext] = {}
+        self._chromes: dict[str, RunningChrome] = {}  # the Chrome process behind each context
         self._locks: dict[str, asyncio.Lock] = {}  # per context key: create / trace start+stop
         self._tracing: dict[str, int] = {}  # jobs tracing on each context right now
         self._keep_trace: dict[str, list[Path]] = {}  # out dirs that want the trace saved
@@ -290,10 +292,15 @@ class Applier:
         return self
 
     async def __aexit__(self, *exc: object) -> None:
-        for ctx in self._contexts.values():
-            await ctx.close()
-        if self._pw is not None:
-            await self._pw.stop()
+        try:
+            for chrome in self._chromes.values():  # ends Chrome; the CDP connection drops with it
+                with contextlib.suppress(Exception):
+                    await chrome.close()
+        finally:
+            self._chromes.clear()
+            self._contexts.clear()
+            if self._pw is not None:
+                await self._pw.stop()
 
     async def _context(self, ats: str) -> BrowserContext:
         """One persistent Chrome profile per ATS, so cookies and sessions survive runs."""
@@ -302,13 +309,10 @@ class Applier:
                 if self._pw is None:
                     raise RuntimeError("use Applier as an async context manager")
                 profile = profile_dir(self.settings, ats)
-                profile.mkdir(parents=True, exist_ok=True)
-                self._contexts[ats] = await self._pw.chromium.launch_persistent_context(
-                    str(profile),
-                    channel="chrome",
-                    headless=self.cfg.apply.headless,
-                    viewport={"width": 1280, "height": 900},
+                chrome, ctx = await open_context(
+                    self._pw, profile, headless=self.cfg.apply.headless
                 )
+                self._chromes[ats], self._contexts[ats] = chrome, ctx
             return self._contexts[ats]
 
     async def _trace_start(self, key: str, browser: BrowserContext) -> None:

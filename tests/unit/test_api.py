@@ -606,17 +606,16 @@ Launch = list[tuple[str, dict[str, Any], FakeContext]]
 
 
 class FakePlaywright:
-    def __init__(self, launched: Launch) -> None:
-        self.chromium = self
-        self._launched = launched
-
-    async def launch_persistent_context(self, profile: str, **kw: Any) -> FakeContext:
-        ctx = FakeContext()
-        self._launched.append((profile, kw, ctx))
-        return ctx
-
     async def stop(self) -> None:
         pass
+
+
+class FakeChrome:
+    def __init__(self) -> None:
+        self.closed = False
+
+    async def close(self) -> None:
+        self.closed = True
 
 
 @pytest.fixture
@@ -625,9 +624,15 @@ def launched(monkeypatch: pytest.MonkeyPatch) -> Launch:
 
     class Starter:
         async def start(self) -> FakePlaywright:
-            return FakePlaywright(calls)
+            return FakePlaywright()
+
+    async def fake_open(pw: Any, profile: Path, **kw: Any) -> tuple[FakeChrome, FakeContext]:
+        ctx = FakeContext()
+        calls.append((str(profile), kw, ctx))
+        return FakeChrome(), ctx
 
     monkeypatch.setattr(browser_module, "async_playwright", lambda: Starter())
+    monkeypatch.setattr(browser_module, "open_context", fake_open)
     return calls
 
 
@@ -649,7 +654,7 @@ def test_app_browser_opens_on_the_runner_profile(client: TestClient, launched: L
     profile, kw, ctx = launched[0]
     data_dir = client.app.state.settings.data_dir  # type: ignore[attr-defined]
     assert Path(profile) == data_dir / "browser" / "lever"
-    assert kw["headless"] is False and kw["channel"] == "chrome"
+    assert kw["headless"] is False
     assert ctx.pages[0].url == "https://jobs.lever.co/acme/1/apply"
     assert client.get("/api/status").json()["app_browser"] == {"open": True, "item_id": item_id}
     assert client.post(url, headers=SAME_ORIGIN).status_code == 409  # one at a time
@@ -676,7 +681,7 @@ def test_app_browser_generic_profile_and_launch_failure(
     async def boom(*_: Any, **__: Any) -> None:
         raise RuntimeError("Chrome is not installed\nlong trace")
 
-    monkeypatch.setattr(FakePlaywright, "launch_persistent_context", boom)
+    monkeypatch.setattr(browser_module, "open_context", boom)
     r = client.post(url, headers=SAME_ORIGIN)
     assert r.status_code == 503
     assert r.json()["detail"] == "Could not open Chrome: Chrome is not installed"

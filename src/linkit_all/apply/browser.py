@@ -16,6 +16,7 @@ from pathlib import Path
 from playwright.async_api import BrowserContext, Page, Playwright, async_playwright
 
 from linkit_all.apply.handlers import HANDLERS
+from linkit_all.core.chrome import RunningChrome, open_context
 from linkit_all.core.config import Settings
 
 LIVE_MAX_AGE_S = 30  # a frame older than this is left over from a crashed run
@@ -76,6 +77,7 @@ class UserBrowser:
     def __init__(self) -> None:
         self._pw: Playwright | None = None
         self._ctx: BrowserContext | None = None
+        self._chrome: RunningChrome | None = None
         self._opening = False
         self._stopping: asyncio.Task[None] | None = None  # keeps the task referenced
         self.item_id: int | None = None
@@ -90,11 +92,8 @@ class UserBrowser:
         self._opening = True
         try:
             await self._stop_pw(self._pw)  # driver left over from a window the user closed
-            profile.mkdir(parents=True, exist_ok=True)
             self._pw = await async_playwright().start()
-            ctx = await self._pw.chromium.launch_persistent_context(
-                str(profile), channel="chrome", headless=False, no_viewport=True
-            )
+            self._chrome, ctx = await open_context(self._pw, profile, headless=False)
             self._ctx, self.item_id = ctx, item_id
             ctx.on("close", lambda _: self._forget())  # the user closed the window
             page = ctx.pages[0] if ctx.pages else await ctx.new_page()
@@ -107,25 +106,34 @@ class UserBrowser:
             self._opening = False
 
     def _forget(self) -> None:
+        chrome, self._chrome = self._chrome, None
         self._ctx, self.item_id = None, None
         # ponytail: the Playwright driver is stopped here, else by the next open() / shutdown
         with contextlib.suppress(RuntimeError):  # no running loop
             if self._pw is not None:
-                self._stopping = asyncio.get_running_loop().create_task(self._stop_pw(self._pw))
+                self._stopping = asyncio.get_running_loop().create_task(
+                    self._stop_pw(self._pw, chrome)
+                )
                 self._pw = None
 
     @staticmethod
-    async def _stop_pw(pw: Playwright | None) -> None:
+    async def _stop_pw(pw: Playwright | None, chrome: RunningChrome | None = None) -> None:
+        with contextlib.suppress(Exception):
+            if chrome is not None:  # the user closed the window: sweep any leftover process
+                await chrome.close()
         with contextlib.suppress(Exception):
             if pw is not None:
                 await pw.stop()
 
     async def close(self) -> None:
-        ctx, pw = self._ctx, self._pw
-        self._ctx, self._pw, self.item_id = None, None, None
+        ctx, pw, chrome = self._ctx, self._pw, self._chrome
+        self._ctx, self._pw, self._chrome, self.item_id = None, None, None, None
         with contextlib.suppress(Exception):
             if ctx is not None:
                 await ctx.close()
+        with contextlib.suppress(Exception):
+            if chrome is not None:
+                await chrome.close()
         with contextlib.suppress(Exception):
             if pw is not None:
                 await pw.stop()

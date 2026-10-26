@@ -12,6 +12,7 @@ import asyncio
 import contextlib
 import json
 import re
+import tempfile
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -32,6 +33,7 @@ from playwright.async_api import TimeoutError as PlaywrightTimeout
 from pydantic import BaseModel, ValidationError
 from selectolax.lexbor import LexborHTMLParser, LexborNode
 
+from linkit_all.core.chrome import ChromeError, RunningChrome, open_context
 from linkit_all.providers.base import LLMProvider, ProviderError, UsageLimitError, render
 from linkit_all.sources.ats_detector import detect
 from linkit_all.sources.base import JobStub, from_iso, remote_from_text
@@ -404,6 +406,8 @@ class PageBrowser:
         self._route = route
         self._pw: Playwright | None = None
         self._browser: Browser | None = None
+        self._proc: RunningChrome | None = None
+        self._tmp: tempfile.TemporaryDirectory[str] | None = None
         self._start = asyncio.Lock()
         self._slots = asyncio.Semaphore(MAX_PAGES)
         self._hosts: dict[str, asyncio.Lock] = {}
@@ -413,18 +417,31 @@ class PageBrowser:
             if self._browser is None:
                 try:
                     self._pw = await async_playwright().start()
-                    self._browser = await self._pw.chromium.launch(channel="chrome", headless=True)
-                except PlaywrightError as e:
+                    self._tmp = tempfile.TemporaryDirectory(
+                        prefix="linkit-chrome-", ignore_cleanup_errors=True
+                    )
+                    self._proc, ctx = await open_context(
+                        self._pw, Path(self._tmp.name) / "profile", headless=True
+                    )
+                    self._browser = ctx.browser
+                    if self._browser is None:
+                        raise ChromeError("Chrome did not attach")
+                except (PlaywrightError, ChromeError) as e:
                     await self.close()
                     raise BrowserError(f"Chrome could not be started: {e}") from None
             return self._browser
 
     async def close(self) -> None:
-        if self._browser is not None:
-            await self._browser.close()
-        if self._pw is not None:
-            await self._pw.stop()
-        self._browser = self._pw = None
+        try:
+            if self._proc is not None:
+                await self._proc.close()
+        finally:
+            if self._pw is not None:
+                with contextlib.suppress(Exception):
+                    await self._pw.stop()
+            if self._tmp is not None:
+                self._tmp.cleanup()
+            self._browser = self._pw = self._proc = self._tmp = None
         self._hosts.clear()
 
     async def capture(self, http: Http, url: str) -> Capture:

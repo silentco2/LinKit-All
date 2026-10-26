@@ -15,9 +15,9 @@ from typing import Literal
 from urllib.parse import quote, urlsplit
 
 from playwright.async_api import BrowserContext, Page, async_playwright
-from playwright_stealth import Stealth
 
 from linkit_all.apply.browser import UserBrowser, profile_dir
+from linkit_all.core.chrome import open_context
 from linkit_all.core.config import Settings
 
 SessionState = Literal["ok", "logged_out", "challenge"]
@@ -83,25 +83,18 @@ async def session_state(page: Page) -> SessionState:
 async def linkedin_context(
     settings: Settings, headless: bool, browser: UserBrowser | None = None
 ) -> AsyncIterator[BrowserContext]:
-    """The persistent `linkedin` profile in installed Chrome; closed (with the driver) on exit.
-
-    LinkedIn hides results from automated Chrome, so playwright-stealth is applied here and only
-    here (maintainer decision 2026-10-26; used by check_session and capture_search). It is not
-    used by the apply browser or any other source, and it never solves challenges or logs in.
-    """
+    """The persistent `linkedin` profile in installed Chrome (real Chrome, no automation flags,
+    Playwright attached over CDP); Chrome and the driver are closed on exit. It never solves
+    challenges or logs in."""
     if browser is not None and browser.is_open:
         raise SessionError("The app browser is open: close its window first")
     profile = profile_dir(settings, "linkedin")
-    profile.mkdir(parents=True, exist_ok=True)
     async with async_playwright() as pw:
-        ctx = await pw.chromium.launch_persistent_context(
-            str(profile), channel="chrome", headless=headless, no_viewport=True
-        )
+        chrome, ctx = await open_context(pw, profile, headless=headless)
         try:
-            await Stealth().apply_stealth_async(ctx)
             yield ctx
         finally:
-            await ctx.close()
+            await chrome.close()
 
 
 async def check_session(
