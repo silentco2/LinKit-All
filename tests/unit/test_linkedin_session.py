@@ -1,5 +1,6 @@
 """LinkedIn profile key, search URL, sign-in/session API (fake browser) and capture command."""
 
+import asyncio
 from collections.abc import Iterator
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
@@ -120,3 +121,39 @@ def test_capture_command(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     result_state[0] = "logged_out"
     r = CliRunner().invoke(cli.app, ["linkedin", "capture", "--keywords", "a", "--headed"])
     assert r.exit_code == 1 and "Not signed in" in r.output and calls[-1][2] is True
+
+
+def test_linkedin_context_applies_stealth(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[object] = []
+
+    class FakeCtx:
+        async def close(self) -> None:
+            calls.append("closed")
+
+    class FakeChromium:
+        async def launch_persistent_context(self, *args: object, **kwargs: object) -> FakeCtx:
+            calls.append(("launch", kwargs.get("channel")))
+            return FakeCtx()
+
+    class FakePW:
+        chromium = FakeChromium()
+
+        async def __aenter__(self) -> "FakePW":
+            return self
+
+        async def __aexit__(self, *exc: object) -> None:
+            return None
+
+    class FakeStealth:
+        async def apply_stealth_async(self, ctx: object) -> None:
+            calls.append(("stealth", type(ctx).__name__))
+
+    monkeypatch.setattr(sess, "async_playwright", lambda: FakePW())
+    monkeypatch.setattr(sess, "Stealth", FakeStealth)
+
+    async def run() -> None:
+        async with sess.linkedin_context(Settings(data_dir=tmp_path), headless=True) as ctx:
+            assert isinstance(ctx, FakeCtx)
+
+    asyncio.run(run())
+    assert calls == [("launch", "chrome"), ("stealth", "FakeCtx"), "closed"]

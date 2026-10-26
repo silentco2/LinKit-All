@@ -31,7 +31,7 @@ Users bring their own AI: ChatGPT plan via Codex CLI, API keys, and later local 
 - APScheduler (SQLAlchemy job store), aiolimiter, tenacity, loguru (redaction filter), platformdirs.
 - AI: LiteLLM (API keys, Ollama/LM Studio); subprocess adapters for `codex exec --json` and `claude -p --output-format json`.
 - Scraping: httpx (async), python-jobspy, Playwright, selectolax, extruct, trafilatura, rapidfuzz,
-  lingua-py. Embeddings: fastembed.
+  lingua-py, playwright-stealth (LinkedIn posts only). Embeddings: fastembed.
 - CV: python-docx + lxml, pylatexenc/TexSoup + Tectonic, pdf2docx, LibreOffice headless
   (DOCX->PDF, ODT<->DOCX), PyMuPDF, pdfplumber, Pillow/scikit-image (layout diff).
 - Apply: Playwright (installed Chrome, persistent context per site), imap-tools, vault via cryptography
@@ -77,12 +77,13 @@ Tailoring happens just before applying, never for jobs that will not be applied 
 - Also: Telegram channels (t.me/s preview), discovered boards (Common Crawl, `linkit discover-boards`),
   aggregator API keys from the vault.
 - Never defeat bot challenges (no TLS spoofing, challenge solving, rotating proxies, fake UAs). OK: what the
-  site's own pages send (Referer, XHR header, page CSRF/public key). robots.txt not enforced.
+  site's own pages send (Referer, XHR header, page CSRF/public key). robots.txt not enforced. (exception: LinkedIn posts stealth)
 - ATS detector routes any pasted URL (or careers-page HTML) to the right plugin.
 - LinkedIn hiring posts (`sources/linkedin_posts/`): opt-in, off by default, ban-risk warning, low caps.
   Dedicated `linkedin` Chrome profile (user signs in once, headed); scraping headless by default. Logged out or
-  security check -> stop and notify. Never automate login, bypass challenges, comment, DM or react. ATS links ->
-  that ATS; other posts -> batched AI extraction; no email/link -> dropped.
+  security check -> stop and notify. Never automate login, bypass challenges, comment, DM or react.
+  playwright-stealth allowed for this source only (maintainer 2026-10-26); still never solve challenges or
+  automate login. ATS links -> that ATS; other posts -> batched AI extraction; no email/link -> dropped.
 - Per-domain rate limits, page checkpoints, dedupe by normalized URL + hash(title, company, location) +
   rapidfuzz near-duplicate check.
 
@@ -196,5 +197,4 @@ Phases 1-11 are built; blocked items: handoff.md.
 11. LinkedIn hiring posts: built except the scraper (needs a captured page).
 
 ## 11. License
-AGPL-3.0-or-later (code is reused from ApplyPilot/AIHawk). Reused files keep their
-original headers and are listed in NOTICE.
+AGPL-3.0-or-later (code reused from ApplyPilot/AIHawk). Reused files keep original headers, listed in NOTICE.

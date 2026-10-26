@@ -30,6 +30,7 @@ dependencies = [
     "pillow>=12.3.0",
     "platformdirs>=4.13.0",
     "playwright>=1.64.0",
+    "playwright-stealth>=2.0.3",
     "pydantic>=2.14.1",
     "pydantic-settings>=2.16.0",
     "pylatexenc>=2.11",
@@ -86,7 +87,7 @@ dev = [
 ]
 
 [[tool.mypy.overrides]]
-module = ["jobspy.*", "pdf2docx.*", "apscheduler.*", "pylatexenc.*"]
+module = ["jobspy.*", "pdf2docx.*", "apscheduler.*", "pylatexenc.*", "playwright_stealth.*"]
 ignore_missing_imports = true
 
 [tool.hatch.build.targets.wheel]

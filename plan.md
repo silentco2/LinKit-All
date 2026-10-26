@@ -284,6 +284,9 @@ age), Iron-Mark/Hackathon-HireProof (ISC: scam vocabulary, text normalizer, doma
 floors + signal trace), Farhan89082 (age tiers, fuzzy repost, vague titles; ideas only),
 Arya185 (MIT: fee/contact phrase lists). Rejected: every ML model (English-only 2014 EMSCAD,
 scam-only), aliabdm (one LLM call per job, no rules), paid/search APIs. ghostbust.us: DNS fails.
+Decision (maintainer, 2026-10-26): LinkedIn hides results from automated Chrome; playwright-stealth
+is allowed for this source only (capture + session check), ban risk accepted. Challenges, login and
+proxies stay forbidden; the apply browser and other sources stay un-stealthed.
 Decisions (maintainer, 2026-10-25):
 - Two separate scores per job, `scam` and `ghost` (0-100), each with a signal list
   `{code, weight, evidence}`, stored in `jobs.data["trust"]`; EN + AR rules.
@@ -340,6 +343,7 @@ scraped_at), `extract.py` (RawPost list -> JobStub list), `scrape.py` (Playwrigh
 `__init__.py` Source (kind "social", opt-in). Email apply: `apply/email_send/`.
 Execution tasks:
 - ✅ L1 `linkedin` profile key, sign-in (headed app browser) + session check API, `linkit linkedin capture`
+- ✅ L1b playwright-stealth on the LinkedIn profile (capture + session check)
 - ⬜ L2 Scraper: search URL, scroll caps, per-post extraction, login/checkpoint stop, zero-post HTML dump (needs the maintainer's captured page)
 - ✅ L3 RawPost model, hiring/seeker filter, ATS routing, batched AI extraction prompt, stubs, trust tweaks
 - ✅ L4 SMTP sender (vault creds) + "send test email to myself" API
