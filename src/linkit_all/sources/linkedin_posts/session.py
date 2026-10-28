@@ -1,12 +1,14 @@
 """LinkedIn session helpers: is the user signed in on the `linkedin` Chrome profile?
 
-Only URL and page checks. The app never types credentials, never clicks, never gets past a
-security check: the user signs in themselves in the app browser (CLAUDE.md §5.2, plan Phase 11).
+Only URL and page checks; the one click is the search page's own "Load more". The app never
+types credentials, never gets past a security check: the user signs in themselves in the app
+browser (CLAUDE.md §5.2, plan Phase 11).
 """
 
 import asyncio
 import contextlib
 import random
+import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -30,22 +32,22 @@ CHALLENGE_SELECTORS = (
 )
 CHALLENGE_WORDS = ("let's do a quick security check", "verify you are not a robot")
 SIGNED_IN_SELECTORS = "nav.global-nav, #global-nav, header#global-nav, [data-test-global-nav]"
-WINDOWS = {"day": "past-24h", "week": "past-week", "month": "past-month"}
+# ponytail: English label seen live 2026-10-28; the Arabic one is a guess until a capture shows it
+LOAD_MORE = re.compile(r"^\s*(load more|تحميل المزيد|عرض المزيد)\s*$", re.I)
+LOAD_MORE_MAX = 3  # extra result pages per capture (about 3 posts each)
 
 
 class SessionError(RuntimeError):
     """The LinkedIn profile cannot be used right now (e.g. the app browser holds it)."""
 
 
-def search_url(keywords: str, window: str = "week") -> str:
-    """LinkedIn content-search URL: posts matching `keywords`, newest first."""
-    if window not in WINDOWS:
-        raise ValueError(f"window must be one of {sorted(WINDOWS)}")
-    quoted = quote(f'"{WINDOWS[window]}"', safe="")
+def search_url(keywords: str) -> str:
+    """LinkedIn content-search URL for `keywords`, with no filters: Latest + Past week together
+    returned 1 post live (2026-10-28) where the plain search pages on. The posting window is
+    applied to the scraped posts instead (`post.keep_recent`)."""
     return (
         "https://www.linkedin.com/search/results/content/"
         f"?keywords={quote(keywords.strip(), safe='')}"
-        f"&datePosted={quoted}&sortBy={quote(chr(34) + 'date_posted' + chr(34), safe='')}"
     )
 
 
@@ -85,7 +87,11 @@ async def linkedin_context(
 ) -> AsyncIterator[BrowserContext]:
     """The persistent `linkedin` profile in installed Chrome (real Chrome, no automation flags,
     Playwright attached over CDP); Chrome and the driver are closed on exit. It never solves
-    challenges or logs in."""
+    challenges or logs in.
+
+    Headless by default: the launcher gives headless Chrome a screen its window fits in and the
+    real user agent with full client hints (core/chrome.py). Headed stays a setting, for when
+    LinkedIn starts returning fewer posts."""
     if browser is not None and browser.is_open:
         raise SessionError("The app browser is open: close its window first")
     profile = profile_dir(settings, "linkedin")
@@ -118,12 +124,42 @@ async def capture_search(
         await page.goto(search_url(keywords), wait_until="domcontentloaded", timeout=30000)
         with contextlib.suppress(Exception):
             await page.wait_for_selector("main", timeout=15000)
-        for _ in range(3):
-            await page.mouse.wheel(0, 3000)
-            await asyncio.sleep(random.uniform(2.0, 4.0))  # noqa: S311 - pacing, not security
+        await load_more(page, LOAD_MORE_MAX)
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(await page.content(), encoding="utf-8")
         return "ok"
+
+
+async def load_more(page: Page, pages: int) -> int:
+    """Read down the results and press the page's "Load more" up to `pages` times, at a reading
+    pace. Results scroll inside <main>, not the document, so the wheel turns over them.
+    Returns how many times it pressed."""
+    pause = random.uniform  # pacing, not security
+    box = await page.locator("main").bounding_box()
+    if box:
+        await page.mouse.move(box["x"] + box["width"] / 2, box["y"] + min(box["height"], 400) / 2)
+    for done in range(pages):
+        await _read_to_end(page)  # the list renders "Load more" only near its end
+        button = page.get_by_role("button", name=LOAD_MORE)
+        if not await button.count():
+            return done  # last page
+        await button.first.scroll_into_view_if_needed()
+        await asyncio.sleep(pause(1.0, 2.5))
+        await button.first.click()
+        await asyncio.sleep(pause(2.5, 5.0))
+    return pages
+
+
+async def _read_to_end(page: Page, max_steps: int = 20) -> None:
+    """Wheel down over <main> in reading-sized steps until it stops moving."""
+    last = -1.0
+    for _ in range(max_steps):
+        await page.mouse.wheel(0, random.randint(250, 600))  # noqa: S311 - pacing
+        await asyncio.sleep(random.uniform(0.8, 2.0))  # noqa: S311
+        top = float(await page.evaluate("() => document.querySelector('main')?.scrollTop ?? 0"))
+        if top == last:
+            return
+        last = top
 
 
 def default_capture_path(settings: Settings) -> Path:

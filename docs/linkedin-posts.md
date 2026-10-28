@@ -33,9 +33,9 @@ You sign in once. Later runs reuse the saved session.
 |---|---|
 | **Search LinkedIn hiring posts** | The on/off switch (adds `linkedin_posts` to the enabled sources). |
 | **Keywords** | One per line, English or Arabic, for example `python developer hiring` or `مطلوب مهندس`. Each keyword is one search. Keep it to about 5. |
-| **Posted within** | Last 24 hours or last week. |
+| **Posted within** | Last 24 hours or last week. LinkedIn is searched without filters; this window only drops older posts when a keyword returns more than 100 posts. |
+| **Run headless** | On by default: no browser window during runs. Turn it off to watch the browser, or if LinkedIn starts returning fewer posts than usual. |
 | **Max posts per keyword** | How many posts are read per search (default 60, at most 200). |
-| **Run headless** | On by default: no browser window during runs. Turn it off to watch the browser. A visible window looks more like a normal visit, so it is less likely to be flagged. |
 
 If you are signed out, or LinkedIn shows a security check, LinKit All **stops this source for
 the run** and tells you (a notification and an event in the run log). The other sources carry

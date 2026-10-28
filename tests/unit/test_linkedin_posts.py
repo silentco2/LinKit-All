@@ -15,7 +15,13 @@ from linkit_all.sources.linkedin_posts.extract import (
     ExtractedPosts,
     posts_to_stubs,
 )
-from linkit_all.sources.linkedin_posts.post import RawPost, find_emails, find_links, posted_at
+from linkit_all.sources.linkedin_posts.post import (
+    RawPost,
+    find_emails,
+    find_links,
+    keep_recent,
+    posted_at,
+)
 
 NOW = datetime(2026, 10, 25, 12, 0)
 HIRING = "We're hiring a Data Engineer. Send your CV to hr@acme.com"
@@ -78,6 +84,33 @@ def test_posted_at(label: str, delta: timedelta) -> None:
 def test_posted_at_unreadable() -> None:
     assert posted_at(mk(posted_text="")) is None
     assert posted_at(mk(posted_text="soon")) is None
+    assert posted_at(mk(posted_text="Feb 30")) is None
+
+
+@pytest.mark.parametrize(
+    ("label", "at"),
+    [
+        ("Oct 22", datetime(2026, 10, 22)),
+        ("Oct 22 • Edited", datetime(2026, 10, 22)),
+        ("22 Oct", datetime(2026, 10, 22)),
+        ("22 Dec", datetime(2025, 12, 22)),  # not "22 days"; a future date is last year's
+        ("Dec 3, 2024", datetime(2024, 12, 3)),
+        ("٢٢ أكتوبر", datetime(2026, 10, 22)),
+        ("Yesterday", NOW - timedelta(days=1)),
+        ("أمس", NOW - timedelta(days=1)),
+    ],
+)
+def test_posted_at_absolute_labels(label: str, at: datetime) -> None:
+    assert posted_at(mk(posted_text=label)) == at
+
+
+def test_keep_recent_only_filters_past_the_threshold() -> None:
+    labels = ["2d", "Oct 18", "Oct 10", "soon"]  # 3 / 7 / 15 days old, unreadable
+    posts = [mk(i, posted_text=labels[i % 4]) for i in range(8)]
+    assert keep_recent(posts, "week", after=8) == posts  # not more than `after`: untouched
+    kept = keep_recent(posts, "week", after=7)
+    assert [p.posted_text for p in kept] == ["2d", "Oct 18", "soon"] * 2
+    assert [p.posted_text for p in keep_recent(posts, "day", after=7)] == ["soon"] * 2
 
 
 def test_find_emails() -> None:

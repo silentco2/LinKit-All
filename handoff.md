@@ -346,8 +346,9 @@ anywhere; Crawl-delay pacing and per-host rate limits stay. Recorded in CLAUDE.m
 
 ## Known issues and debt
 
-- LinkedIn markup changes often: the post selectors (once L2 exists) will need upkeep. Headless
-  scraping is likelier to be flagged than a visible window. Seeker-tag posts ("open to work")
+- LinkedIn markup changes often: the post selectors (once L2 exists) will need upkeep. LinkedIn runs headless by
+  default (real UA + client hints, fitted screen); the Latest + Past week filters gave 1 post, so
+  search is unfiltered and the window is applied to scraped posts past 100. Seeker-tag posts ("open to work")
   that also contain hiring words are dropped. The email greeting heuristic can misjudge a
   company address versus a person.
 

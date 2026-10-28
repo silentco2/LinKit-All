@@ -345,7 +345,7 @@ scraped_at), `extract.py` (RawPost list -> JobStub list), `scrape.py` (Playwrigh
 Execution tasks:
 - ✅ L1 `linkedin` profile key, sign-in (headed app browser) + session check API, `linkit linkedin capture`
 - ✅ L1b playwright-stealth on the LinkedIn profile (superseded by S1, removed)
-- ⬜ L2 Scraper: search URL, scroll caps, per-post extraction, login/checkpoint stop, zero-post HTML dump (needs the maintainer's captured page)
+- ⬜ L2 Scraper: unfiltered search URL + `load_more` pager (live-checked), `post.keep_recent` (window only past 100 posts), per-post extraction, login/checkpoint stop, zero-post HTML dump (needs the maintainer's captured page)
 - ✅ L3 RawPost model, hiring/seeker filter, ATS routing, batched AI extraction prompt, stubs, trust tweaks
 - ✅ L4 SMTP sender (vault creds) + "send test email to myself" API
 - ✅ L5 Email apply channel in the runner: compose, dry-run .eml, confirm park, caps, recipient dedupe, evidence

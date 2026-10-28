@@ -781,7 +781,7 @@ export const en: Record<string, string> = {
   'setup.linkedin.window.week': 'Last week',
   'setup.linkedin.maxPosts': 'Max posts per keyword',
   'setup.linkedin.headless': 'Run headless (hide the browser window)',
-  'setup.linkedin.headlessHint': 'Headed (unticked) is less likely to be flagged by LinkedIn.',
+  'setup.linkedin.headlessHint': 'Untick to watch the browser, or if LinkedIn starts returning fewer posts than usual.',
   'setup.linkedin.save': 'Save LinkedIn settings',
   'setup.linkedin.saved': 'LinkedIn settings saved',
   'setup.email.cap': 'Application emails per day',

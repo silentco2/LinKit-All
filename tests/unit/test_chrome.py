@@ -28,12 +28,24 @@ def test_args_have_no_automation_flags_and_a_real_port(tmp_path: Path) -> None:
     assert not any(a.startswith(("--headless", "--user-agent")) for a in args)
 
 
-def test_headless_args_carry_the_real_user_agent(tmp_path: Path) -> None:
-    ua = "Mozilla/5.0 Chrome/150.0.0.0 Safari/537.36"
-    args = chrome.chrome_args(tmp_path, 9333, headless=True, user_agent=ua)
-    assert "--headless=new" in args and f"--user-agent={ua}" in args
+def test_headless_args_fit_the_window_in_the_screen_and_keep_client_hints(tmp_path: Path) -> None:
+    args = chrome.chrome_args(tmp_path, 9333, headless=True)
+    assert "--headless=new" in args and f"--screen-info={chrome.HEADLESS_SCREEN}" in args
+    win = [int(n) for n in chrome.HEADLESS_WINDOW.split(",")]
+    screen = [int(n) for n in chrome.HEADLESS_SCREEN.strip("{}").split()[0].split("x")]
+    assert win[0] <= screen[0] and win[1] <= screen[1]
+    assert not any(a.startswith("--user-agent") for a in args)  # the flag blanks client hints
     assert not any(f in a for a in args for f in FORBIDDEN)
     assert chrome.real_user_agent("A HeadlessChrome/150.0 B") == "A Chrome/150.0 B"
+
+
+def test_ua_metadata_keeps_the_browsers_own_hints() -> None:
+    hints = {"brands": [{"brand": "Google Chrome", "version": "150"}], "mobile": False,
+             "fullVersionList": [{"brand": "Google Chrome", "version": "150.0.1.2"}],
+             "platform": "Windows", "platformVersion": "19.0.0", "architecture": "x86",
+             "bitness": "64", "model": "", "wow64": False, "uaFullVersion": "150.0.1.2"}  # fmt: skip
+    meta = chrome.ua_metadata(hints)
+    assert meta == {k: v for k, v in hints.items() if k != "uaFullVersion"}
 
 
 def test_no_sandbox_only_for_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -81,7 +93,7 @@ def test_wait_ready_returns_version_info(monkeypatch: pytest.MonkeyPatch) -> Non
     assert got == {"Browser": "Chrome/1"}
 
 
-def test_launch_reads_ua_once_and_uses_it_headless(
+def test_launch_reads_identity_once_and_masks_headless(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     spawned: list[list[str]] = []
@@ -92,7 +104,17 @@ def test_launch_reads_ua_once_and_uses_it_headless(
         return FakeProc()
 
     async def fake_version(port: int) -> dict[str, Any]:
-        return {"User-Agent": "Mozilla/5.0 HeadlessChrome/150.0.0.0 Safari/537.36"}
+        ua = "Mozilla/5.0 HeadlessChrome/150.0.0.0 Safari/537.36"
+        return {"User-Agent": ua, "webSocketDebuggerUrl": f"ws://127.0.0.1:{port}/devtools/b"}
+
+    async def fake_hints(port: int, ws_url: str) -> dict[str, Any]:
+        return {"brands": [{"brand": "Google Chrome", "version": "150"}], "mobile": False}
+
+    masks: list[tuple[str, chrome.Identity]] = []
+
+    async def fake_mask(ws_url: str, identity: chrome.Identity) -> str:
+        masks.append((ws_url, identity))
+        return "mask"
 
     async def fake_terminate(proc: object) -> None:
         ended.append(proc)
@@ -101,7 +123,9 @@ def test_launch_reads_ua_once_and_uses_it_headless(
     monkeypatch.setattr(chrome, "_spawn", fake_spawn)
     monkeypatch.setattr(chrome, "_version", fake_version)
     monkeypatch.setattr(chrome, "_terminate", fake_terminate)
-    monkeypatch.setattr(chrome, "_ua_cache", {})
+    monkeypatch.setattr(chrome, "_read_hints", fake_hints)
+    monkeypatch.setattr(chrome.HeadlessMask, "start", fake_mask)
+    monkeypatch.setattr(chrome, "_identity_cache", {})
 
     async def go() -> tuple[chrome.RunningChrome, chrome.RunningChrome]:
         return (
@@ -110,11 +134,14 @@ def test_launch_reads_ua_once_and_uses_it_headless(
         )
 
     first, _ = asyncio.run(go())
-    assert len(spawned) == 3  # one short UA probe, then the two real launches
-    ua = "--user-agent=Mozilla/5.0 Chrome/150.0.0.0 Safari/537.36"
-    assert (
-        ua in spawned[1] and ua in spawned[2] and not any("--user-agent" in a for a in spawned[0])
+    assert len(spawned) == 3  # one short identity probe, then the two real launches
+    assert not any("--user-agent" in a for args in spawned for a in args)
+    want = chrome.Identity(
+        "Mozilla/5.0 Chrome/150.0.0.0 Safari/537.36",
+        {"brands": [{"brand": "Google Chrome", "version": "150"}], "mobile": False},
     )
+    assert [m[1] for m in masks] == [want, want] and first.mask == "mask"  # type: ignore[comparison-overlap]
+    assert masks[0][0] == f"ws://127.0.0.1:{first.port}/devtools/b"
     assert first.cdp_url == f"http://127.0.0.1:{first.port}" and first.port != 0
     assert len(ended) == 1  # only the probe was stopped
 
@@ -163,21 +190,27 @@ def test_close_kills_the_process_and_its_children(tmp_path: Path) -> None:
 @pytest.mark.skipif(chrome.browser_path() is None, reason="no Chrome or Chromium installed")
 @pytest.mark.parametrize("headless", [True])
 def test_real_launch_connect_and_close(tmp_path: Path, headless: bool) -> None:
-    async def go() -> tuple[str, bool, int | None]:
+    probe = """async () => ({ ua: navigator.userAgent, webdriver: navigator.webdriver,
+      full: (await navigator.userAgentData.getHighEntropyValues(['fullVersionList']))
+        .fullVersionList.map(b => b.brand),
+      fits: outerWidth <= screen.width && outerHeight <= screen.height })"""
+
+    async def go() -> tuple[dict[str, Any], int | None]:
         async with async_playwright() as pw:
             running, ctx = await chrome.open_context(pw, tmp_path / "profile", headless=headless)
             try:
-                page = await ctx.new_page()
+                page = await ctx.new_page()  # a new tab: the mask must cover it before it loads
                 await page.route(
                     "**/*", lambda r: r.fulfill(body="<p>hi</p>", content_type="text/html")
                 )
-                await page.goto("http://example.test/")
-                ua = await page.evaluate("navigator.userAgent")
-                webdriver = await page.evaluate("navigator.webdriver")
+                await page.goto("https://example.test/")  # secure, so userAgentData exists
+                seen = await page.evaluate(probe)
             finally:
                 await running.close()
-            return ua, bool(webdriver), running.process.returncode
+            return seen, running.process.returncode
 
-    ua, webdriver, code = asyncio.run(go())
-    assert "HeadlessChrome" not in ua and webdriver is False
+    seen, code = asyncio.run(go())
+    assert "HeadlessChrome" not in seen["ua"] and seen["webdriver"] is False
+    assert seen["full"] and not any("Headless" in b for b in seen["full"])  # hints not blanked
+    assert seen["fits"]  # the window fits in the screen
     assert code is not None

@@ -781,7 +781,7 @@ export const ar: Record<string, string> = {
   'setup.linkedin.window.week': 'آخر أسبوع',
   'setup.linkedin.maxPosts': 'أقصى عدد منشورات لكل كلمة',
   'setup.linkedin.headless': 'التشغيل بدون واجهة (إخفاء نافذة المتصفح)',
-  'setup.linkedin.headlessHint': 'إبقاء النافذة ظاهرة (بدون تحديد) أقل عرضة لأن يعلّمه لينكدإن.',
+  'setup.linkedin.headlessHint': 'ألغِ التحديد لمشاهدة المتصفح، أو إذا بدأ لينكدإن يعيد منشورات أقل من المعتاد.',
   'setup.linkedin.save': 'حفظ إعدادات لينكدإن',
   'setup.linkedin.saved': 'تم حفظ إعدادات لينكدإن',
   'setup.email.cap': 'رسائل التقديم في اليوم',

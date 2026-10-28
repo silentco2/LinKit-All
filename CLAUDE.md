@@ -77,15 +77,15 @@ Tailoring happens just before applying, never for jobs that will not be applied 
 - Also: Telegram channels (t.me/s preview), discovered boards (Common Crawl, `linkit discover-boards`),
   aggregator API keys from the vault.
 - All browser automation runs real installed Chrome launched without automation flags (stealth-browser-mcp approach,
-  maintainer 2026-10-26); still never solve CAPTCHAs/challenges, automate login, use rotating proxies, TLS or fingerprint spoofing. OK: what the site's own pages send (Referer, XHR header, CSRF key).
-  robots.txt not enforced.
+  maintainer 2026-10-26); never solve CAPTCHAs/challenges, automate login, use rotating proxies, TLS or fingerprint
+  spoofing (exception 2026-10-29: headless gets a fitted screen + real Chrome UA/client hints). OK: what the site's
+  own pages send (Referer, XHR header, CSRF key). robots.txt not enforced.
 - ATS detector routes any pasted URL (or careers-page HTML) to the right plugin.
 - LinkedIn hiring posts (`sources/linkedin_posts/`): opt-in, off by default, ban-risk warning, low caps.
-  Dedicated `linkedin` Chrome profile (user signs in once, headed); scraping headless by default. Logged out or
-  security check -> stop and notify. Never automate login, bypass challenges, comment, DM or react.
+  Dedicated `linkedin` Chrome profile; scraping headless by default (setting), search without filters + "Load more".
+  Logged out or security check -> stop and notify. Never automate login, bypass challenges, comment, DM or react.
   ATS links -> that ATS; other posts -> batched AI extraction; no email/link -> dropped.
-- Per-domain rate limits, page checkpoints, dedupe by normalized URL + hash(title, company, location) +
-  rapidfuzz near-duplicate check.
+- Per-domain rate limits, page checkpoints, dedupe by normalized URL + hash(title, company, location) + rapidfuzz.
 
 ### 5.3 Matching (`matching/`)
 1. Hard rules: titles include/exclude, location, remote mode, seniority, posted date,

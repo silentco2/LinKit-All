@@ -730,13 +730,15 @@ async def linkedin_signin(request: Request) -> dict[str, Any]:
 
 @router.get("/linkedin/session")
 async def linkedin_session(request: Request) -> dict[str, str]:
-    """Is the saved LinkedIn sign-in still good? Looks at the feed in a headless Chrome."""
+    """Is the saved LinkedIn sign-in still good? Looks at the feed (headless unless the setting says
+    otherwise)."""
     from linkit_all.sources.linkedin_posts.session import SessionError, check_session
 
     if _runner(request).state.running:
         raise HTTPException(409, "A run is in progress: wait for it, or cancel it")
+    headless = (load_search(_db(request)) or SearchConfig()).sources.linkedin_headless
     try:
-        state = await check_session(_settings(request), True, _user_browser(request))
+        state = await check_session(_settings(request), headless, _user_browser(request))
     except SessionError as e:
         raise HTTPException(409, str(e)) from e
     except Exception as e:

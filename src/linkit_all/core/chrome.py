@@ -3,8 +3,13 @@
 Launch approach adapted from stealth-browser-mcp (MIT). Chrome is started without any
 automation flag (no --enable-automation, no --remote-debugging-pipe, no
 --disable-blink-features=AutomationControlled) and on a real, non-zero debugging port, so the
-page sees an ordinary browser. Nothing here solves challenges, logs in, spoofs a fingerprint or
-changes the network identity (CLAUDE.md §5.2).
+page sees an ordinary browser. Nothing here solves challenges, logs in or changes the network
+identity (CLAUDE.md §5.2).
+
+Headless only (maintainer 2026-10-29): the virtual screen is set so the window fits inside it,
+and every tab and worker gets the real Chrome user agent (no "HeadlessChrome") together with the
+browser's own client hints (full version list, platform version...), set over CDP before the
+target runs. A `--user-agent` flag would blank those hints, which is itself a tell.
 
 One profile directory can be held by one Chrome at a time: a second launch on the same profile
 exits at once (Chrome hands over to the running one) and is reported as an error.
@@ -12,6 +17,7 @@ exits at once (Chrome hands over to the running one) and is reported as an error
 
 import asyncio
 import contextlib
+import json
 import os
 import signal
 import socket
@@ -19,24 +25,130 @@ import subprocess
 import sys
 import tempfile
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import httpx
 from playwright.async_api import BrowserContext, Playwright
+from websockets.asyncio.client import ClientConnection
+from websockets.asyncio.client import connect as ws_connect
 
 from linkit_all.core.tools import chrome_path, find_tool
 
 READY_TIMEOUT_S = 20.0
 CLOSE_TIMEOUT_S = 8.0
 HEADLESS_WINDOW = "1280,900"
+# headless virtual display: the window must fit inside it (the default 800x600 does not)
+# ponytail: fixed 1080p like the maintainer's screen; read the OS screen size if users differ
+HEADLESS_SCREEN = "{1920x1080}"
+UA_CH = (
+    "navigator.userAgentData.getHighEntropyValues(['architecture', 'bitness', 'formFactors', "
+    "'fullVersionList', 'model', 'platformVersion', 'wow64'])"
+)
+AUTO_ATTACH = {"autoAttach": True, "waitForDebuggerOnStart": True, "flatten": True}
 
-_ua_cache: dict[str, str] = {}  # real user agent per Chrome binary path
+
+@dataclass(frozen=True)
+class Identity:
+    """What a headed Chrome of this binary says about itself: user agent + client hints."""
+
+    user_agent: str
+    metadata: dict[str, Any]  # CDP Emulation.UserAgentMetadata
+
+
+_identity_cache: dict[str, Identity] = {}  # per Chrome binary path
 
 
 class ChromeError(RuntimeError):
     """Chrome is not installed, did not start, or did not open its debugging port."""
+
+
+class Cdp:
+    """A minimal CDP client on one websocket, flat sessions (`session` = sessionId)."""
+
+    def __init__(self, ws: ClientConnection) -> None:
+        self._ws = ws
+        self._ids = 0
+        self._pending: dict[int, asyncio.Future[dict[str, Any]]] = {}
+        self.on_event: dict[str, Callable[[dict[str, Any]], None]] = {}
+        self._reader = asyncio.create_task(self._read())
+
+    @classmethod
+    async def open(cls, ws_url: str) -> "Cdp":
+        return cls(await ws_connect(ws_url, max_size=None, proxy=None))
+
+    async def send(
+        self, method: str, params: dict[str, Any] | None = None, session: str | None = None
+    ) -> dict[str, Any]:
+        self._ids += 1
+        msg: dict[str, Any] = {"id": self._ids, "method": method, "params": params or {}}
+        if session:
+            msg["sessionId"] = session
+        fut = self._pending[self._ids] = asyncio.get_running_loop().create_future()
+        await self._ws.send(json.dumps(msg))
+        reply = await fut
+        if "error" in reply:
+            raise ChromeError(f"{method}: {reply['error'].get('message')}")
+        return dict(reply.get("result", {}))
+
+    async def _read(self) -> None:
+        with contextlib.suppress(Exception):  # socket closed: Chrome ended or close() was called
+            async for raw in self._ws:
+                msg = json.loads(raw)
+                if (fut := self._pending.pop(msg.get("id", -1), None)) is not None:
+                    fut.set_result(msg)
+                elif (cb := self.on_event.get(msg.get("method", ""))) is not None:
+                    cb(msg.get("params", {}))
+        for fut in self._pending.values():
+            if not fut.done():
+                fut.set_result({"error": {"message": "connection closed"}})
+
+    async def close(self) -> None:
+        await self._ws.close()
+        with contextlib.suppress(BaseException):
+            await self._reader
+
+
+class HeadlessMask:
+    """Holds every new tab, frame and worker (auto-attach, paused) until it carries the real
+    user agent and client hints, then lets it run. Lives as long as the Chrome it watches."""
+
+    def __init__(self, cdp: Cdp, identity: Identity) -> None:
+        self.cdp = cdp
+        self.override = {"userAgent": identity.user_agent, "userAgentMetadata": identity.metadata}
+        self.tasks: set[asyncio.Task[None]] = set()
+        cdp.on_event["Target.attachedToTarget"] = self._on_attached
+
+    @classmethod
+    async def start(cls, ws_url: str, identity: Identity) -> "HeadlessMask":
+        mask = cls(await Cdp.open(ws_url), identity)
+        await mask.cdp.send("Target.setAutoAttach", AUTO_ATTACH)  # existing targets attach too
+        await asyncio.gather(*mask.tasks)  # the start page is covered before anyone navigates
+        return mask
+
+    def _on_attached(self, params: dict[str, Any]) -> None:
+        task = asyncio.create_task(self._cover(params))
+        self.tasks.add(task)
+        task.add_done_callback(self.tasks.discard)
+
+    async def _cover(self, params: dict[str, Any]) -> None:
+        sid, kind = params["sessionId"], params["targetInfo"]["type"]
+        try:
+            with contextlib.suppress(ChromeError):  # the target may already be gone
+                if kind in ("page", "iframe"):
+                    await self.cdp.send("Emulation.setUserAgentOverride", self.override, sid)
+                    await self.cdp.send("Target.setAutoAttach", AUTO_ATTACH, sid)  # its workers
+                elif kind in ("worker", "shared_worker", "service_worker"):
+                    await self.cdp.send("Network.setUserAgentOverride", self.override, sid)
+        finally:
+            if params.get("waitingForDebugger"):  # never leave a target paused
+                with contextlib.suppress(ChromeError):
+                    await self.cdp.send("Runtime.runIfWaitingForDebugger", None, sid)
+
+    async def close(self) -> None:
+        await self.cdp.close()
 
 
 @dataclass
@@ -47,8 +159,13 @@ class RunningChrome:
     port: int
     profile_dir: Path
     cdp_url: str
+    mask: HeadlessMask | None = None
 
     async def close(self) -> None:
+        if self.mask is not None:
+            mask, self.mask = self.mask, None
+            with contextlib.suppress(Exception):
+                await mask.close()
         await _terminate(self.process)
 
 
@@ -86,9 +203,7 @@ def _needs_no_sandbox() -> bool:
     return geteuid is not None and geteuid() == 0  # root or a container: the sandbox cannot start
 
 
-def chrome_args(
-    profile_dir: Path, port: int, *, headless: bool, user_agent: str | None = None
-) -> list[str]:
+def chrome_args(profile_dir: Path, port: int, *, headless: bool) -> list[str]:
     args = [
         f"--user-data-dir={profile_dir}",
         f"--remote-debugging-port={port}",
@@ -99,9 +214,11 @@ def chrome_args(
         "--password-store=basic",
     ]
     if headless:
-        args += ["--headless=new", f"--window-size={HEADLESS_WINDOW}"]
-        if user_agent:
-            args.append(f"--user-agent={user_agent}")
+        args += [
+            "--headless=new",
+            f"--window-size={HEADLESS_WINDOW}",
+            f"--screen-info={HEADLESS_SCREEN}",
+        ]
     if _needs_no_sandbox():
         args.append("--no-sandbox")
     return [*args, "about:blank"]
@@ -175,13 +292,11 @@ async def _wait_ready(
 
 
 async def _start(
-    exe: str, profile_dir: Path, *, headless: bool, user_agent: str | None, timeout: float
+    exe: str, profile_dir: Path, *, headless: bool, timeout: float
 ) -> tuple[asyncio.subprocess.Process, int, dict[str, Any]]:
     profile_dir.mkdir(parents=True, exist_ok=True)
     port = free_port()
-    proc = await _spawn(
-        exe, chrome_args(profile_dir, port, headless=headless, user_agent=user_agent)
-    )
+    proc = await _spawn(exe, chrome_args(profile_dir, port, headless=headless))
     try:
         return proc, port, await _wait_ready(proc, port, timeout)
     except BaseException:
@@ -189,18 +304,48 @@ async def _start(
         raise
 
 
-async def _headless_ua(exe: str, timeout: float) -> str:
-    """The user agent a headed Chrome would send, read once per binary from a short headless run."""
-    if exe not in _ua_cache:
+def ua_metadata(hints: dict[str, Any]) -> dict[str, Any]:
+    """navigator.userAgentData.getHighEntropyValues() -> CDP UserAgentMetadata (same values)."""
+    keys = ("brands", "fullVersionList", "platform", "platformVersion", "architecture", "model",
+            "mobile", "bitness", "wow64", "formFactors")  # fmt: skip
+    return {k: hints[k] for k in keys if k in hints}
+
+
+async def _read_hints(port: int, ws_url: str) -> dict[str, Any]:
+    """The browser's own client hints, from a page on its loopback debugging origin (a secure
+    context, so navigator.userAgentData exists)."""
+    cdp = await Cdp.open(ws_url)
+    try:
+        url = f"http://127.0.0.1:{port}/json/version"
+        target = await cdp.send("Target.createTarget", {"url": url})
+        sid = (await cdp.send("Target.attachToTarget", {**target, "flatten": True}))["sessionId"]
+        ready = {"expression": "isSecureContext && !!navigator.userAgentData"}
+        for _ in range(50):
+            if (await cdp.send("Runtime.evaluate", ready, sid)).get("result", {}).get("value"):
+                break
+            await asyncio.sleep(0.1)
+        ask = {"expression": UA_CH, "awaitPromise": True, "returnByValue": True}
+        hints = (await cdp.send("Runtime.evaluate", ask, sid)).get("result", {}).get("value")
+        if not isinstance(hints, dict):
+            raise ChromeError("Chrome did not report its client hints")
+        return hints
+    finally:
+        await cdp.close()
+
+
+async def _headless_identity(exe: str, timeout: float) -> Identity:
+    """User agent and client hints of this binary, read once per binary from a short headless
+    run (its hints already name the real browser; only the UA string says HeadlessChrome)."""
+    if exe not in _identity_cache:
         with tempfile.TemporaryDirectory(prefix="linkit-ua-") as tmp:
-            proc, _, info = await _start(
-                exe, Path(tmp) / "p", headless=True, user_agent=None, timeout=timeout
-            )
+            proc, port, info = await _start(exe, Path(tmp) / "p", headless=True, timeout=timeout)
             try:
-                _ua_cache[exe] = real_user_agent(str(info.get("User-Agent", "")))
+                hints = await _read_hints(port, str(info["webSocketDebuggerUrl"]))
+                ua = real_user_agent(str(info.get("User-Agent", "")))
+                _identity_cache[exe] = Identity(ua, ua_metadata(hints))
             finally:
                 await _terminate(proc)
-    return _ua_cache[exe]
+    return _identity_cache[exe]
 
 
 async def launch_chrome(
@@ -209,11 +354,16 @@ async def launch_chrome(
     exe = browser_path()
     if exe is None:
         raise ChromeError("Google Chrome is not installed: https://www.google.com/chrome/")
-    ua = await _headless_ua(exe, timeout) if headless else None
-    proc, port, _ = await _start(
-        exe, profile_dir, headless=headless, user_agent=ua, timeout=timeout
-    )
-    return RunningChrome(proc, port, profile_dir, f"http://127.0.0.1:{port}")
+    identity = await _headless_identity(exe, timeout) if headless else None
+    proc, port, info = await _start(exe, profile_dir, headless=headless, timeout=timeout)
+    running = RunningChrome(proc, port, profile_dir, f"http://127.0.0.1:{port}")
+    if identity is not None:
+        try:
+            running.mask = await HeadlessMask.start(str(info["webSocketDebuggerUrl"]), identity)
+        except BaseException:
+            await running.close()
+            raise
+    return running
 
 
 async def connect(pw: Playwright, running: RunningChrome) -> BrowserContext:
