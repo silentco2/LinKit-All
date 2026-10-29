@@ -36,3 +36,6 @@ Thumbs.db
 
 # Built docs
 site/
+
+# Usability study notes (participant quotes stay local)
+docs/usability/results/
