@@ -7,7 +7,8 @@ import { Api } from '../api';
 import { I18n, SourcePipe, TPipe } from '../i18n';
 import { Live } from '../live';
 import { fmtNum, localeOf } from '../locale';
-import { GHOST_HIGH, GHOST_MEDIUM, JobRow, SCAM_HIGH, SCAM_MEDIUM } from '../types';
+import { Hint } from '../components/hint';
+import { GHOST_HIGH, GHOST_MEDIUM, JobRow, reasonText, SCAM_HIGH, SCAM_MEDIUM } from '../types';
 
 interface Risk { key: string; cls: string }
 const RISK_RED = 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300';
@@ -37,12 +38,14 @@ const STATES = ['discovered', 'enriched', 'filtered_out', 'ranked', 'scored', 'b
 @Component({
   selector: 'app-jobs',
   host: { '(document:keydown.escape)': 'selected.set(null)' },
-  imports: [ScrollingModule, FormsModule, RouterLink, JobDetailPanel, SourcePipe, TPipe],
+  imports: [ScrollingModule, FormsModule, Hint, RouterLink, JobDetailPanel, SourcePipe, TPipe],
   template: `
     <div class="flex items-baseline justify-between">
       <h1>{{ 'jobs.title' | t }}</h1>
       <span class="text-sm text-slate-500">{{ 'jobs.shown' | t: { n: num(rows().length) } }}</span>
     </div>
+
+    <app-hint id="jobs">{{ 'hint.jobs' | t }}</app-hint>
 
     <div class="mt-4 flex flex-wrap gap-3" role="search">
       <input class="input max-w-xs" type="search" [placeholder]="'jobs.searchPh' | t" [attr.aria-label]="'jobs.searchLabel' | t"
@@ -84,7 +87,7 @@ const STATES = ['discovered', 'enriched', 'filtered_out', 'ranked', 'scored', 'b
               </span>
               <span class="min-w-0">
                 <span [class]="compact() ? 'line-clamp-2' : 'block truncate'" class="text-sm font-medium break-words" dir="auto">{{ j.title }}</span>
-                <span class="block truncate text-xs text-slate-500" dir="auto">@if (risk(j); as r) { <span class="badge me-1.5 px-1.5 py-0 text-[11px] leading-4 {{ r.cls }}">{{ 'trust.badge.' + r.key | t }}</span> }@if (compact()) { <span>{{ 'common.state.' + j.state | t }} · </span> }<bdi>{{ j.company }}</bdi> · <bdi>{{ j.location }}</bdi> · <bdi>{{ j.source | src }}</bdi></span>
+                <span class="block truncate text-xs text-slate-500" dir="auto">@if (reasonOf(j); as why) { <span class="badge tier-low me-1.5 inline-block max-w-[55%] truncate px-1.5 py-0 align-middle text-[11px] leading-4" [attr.title]="why" dir="auto">{{ why }}</span> }@if (risk(j); as r) { <span class="badge me-1.5 px-1.5 py-0 text-[11px] leading-4 {{ r.cls }}">{{ 'trust.badge.' + r.key | t }}</span> }@if (compact()) { <span>{{ 'common.state.' + j.state | t }} · </span> }<bdi>{{ j.company }}</bdi> · <bdi>{{ j.location }}</bdi> · <bdi>{{ j.source | src }}</bdi></span>
               </span>
               @if (!compact()) {
                 <span class="truncate text-xs text-slate-600 dark:text-slate-400">{{ 'common.state.' + j.state | t }}</span>
@@ -122,6 +125,7 @@ export class JobsPage {
   protected readonly rows = computed(() =>
     this.hideRisky() ? this.all().filter((j) => (j.scam_score ?? 0) < SCAM_HIGH && (j.ghost_score ?? 0) < GHOST_HIGH) : this.all());
   protected readonly risk = riskOf;
+  protected readonly reasonOf = (j: JobRow): string => reasonText(this.i18n, j);
   protected readonly q = computed(() => this.params()?.get('q') ?? '');
   protected readonly state = computed(() => this.params()?.get('state') ?? '');
   protected readonly tier = computed(() => this.params()?.get('tier') ?? '');

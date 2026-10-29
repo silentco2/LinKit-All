@@ -1,6 +1,7 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
+import { Hint } from '../components/hint';
 import { TabItem, Tabs } from '../components/tabs';
 import { TPipe } from '../i18n';
 import { Shell } from '../shell';
@@ -12,9 +13,10 @@ type Tab = 'approve' | 'finish';
 /** Needs you: jobs waiting for a yes or no (old Review) and applications that stopped on something (old Action Center). */
 @Component({
   selector: 'app-needs-you',
-  imports: [Tabs, TPipe, ReviewPage, ActionsPage],
+  imports: [Hint, Tabs, TPipe, ReviewPage, ActionsPage],
   template: `
     <h1>{{ 'needs.title' | t }}</h1>
+    <app-hint id="needs-you">{{ 'hint.needs' | t }}</app-hint>
     @if (active(); as tab) {
       <div class="mt-5">
         <app-tabs [tabs]="tabs()" [active]="tab" prefix="needs" label="needs.tabs" (pick)="pick($event)" />

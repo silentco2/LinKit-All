@@ -1,5 +1,6 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { GoLiveCard } from '../../components/golive';
 import { I18n, TPipe } from '../../i18n';
 import { Field } from './saved';
 import { SettingsStore } from './store';
@@ -10,7 +11,7 @@ const MODE = 'rounded-lg border p-3 text-start text-sm focus-visible:outline-2 f
 /** Settings > Applying: practice or real, the pace, and how the browser behaves. Everything saves as you edit. */
 @Component({
   selector: 'app-settings-applying',
-  imports: [Field, RouterLink, TPipe],
+  imports: [Field, GoLiveCard, RouterLink, TPipe],
   template: `
     <div class="space-y-6">
       <section class="card space-y-4">
@@ -27,6 +28,13 @@ const MODE = 'rounded-lg border p-3 text-start text-sm focus-visible:outline-2 f
             </button>
           </div>
         </app-field>
+
+        @if (guide()) {
+          <div class="rounded-lg border border-slate-200 p-4 dark:border-slate-700">
+            <h3 class="mb-3 font-semibold">{{ 'golive.title' | t }}</h3>
+            <app-golive (enabled)="guide.set(false)" (cancel)="guide.set(false)" />
+          </div>
+        }
 
         @if (live()) {
           <div class="alert alert-error" role="note"><strong>{{ 'settings.apply.realWarnTitle' | t }}</strong> {{ 'settings.apply.realWarnBody' | t }}</div>
@@ -86,6 +94,8 @@ export class ApplyingSection implements OnInit {
   protected readonly tuning = inject(Tuning);
   private readonly i18n = inject(I18n);
   protected readonly card = cardClass;
+  /** Switching to "Applying for real" opens the guided card instead of flipping the switch. */
+  protected readonly guide = signal(false);
 
   ngOnInit(): void {
     void this.tuning.load();
@@ -118,12 +128,14 @@ export class ApplyingSection implements OnInit {
   }
 
   /**
-   * Real applications are asked about once, with the action named. The guided card (ux-plan 8.2) replaces this method.
-   * Going back to practice mode also drops "submit without asking", which only means something when applying for real.
+   * Turning real applications on goes through the guided card (ux-plan 8.2), which saves it itself; turning them off is
+   * instant. Going back to practice mode also drops "submit without asking", which only means something when applying
+   * for real.
    */
   protected setLive(live: boolean): void {
     if (live === this.live()) return;
-    if (live && !confirm(this.i18n.t('settings.apply.realConfirm'))) return;
+    this.guide.set(live);
+    if (live) return;
     this.store.update('apply.live', live);
     if (!live && this.store.cfg.apply.submit_without_asking) this.store.update('apply.submit_without_asking', false);
   }

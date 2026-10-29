@@ -1,3 +1,6 @@
+import { I18n, Params } from './i18n';
+import { fmtNum, localeOf } from './locale';
+
 export type Tier = 'high' | 'mid' | 'low';
 export const STAGES = ['discover', 'enrich', 'rank', 'score', 'apply'] as const;
 export type Stage = (typeof STAGES)[number];
@@ -41,12 +44,24 @@ export interface Status {
   states: Record<string, number>;
   actions_open: number;
   apply_live: boolean;
+  /** Jobs the next apply stage would pick; practised jobs are excluded in practice mode. */
+  ready_to_apply: number;
+  /** Jobs practised so far (a form was filled, nothing sent). */
+  practiced: number;
   run: RunState;
   /** The headed Chrome window opened from the Action Center, if any. */
   app_browser: { open: boolean; item_id: number | null };
   /** Modified time (epoch seconds) of the newest live screenshot, null when none is fresh. */
   live_shot: number | null;
   next_run: string | null;
+}
+
+/** GET /golive: what the "Ready to apply for real?" card shows. */
+export interface GoLive {
+  eligible: boolean;
+  live: boolean;
+  samples: { job_id: number; title: string; company: string; screenshots: string[]; tailored: boolean }[];
+  checklist: { cv_approved: boolean; answers_reviewed: boolean; caps_set: boolean; confirm_each: boolean };
 }
 
 export interface Profile {
@@ -421,4 +436,15 @@ export interface InferPayload {
   country: { name: string; jobspy: string; currency: string; region: string };
   sources: { jobspy: string[]; regional: string[]; enabled: string[]; telegram_channels: string[] };
   has_cv: boolean;
+}
+
+/** Why a job sits where it is, in the UI language: `reason.<code>` with the server's params, else its English `reason`. */
+export function reasonText(i18n: I18n, j: { reason?: string | null; reason_code?: string | null; reason_params?: Record<string, unknown> }): string {
+  const key = j.reason_code ? `reason.${j.reason_code}` : '';
+  if (!key || i18n.t(key) === key) return j.reason ?? ''; // `other`, or a code this UI does not know yet
+  const loc = localeOf(i18n.lang());
+  const params: Params = {};
+  for (const [k, v] of Object.entries(j.reason_params ?? {})) params[k] = typeof v === 'number' ? fmtNum(loc, v) : String(v ?? '');
+  if (j.reason_code === 'too_old' && params['days'] !== undefined) return i18n.t('reason.too_old_days', params);
+  return i18n.t(key, params);
 }

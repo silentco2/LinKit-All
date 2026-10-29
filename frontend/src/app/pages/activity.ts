@@ -1,6 +1,7 @@
 import { Component, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
+import { Hint } from '../components/hint';
 import { TabItem, Tabs } from '../components/tabs';
 import { TPipe } from '../i18n';
 import { LivePage } from './live';
@@ -15,9 +16,10 @@ const TABS: TabItem[] = [
 /** Activity: what is happening now (old Live run) and what happened before (old Report). */
 @Component({
   selector: 'app-activity',
-  imports: [Tabs, TPipe, LivePage, ReportPage],
+  imports: [Hint, Tabs, TPipe, LivePage, ReportPage],
   template: `
     <h1>{{ 'activity.title' | t }}</h1>
+    <app-hint id="activity">{{ 'hint.activity' | t }}</app-hint>
     <div class="mt-5">
       <app-tabs [tabs]="tabs" [active]="active()" prefix="activity" label="activity.tabs" (pick)="pick($event)" />
     </div>

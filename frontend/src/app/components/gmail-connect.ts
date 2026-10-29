@@ -33,7 +33,7 @@ let nextId = 0;
           <div class="alert alert-ok" role="status">{{ 'setup.email.connectedAs' | t }} <bdi dir="ltr">{{ email()!.imap_user }}</bdi>.</div>
         }
         @if (eUser()) {
-          <p class="text-sm"><span class="text-slate-500">{{ 'setup.email.address' | t }}:</span> <bdi dir="ltr" class="font-medium">{{ eUser() }}</bdi></p>
+          <p class="text-sm"><span class="text-slate-500">{{ 'setup.email.address' | t }}: </span><bdi dir="ltr" class="font-medium">{{ eUser() }}</bdi></p>
         }
         @if (unsupported()) {
           <div class="alert alert-info" role="status">{{ 'settings.acc.outlook' | t }}</div>

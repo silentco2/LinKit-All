@@ -3,7 +3,7 @@ import { Component, computed, effect, inject, input, output, signal } from '@ang
 import { Api } from '../api';
 import { I18n, MsgPipe, SourcePipe, TPipe } from '../i18n';
 import { fmtNum, labelOr, localeOf } from '../locale';
-import { JobDetail, SCAM_MEDIUM, TailorPatch, TrustVerdict } from '../types';
+import { JobDetail, reasonText, SCAM_MEDIUM, TailorPatch, TrustVerdict } from '../types';
 
 interface Filled { value: unknown; source: string }
 type Detail = Omit<JobDetail, 'events'> & {
@@ -61,6 +61,9 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
             @if (j.rank !== null) { <span class="badge tier-low">{{ 'detail.match' | t: { pct: num(j.rank, { style: 'percent', maximumFractionDigits: 0 }) } }}</span> }
             @if (j.posted_at) { <span class="text-slate-500">{{ 'detail.posted' | t }} {{ j.posted_at | date: 'mediumDate' : undefined : loc() }}</span> }
           </div>
+          @if (why(j); as text) {
+            <p class="mt-2 text-sm"><span class="font-medium">{{ 'detail.why' | t }} </span><span dir="auto">{{ text }}</span></p>
+          }
           <div class="mt-3 flex flex-wrap gap-2">
             <a class="btn" [href]="j.url" target="_blank" rel="noopener noreferrer">{{ 'detail.open' | t }}</a>
             @if (approvable(j.state)) {
@@ -283,6 +286,7 @@ export class JobDetailPanel {
 
   protected verdict = (tr: NonNullable<Detail['trust']>, kind: 'scam' | 'ghost'): TrustVerdict => tr[kind] ?? { score: 0, band: 'low', signals: [] };
   protected bandClass = (b: string): string => ({ high: 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300', medium: 'tier-mid' })[b] ?? 'tier-low';
+  protected why = (j: Detail): string => reasonText(this.i18n, j);
   protected signalLabel = (code: string): string => labelOr(this.i18n, 'trust.', code);
   protected sgn = (w: number): string => '\u2066' + (w > 0 ? '+' : '') + fmtNum(this.loc(), w) + '\u2069';
 
