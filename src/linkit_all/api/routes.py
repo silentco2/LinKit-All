@@ -52,7 +52,15 @@ from linkit_all.core.models import (
     Tier,
     utcnow,
 )  # fmt: skip
-from linkit_all.core.presets import Track, country_preset, source_preset
+from linkit_all.core.presets import (
+    PACE,
+    PICKINESS,
+    Track,
+    country_preset,
+    pace_of,
+    pickiness_of,
+    source_preset,
+)
 from linkit_all.core.profile import (
     ProfileFields,
     approve_cv,
@@ -72,6 +80,7 @@ from linkit_all.core.search import (
 )
 from linkit_all.core.state import InvalidTransition, can_transition, transition
 from linkit_all.core.tools import soffice_path, tectonic_path
+from linkit_all.matching.reasons import FilterEvent, job_reason
 from linkit_all.pipeline import STAGES, PipelineError, ai_settings
 from linkit_all.reports import build_report, export_csv, export_pdf
 from linkit_all.sources import registry
@@ -274,6 +283,68 @@ def put_search(request: Request, cfg: SearchConfig) -> SearchConfig:
     save_search(_db(request), cfg)
     apply_schedule(request.app.state.scheduler, cfg)
     return cfg
+
+
+@router.get("/presets")
+def get_presets(request: Request) -> dict[str, Any]:
+    """Pace and Pickiness presets, the field defaults, and which preset the saved config matches."""
+    cfg = load_search(_db(request)) or SearchConfig()
+    return {
+        "pace": PACE,
+        "pickiness": PICKINESS,
+        "defaults": SearchConfig().model_dump(mode="json"),
+        "current": {"pace": pace_of(cfg.apply), "pickiness": pickiness_of(cfg.matching)},
+    }
+
+
+DRY_RUN_FORM_CODES = ("dry_run_filled", "dry_run_agent")  # runner.py: a filled form + screenshots
+
+
+@router.get("/golive")
+def go_live(request: Request) -> dict[str, Any]:
+    """Data for the "Ready to apply for real?" card. Read-only: PUT /search turns Live on."""
+    db = _db(request)
+    cfg = load_search(db) or SearchConfig()
+    _, cv = load_fields(db)
+    with db() as s:
+        newest_first = s.execute(
+            select(JobEvent, Job)
+            .join(Job, Job.id == JobEvent.job_id)
+            .where(JobEvent.code.in_(DRY_RUN_FORM_CODES))
+            .order_by(JobEvent.id.desc())
+            .limit(50)
+        )
+        picked: dict[int, tuple[JobEvent, Job]] = {}
+        for event, job in newest_first:
+            if event.artifacts and job.id not in picked and len(picked) < 3:
+                picked[job.id] = (event, job)
+        tailored = set(s.scalars(select(TailoredCV.job_id).where(TailoredCV.job_id.in_(picked))))
+        samples = [
+            {
+                "job_id": job.id,
+                "title": job.title,
+                "company": job.company,
+                "screenshots": [
+                    f"/api/jobs/{job.id}/events/{event.id}/screenshot/{n}"
+                    for n in range(len(event.artifacts))
+                ],
+                "tailored": job.id in tailored,
+            }
+            for event, job in picked.values()
+        ]
+        profile = s.get(Profile, 1)
+        answers = ApplicationAnswers.model_validate(profile.answers if profile else {})
+    return {
+        "eligible": bool(samples),
+        "live": cfg.apply.live,
+        "samples": samples,
+        "checklist": {
+            "cv_approved": bool(cv) and cv_state(db)[1],
+            "answers_reviewed": answers != ApplicationAnswers(),
+            "caps_set": cfg.apply.daily_cap_per_site <= 40,
+            "confirm_each": not cfg.apply.submit_without_asking,
+        },
+    }
 
 
 @router.get("/schedule")
@@ -570,13 +641,32 @@ def _scores(j: Job) -> tuple[int | None, int | None]:
     return (trust.get("scam") or {}).get("score"), (trust.get("ghost") or {}).get("score")
 
 
-def _row(j: Job) -> dict[str, Any]:
+def _row(j: Job, filter_event: FilterEvent | None = None) -> dict[str, Any]:
     scam, ghost = _scores(j)
+    why = job_reason(j, filter_event)
     return {"scam_score": scam, "ghost_score": ghost,
+            "reason": why[0] if why else None, "reason_code": why[1] if why else None,
+            "reason_params": why[2] if why else {},
             "id": j.id, "title": j.title, "company": j.company, "location": j.location,
             "source": j.source, "state": j.state, "tier": j.tier, "score": j.score,
             "rank": j.data.get("rank"), "remote": j.data.get("remote"), "ai": j.data.get("ai"),
             "posted_at": j.posted_at.isoformat() if j.posted_at else None}  # fmt: skip
+
+
+def _last_drops(s: Session) -> dict[int, FilterEvent]:
+    """The event that filtered out each currently filtered-out job: one query, not one per row."""
+    latest = (
+        select(func.max(JobEvent.id))
+        .join(Job, Job.id == JobEvent.job_id)
+        .where(JobEvent.to_state == JobState.filtered_out, Job.state == JobState.filtered_out)
+        .group_by(JobEvent.job_id)
+    )
+    rows = s.execute(
+        select(JobEvent.job_id, JobEvent.message, JobEvent.code, JobEvent.params).where(
+            JobEvent.id.in_(latest)
+        )
+    )
+    return {job_id: (message, code, params) for job_id, message, code, params in rows}
 
 
 @router.get("/jobs")
@@ -601,8 +691,9 @@ def list_jobs(
         )
     with _db(request)() as s:
         jobs = list(s.scalars(query.limit(20000)))
+        drops = _last_drops(s) if any(j.state == JobState.filtered_out for j in jobs) else {}
     jobs.sort(key=lambda j: (-(j.score or 0), -(j.data.get("rank") or 0)))
-    return [_row(j) for j in jobs]
+    return [_row(j, drops.get(j.id)) for j in jobs]
 
 
 def _tailoring(cv: TailoredCV | None) -> dict[str, Any] | None:
@@ -629,7 +720,8 @@ def job_detail(request: Request, job_id: int) -> dict[str, Any]:
         job = s.get(Job, job_id)
         if job is None:
             raise HTTPException(404, "Job not found")
-        events = s.scalars(select(JobEvent).filter_by(job_id=job_id).order_by(JobEvent.id))
+        events = list(s.scalars(select(JobEvent).filter_by(job_id=job_id).order_by(JobEvent.id)))
+        drop = next((e for e in reversed(events) if e.to_state == JobState.filtered_out), None)
         salary = {k: job.data.get(f"salary_{k}") for k in ("min", "max", "currency", "interval")}
         history = [
             {"id": e.id, "at": e.at.isoformat(), "from": e.from_state, "to": e.to_state,
@@ -641,7 +733,7 @@ def job_detail(request: Request, job_id: int) -> dict[str, Any]:
             select(TailoredCV).filter_by(job_id=job_id).order_by(TailoredCV.id.desc())
         ).first()
         return {
-            **_row(job),
+            **_row(job, (drop.message, drop.code, drop.params) if drop else None),
             "tailoring": _tailoring(tailored),
             "url": job.url,
             "description": job.description,
