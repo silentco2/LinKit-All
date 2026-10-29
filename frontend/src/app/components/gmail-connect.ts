@@ -1,7 +1,6 @@
 import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { Api } from '../api';
 import { I18n, TPipe } from '../i18n';
-import { fmtNum, localeOf } from '../locale';
 import { EmailState } from '../types';
 
 type Note = { ok: boolean; text: string };
@@ -158,8 +157,7 @@ export class GmailConnect {
       this.connected.emit({ email: e, count });
       const text = this.i18n.t('setup.email.connectedMsg', { user: e.imap_user });
       if (count <= 0) return text;
-      const n = fmtNum(localeOf(this.i18n.lang()), count);
-      return `${text}. ${this.i18n.t(count === 1 ? 'settings.acc.waiting.one' : 'settings.acc.waiting.other', { n })}`;
+      return `${text}. ${this.i18n.plural('settings.acc.waiting', count)}`;
     });
   }
 

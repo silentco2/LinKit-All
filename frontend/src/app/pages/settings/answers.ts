@@ -150,7 +150,7 @@ type Choice = { v: boolean | null; label: string };
                 </header>
                 <p class="mt-2 whitespace-pre-line break-words text-sm text-slate-700 dark:text-slate-300" dir="auto">{{ show(e.answer) }}</p>
                 <footer class="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                  <span>{{ (e.uses === 1 ? 'answers.used.one' : 'answers.used.other') | t: { n: num(e.uses) } }}</span>
+                  <span>{{ plural('answers.used', e.uses) }}</span>
                   <span>{{ 'answers.updated' | t: { date: when(e.updated_at) } }}</span>
                   <span class="ms-auto flex gap-2">
                     <button type="button" class="btn" [disabled]="busy()" (click)="edit(e)">{{ 'answers.edit' | t }}</button>
@@ -283,6 +283,7 @@ export class AnswersSection implements OnInit {
 
   protected count = (f: Filter): number => this.entries().filter((e) => f === 'all' || e.source === f).length;
   protected num = (n: number): string => fmtNum(this.loc(), n);
+  protected plural = (base: string, n: number): string => this.i18n.plural(base, n);
   protected when = (iso: string): string => new Date(iso).toLocaleString(this.loc());
   protected isBool = (v: AnswerValue): boolean => typeof v === 'boolean';
   protected isList = (v: AnswerValue): boolean => Array.isArray(v);

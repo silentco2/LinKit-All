@@ -48,6 +48,23 @@ export class I18n {
   }
 
   /**
+   * `{base}.{zero|one|two|few|many|other}` picked with the browser's CLDR rules for the UI language (Arabic has all six).
+   * Tries an exact `.zero` for 0 (English can opt in to "No jobs"), then the rule's category, then `.other`; the UI
+   * language first, then English. `{n}` is filled with `n` formatted for the language unless `params` sets it.
+   */
+  plural(base: string, n: number, params?: Params): string {
+    const lang = this.lang();
+    const cats = [...(n === 0 ? ['zero'] : []), new Intl.PluralRules(lang).select(n), 'other'];
+    for (const dict of [DICTS[lang], en]) {
+      for (const c of cats) {
+        const text = dict[`${base}.${c}`];
+        if (text !== undefined) return this.t(`${base}.${c}`, { n: new Intl.NumberFormat(lang === 'ar' ? 'ar-EG' : 'en').format(n), ...params });
+      }
+    }
+    return base;
+  }
+
+  /**
    * A server message (Action Center item, job event) in the UI language. The server sends an English `message` plus a
    * stable `code` and `params`; `park.<code>` is used when it exists, else the English message (old rows have no code).
    */

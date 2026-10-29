@@ -205,8 +205,7 @@ export class ReviewPage implements OnDestroy {
     const o = this.open();
     if (o !== null && taken.has(o)) this.open.set(null);
     this.focusNear(ids);
-    const key = `review.${action === 'approve' ? 'approved' : 'skipped'}.${ids.length === 1 ? 'one' : 'other'}`;
-    const text = this.i18n.t(key, { n: this.num(ids.length) });
+    const text = this.i18n.plural(`review.${action === 'approve' ? 'approved' : 'skipped'}`, ids.length);
     this.toast.set(text);
     this.announce.set(`${text}. ${this.i18n.t('review.undo')}`);
   }

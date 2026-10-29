@@ -155,7 +155,7 @@ export class HomePage {
     const s = this.shell.status();
     if (!s) return null;
     const t = (key: string, n?: number) => this.i18n.t(key, n === undefined ? undefined : { n: this.num(n) });
-    const plural = (key: string, n: number) => t(`${key}.${n === 1 ? 'one' : 'other'}`, n);
+    const plural = (key: string, n: number) => this.i18n.plural(key, n);
     const run = this.live.run();
     if (!s.setup.required_done) {
       const step = setupDone(s.setup) + 1;

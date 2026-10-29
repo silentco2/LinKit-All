@@ -389,7 +389,7 @@ export class ActionsPage {
 
   // ---- setup cards ---------------------------------------------------------------------------------------
 
-  protected plural = (base: string, n: number): string => this.i18n.t(`${base}.${n === 1 ? 'one' : 'other'}`, { n: this.num(n) });
+  protected plural = (base: string, n: number): string => this.i18n.plural(base, n);
   protected isSetup = (a: ActionItem): boolean => VAULT_CODES.includes(a.code ?? '') || EMAIL_CODES.includes(a.code ?? '');
   /** The first three sites the waiting applications are for, then "+N". */
   protected sites(list: ActionItem[]): string {

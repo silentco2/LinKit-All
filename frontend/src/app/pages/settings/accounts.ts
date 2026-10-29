@@ -4,7 +4,7 @@ import { GmailConnect, GmailConnected } from '../../components/gmail-connect';
 import { KeyForm } from '../../components/key-form';
 import { VaultGate, VaultReady } from '../../components/vault-gate';
 import { I18n, TPipe } from '../../i18n';
-import { fmtNum, labelOr, localeOf } from '../../locale';
+import { labelOr, localeOf } from '../../locale';
 import { ApiKeyProvider, VaultEntry, VaultState } from '../../types';
 import { Field } from './saved';
 import { SettingsStore } from './store';
@@ -28,7 +28,7 @@ type Note = { ok: boolean; text: string };
           <div class="space-y-4">
             <div class="flex flex-wrap items-center gap-3">
               <span class="badge tier-high">{{ 'vault.unlocked' | t }}</span>
-              <span class="text-sm text-slate-500">{{ (entries().length === 1 ? 'vault.entries.one' : 'vault.entries.other') | t: { n: num(entries().length) } }}</span>
+              <span class="text-sm text-slate-500">{{ plural('vault.entries', entries().length) }}</span>
               <span class="ms-auto flex gap-2">
                 <button type="button" class="btn" [disabled]="busy()" (click)="toggleExport()" [attr.aria-expanded]="exporting()">{{ 'vault.export' | t }}</button>
                 <button type="button" class="btn" [disabled]="busy()" (click)="lock()">{{ 'vault.lock' | t }}</button>
@@ -145,7 +145,7 @@ export class AccountsSection implements OnInit {
     void this.loadAll();
   }
 
-  protected num = (n: number): string => fmtNum(this.loc(), n);
+  protected plural = (base: string, n: number): string => this.i18n.plural(base, n);
   protected kindLabel = (kind: string): string => labelOr(this.i18n, 'vault.kind.', kind);
   protected when = (iso: string): string => new Date(iso).toLocaleString(this.loc());
 
@@ -174,7 +174,7 @@ export class AccountsSection implements OnInit {
   }
 
   private waiting(n: number): string {
-    return this.i18n.t(n === 1 ? 'settings.acc.waiting.one' : 'settings.acc.waiting.other', { n: this.num(n) });
+    return this.i18n.plural('settings.acc.waiting', n);
   }
 
   /** Run an action; it returns the (already translated) text to show. */
