@@ -1,9 +1,12 @@
 """REST API for the local UI. Everything lives under /api."""
 
 import asyncio
+import hashlib
+import json
 import re
 import shutil
 import sys
+from dataclasses import asdict
 from datetime import date
 from functools import partial
 from pathlib import Path
@@ -12,7 +15,7 @@ from typing import Any, Literal
 import httpx
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse, Response
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -32,6 +35,7 @@ from linkit_all.apply.email_verify import EmailLoginError, check_login, credenti
 from linkit_all.apply.vault import Vault, VaultError, VaultLocked, WrongPassphrase
 from linkit_all.core.api_keys import KNOWN, delete_keys, get_keys, set_keys
 from linkit_all.core.config import Settings
+from linkit_all.core.infer import InferredValue, infer, read_cv
 from linkit_all.core.models import (
     ActionItem,
     ActionStatus,
@@ -46,6 +50,7 @@ from linkit_all.core.models import (
     Tier,
     utcnow,
 )  # fmt: skip
+from linkit_all.core.presets import Track, country_preset, source_preset
 from linkit_all.core.profile import (
     ProfileFields,
     approve_cv,
@@ -55,7 +60,14 @@ from linkit_all.core.profile import (
     save_fields,
 )
 from linkit_all.core.scheduler import apply_schedule, next_runs
-from linkit_all.core.search import SearchConfig, load_search, save_search
+from linkit_all.core.search import (
+    DEFAULT_TELEGRAM_CHANNELS,
+    WORK_MODES,
+    SearchConfig,
+    SourcesSection,
+    load_search,
+    save_search,
+)
 from linkit_all.core.state import InvalidTransition, can_transition, transition
 from linkit_all.core.tools import soffice_path, tectonic_path
 from linkit_all.pipeline import STAGES, PipelineError, ai_settings
@@ -120,11 +132,27 @@ def status(request: Request) -> dict[str, Any]:
     vault = _vault(request)
     with db() as s:
         states = dict(s.execute(select(Job.state, func.count()).group_by(Job.state)).all())
+    profile_ready = bool(fields.full_name and fields.email)
+    cv_ready = bool(cv) and cv_state(db)[1]  # a converted PDF counts once approved
+    search_ready = cfg is not None and bool(cfg.search.queries or cfg.sources.companies)
+    ai_ready = cfg is not None and cfg.ai.provider is not None
+    setup = {
+        "cv": cv_ready,
+        "ai": ai_ready,
+        "profile": profile_ready,
+        "roles": search_ready,
+        "where": cfg is not None and any(loc.strip() for loc in cfg.search.locations),
+    }
     return {
-        "profile_ready": bool(fields.full_name and fields.email),
-        "cv_ready": bool(cv) and cv_state(db)[1],  # a converted PDF counts once approved
-        "search_ready": cfg is not None and bool(cfg.search.queries or cfg.sources.companies),
-        "ai_ready": cfg is not None and cfg.ai.provider is not None,
+        "profile_ready": profile_ready,
+        "cv_ready": cv_ready,
+        "search_ready": search_ready,
+        "ai_ready": ai_ready,
+        "setup": {
+            **setup,
+            "required_done": all(setup.values()),
+            "next_step": next((k for k, done in setup.items() if not done), None),
+        },
         "libreoffice": soffice_path() is not None,
         "vault": {"initialized": vault.initialized(), "unlocked": vault.unlocked()},
         "states": {str(k): v for k, v in states.items()},
@@ -318,6 +346,218 @@ async def check_ai(request: Request, body: AICheck) -> dict[str, Any]:
     except (ProviderError, PipelineError) as e:
         return {"ok": False, "message": str(e)}
     return {"ok": True, "message": message}
+
+
+# --- first-run setup: what the CV says, and writing what the user confirmed ---------------
+
+# Non-sensitive keys the model may fill when the rules found nothing -> AiFill field.
+_AI_KEYS = {
+    "profile.full_name": "full_name",
+    "profile.email": "email",
+    "profile.phone": "phone",
+    "profile.location": "location",
+    "profile.skills": "skills",
+    "answers.current_company": "current_company",
+    "answers.current_title": "current_title",
+    "answers.linkedin": "linkedin",
+    "answers.github": "github",
+    "answers.portfolio": "portfolio",
+}
+_AI_CV_CHARS = 30000
+
+
+class AiFill(BaseModel):
+    full_name: str = ""
+    email: str = ""
+    phone: str = ""
+    location: str = ""
+    skills: list[str] = []
+    current_company: str = ""
+    current_title: str = ""
+    linkedin: str = ""
+    github: str = ""
+    portfolio: str = ""
+
+
+def _cv_file(request: Request) -> Path | None:
+    _, cv = load_fields(_db(request))
+    path = Path(cv) if cv else None
+    return path if path is not None and path.is_file() else None
+
+
+def _cv_read(cv: Path) -> tuple[list[str], list[str]]:
+    """(segment texts in order, hyperlink targets) of the stored CV."""
+    from linkit_all.core.infer import cv_links
+    from linkit_all.tailor.pipeline import cv_segments as read_segments
+
+    return [s.text for s in read_segments(cv)], cv_links(cv)
+
+
+def _ai_file(cv: Path) -> Path:
+    return cv.parent / "infer_ai.json"
+
+
+def _cv_stamp(cv: Path) -> str:
+    return hashlib.sha256(cv.read_bytes()).hexdigest()
+
+
+def _saved_ai(cv: Path) -> dict[str, Any]:
+    """The saved gap-fill result, valid only for the exact CV file it was made from."""
+    try:
+        data = json.loads(_ai_file(cv).read_text("utf-8"))
+        stamp = _cv_stamp(cv)
+    except (OSError, ValueError):
+        return {}
+    if isinstance(data, dict) and data.get("cv") == stamp and isinstance(data.get("values"), dict):
+        return {k: v for k, v in data["values"].items() if k in _AI_KEYS}
+    return {}
+
+
+def _infer_payload(
+    cv: Path | None, rules: dict[str, InferredValue] | None = None
+) -> dict[str, Any]:
+    values: dict[str, InferredValue] = {}
+    if cv is not None:
+        if rules is None:
+            texts, links = _cv_read(cv)
+            rules = infer(read_cv(texts, links), date.today())
+        values = dict(rules)
+        for key, value in _saved_ai(cv).items():
+            if key not in values:
+                values[key] = InferredValue(value=value, source="ai", level="suggest", check=True)
+    where = str(values["answers.country"].value) if "answers.country" in values else ""
+    country = country_preset(where)
+    track: Track = "tech" if "track" in values and values["track"].value == "tech" else "general"
+    return {
+        "values": {k: v.model_dump(mode="json") for k, v in values.items()},
+        "country": asdict(country),
+        "sources": source_preset(country, track),
+        "has_cv": cv is not None,
+    }
+
+
+@router.get("/infer")
+def get_infer(request: Request) -> dict[str, Any]:
+    """What LinKit read from the CV (plus the saved AI gap-fill). Writes nothing."""
+    return _infer_payload(_cv_file(request))
+
+
+def _norm(text: str) -> str:
+    return " ".join(text.split()).casefold()
+
+
+@router.post("/infer/ai-fill")
+async def infer_ai_fill(request: Request) -> dict[str, Any]:
+    """One model call for the non-sensitive keys the rules missed. Values must appear in the CV."""
+    from linkit_all.providers import ProviderError, get_provider
+    from linkit_all.providers.base import render
+
+    cv = _cv_file(request)
+    if cv is None:
+        raise HTTPException(404, "No CV uploaded yet")
+    cfg = load_search(_db(request)) or SearchConfig()
+    if cfg.ai.provider is None:
+        raise HTTPException(409, "Connect an AI first (Setup, AI connection)")
+    texts, links = await asyncio.to_thread(_cv_read, cv)
+    rules = infer(read_cv(texts, links), date.today())
+    wanted = [k for k in _AI_KEYS if k not in rules]
+    if wanted:
+        cv_text = "\n".join(texts)[:_AI_CV_CHARS]
+        prompt = render("infer_fill.j2", wanted=[_AI_KEYS[k] for k in wanted], cv=cv_text)
+        try:
+            provider = get_provider(ai_settings(_settings(request), cfg))
+            got = (await provider.complete(prompt, AiFill, use_cache=False)).model_dump()
+        except PipelineError as e:
+            raise HTTPException(409, str(e)) from e
+        except ProviderError as e:
+            raise HTTPException(502, str(e)) from e
+        blob = _norm("\n".join([*texts, *links]))
+        kept: dict[str, Any] = {}
+        for key in wanted:
+            value = got[_AI_KEYS[key]]
+            if isinstance(value, list):  # skills: each item must be in the CV
+                value = [x for x in value if x.strip() and _norm(x) in blob]
+            elif not (value.strip() and _norm(value) in blob):
+                value = ""
+            if value:
+                kept[key] = value
+        _ai_file(cv).write_text(json.dumps({"cv": _cv_stamp(cv), "values": kept}), "utf-8")
+    return _infer_payload(cv, rules)
+
+
+class InferApply(BaseModel):
+    values: dict[str, Any] = {}
+    where: list[str] | None = None
+    remote: bool | None = None
+    track: Track | None = None
+
+
+_PROFILE_KEYS = {f"profile.{k}" for k in ProfileFields.model_fields}
+_ANSWER_KEYS = {f"answers.{k}" for k in ApplicationAnswers.model_fields}
+_SEARCH_KEYS = {"search.queries", "filters.seniority", "filters.title_exclude"}
+
+
+def _problem(e: ValidationError) -> str:
+    return "; ".join(f"{'.'.join(map(str, x['loc']))}: {x['msg']}" for x in e.errors())
+
+
+@router.post("/infer/apply")
+def apply_infer(request: Request, body: InferApply) -> dict[str, Any]:
+    """Write only the confirmed values (and the where/remote/track choices); return /status."""
+    values = body.values
+    unknown = sorted(set(values) - _PROFILE_KEYS - _ANSWER_KEYS - _SEARCH_KEYS)
+    if unknown:
+        raise HTTPException(422, f"Unknown setting: {unknown[0]}")
+    db = _db(request)
+    fields, _ = load_fields(db)
+    with db() as s:
+        profile = s.get(Profile, 1)
+        answers_now = ApplicationAnswers.model_validate(profile.answers if profile else {})
+    profile_new = {k[len("profile.") :]: v for k, v in values.items() if k in _PROFILE_KEYS}
+    answers_new = {k[len("answers.") :]: v for k, v in values.items() if k in _ANSWER_KEYS}
+    data = (load_search(db) or SearchConfig()).model_dump()
+    for key in _SEARCH_KEYS & set(values):
+        section, name = key.split(".")
+        data[section][name] = values[key]
+
+    where = [w.strip() for w in body.where or [] if w.strip()]
+    country = country_preset("")
+    if where:
+        places = [*where, *(["Remote"] if body.remote else [])]
+        data["search"]["locations"] = places
+        data["filters"]["locations"] = [p.lower() for p in places]
+        country = next((p for w in where if (p := country_preset(w)).name), country)
+        if country.name:
+            if country.jobspy:
+                data["sources"]["jobspy_country"] = country.jobspy
+            data["filters"]["salary_currency"] = country.currency
+            if not answers_now.salary_currency:
+                answers_new.setdefault("salary_currency", country.currency)
+    if body.remote is not None:
+        data["filters"]["work_modes"] = list(WORK_MODES) if body.remote else ["hybrid", "onsite"]
+    try:
+        fields_out = ProfileFields.model_validate({**fields.model_dump(), **profile_new})
+        answers_out = ApplicationAnswers.model_validate({**answers_now.model_dump(), **answers_new})
+        if where or body.track:
+            if not country.name:
+                country = country_preset(answers_out.country)
+            preset = source_preset(country, body.track or "general")
+            src = data["sources"]
+            src["jobspy"], src["regional"] = preset["jobspy"], preset["regional"]
+            src["enabled"] += [x for x in preset["enabled"] if x not in src["enabled"]]
+            default = SourcesSection(telegram_channels=list(DEFAULT_TELEGRAM_CHANNELS))
+            if src["telegram_channels"] == default.telegram_channels:  # never edited
+                src["telegram_channels"] = preset["telegram_channels"]
+        cfg_out = SearchConfig.model_validate(data)
+    except ValidationError as e:
+        raise HTTPException(422, _problem(e)) from e
+    if profile_new or answers_new:
+        save_fields(db, fields_out)  # also creates the profile row the answers live on
+    if answers_new:
+        with db.begin() as s:
+            s.get_one(Profile, 1).answers = answers_out.model_dump()
+    save_search(db, cfg_out)
+    return status(request)
 
 
 # --- jobs ---------------------------------------------------------------------

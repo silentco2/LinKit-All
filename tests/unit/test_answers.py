@@ -124,6 +124,28 @@ def test_abroad_uses_saved_sponsorship_need() -> None:
     assert r.answers["q2"].startswith("Yes, I will require immigration sponsorship now")
 
 
+@pytest.mark.parametrize(
+    ("job_location", "needs", "authorized", "expected"),
+    [("Cairo, Egypt", None, ["Egypt"], "No, I do not"),
+     ("Dubai", None, ["Egypt"], "Yes, I will require immigration sponsorship now"),
+     ("Dubai", True, ["Egypt"], "Yes, I will require immigration sponsorship now"),
+     ("Dubai", False, ["Egypt"], "No, I do not"),
+     ("Cairo, Egypt", True, ["Egypt"], "No, I do not"),  # authorized there: explicit True does not override
+     ("Remote", None, ["Egypt"], None),
+     ("Dubai", None, [], None)],
+)  # fmt: skip
+def test_sponsorship_derived_per_job(
+    job_location: str, needs: bool | None, authorized: list[str], expected: str | None
+) -> None:
+    c = ctx(authorized_countries=authorized, needs_sponsorship=needs)
+    c.job_location = job_location
+    r = resolve_static([SPONSOR], c)
+    if expected is None:
+        assert [m.question.key for m in r.missing] == ["q2"] and "q2" not in r.answers
+    else:
+        assert r.answers["q2"].startswith(expected)
+
+
 def test_sensitive_without_profile_data_goes_to_user() -> None:
     r = resolve_static([AUTH, SPONSOR, GENDER, PRIVACY, CRIMINAL], ctx())
     assert {m.question.key for m in r.missing} == {"q1", "q2", "q3", "q5", "q8"}

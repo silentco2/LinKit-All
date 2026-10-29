@@ -327,6 +327,10 @@ def sensitive_answer(q: Question, category: str, ctx: Context) -> tuple[Any, str
         if country is not None and country in authorized:
             return yes_no(q, False), ""  # authorized there already: no sponsorship needed
         if a.needs_sponsorship is None:
+            # "Ask me": derive per job from authorized countries + the job's country (profile data only).
+            where = country or country_of(ctx.job_location)
+            if where is not None and authorized:
+                return yes_no(q, where not in authorized), ""
             return None, "visa sponsorship: not set in your profile"
         return yes_no(q, a.needs_sponsorship), ""
     if category == "salary":
