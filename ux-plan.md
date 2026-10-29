@@ -504,16 +504,23 @@ Started 2026-10-29. Orchestrator plans and reviews; Sonnet executors build; Haik
 
 | Id | Phase | Task | Depends | Status |
 |---|---|---|---|---|
-| T1.1 | UX1 | `core/presets.py`: country, track, Pace, Pickiness presets + tests | — | todo |
-| T1.2 | UX1 | `core/infer.py`: CV rules (contacts, links, name split, location, experience/years, current role, skills, locked facts, track, queries, seniority, title_exclude) + EN/AR tests | T1.1 interface | todo |
-| T1.3 | UX1 | Per-job sponsorship rule in `apply/answers.py` + tests | — | todo |
-| T1.4 | UX1 | API: `GET /infer`, `POST /infer/ai-fill`, `POST /infer/apply`, `GET /setup/state`, "where" writer + tests; commit UX1 | T1.1, T1.2 | todo |
-| T2.1 | UX2 | `pages/welcome.ts` 4-screen first run; `''`/`/setup` routing; commit UX2 | T1.4 | todo |
-| T3.1 | UX3 | Settings shell + autosave helper + Profile & CV, Jobs & places (one Where), AI sections | T2.1 | todo |
-| T3.2 | UX3 | Settings: Sources (recommended filter), Answers (bank merged), Applying (Pace, Live), Accounts & email (vault, Gmail, keys), Advanced (Pickiness, raw knobs, changed marks); delete `setup.ts`, `answers.ts`, `vault.ts` pages; commit UX3 | T3.1 | todo |
+| T1.1 | UX1 | `core/presets.py`: country, track, Pace, Pickiness presets + tests | — | done (2777e78) |
+| T1.2 | UX1 | `core/infer.py`: CV rules (contacts, links, name split, location, experience/years, current role, skills, locked facts, track, queries, seniority, title_exclude) + EN/AR tests | T1.1 interface | done (2777e78) |
+| T1.3 | UX1 | Per-job sponsorship rule in `apply/answers.py` + tests | — | done (2777e78) |
+| T1.4 | UX1 | API: `GET /infer`, `POST /infer/ai-fill`, `POST /infer/apply`, `GET /setup/state`, "where" writer + tests; commit UX1 | T1.1, T1.2 | done (2777e78) |
+| T2.1 | UX2 | `pages/welcome.ts` 4-screen first run; `''`/`/setup` routing; commit UX2 | T1.4 | done |
+| T3.1 | UX3 | Settings shell + autosave helper + Profile & CV, Jobs & places (one Where), AI sections | T2.1 | done |
+| T3.2 | UX3 | Settings: Sources (recommended filter), Answers (bank merged), Applying (Pace, Live), Accounts & email (vault, Gmail, keys), Advanced (Pickiness, raw knobs, changed marks); delete `setup.ts`, `answers.ts`, `vault.ts` pages; commit UX3 | T3.1 | done |
 | T4.1 | UX4 | Home + smart button + 5-item nav + Activity (Live + Report tabs) + Needs you (Review + Actions tabs) + redirects + vocabulary rename EN/AR; commit UX4 | T3.2 | todo |
-| T5.1 | UX5 | Backend: JIT park kinds (vault/email needed), batch answer API, privacy/legal "always" option, resolve_action fix + tests | T1.4 | todo |
+| T5.1 | UX5 | Backend: JIT park kinds (vault/email needed), batch answer API, privacy/legal "always" option, resolve_action fix + tests | T1.4 | done |
 | T5.2 | UX5 | Frontend: grouped Needs you, JIT cards, undo toast, J/K/A/S/O shortcuts; commit UX5 | T4.1, T5.1 | todo |
 | T6.1 | UX6 | Guided Live unlock, reason chips on Jobs, first-time hints; commit UX6 | T5.2 | todo |
 | T7.1 | — | CLAUDE.md §13 edits (≤ 200 lines), handoff.md note | T6.1 | todo |
 | T7.2 | — | Browser E2E pass (Haiku) on a fresh data dir + full test suite | T7.1 | todo |
+
+### 16.5 Log
+
+- T1.1: `enabled` source presets are hard-coded curated name lists (registry has no region/tech metadata) + a registry-sync test. Pace "fast" = 3 sites, 10–30 s, 40/day, 25/run; "careful" = 1 site, 60–120 s, 10/day, 5/run.
+- T1.3: sponsorship compares the country the question names, else the job's country.
+- T1.4: AI-filled values come back as level "suggest", check true; stored in `<cv dir>/infer_ai.json` keyed by CV hash.
+- UX1 committed 2777e78. T2.1 and T5.1 running in parallel (frontend vs backend, no shared files).

@@ -70,7 +70,7 @@ const FRESH_MS = 60_000; // a run that ended longer ago than this is replayed hi
       <main class="min-w-0 flex-1 overflow-x-auto p-4 md:p-8">
         @if (status() && !ready() && !welcome()) {
           <div class="alert alert-info mb-6">
-            {{ 'shell.setupA' | t }}<a routerLink="setup">{{ 'shell.setupB' | t }}</a>{{ 'shell.setupC' | t }}
+            {{ 'shell.setupA' | t }}<a routerLink="/welcome">{{ 'shell.setupB' | t }}</a>{{ 'shell.setupC' | t }}
           </div>
         }
         <router-outlet />
@@ -95,12 +95,10 @@ export class App {
   protected readonly notifyHint = signal('');
   private lastRunEnd = '';
   protected readonly nav = [
-    { path: 'setup', label: 'shell.nav.setup' },
+    { path: 'settings', label: 'shell.nav.settings' },
     { path: 'jobs', label: 'shell.nav.jobs' },
     { path: 'review', label: 'shell.nav.review' },
     { path: 'actions', label: 'shell.nav.actions' },
-    { path: 'answers', label: 'shell.nav.answers' },
-    { path: 'vault', label: 'shell.nav.vault' },
     { path: 'live', label: 'shell.nav.live' },
     { path: 'report', label: 'shell.nav.report' },
   ];

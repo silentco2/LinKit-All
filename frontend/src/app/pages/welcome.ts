@@ -2,12 +2,11 @@ import { Component, computed, ElementRef, inject, OnInit, signal, viewChild, Wri
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Api } from '../api';
+import { AiConnect, AiState } from '../components/ai-connect';
 import { I18n, Lang, SourcePipe, TPipe } from '../i18n';
-import { expandQueries, InferPayload, lines, Profile, Provider, SearchConfig, Segment, Status, unlines } from '../types';
+import { expandQueries, InferPayload, lines, Profile, SearchConfig, Segment, Status, unlines } from '../types';
 
 type StepNo = 1 | 2 | 3 | 4;
-type AiMode = Provider | 'local';
-type LocalServer = 'ollama' | 'lmstudio';
 type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_disability';
 type Chip = { text: string; on: boolean };
 type Field = { key: string; label: string; kind: 'text' | 'ltr' | 'num' };
@@ -57,7 +56,7 @@ const SRC_TEXT: Record<string, string> = {
 // The first-run flow: four screens that replace the ten-tab Setup. Labels in the arrays are i18n keys.
 @Component({
   selector: 'app-welcome',
-  imports: [FormsModule, RouterLink, SourcePipe, TPipe],
+  imports: [FormsModule, RouterLink, AiConnect, SourcePipe, TPipe],
   template: `
     <div class="mx-auto max-w-3xl">
       <div class="flex flex-wrap items-center justify-between gap-3">
@@ -132,90 +131,6 @@ const SRC_TEXT: Record<string, string> = {
                 } @else if (!status()!.libreoffice) {
                   <div class="alert alert-error">{{ 'setup.cv.noLibreA' | t }}<code dir="ltr">linkit doctor</code>{{ 'setup.cv.noLibreB' | t }}</div>
                 }
-              }
-            }
-
-            @case (2) {
-              <p class="text-sm text-slate-600 dark:text-slate-400">{{ 'welcome.ai.intro' | t }}</p>
-              @if (loaded() && !hasCli()) { <p class="text-sm text-slate-500">{{ 'welcome.ai.none' | t }}</p> }
-              <fieldset class="space-y-2">
-                <legend class="sr-only">{{ 'setup.ai.provider' | t }}</legend>
-                @for (p of providers; track p.id) {
-                  <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700"
-                         [class.border-brand-500]="mode() === p.id">
-                    <input type="radio" name="provider" class="mt-1" [checked]="mode() === p.id" (change)="pick(p.id)">
-                    <span>
-                      <span class="font-medium">{{ p.label | t }}</span>
-                      @if ((p.id === 'codex_cli' || p.id === 'claude_cli') && available()[p.id]) { <span class="badge tier-high ms-2">{{ 'welcome.ai.found' | t }}</span> }
-                      <span class="block text-xs text-slate-500">{{ p.hint | t }}</span>
-                    </span>
-                  </label>
-                }
-              </fieldset>
-
-              @if (mode() === 'local') {
-                <div class="space-y-3">
-                  @for (s of localServers; track s.id) {
-                    <div class="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
-                      <div class="flex items-center gap-2">
-                        <span class="font-medium">{{ s.label }}</span>
-                        @if (!local()) { <span class="badge">{{ 'setup.ai.checking' | t }}</span> }
-                        @else if (local()![s.id].running) { <span class="badge tier-high">{{ 'setup.ai.running' | t }}</span> }
-                        @else { <span class="badge tier-low">{{ 'setup.ai.notRunning' | t }}</span> }
-                      </div>
-                      @if (local()?.[s.id]?.running) {
-                        @if (local()![s.id].models.length === 0) { <p class="hint">{{ 'setup.ai.noModels' | t }}</p> }
-                        <div class="mt-2 flex flex-wrap gap-2">
-                          @for (m of local()![s.id].models; track m) {
-                            <button type="button" class="btn" dir="ltr" [class.btn-primary]="model === s.prefix + m" (click)="pickLocal(s, m)">{{ m }}</button>
-                          }
-                        </div>
-                      }
-                    </div>
-                  }
-                  <button type="button" class="btn" (click)="scanLocal()">{{ 'setup.ai.scan' | t }}</button>
-                  @if (ai().state === 'idle') { <p class="hint">{{ 'welcome.ai.pickModel' | t }}</p> }
-                </div>
-              }
-
-              <div aria-live="polite">
-                @switch (ai().state) {
-                  @case ('testing') { <p class="text-sm text-slate-500" role="status">{{ 'welcome.ai.testing' | t }}</p> }
-                  @case ('ok') {
-                    <div class="alert alert-ok" role="status">
-                      <p><strong>{{ 'welcome.ai.ok' | t }}</strong></p>
-                      @if (ai().msg) { <p class="mt-1" dir="auto">{{ ai().msg }}</p> }
-                    </div>
-                  }
-                  @case ('fail') {
-                    <div class="alert alert-error" role="alert">
-                      <p><strong>{{ 'welcome.ai.fail' | t }}</strong></p>
-                      <p class="mt-1" dir="auto">{{ ai().msg }}</p>
-                      @if (mode() === 'litellm') { <p class="mt-1 text-xs">{{ 'setup.ai.keyHintA' | t }}<code dir="ltr">LINKIT_API_KEY</code>{{ 'setup.ai.keyHintB' | t }}</p> }
-                      <button type="button" class="btn mt-3" (click)="test()">{{ 'welcome.retry' | t }}</button>
-                    </div>
-                  }
-                }
-              </div>
-              @if (mode() && mode() !== 'local' && mode() !== 'litellm') { <p class="hint">{{ 'setup.ai.cliHint' | t }}</p> }
-
-              @if (mode()) {
-                <details class="text-sm" [attr.open]="mode() === 'litellm' && ai().state === 'fail' ? '' : null">
-                  <summary class="cursor-pointer font-medium">{{ 'welcome.ai.advanced' | t }}</summary>
-                  <div class="mt-3 space-y-3">
-                    @if (mode() === 'local') {
-                      <div>
-                        <label class="label" for="api-base">{{ 'setup.ai.base' | t }}</label>
-                        <input id="api-base" dir="ltr" class="input" [(ngModel)]="apiBase" (change)="retest()" placeholder="http://127.0.0.1:1234/v1">
-                      </div>
-                    }
-                    <div>
-                      <label class="label" for="model">{{ (mode() === 'local' ? 'setup.ai.model' : 'setup.ai.modelOpt') | t }}</label>
-                      <input id="model" dir="ltr" class="input" [(ngModel)]="model" (change)="retest()"
-                             [placeholder]="(mode() === 'local' ? 'setup.ai.modelPhLocal' : mode() === 'litellm' ? 'setup.ai.modelPhApi' : 'setup.ai.modelPhCli') | t">
-                    </div>
-                  </div>
-                </details>
               }
             }
 
@@ -386,6 +301,8 @@ const SRC_TEXT: Record<string, string> = {
             }
           }
 
+          <app-ai-connect [hidden]="step() !== 2" [active]="step() === 2" intro="welcome.ai.intro" (stateChange)="ai.set($event)" (connected)="aiConnected()" />
+
           <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
             @if (step() > 1) {
               <button type="button" class="btn" (click)="go(prev())">{{ 'welcome.back' | t }}</button>
@@ -401,7 +318,7 @@ const SRC_TEXT: Record<string, string> = {
           </div>
         </section>
 
-        <p class="mt-4 text-center text-xs"><a routerLink="/setup">{{ 'welcome.skip' | t }}</a></p>
+        <p class="mt-4 text-center text-xs"><a routerLink="/settings">{{ 'welcome.skip' | t }}</a></p>
       }
     </div>
   `,
@@ -425,28 +342,9 @@ export class WelcomePage implements OnInit {
   protected readonly cvError = signal('');
   protected readonly dragging = signal(false);
 
-  // screen 2
-  protected readonly providers: { id: AiMode; label: string; hint: string }[] = [
-    { id: 'codex_cli', label: 'setup.ai.p.codex_cli', hint: 'setup.ai.p.codex_cli.hint' },
-    { id: 'claude_cli', label: 'setup.ai.p.claude_cli', hint: 'setup.ai.p.claude_cli.hint' },
-    { id: 'litellm', label: 'setup.ai.p.litellm', hint: 'setup.ai.p.litellm.hint' },
-    { id: 'local', label: 'setup.ai.p.local', hint: 'setup.ai.p.local.hint' },
-  ];
-  protected readonly localServers: { id: LocalServer; label: string; prefix: string; base: string }[] = [
-    { id: 'ollama', label: 'Ollama', prefix: 'ollama/', base: 'http://127.0.0.1:11434' },
-    { id: 'lmstudio', label: 'LM Studio', prefix: 'openai/', base: 'http://127.0.0.1:1234/v1' },
-  ];
-  protected readonly available = signal<Partial<Record<Provider, boolean>>>({});
-  protected readonly loaded = signal(false);
-  protected readonly hasCli = computed(() => !!(this.available().codex_cli || this.available().claude_cli));
-  protected readonly mode = signal<AiMode | null>(null);
-  protected readonly ai = signal<{ state: 'idle' | 'testing' | 'ok' | 'fail'; msg: string }>({ state: 'idle', msg: '' });
-  protected readonly local = signal<Record<LocalServer, { running: boolean; models: string[] }> | null>(null);
-  protected model = '';
-  protected apiBase = '';
+  // screen 2: the connection UI is <app-ai-connect>; only its latest state matters here
+  protected readonly ai = signal<AiState>({ state: 'idle', msg: '' });
   private cfg: SearchConfig | null = null;
-  private testId = 0;
-  private aiEntered = false;
 
   // screen 3
   protected readonly infer = signal<InferPayload | null>(null);
@@ -583,7 +481,6 @@ export class WelcomePage implements OnInit {
   protected go(n: StepNo): void {
     this.step.set(n);
     setTimeout(() => this.heading()?.nativeElement.focus());
-    if (n === 2) void this.enterAi();
     if (n >= 3 && !this.infer()) void this.loadInfer();
   }
 
@@ -641,91 +538,10 @@ export class WelcomePage implements OnInit {
 
   // ---- screen 2: AI ------------------------------------------------------------------
 
-  private async enterAi(): Promise<void> {
-    if (this.aiEntered) return;
-    this.aiEntered = true;
-    try {
-      const r = await this.api.get<{ provider: Provider | null; available: Record<Provider, boolean> }>('/ai');
-      this.available.set(r.available);
-      const saved = this.cfg?.ai;
-      let first: AiMode | null = null;
-      if (saved?.provider) {
-        first = saved.provider === 'litellm' && saved.api_base ? 'local' : saved.provider;
-        this.model = saved.model ?? '';
-        this.apiBase = saved.api_base ?? '';
-      } else {
-        first = r.available.codex_cli ? 'codex_cli' : r.available.claude_cli ? 'claude_cli' : null;
-      }
-      this.loaded.set(true);
-      if (!first) return;
-      this.mode.set(first);
-      if (first === 'local') {
-        await this.scanLocal();
-        if (!this.model || !this.apiBase) return; // nothing to test until a model is picked
-      }
-      void this.test();
-    } catch (e) {
-      this.loaded.set(true);
-      this.ai.set({ state: 'fail', msg: (e as Error).message });
-    }
-  }
-
-  protected pick(id: AiMode): void {
-    this.mode.set(id);
-    this.ai.set({ state: 'idle', msg: '' });
-    this.testId++; // an older test must not overwrite this choice
-    if (id === 'local') {
-      this.apiBase = '';
-      this.model = '';
-      void this.scanLocal();
-    } else {
-      this.apiBase = '';
-      this.model = '';
-      void this.test();
-    }
-  }
-
-  protected pickLocal(s: { prefix: string; base: string }, model: string): void {
-    this.model = s.prefix + model;
-    this.apiBase = s.base;
-    void this.test();
-  }
-
-  protected async scanLocal(): Promise<void> {
-    this.local.set(null);
-    try {
-      this.local.set(await this.api.get<Record<LocalServer, { running: boolean; models: string[] }>>('/ai/local'));
-    } catch {
-      this.local.set({ ollama: { running: false, models: [] }, lmstudio: { running: false, models: [] } });
-    }
-  }
-
-  /** The model or address box changed: test again when there is enough to test. */
-  protected retest(): void {
-    if (this.mode() && (this.mode() !== 'local' || (this.model && this.apiBase))) void this.test();
-  }
-
-  /** Test the chosen connection; when it works, save it (`PUT /search`, like Setup) and let the AI fill the CV gaps. */
-  protected async test(): Promise<void> {
-    const mode = this.mode();
-    if (!mode) return;
-    const id = ++this.testId;
-    this.ai.set({ state: 'testing', msg: '' });
-    const body = { provider: mode === 'local' ? 'litellm' : mode, model: this.model.trim() || null, api_base: mode === 'local' ? this.apiBase.trim() || null : null };
-    try {
-      const r = await this.api.post<{ ok: boolean; message: string }>('/ai/check', body);
-      if (id !== this.testId) return;
-      if (!r.ok) return this.ai.set({ state: 'fail', msg: r.message });
-      const cfg = await this.api.get<SearchConfig>('/search'); // fresh copy: do not overwrite changes made elsewhere
-      cfg.ai = body;
-      this.cfg = await this.api.put<SearchConfig>('/search', cfg);
-      if (id !== this.testId) return;
-      this.ai.set({ state: 'ok', msg: r.message });
-      this.status.set(await this.api.get<Status>('/status'));
-      void this.fillAi();
-    } catch (e) {
-      if (id === this.testId) this.ai.set({ state: 'fail', msg: (e as Error).message });
-    }
+  /** The connection tested fine and was saved: the AI can now fill the CV gaps. */
+  protected async aiConnected(): Promise<void> {
+    this.status.set(await this.api.get<Status>('/status'));
+    void this.fillAi();
   }
 
   /** One background model call for what the rules missed. Errors are ignored: the rule-based values are enough. */

@@ -101,6 +101,13 @@ export interface SearchConfig {
   schedule: ScheduleSection;
 }
 
+/** GET /api/presets: the Pace and Pickiness presets and the field defaults (a whole SearchConfig). */
+export interface Presets {
+  pace: Record<string, Record<string, number>>;
+  pickiness: Record<string, Record<string, number>>;
+  defaults: SearchConfig;
+}
+
 export interface TrustSection {
   enabled: boolean;
   scam_threshold: number;
