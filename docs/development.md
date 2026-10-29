@@ -49,8 +49,32 @@ and builds the frontend.
 - The end-to-end apply tests in `tests/e2e/` run in **dry-run mode only**, against saved forms,
   with every network request intercepted. They need Google Chrome. **Never submit a real
   application in a test.**
+- **UI end-to-end tests** (`tests/e2e/ui/`, marker `ui`) start the real app under uvicorn and drive
+  the built Angular UI in headless Chrome (else Playwright's Chromium): the first-run flow and a
+  page smoke test. AI and local-model servers are fakes. Build the frontend first, else they skip:
+  `cd frontend && npx ng build`, then `uv run pytest tests/e2e/ui` (`-m ui` to select them).
+  The Python CI job has no built frontend, so they skip there; the frontend job only builds.
 - Prompts live in `src/linkit_all/providers/prompts/*.j2`, never in code. Every AI answer is
   validated against a Pydantic schema.
+
+### Running live tests
+
+Three tests talk to a real service. They carry the `live` marker, skip unless you set the
+variables below, and are never run in CI. Each has a fake-backed twin that does run in CI.
+
+| Path | Test file | Set to run |
+| --- | --- | --- |
+| Connect Gmail, send a test email to yourself | `test_gmail_connect.py` | `LINKIT_LIVE_GMAIL_USER`, `LINKIT_LIVE_GMAIL_APP_PASSWORD` (a Google app password) |
+| Scan Ollama / LM Studio and run one tiny check | `test_local_model_pick.py` | `LINKIT_LIVE_OLLAMA=1` and/or `LINKIT_LIVE_LMSTUDIO=1` (server running with a model) |
+
+```bash
+# PowerShell: $env:LINKIT_LIVE_GMAIL_USER = "you@gmail.com"; $env:LINKIT_LIVE_GMAIL_APP_PASSWORD = "..."
+uv run pytest -m live -v          # only the live tests (skipped ones say which variable is missing)
+uv run pytest -m "not live"       # everything else
+```
+
+The Gmail test sends one email, to your own address, and removes the saved password again. The
+PDF preview test (`test_pdf_cv_flow.py`) is not live: it needs LibreOffice and skips without it.
 
 ## Adding a job source
 

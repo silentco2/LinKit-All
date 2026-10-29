@@ -74,6 +74,10 @@ untyped_calls_exclude = ["pymupdf", "skimage"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "live: talks to a real service; opt-in via env vars, see docs/development.md",
+    "ui: drives the built Angular UI in a browser (tests/e2e/ui); skips without `ng build` output",
+]
 
 [dependency-groups]
 dev = [
