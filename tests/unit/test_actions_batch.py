@@ -245,3 +245,13 @@ def test_sensitive_questions_group_and_match_on_exact_label_only(client: TestCli
         {"item_ids": [d, e], "label": soft_us, "value": "5 years"},
     )
     assert r.json()["resolved"] == 2
+
+
+def test_action_questions_carry_their_sensitive_category(client: TestClient) -> None:
+    park(client, questions=[
+        q("Notice period"),
+        q("I acknowledge the privacy notice", kind="checkbox"),
+        q("What is your gender?", kind="select", options=["Male", "Decline to self-identify"]),
+    ])  # fmt: skip
+    (item,) = client.get("/api/actions").json()
+    assert [x["category"] for x in item["questions"]] == [None, "acknowledge_privacy", "eeo_gender"]

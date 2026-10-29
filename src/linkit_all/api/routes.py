@@ -997,7 +997,7 @@ def _action(item: ActionItem, job: Job) -> dict[str, Any]:
         "message": item.message,
         "code": item.code,
         "params": item.params,
-        "questions": item.questions,
+        "questions": [{**q, "category": _category(q)} for q in item.questions],
         "answers": item.answers,
         "screenshots": len(item.artifacts),
         "created_at": item.created_at.isoformat(),
@@ -1211,11 +1211,16 @@ def _label_key(label: str) -> str:
     return " ".join(label.lower().split()).rstrip("*:? ")
 
 
-def _is_sensitive(q: dict[str, Any]) -> bool:
+def _category(q: dict[str, Any]) -> str | None:
+    """The sensitive category of a stored question (acknowledge_privacy, ...) or None."""
     flagged = Question(
         key="", label=q["label"], kind=q.get("kind") or "text", options=q.get("options") or []
     )
-    return bool(q.get("sensitive")) or sensitive_category(flagged) is not None
+    return sensitive_category(flagged)
+
+
+def _is_sensitive(q: dict[str, Any]) -> bool:
+    return bool(q.get("sensitive")) or _category(q) is not None
 
 
 def _same_label(a: str, b: str, exact: bool = False) -> bool:

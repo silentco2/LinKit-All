@@ -1,10 +1,11 @@
 import { Component, computed, inject, OnInit, signal, viewChild } from '@angular/core';
 import { Api } from '../../api';
+import { GmailConnect, GmailConnected } from '../../components/gmail-connect';
 import { KeyForm } from '../../components/key-form';
 import { VaultGate, VaultReady } from '../../components/vault-gate';
 import { I18n, TPipe } from '../../i18n';
 import { fmtNum, labelOr, localeOf } from '../../locale';
-import { ApiKeyProvider, EmailState, VaultEntry, VaultState } from '../../types';
+import { ApiKeyProvider, VaultEntry, VaultState } from '../../types';
 import { Field } from './saved';
 import { SettingsStore } from './store';
 
@@ -13,7 +14,7 @@ type Note = { ok: boolean; text: string };
 /** Settings > Accounts & email: saved passwords (the vault), Gmail for sign-up codes and email applications, API keys. */
 @Component({
   selector: 'app-settings-accounts',
-  imports: [Field, KeyForm, VaultGate, TPipe],
+  imports: [Field, GmailConnect, KeyForm, VaultGate, TPipe],
   template: `
     <div class="space-y-6">
       @if (note(); as n) {
@@ -88,55 +89,8 @@ type Note = { ok: boolean; text: string };
       <section class="card space-y-4">
         <h2>{{ 'settings.acc.gmail' | t }} <span class="text-sm font-normal text-slate-500">({{ 'common.optional' | t }})</span></h2>
         <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'setup.email.intro' | t }}</p>
-        @if (!unlocked()) {
-          <div class="alert alert-info" role="status">{{ 'settings.acc.needVault' | t }}</div>
-        } @else {
-          @if (email()?.connected) {
-            <div class="alert alert-ok" role="status">{{ 'setup.email.connectedAs' | t }} <bdi dir="ltr">{{ email()!.imap_user }}</bdi>.</div>
-          }
-          @if (eUser()) {
-            <p class="text-sm"><span class="text-slate-500">{{ 'setup.email.address' | t }}:</span> <bdi dir="ltr" class="font-medium">{{ eUser() }}</bdi></p>
-          }
-          @if (unsupported()) {
-            <div class="alert alert-info" role="status">{{ 'settings.acc.outlook' | t }}</div>
-          } @else {
-            @if (!email()?.connected) {
-              <ol class="list-decimal space-y-1 ps-5 text-sm text-slate-700 dark:text-slate-300">
-                <li>{{ 'settings.acc.step1' | t }} <a href="https://myaccount.google.com/security" target="_blank" rel="noopener">{{ 'settings.acc.open' | t }}</a></li>
-                <li>{{ 'settings.acc.step2' | t }} <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">{{ 'settings.acc.open' | t }}</a></li>
-                <li>{{ 'settings.acc.step3' | t }}</li>
-              </ol>
-              @if (yahoo()) { <p class="hint">{{ 'settings.acc.yahoo' | t }}</p> }
-              <form class="space-y-3" (submit)="connect($event)">
-                <div class="max-w-sm">
-                  <label class="label" for="e-pass">{{ 'setup.email.appPass' | t }}</label>
-                  <input id="e-pass" type="password" dir="ltr" class="input" name="app-password" autocomplete="off" placeholder="abcd efgh ijkl mnop" [value]="ePass()" (input)="ePass.set(val($event))">
-                </div>
-                <button type="submit" class="btn btn-primary" [disabled]="busy() || !ePass().trim() || !eUser()">{{ 'settings.acc.connect' | t }}</button>
-              </form>
-            }
-          }
-          <details class="text-sm" [open]="!eUser()">
-            <summary class="cursor-pointer font-medium">{{ 'setup.email.advanced' | t }}</summary>
-            <div class="mt-2 grid gap-4 sm:grid-cols-2">
-              <div>
-                <label class="label" for="e-user">{{ 'setup.email.address' | t }}</label>
-                <input id="e-user" type="email" dir="ltr" class="input" autocomplete="email" [value]="eUser()" (change)="setUser(val($event))">
-              </div>
-              <div>
-                <label class="label" for="e-host">{{ 'setup.email.imap' | t }}</label>
-                <input id="e-host" dir="ltr" class="input" autocomplete="off" [value]="eHost()" (change)="eHost.set(val($event).trim())">
-              </div>
-            </div>
-          </details>
-          @if (email()?.connected) {
-            <div class="flex flex-wrap gap-3">
-              <button type="button" class="btn" (click)="test()" [disabled]="busy()">{{ 'setup.email.testAgain' | t }}</button>
-              <button type="button" class="btn" (click)="testSend()" [disabled]="busy()">{{ 'setup.email.testSend' | t }}</button>
-              <button type="button" class="btn" (click)="disconnect()" [disabled]="busy()">{{ 'setup.email.disconnect' | t }}</button>
-            </div>
-            <p class="hint">{{ 'setup.email.testSendHint' | t }}</p>
-          }
+        <app-gmail-connect [unlocked]="unlocked()" (connected)="onGmail($event)" />
+        @if (unlocked()) {
           <div class="max-w-xs border-t border-slate-100 pt-4 dark:border-slate-800">
             <app-field key="apply.email_daily_cap" for="e-cap" [label]="'setup.email.cap' | t" [hint]="'setup.email.capHint' | t">
               <input id="e-cap" type="number" min="1" max="100" class="input" [value]="store.cfg.apply.email_daily_cap" (change)="store.update('apply.email_daily_cap', num2($event))">
@@ -175,7 +129,6 @@ export class AccountsSection implements OnInit {
   private readonly gate = viewChild(VaultGate);
   private readonly loc = computed(() => localeOf(this.i18n.lang()));
   protected readonly vault = signal<VaultState | null>(null);
-  protected readonly email = signal<EmailState | null>(null);
   protected readonly keys = signal<ApiKeyProvider[]>([]);
   protected readonly note = signal<Note | null>(null);
   protected readonly busy = signal(false);
@@ -187,13 +140,6 @@ export class AccountsSection implements OnInit {
   protected readonly exporting = signal(false);
   protected readonly revealPass = signal('');
   protected readonly exportPass = signal('');
-
-  protected readonly eUser = signal('');
-  protected readonly eHost = signal('imap.gmail.com');
-  protected readonly ePass = signal('');
-  private readonly domain = computed(() => (this.eUser().split('@')[1] ?? '').trim().toLowerCase());
-  protected readonly unsupported = computed(() => /^(outlook|hotmail|live|msn)\./.test(this.domain()));
-  protected readonly yahoo = computed(() => /^(yahoo\.|ymail\.com$)/.test(this.domain()));
 
   ngOnInit(): void {
     void this.loadAll();
@@ -216,7 +162,6 @@ export class AccountsSection implements OnInit {
   private async loadAll(): Promise<void> {
     await Promise.all([
       this.api.get<VaultState>('/vault').then((v) => this.vault.set(v)),
-      this.api.get<EmailState>('/email').then((e) => this.setEmail(e)),
       this.api.get<ApiKeyProvider[]>('/keys').then((k) => this.keys.set(k)),
     ]).catch((e) => this.note.set({ ok: false, text: (e as Error).message }));
   }
@@ -310,60 +255,9 @@ export class AccountsSection implements OnInit {
 
   // ---- Gmail ----------------------------------------------------------------------------------
 
-  /** Gmail and Yahoo have fixed IMAP servers; any other address keeps what is there. */
-  private hostFor(user: string, current: string): string {
-    const d = (user.split('@')[1] ?? '').trim().toLowerCase();
-    if (d === 'gmail.com' || d === 'googlemail.com') return 'imap.gmail.com';
-    return /^(yahoo\.|ymail\.com$)/.test(d) ? 'imap.mail.yahoo.com' : current;
-  }
-
-  private setEmail(e: EmailState): void {
-    this.email.set(e);
-    this.eUser.set(e.imap_user);
-    this.eHost.set(this.hostFor(e.imap_user, e.imap_host));
-  }
-
-  protected setUser(v: string): void {
-    this.eUser.set(v.trim());
-    this.eHost.set(this.hostFor(v, this.eHost()));
-  }
-
-  protected connect(ev: Event): Promise<void> {
-    ev.preventDefault();
-    return this.run(async () => {
-      const e = await this.api.post<EmailState>('/email', { imap_host: this.eHost(), imap_user: this.eUser(), app_password: this.ePass() });
-      this.ePass.set('');
-      this.setEmail(e);
-      // the server saved the address and host in the search config: keep our copy the same so a later autosave does not undo it
-      this.store.cfg.email.imap_host = e.imap_host;
-      this.store.cfg.email.imap_user = e.imap_user;
-      const n = await this.api.post<{ count: number }>('/actions/retry-code', { code: 'needs_email' }).then((r) => r.count).catch(() => 0);
-      const text = this.i18n.t('setup.email.connectedMsg', { user: e.imap_user });
-      return n > 0 ? `${text}. ${this.waiting(n)}` : text;
-    });
-  }
-
-  protected test(): Promise<void> {
-    return this.run(async () => {
-      await this.api.post('/email/test');
-      return this.i18n.t('setup.email.works');
-    });
-  }
-
-  /** Send one short test message to the user's own address through SMTP. */
-  protected testSend(): Promise<void> {
-    return this.run(async () => {
-      const r = await this.api.post<{ ok: boolean; message_id?: string; error?: string }>('/email/test-send');
-      if (!r.ok) throw new Error(this.i18n.t('setup.email.testFailed', { error: r.error ?? '' }));
-      return this.i18n.t('setup.email.testSent');
-    });
-  }
-
-  protected disconnect(): Promise<void> {
-    return this.run(async () => {
-      await this.api.delete('/email');
-      this.setEmail(await this.api.get<EmailState>('/email'));
-      return this.i18n.t('setup.email.disconnected');
-    });
+  /** The component saved the address and host in the search config: keep our copy the same so a later autosave does not undo it. */
+  protected onGmail(r: GmailConnected): void {
+    this.store.cfg.email.imap_host = r.email.imap_host;
+    this.store.cfg.email.imap_user = r.email.imap_user;
   }
 }

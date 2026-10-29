@@ -203,6 +203,10 @@ export interface JobRow {
   ai: AIScore | null;
   scam_score?: number | null;
   ghost_score?: number | null;
+  /** Plain-words why this job is where it is (filtered, low); null when there is nothing to say. */
+  reason?: string | null;
+  reason_code?: string | null;
+  reason_params?: Record<string, unknown>;
 }
 
 export interface AIScore {
@@ -295,7 +299,22 @@ export interface ActionQuestion {
   required: boolean;
   reason: string;
   sensitive: boolean;
+  /** Server's sensitive category (acknowledge_privacy, acknowledge_legal, eeo_gender, ...), null for ordinary questions. */
+  category?: string | null;
 }
+
+/** One question asked by several waiting applications (GET /actions/groups). */
+export interface ActionGroup {
+  label: string;
+  sensitive: boolean;
+  kind: string | null;
+  options: string[];
+  item_ids: number[];
+  count: number;
+}
+
+/** Profile answers an answer card may keep for every later application (POST /actions/{id} `remember`). */
+export type Remember = Record<string, string | boolean>;
 
 export interface EmailDraft { to: string; subject: string; body: string; attachment: string }
 
