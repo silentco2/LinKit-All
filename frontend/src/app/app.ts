@@ -1,5 +1,5 @@
-import { Component, effect, inject, signal } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Component, computed, effect, inject, signal } from '@angular/core';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Api } from './api';
 import { I18n, Lang, TPipe } from './i18n';
 import { Live } from './live';
@@ -13,12 +13,15 @@ const FRESH_MS = 60_000; // a run that ended longer ago than this is replayed hi
   imports: [RouterOutlet, RouterLink, RouterLinkActive, TPipe],
   template: `
     <div class="flex min-h-screen flex-col md:flex-row">
+      @if (!welcome()) {
       <header class="sticky top-0 z-20 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 md:hidden dark:border-slate-800 dark:bg-slate-900">
         <div class="text-lg font-bold text-slate-900 dark:text-white">LinKit <span class="text-brand-600">All</span></div>
         <button type="button" class="btn" (click)="menuOpen.set(!menuOpen())" [attr.aria-expanded]="menuOpen()" aria-controls="main-nav">
           {{ 'shell.menu' | t }}
         </button>
       </header>
+      }
+      @if (!welcome()) {
       <nav id="main-nav" class="flex-col gap-1 border-b border-slate-200 bg-white p-4 md:sticky md:top-0 md:flex md:h-screen md:w-56 md:shrink-0 md:border-e md:border-b-0 dark:border-slate-800 dark:bg-slate-900"
            [class.hidden]="!menuOpen()" [class.flex]="menuOpen()" [attr.aria-label]="'shell.navLabel' | t">
         <div class="mb-4 px-2 md:mb-6">
@@ -63,8 +66,9 @@ const FRESH_MS = 60_000; // a run that ended longer ago than this is replayed hi
           </div>
         </div>
       </nav>
+      }
       <main class="min-w-0 flex-1 overflow-x-auto p-4 md:p-8">
-        @if (status() && !ready()) {
+        @if (status() && !ready() && !welcome()) {
           <div class="alert alert-info mb-6">
             {{ 'shell.setupA' | t }}<a routerLink="setup">{{ 'shell.setupB' | t }}</a>{{ 'shell.setupC' | t }}
           </div>
@@ -78,6 +82,10 @@ export class App {
   protected readonly live = inject(Live);
   private readonly api = inject(Api);
   protected readonly i18n = inject(I18n);
+  private readonly router = inject(Router);
+  private readonly path = signal(window.location.pathname);
+  /** First-run flow: no side nav and no "finish setup" banner, the page is its own guide. */
+  protected readonly welcome = computed(() => this.path().startsWith('/welcome'));
   protected readonly menuOpen = signal(false);
   protected readonly status = signal<Status | null>(null);
   protected readonly reviewCount = signal(0);
@@ -98,6 +106,11 @@ export class App {
   ];
 
   constructor() {
+    this.router.events.subscribe((e) => {
+      if (!(e instanceof NavigationEnd)) return;
+      this.path.set(e.urlAfterRedirects.split(/[?#]/)[0]);
+      void this.refresh(); // leaving /welcome: the "finish setup" banner must see the new status
+    });
     effect(() => {
       this.live.changed(); // reload counts whenever a stage finishes
       this.refresh();

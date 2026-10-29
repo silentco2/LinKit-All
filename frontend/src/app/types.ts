@@ -13,7 +13,19 @@ export interface RunState {
   results: Record<string, Record<string, unknown>>;
 }
 
+/** What first-run setup still needs; the server computes it once (`/status`). */
+export interface SetupState {
+  cv: boolean;
+  ai: boolean;
+  profile: boolean;
+  roles: boolean;
+  where: boolean;
+  required_done: boolean;
+  next_step: 'cv' | 'ai' | 'profile' | 'roles' | 'where' | null;
+}
+
 export interface Status {
+  setup: SetupState;
   profile_ready: boolean;
   cv_ready: boolean;
   search_ready: boolean;
@@ -361,4 +373,20 @@ export interface Report {
   per_run: (Omit<OutcomeRow, 'name'> & { run_id: number; status: string; started_at: string })[];
   over_time: { date: string; applied: number; failed: number; skipped: number; needs_user: number }[];
   filter: { run_id: number | null; since: string | null };
+}
+
+/** One guess from the CV: `check` means the rule is unsure; `level` says whether it is used as is or must be confirmed. */
+export interface InferredValue {
+  value: unknown;
+  source: 'cv' | 'country' | 'roles' | 'years' | 'default' | 'ai';
+  level: 'auto' | 'suggest' | 'ask';
+  check: boolean;
+}
+
+/** `GET /infer`, `POST /infer/ai-fill`. A key is missing when the CV says nothing about it. */
+export interface InferPayload {
+  values: Record<string, InferredValue>;
+  country: { name: string; jobspy: string; currency: string; region: string };
+  sources: { jobspy: string[]; regional: string[]; enabled: string[]; telegram_channels: string[] };
+  has_cv: boolean;
 }
