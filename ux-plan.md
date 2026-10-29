@@ -515,8 +515,8 @@ Started 2026-10-29. Orchestrator plans and reviews; Sonnet executors build; Haik
 | T4.2 | UX4 | Vocabulary sweep EN/AR (section 9) across all strings + AR term consistency; commit UX4 | T4.1 | done |
 | T5.1 | UX5 | Backend: JIT park kinds (vault/email needed), batch answer API, privacy/legal "always" option, resolve_action fix + tests | T1.4 | done |
 | T5.2 | UX5 | Frontend: grouped Needs you, JIT cards, undo toast, J/K/A/S/O shortcuts; commit UX5 | T4.1, T5.1 | done |
-| T6.1 | UX6 | Guided Live unlock, reason chips on Jobs, first-time hints; commit UX6 | T5.2 | todo |
-| T7.1 | — | CLAUDE.md §13 edits (≤ 200 lines), handoff.md note | T6.1 | todo |
+| T6.1 | UX6 | Guided Live unlock, reason chips on Jobs, first-time hints; commit UX6 | T5.2 | done |
+| T7.1 | — | CLAUDE.md §13 edits (≤ 200 lines), handoff.md note | T6.1 | done |
 | T7.2 | — | Browser E2E pass (Haiku) on a fresh data dir + full test suite | T7.1 | todo |
 
 ### 16.5 Log

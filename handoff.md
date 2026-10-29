@@ -7,6 +7,17 @@ changing a decision in either file.
 
 ## TL;DR
 
+- **UX for V1 (2026-10-29)**: the app was rebuilt around a plain-language, low-setup flow. Plan, audit and
+  task log: `ux-plan.md` (CLAUDE.md sections 5.5, 5.7, 5.9, 6, 7, 10 updated for it). Built, one commit per phase:
+  - UX1 `2777e78`: rule-based setup inference (`core/infer.py`, `core/presets.py`) and per-job sponsorship answers.
+  - UX2 `4d96adc`: 4-screen first run at `/welcome`.
+  - UX3 `da96a87`: autosaving Settings replace the 10-step wizard.
+  - UX4 `986969a`: Home, Needs you, Activity and the plain-word vocabulary (EN + AR).
+  - UX5a `3c9ae0c` + UX5 `60eb327`: just-in-time park codes, batch answers, a Needs you that clears fast.
+  - UX6a `da5a346` + UX6 `6ee5dc3`: presets, job reasons, the guided switch to real applications, first-visit hints.
+  - Not verified: a real Gmail connect; the PDF approve path without LibreOffice; the local-model pick; a
+    native-speaker review of the new Arabic terms (the executors wrote them from the `ux-plan.md` section 9 list).
+  - Remaining: **UX7**, the usability round with 5 people (`ux-plan.md` section 14), pending with the maintainer.
 - Phases 0-8 are built, except the items blocked on the maintainer (see "Needs the
   maintainer"). Every task in `plan.md` is done or marked blocked.
 - Phase 8 (sources ported from freehire) is built too: see "Phase 8 - sources from freehire".
