@@ -1404,6 +1404,8 @@ def edit_email_draft(request: Request, item_id: int, body: EmailDraftEdit) -> di
         draft = job.data.get("email_draft")
         if not isinstance(draft, dict):
             raise HTTPException(409, "This job has no email draft")
+        if body.body != draft.get("body"):
+            draft = {k: v for k, v in draft.items() if k != "problem"}  # the user wrote it
         draft = {**draft, "subject": body.subject, "body": body.body}
         job.data = {**job.data, "email_draft": draft}
         item.params = {**item.params, "subject": body.subject}

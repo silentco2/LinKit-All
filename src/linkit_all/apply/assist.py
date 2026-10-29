@@ -25,6 +25,7 @@ from linkit_all.apply.answers import (
 from linkit_all.core.models import AnswerEntry
 from linkit_all.matching.rank import Embed
 from linkit_all.providers.base import LLMProvider, UsageLimitError, render
+from linkit_all.tailor.patches import has_arabic
 
 MATCH = 0.93  # paraphrase similarity needed to reuse a saved answer
 MATCH_SENSITIVE = 0.97  # sensitive questions: near-identical wording, the user's own answers only
@@ -136,19 +137,37 @@ async def ai_drafts(
     out = {}
     for d in result.answers:
         q = by_key.get(d.key)
-        if q is not None and d.known and (value := _fit(q, d.answer)) is not None:
-            out[q.key] = value
+        if q is None or not d.known or (value := _fit(q, d.answer)) is None:
+            continue
+        if has_arabic(" ".join(value) if isinstance(value, list) else str(value)):
+            logger.warning("AI draft for {} discarded: not English", q.key)  # goes to Needs you
+            continue
+        out[q.key] = value
     return out
+
+
+ARABIC_LETTER = "The AI wrote the cover letter in Arabic; write it yourself or retry"
+_ENGLISH_ONLY = "\n\nYour previous answer contained Arabic script. Write in English only."
+
+
+class NotEnglish(ValueError):
+    """The model wrote Arabic twice in a row (the AI never writes Arabic)."""
 
 
 async def write_cover_letter(
     provider: LLMProvider, cv: str, profile: str, job: dict[str, str], out_dir: Path
 ) -> tuple[str, Path]:
-    """Letter text and a simple PDF of it (for upload fields)."""
+    """Letter text and a simple PDF of it (for upload fields). Raises NotEnglish."""
     import pymupdf
 
     prompt = render("cover_letter.j2", cv=cv[:6000], profile=profile, job=_job_brief(job))
     text = (await provider.complete(prompt, CoverLetter)).text.strip()
+    if has_arabic(text):  # retry once, uncached
+        text = (
+            await provider.complete(prompt + _ENGLISH_ONLY, CoverLetter, use_cache=False)
+        ).text.strip()
+        if has_arabic(text):
+            raise NotEnglish(ARABIC_LETTER)
     out_dir.mkdir(parents=True, exist_ok=True)
     pdf = out_dir / "cover_letter.pdf"
     doc = pymupdf.open()
@@ -170,12 +189,20 @@ async def answer_questions(
     out_dir: Path,
 ) -> Resolution:
     """Full resolution; anything required and still unanswered ends in `missing`."""
-    letter = ""
+    letter, letter_arabic = "", False
     if provider is not None and any(is_cover_letter(q) for q in questions):
-        letter, pdf = await write_cover_letter(provider, cv, profile, job, out_dir)
-        ctx.cover_letter_path = str(pdf)
+        try:
+            letter, pdf = await write_cover_letter(provider, cv, profile, job, out_dir)
+            ctx.cover_letter_path = str(pdf)
+        except NotEnglish:
+            letter_arabic = True  # optional fields stay empty; required ones go to Needs you
 
     r = resolve_static(questions, ctx)
+    if letter_arabic:
+        r.missing = [
+            Missing(m.question, ARABIC_LETTER, m.sensitive) if is_cover_letter(m.question) else m
+            for m in r.missing
+        ]
     still_missing = []
     for m in r.missing:  # the user may have answered this exact question before
         if m.sensitive and (value := bank.lookup(m.question, sensitive=True)) is not None:
@@ -190,6 +217,9 @@ async def answer_questions(
             r.answers[q.key], r.sources[q.key] = letter, "ai"
         elif (value := bank.lookup(q)) is not None:
             r.answers[q.key], r.sources[q.key] = value, "bank"
+        elif letter_arabic and is_cover_letter(q):
+            if q.required:
+                r.missing.append(Missing(q, ARABIC_LETTER))
         else:
             for_ai.append(q)
     if provider is not None and for_ai:

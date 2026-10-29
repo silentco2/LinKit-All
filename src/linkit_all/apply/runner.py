@@ -607,6 +607,7 @@ class Applier:
                 "subject": made.subject,
                 "body": made.body,
                 "attachment": str(attachment),
+                **({"problem": made.problem} if made.problem else {}),
             }
             if apply_cfg.live:  # the UI edits this copy; a retry or confirm reuses it
                 with self.db.begin() as s:
@@ -637,12 +638,23 @@ class Applier:
         if not apply_cfg.live:
             eml = str(save_eml(msg, out_dir / "application.eml"))
             note = f"dry run: email to {addr} prepared, not sent"
+            if draft.get("problem"):
+                note += " (the AI wrote the body in Arabic, so it is blank; a live run asks you)"
             with self.db.begin() as s:
                 row = s.get_one(Job, job_id)
                 _event(s, row, note, [eml], "email_preview", {"to": addr})
                 row.data = {**row.data, "dry_run_at": utcnow().isoformat()}
             return Outcome("dry_run", note, [eml])
 
+        if draft.get(
+            "problem"
+        ):  # only the user's edit clears it; never sent, whatever the settings
+            return park(
+                ActionKind.confirm_email,
+                f"The AI wrote the email to {addr} in Arabic; write the message yourself",
+                "confirm_email",
+                {"to": addr, "subject": draft["subject"], "problem": draft["problem"]},
+            )
         if not apply_cfg.submit_without_asking and not job.data.get("submit_confirmed"):
             return park(
                 ActionKind.confirm_email,

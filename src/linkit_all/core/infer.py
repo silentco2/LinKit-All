@@ -502,9 +502,9 @@ def _month_index(d: date) -> int:
 
 
 def years_experience(facts: CvFacts, today: date) -> int | None:
-    """Whole years over the union of dated, non-intern ranges (overlaps counted once).
+    """Whole years over the union of dated ranges, internships included (overlaps counted once).
 
-    None when no experience has dates. Internships do not count (decision Q2).
+    None when no experience has dates. Internships count (maintainer decision, T8.1).
     """
     dated = [e for e in facts.experiences if e.start and (e.end or e.current)]
     if not dated:
@@ -513,7 +513,7 @@ def years_experience(facts: CvFacts, today: date) -> int | None:
     spans = sorted(
         (_month_index(e.start), min(_month_index(e.end) if e.end else now, now))
         for e in dated
-        if e.start and not e.intern
+        if e.start
     )
     total, reach = 0, -1
     for a, b in spans:

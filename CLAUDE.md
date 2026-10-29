@@ -97,7 +97,7 @@ Tailoring happens just before applying, never for jobs that will not be applied 
 ### 5.4 Tailoring (`tailor/`)
 - CV is split into numbered text segments; AI returns patches only: `[{segment_id, old_text, new_text, reason}]`. Never a full rewrite.
 - Reject a patch if it: touches locked facts; adds unlisted skills/claims; grows a segment > ~10% chars; or
-  total changed words exceed the configured cap (default 15%).
+  total changed words exceed the configured cap (default 15%); `new_text` has Arabic script; the segment is mostly Arabic.
 - DOCX: write new text into the first run of a span, empty the rest, keep run formatting. Cover body, tables,
   text boxes, headers/footers (lxml for what python-docx misses).
 - LaTeX: edit text nodes only, compile with Tectonic. ODT: LibreOffice round-trip. PDF input: convert once via
@@ -123,7 +123,7 @@ Tailoring happens just before applying, never for jobs that will not be applied 
 - Email applications (`mailto:`, `apply/email_apply.py`): Gmail/Yahoo SMTP, vault app password; short cover
   email (greeting/signature in code, body from the model, CV/profile only) + tailored CV PDF. Dry run writes an
   .eml only; live follows "submit without asking" (else `confirm_email`). 15/day, never the same address twice.
-- Cover letter only if the form has a field. Screenshot before submit and on confirmation; trace on failure.
+- Cover letter only if the form has a field. All AI-written prose is English only, never Arabic (copying stays verbatim). Screenshot before submit and on confirmation; trace on failure.
 - Success = confirmation page text and/or email, else failed with reason, never assumed. A sent email = applied
   (by email); the sent message is the proof.
 

@@ -104,25 +104,29 @@ def _exp(start: date, end: date | None, **kw: bool) -> Experience:
     return Experience(start=start, end=end, current=end is None, **kw)
 
 
-def test_years_union_excludes_interns_and_overlaps() -> None:
+def test_years_union_includes_interns_and_overlaps() -> None:
     facts = CvFacts(
         experiences=[
             _exp(date(2020, 1, 1), date(2022, 1, 1)),
             _exp(date(2021, 1, 1), date(2023, 1, 1)),  # overlaps: union is 2020-2023
-            _exp(date(2015, 1, 1), date(2019, 1, 1), intern=True),  # not counted
         ]
     )
     assert years_experience(facts, TODAY) == 3
+    # an internship adds its years (2018-2020 does not overlap 2020-2023)
+    facts.experiences.append(_exp(date(2018, 1, 1), date(2020, 1, 1), intern=True))
+    assert years_experience(facts, TODAY) == 5
     assert years_experience(CvFacts(), TODAY) is None
     only_intern = CvFacts(experiences=[_exp(date(2015, 1, 1), date(2016, 1, 1), intern=True)])
-    assert years_experience(only_intern, TODAY) == 0
+    assert years_experience(only_intern, TODAY) == 1
     # a current job runs to today
     assert years_experience(CvFacts(experiences=[_exp(date(2021, 1, 1), None)]), TODAY) == 5
 
 
 def test_en_infer_values_and_levels() -> None:
     out = infer(read_cv(EN_CV), TODAY)
-    assert out["answers.years_experience"].value == 7  # 2021-2026 + 2018-03..2020-12, no intern
+    assert (
+        out["answers.years_experience"].value == 7
+    )  # 2021-2026 + 2018-03..2020-12 + 2017 internship
     assert out["answers.years_experience"].source == "years"
     assert out["filters.seniority"].value == ["senior", "lead"]
     assert out["filters.title_exclude"].value == ["intern", "junior"]

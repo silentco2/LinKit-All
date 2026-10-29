@@ -89,6 +89,13 @@ _REGIONAL: dict[Region, list[str]] = {
 }
 
 
+# MENA tech Telegram channels, names only (the shape DEFAULT_TELEGRAM_CHANNELS uses).
+_MENA_TECH_TELEGRAM = (
+    "IT_jobs_coop", "Freejobs5", "findmyremote_frontend", "SDEjobsandinternships", "ELIT_IT",
+    "technomajed",
+)  # fmt: skip
+
+
 def source_preset(country: CountryPreset, track: Track) -> dict[str, list[str]]:
     """Values for SourcesSection's jobspy, regional, enabled and telegram_channels."""
     jobspy = ["linkedin", "indeed", "google"]
@@ -101,9 +108,11 @@ def source_preset(country: CountryPreset, track: Track) -> dict[str, list[str]]:
         *(_TECH_GLOBAL if track == "tech" else _GENERAL_GLOBAL),
         *by_country.get(country.name.lower(), []),
     ]
-    # ponytail: MENA channel lists are curated later by the maintainer; none ship for now.
-    tech_other = track == "tech" and country.region == "other"
-    channels = list(DEFAULT_TELEGRAM_CHANNELS) if tech_other else []
+    channels: list[str] = []
+    if track == "tech":
+        channels = list(
+            _MENA_TECH_TELEGRAM if country.region != "other" else DEFAULT_TELEGRAM_CHANNELS
+        )
     return {
         "jobspy": jobspy,
         "regional": list(_REGIONAL[country.region]),

@@ -179,7 +179,7 @@ def test_where_remote_and_track_presets(client: TestClient) -> None:
     assert "wuzzuf" in cfg["sources"]["regional"]
     assert cfg["sources"]["enabled"][0] == "my_board"  # union: nothing of the user's is removed
     assert "remoteok" in cfg["sources"]["enabled"]
-    assert cfg["sources"]["telegram_channels"] == []  # still the default list: replaced
+    assert "ELIT_IT" in cfg["sources"]["telegram_channels"]  # MENA tech list replaces the default
     assert client.get("/api/profile/answers").json()["salary_currency"] == "EGP"
     assert r.json()["setup"]["where"] is True
     # not remote -> hybrid/onsite only; an edited channel list and a set currency stay
