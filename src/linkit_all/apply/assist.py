@@ -63,25 +63,34 @@ class AnswerBank:
                 return value
         return None
 
-    def save(self, question: str, answer: Any, source: str, sensitive: bool = False) -> None:
+    def save(
+        self,
+        question: str,
+        answer: Any,
+        source: str,
+        sensitive: bool = False,
+        session: Session | None = None,
+    ) -> None:
+        """Save in `session` when given (the caller commits), else in a transaction of its own."""
         key = " ".join(question.lower().split())
-        with self.db.begin() as s:
-            existing = next(
-                (
-                    e
-                    for e in s.scalars(select(AnswerEntry))
-                    if " ".join(e.question.lower().split()) == key
-                ),
-                None,
+        if session is None:
+            with self.db.begin() as s:
+                self.save(question, answer, source, sensitive, s)
+            return
+        existing = next(
+            (
+                e
+                for e in session.scalars(select(AnswerEntry))
+                if " ".join(e.question.lower().split()) == key
+            ),
+            None,
+        )
+        if existing is None:
+            session.add(
+                AnswerEntry(question=question, answer=answer, source=source, sensitive=sensitive)
             )
-            if existing is None:
-                s.add(
-                    AnswerEntry(
-                        question=question, answer=answer, source=source, sensitive=sensitive
-                    )
-                )
-            elif source == "user" or existing.source == "ai":  # never overwrite the user's words
-                existing.answer, existing.source = answer, source
+        elif source == "user" or existing.source == "ai":  # never overwrite the user's words
+            existing.answer, existing.source = answer, source
         self._entries = None
 
 

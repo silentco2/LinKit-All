@@ -16,12 +16,13 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, Field, ValidationError, field_validator
+from rapidfuzz import fuzz
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from linkit_all.api.events import EventBus
 from linkit_all.api.runner import PipelineRunner, RunBusy
-from linkit_all.apply.answers import ApplicationAnswers
+from linkit_all.apply.answers import ApplicationAnswers, Question, sensitive_category
 from linkit_all.apply.assist import AnswerBank
 from linkit_all.apply.browser import UserBrowser, fresh_live_shot, profile_dir
 from linkit_all.apply.email_send import (
@@ -38,6 +39,7 @@ from linkit_all.core.config import Settings
 from linkit_all.core.infer import InferredValue, infer, read_cv
 from linkit_all.core.models import (
     ActionItem,
+    ActionKind,
     ActionStatus,
     AnswerEntry,
     Job,
@@ -998,9 +1000,22 @@ def _entry(e: AnswerEntry) -> dict[str, Any]:
     }
 
 
+AnswerValue = str | list[str] | bool
+
+
+def _check_answer(v: AnswerValue) -> AnswerValue:
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, str):
+        v = v.strip()
+    if not v or (isinstance(v, list) and not any(x.strip() for x in v)):
+        raise ValueError("answer cannot be empty")
+    return v
+
+
 class AnswerEdit(BaseModel):
     question: str | None = None
-    answer: str | list[str] | bool
+    answer: AnswerValue
 
     @field_validator("question")
     @classmethod
@@ -1011,14 +1026,8 @@ class AnswerEdit(BaseModel):
 
     @field_validator("answer")
     @classmethod
-    def _answer(cls, v: str | list[str] | bool) -> str | list[str] | bool:
-        if isinstance(v, bool):
-            return v
-        if isinstance(v, str):
-            v = v.strip()
-        if not v or (isinstance(v, list) and not any(x.strip() for x in v)):
-            raise ValueError("answer cannot be empty")
-        return v
+    def _answer(cls, v: AnswerValue) -> AnswerValue:
+        return _check_answer(v)
 
 
 @router.get("/answers")
@@ -1061,6 +1070,198 @@ class ActionAnswers(BaseModel):
 class ActionDecision(BaseModel):
     decision: Literal["answer", "confirm", "retry", "applied_by_hand", "skip"]
     answers: dict[str, Any] = {}
+    remember: dict[str, Any] = {}  # profile answers to keep ("Always"); see REMEMBER_KEYS
+
+
+# Profile answers the Action Center may save for good (agreements and standing preferences).
+REMEMBER_KEYS = frozenset({
+    "acknowledge_privacy", "acknowledge_legal", "notice_period", "willing_to_relocate",
+    "eeo_gender", "eeo_race", "eeo_hispanic", "eeo_veteran", "eeo_disability",
+})  # fmt: skip
+# Park codes that were renamed: open items with the old code count as the new one.
+CODE_ALIASES = {"needs_email": ("needs_email", "email_not_connected")}
+SAME_QUESTION = 92  # rapidfuzz token_sort_ratio at which two question labels are one question
+
+
+def _remembered(remember: dict[str, Any]) -> dict[str, Any]:
+    """The validated `remember` values; 422 for a key outside REMEMBER_KEYS or a bad value."""
+    if bad := sorted(set(remember) - REMEMBER_KEYS):
+        raise HTTPException(422, f"Cannot remember: {', '.join(bad)}")
+    try:
+        return ApplicationAnswers.model_validate(remember).model_dump(include=set(remember))
+    except ValidationError as e:
+        fields = ", ".join(str(err["loc"][0]) for err in e.errors())
+        raise HTTPException(422, f"Invalid value for: {fields}") from None
+
+
+def _save_remembered(s: Session, values: dict[str, Any]) -> None:
+    if not values:
+        return
+    profile = s.get(Profile, 1)
+    if profile is None:
+        raise HTTPException(409, "Save your profile first")
+    profile.answers = ApplicationAnswers.model_validate({**profile.answers, **values}).model_dump()
+
+
+def _label_key(label: str) -> str:
+    """Lowercase, collapse whitespace, drop trailing `*`, `:` and `?`."""
+    return " ".join(label.lower().split()).rstrip("*:? ")
+
+
+def _is_sensitive(q: dict[str, Any]) -> bool:
+    flagged = Question(
+        key="", label=q["label"], kind=q.get("kind") or "text", options=q.get("options") or []
+    )
+    return bool(q.get("sensitive")) or sensitive_category(flagged) is not None
+
+
+def _same_label(a: str, b: str, exact: bool = False) -> bool:
+    """a and b are `_label_key`s. `exact`: sensitive questions never match by similarity."""
+    return a == b or (not exact and fuzz.token_sort_ratio(a, b) >= SAME_QUESTION)
+
+
+def _unanswered(item: ActionItem) -> list[dict[str, Any]]:
+    return [q for q in item.questions if item.answers.get(q["label"]) in (None, "", [])]
+
+
+def _close_item(s: Session, item: ActionItem, job: Job, decision: str) -> None:
+    """Apply an Action Center decision to the item and its job."""
+    if decision == "confirm":
+        job.data = {**job.data, "submit_confirmed": True}
+    if decision == "skip":
+        transition(s, job, JobState.skipped, "you skipped it in the Action Center", code="skipped")
+    elif decision == "applied_by_hand":
+        transition(s, job, JobState.applying, "you applied by hand", code="applied_by_hand")
+        transition(s, job, JobState.applied, "you applied by hand", code="applied_by_hand")
+    else:
+        transition(
+            s, job, JobState.queued_apply, f"Action Center: {decision}",
+            code=f"decision_{decision}",
+        )  # fmt: skip
+    item.status = ActionStatus.dismissed if decision == "skip" else ActionStatus.resolved
+    item.resolved_at = utcnow()
+
+
+class RetryCode(BaseModel):
+    code: str = Field(min_length=1)
+
+
+@router.post("/actions/retry-code")
+def retry_code(request: Request, body: RetryCode) -> dict[str, int]:
+    """Requeue every open item parked with this code (e.g. after the user connected their email)."""
+    codes = CODE_ALIASES.get(body.code, (body.code,))
+    count = 0
+    with _db(request).begin() as s:
+        items = s.scalars(
+            select(ActionItem)
+            .where(ActionItem.status == ActionStatus.open, ActionItem.code.in_(codes))
+            .order_by(ActionItem.id)
+        ).all()
+        for item in items:
+            job = s.get_one(Job, item.job_id)
+            if can_transition(job.state, JobState.queued_apply):
+                _close_item(s, item, job, "retry")
+                count += 1
+    return {"count": count}
+
+
+@router.get("/actions/groups")
+def action_groups(request: Request) -> list[dict[str, Any]]:
+    """Open questions grouped by label, so one answer can serve every item that asks it."""
+    groups: list[dict[str, Any]] = []
+    with _db(request)() as s:
+        items = s.scalars(
+            select(ActionItem)
+            .where(
+                ActionItem.status == ActionStatus.open,
+                ActionItem.kind == ActionKind.unknown_question,
+            )
+            .order_by(ActionItem.id)
+        )
+        for item in items:
+            for q in _unanswered(item):
+                key = _label_key(q["label"])
+                options = sorted(str(o).lower() for o in q.get("options") or [])
+                sensitive = _is_sensitive(q)
+                # same wording AND same kind/options: the one answer must fit every item
+                group = next(
+                    (
+                        g for g in groups
+                        if g["kind"] == q.get("kind") and g["_options"] == options
+                        and _same_label(g["_key"], key, sensitive or g["sensitive"])
+                    ),
+                    None,
+                )  # fmt: skip
+                if group is None:
+                    group = {
+                        "label": q["label"].strip(), "sensitive": False, "kind": q.get("kind"),
+                        "options": q.get("options") or [], "item_ids": [],
+                        "_key": key, "_options": options,
+                    }  # fmt: skip
+                    groups.append(group)
+                group["sensitive"] = group["sensitive"] or sensitive
+                if item.id not in group["item_ids"]:
+                    group["item_ids"].append(item.id)
+    groups.sort(key=lambda g: -len(g["item_ids"]))  # stable: ties keep first-seen order
+    return [
+        {**{k: v for k, v in g.items() if not k.startswith("_")}, "count": len(g["item_ids"])}
+        for g in groups
+    ]
+
+
+class GroupAnswer(BaseModel):
+    item_ids: list[int] = Field(min_length=1)
+    label: str = Field(min_length=1)
+    value: AnswerValue
+    remember: dict[str, Any] = {}
+
+    @field_validator("value")
+    @classmethod
+    def _value(cls, v: AnswerValue) -> AnswerValue:
+        return _check_answer(v)
+
+
+@router.post("/actions/answer-group")
+def answer_group(request: Request, body: GroupAnswer) -> dict[str, int]:
+    """Give one answer to the matching question in each listed open item. An item with no other
+    required question left is requeued; the rest keep the partial answer and stay open. The
+    answer is typed by the user, so sensitive questions are fine; the AI is never involved."""
+    remembered = _remembered(body.remember)
+    key = _label_key(body.label)
+    label_sensitive = _is_sensitive({"label": body.label})
+    resolved = still_open = skipped = 0
+    sensitive = False
+    with _db(request).begin() as s:
+        for item_id in dict.fromkeys(body.item_ids):
+            item = s.get(ActionItem, item_id)
+            job = s.get(Job, item.job_id) if item else None
+            if (
+                item is None or job is None
+                or item.status != ActionStatus.open or item.kind != ActionKind.unknown_question
+                or not can_transition(job.state, JobState.queued_apply)
+            ):  # fmt: skip
+                skipped += 1
+                continue
+            hits = [
+                q for q in _unanswered(item)
+                if _same_label(key, _label_key(q["label"]), label_sensitive or _is_sensitive(q))
+            ]  # fmt: skip
+            if not hits:
+                skipped += 1
+                continue
+            item.answers = {**item.answers, **{q["label"]: body.value for q in hits}}
+            sensitive = sensitive or any(_is_sensitive(q) for q in hits)
+            if any(q.get("required") for q in _unanswered(item)):
+                still_open += 1
+            else:
+                _close_item(s, item, job, "answer")
+                resolved += 1
+        if resolved + still_open:
+            AnswerBank(_db(request)).save(
+                body.label.strip(), body.value, "user", sensitive, session=s
+            )
+            _save_remembered(s, remembered)
+    return {"resolved": resolved, "still_open": still_open, "skipped": skipped}
 
 
 class EmailDraftEdit(BaseModel):
@@ -1106,42 +1307,30 @@ def resolve_action(request: Request, item_id: int, body: ActionDecision) -> dict
     """answer: save to the answer bank and requeue; confirm: submit on the next apply run;
     retry: requeue as is; applied_by_hand: you submitted it yourself; skip: drop the job."""
     db = _db(request)
-    if body.decision == "answer":
-        with db() as s:
-            item = s.get(ActionItem, item_id)
-            questions = {q["label"]: q for q in (item.questions if item else [])}
-        missing = [
-            label
-            for label, q in questions.items()
-            if q.get("required") and body.answers.get(label) in (None, "", [])
-        ]
-        if missing:
-            raise HTTPException(422, f"Please answer: {missing[0]}")
-        bank = AnswerBank(db)
-        for label, value in body.answers.items():
-            if label in questions and value not in (None, "", []):
-                bank.save(label, value, "user", sensitive=bool(questions[label].get("sensitive")))
-    with db.begin() as s:
+    remembered = _remembered(body.remember) if body.decision == "answer" else {}
+    with db.begin() as s:  # one transaction: a refused request writes nothing
         item = s.get(ActionItem, item_id)
         if item is None or item.status != ActionStatus.open:
             raise HTTPException(404, "No open item with that id")
         job = s.get_one(Job, item.job_id)
-        if body.decision == "confirm":
-            job.data = {**job.data, "submit_confirmed": True}
-        if body.decision == "skip":
-            transition(
-                s, job, JobState.skipped, "you skipped it in the Action Center", code="skipped"
-            )
-        elif body.decision == "applied_by_hand":
-            transition(s, job, JobState.applying, "you applied by hand", code="applied_by_hand")
-            transition(s, job, JobState.applied, "you applied by hand", code="applied_by_hand")
-        else:
-            transition(
-                s, job, JobState.queued_apply, f"Action Center: {body.decision}",
-                code=f"decision_{body.decision}",
-            )  # fmt: skip
-        item.status = ActionStatus.dismissed if body.decision == "skip" else ActionStatus.resolved
-        item.resolved_at = utcnow()
+        if body.decision == "answer":
+            questions = {q["label"]: q for q in item.questions}
+            given = {
+                k: v for k, v in body.answers.items() if k in questions and v not in (None, "", [])
+            }
+            have = {**item.answers, **given}  # answers kept earlier from a group count too
+            missing = [
+                label for label, q in questions.items()
+                if q.get("required") and have.get(label) in (None, "", [])
+            ]  # fmt: skip
+            if missing:
+                raise HTTPException(422, f"Please answer: {missing[0]}")
+            bank = AnswerBank(db)
+            for label, value in given.items():
+                bank.save(label, value, "user", bool(questions[label].get("sensitive")), s)
+            item.answers = have
+            _save_remembered(s, remembered)
+        _close_item(s, item, job, body.decision)
         return {"job_state": job.state}
 
 

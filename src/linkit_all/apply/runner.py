@@ -652,7 +652,7 @@ class Applier:
             return park(
                 ActionKind.login_issue,
                 "Unlock (or create) the vault so the app can sign in to your email",
-                "vault_locked",
+                self._vault_code(),
                 {"site": "your email"},
             )
         with self.db.begin() as s:
@@ -665,8 +665,8 @@ class Applier:
             return park(
                 ActionKind.login_issue,
                 "Connect your email in Setup so the app can send applications",
-                "email_not_connected",
-                {},
+                "needs_email",
+                {"purpose": "send"},
             )
         except SmtpError as e:
             return fail(
@@ -868,6 +868,11 @@ class Applier:
             vault.unlock_from_keyring()
         return vault if vault.unlocked() else None
 
+    def _vault_code(self) -> str:
+        """Park code for a missing vault: `needs_vault` (never created) or `vault_locked`."""
+        vault = self._vault if self._vault is not None else vault_for(self.settings, self.db)
+        return "vault_locked" if vault.initialized() else "needs_vault"
+
     async def _account_gate(
         self, page: Page, handler: Handler, info: JobInfo, profile: Profile, out_dir: Path
     ) -> Outcome | None:
@@ -890,7 +895,7 @@ class Applier:
         vault = self._unlocked_vault()
         if vault is None:
             msg = f"Unlock (or create) the vault so the app can sign in to {site}"
-            return await park(ActionKind.login_issue, msg, "vault_locked", {"site": site})
+            return await park(ActionKind.login_issue, msg, self._vault_code(), {"site": site})
         account = find_account(vault, handler.ats, tenant)
         if account is None:
             if not live:  # no typing, no clicks: sign-up forms are never touched in a dry run
@@ -910,7 +915,9 @@ class Applier:
             mail = credentials(self.cfg.email, vault, profile.email)
             if mail is None:
                 msg = "Connect your email in Setup so the app can read the verification email"
-                return await park(ActionKind.login_issue, msg, "email_not_connected")
+                return await park(
+                    ActionKind.login_issue, msg, "needs_email", {"site": site, "purpose": "verify"}
+                )
             account = create_account(  # saved before the sign-up click: a crash never loses it
                 vault, handler.ats, tenant, profile.email, handler.password_rules
             )

@@ -92,9 +92,17 @@ def test_locked_vault_parks_with_site(tmp_path: Path) -> None:
     item, events = rows(applier)
     assert item is not None
     assert item.kind == ActionKind.login_issue
-    assert (item.code, item.params) == ("vault_locked", {"site": "workday (acme)"})
+    assert (item.code, item.params) == ("needs_vault", {"site": "workday (acme)"})  # never created
     assert "Unlock" in item.message  # the English text stays
-    assert events[-1].code == "vault_locked" and events[-1].to_state == JobState.needs_user
+    assert events[-1].code == "needs_vault" and events[-1].to_state == JobState.needs_user
+
+
+def test_created_but_locked_vault_parks_vault_locked(tmp_path: Path) -> None:
+    applier, info, profile = make(tmp_path)
+    unlocked_vault(applier).lock()
+    gate(applier, info, profile, GatedHandler(), tmp_path)
+    item, _ = rows(applier)
+    assert item is not None and item.code == "vault_locked"
 
 
 def test_dry_run_would_create_account_event(tmp_path: Path) -> None:
@@ -107,12 +115,13 @@ def test_dry_run_would_create_account_event(tmp_path: Path) -> None:
     assert (events[-1].code, events[-1].params) == ("dry_run_signup", {"site": "workday (acme)"})
 
 
-def test_live_without_email_parks_email_not_connected(tmp_path: Path) -> None:
+def test_live_without_email_parks_needs_email(tmp_path: Path) -> None:
     applier, info, profile = make(tmp_path, live=True)
     unlocked_vault(applier)
     gate(applier, info, profile, GatedHandler(), tmp_path)
     item, _ = rows(applier)
-    assert item is not None and item.code == "email_not_connected"
+    assert item is not None and item.code == "needs_email"
+    assert item.params == {"site": "workday (acme)", "purpose": "verify"}
 
 
 @pytest.mark.parametrize(

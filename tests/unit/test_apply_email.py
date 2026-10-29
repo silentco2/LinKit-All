@@ -30,6 +30,7 @@ from linkit_all.core.models import (
     JobEvent,
     JobState,
     Profile,
+    VaultMeta,
 )
 from linkit_all.core.search import SearchConfig
 from linkit_all.core.state import transition
@@ -342,7 +343,8 @@ def test_email_not_connected_and_locked_vault_park(make: Any, smtp: type[FakeSMT
     assert env.apply(job_id).status == "needs_user"
     item = env.item()
     assert item is not None and item.kind == ActionKind.login_issue
-    assert item.code == "email_not_connected" and smtp.instances == []
+    assert (item.code, item.params) == ("needs_email", {"purpose": "send"})
+    assert smtp.instances == []
     assert env.row(job_id).state == JobState.needs_user
 
 
@@ -352,6 +354,16 @@ def test_locked_vault_parks_vault_locked(make: Any, smtp: type[FakeSMTP]) -> Non
     assert env.apply(env.job()).status == "needs_user"
     item = env.item()
     assert item is not None and item.code == "vault_locked" and smtp.instances == []
+
+
+def test_missing_vault_parks_needs_vault(make: Any, smtp: type[FakeSMTP]) -> None:
+    env: Env = make(live=True, submit_without_asking=True)
+    env.vault.lock()
+    with env.db.begin() as s:
+        s.query(VaultMeta).delete()  # as if it was never created
+    assert env.apply(env.job()).status == "needs_user"
+    item = env.item()
+    assert item is not None and item.code == "needs_vault" and smtp.instances == []
 
 
 def test_pick_jobs_takes_mailto_and_respects_the_daily_cap(make: Any) -> None:
