@@ -1,5 +1,6 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { Api } from '../api';
+import { AllClear } from '../components/all-clear';
 import { I18n, MsgPipe, TPipe } from '../i18n';
 import { Live } from '../live';
 import { fmtNum, labelOr, localeOf } from '../locale';
@@ -18,10 +19,9 @@ const SOURCES: Record<string, string> = {
 
 @Component({
   selector: 'app-actions',
-  imports: [MsgPipe, TPipe],
+  imports: [AllClear, MsgPipe, TPipe],
   template: `
-    <h1>{{ 'actions.title' | t }}</h1>
-    <p class="mt-1 text-sm text-slate-500">{{ 'actions.intro' | t }}</p>
+    <p class="text-sm text-slate-500">{{ 'actions.intro' | t }}</p>
 
     <div class="mt-5 max-w-4xl space-y-5">
       @for (a of items(); track a.id) {
@@ -194,7 +194,7 @@ const SOURCES: Record<string, string> = {
           </footer>
         </section>
       } @empty {
-        <div class="card text-center text-sm text-slate-500">{{ (loaded() ? 'actions.empty' : 'common.loading') | t }}</div>
+        @if (loaded()) { <app-all-clear /> } @else { <div class="card text-center text-sm text-slate-500">{{ 'common.loading' | t }}</div> }
       }
     </div>
   `,

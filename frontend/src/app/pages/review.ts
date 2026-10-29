@@ -1,5 +1,6 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { Api } from '../api';
+import { AllClear } from '../components/all-clear';
 import { I18n, TPipe } from '../i18n';
 import { Live } from '../live';
 import { fmtNum, localeOf } from '../locale';
@@ -15,10 +16,9 @@ const MESSAGE = {
 @Component({
   selector: 'app-review',
   host: { '(document:keydown.escape)': 'open.set(null)' },
-  imports: [JobDetailPanel, TPipe],
+  imports: [AllClear, JobDetailPanel, TPipe],
   template: `
-    <h1>{{ 'review.title' | t }}</h1>
-    <p class="mt-1 text-sm text-slate-500">{{ 'review.intro' | t }}</p>
+    <p class="text-sm text-slate-500">{{ 'review.intro' | t }}</p>
 
     <div class="mt-5 flex flex-wrap gap-2" role="tablist">
       @for (t of tabs; track t.id) {
@@ -64,8 +64,9 @@ const MESSAGE = {
             </div>
           </li>
         } @empty {
-          <li class="card text-center text-sm text-slate-500">
-            {{ (tab() === 'awaiting_review' ? 'review.empty.needs' : 'review.empty.low') | t }}
+          <li>
+            @if (tab() === 'awaiting_review') { <app-all-clear /> }
+            @else { <div class="card text-center text-sm text-slate-500">{{ 'review.empty.low' | t }}</div> }
           </li>
         }
       </ul>

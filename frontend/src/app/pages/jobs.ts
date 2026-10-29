@@ -1,7 +1,8 @@
 import { ScrollingModule } from '@angular/cdk/scrolling';
 import { Component, computed, DestroyRef, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Api } from '../api';
 import { I18n, SourcePipe, TPipe } from '../i18n';
 import { Live } from '../live';
@@ -25,6 +26,11 @@ function riskOf(j: JobRow): Risk | null {
 }
 import { JobDetailPanel } from './job-detail';
 
+/** A pseudo-state in the URL for several states at once (the server filters one state at a time). */
+const GROUPS: Record<string, Set<string>> = {
+  // ranked or later: what Home calls "passed filters"
+  passed: new Set(['ranked', 'scored', 'below_threshold', 'awaiting_review', 'queued_apply', 'tailored', 'applying', 'needs_user', 'applied', 'failed', 'skipped']),
+};
 const STATES = ['discovered', 'enriched', 'filtered_out', 'ranked', 'scored', 'below_threshold', 'awaiting_review',
   'queued_apply', 'tailored', 'applying', 'needs_user', 'applied', 'failed', 'skipped'];
 
@@ -40,18 +46,19 @@ const STATES = ['discovered', 'enriched', 'filtered_out', 'ranked', 'scored', 'b
 
     <div class="mt-4 flex flex-wrap gap-3" role="search">
       <input class="input max-w-xs" type="search" [placeholder]="'jobs.searchPh' | t" [attr.aria-label]="'jobs.searchLabel' | t"
-             [ngModel]="q()" (ngModelChange)="search($event)">
-      <select class="input w-44" [attr.aria-label]="'jobs.filter.state' | t" [ngModel]="state()" (ngModelChange)="state.set($event); load()">
+             [ngModel]="qText()" (ngModelChange)="search($event)">
+      <select class="input w-44" [attr.aria-label]="'jobs.filter.state' | t" [ngModel]="state()" (ngModelChange)="setFilter('state', $event)">
         <option value="">{{ 'jobs.filter.allStates' | t }}</option>
+        <option value="passed">{{ 'jobs.filter.passed' | t }}</option>
         @for (s of states; track s) { <option [value]="s">{{ 'common.state.' + s | t }}</option> }
       </select>
-      <select class="input w-36" [attr.aria-label]="'jobs.filter.tier' | t" [ngModel]="tier()" (ngModelChange)="tier.set($event); load()">
+      <select class="input w-36" [attr.aria-label]="'jobs.filter.tier' | t" [ngModel]="tier()" (ngModelChange)="setFilter('tier', $event)">
         <option value="">{{ 'jobs.filter.allTiers' | t }}</option>
         <option value="high">{{ 'common.tier.high' | t }}</option>
         <option value="mid">{{ 'common.tier.mid' | t }}</option>
         <option value="low">{{ 'common.tier.low' | t }}</option>
       </select>
-      <select class="input w-40" [attr.aria-label]="'jobs.filter.source' | t" [ngModel]="source()" (ngModelChange)="source.set($event); load()">
+      <select class="input w-40" [attr.aria-label]="'jobs.filter.source' | t" [ngModel]="source()" (ngModelChange)="setFilter('source', $event)">
         <option value="">{{ 'jobs.filter.allSources' | t }}</option>
         @for (s of sources(); track s) { <option [value]="s">{{ s | src }}</option> }
       </select>
@@ -86,7 +93,7 @@ const STATES = ['discovered', 'enriched', 'filtered_out', 'ranked', 'scored', 'b
             </button>
           </cdk-virtual-scroll-viewport>
         } @else if (!loading()) {
-          <p class="p-8 text-center text-sm text-slate-500">{{ 'jobs.empty.a' | t }}<a routerLink="/live">{{ 'shell.nav.live' | t }}</a>{{ 'jobs.empty.b' | t }}</p>
+          <p class="p-8 text-center text-sm text-slate-500">{{ 'jobs.empty.a' | t }}<a routerLink="/home">{{ 'shell.nav.home' | t }}</a>{{ 'jobs.empty.b' | t }}</p>
         }
       </div>
 
@@ -104,6 +111,9 @@ export class JobsPage {
   private readonly api = inject(Api);
   private readonly live = inject(Live);
   private readonly i18n = inject(I18n);
+  private readonly router = inject(Router);
+  /** The filters live in the URL (`?state=&tier=&source=&q=`), so Home's numbers and a reload both land on the same list. */
+  private readonly params = toSignal(inject(ActivatedRoute).queryParamMap);
   private readonly loc = computed(() => localeOf(this.i18n.lang()));
   protected readonly states = STATES;
   private readonly all = signal<JobRow[]>([]);
@@ -112,10 +122,12 @@ export class JobsPage {
   protected readonly rows = computed(() =>
     this.hideRisky() ? this.all().filter((j) => (j.scam_score ?? 0) < SCAM_HIGH && (j.ghost_score ?? 0) < GHOST_HIGH) : this.all());
   protected readonly risk = riskOf;
-  protected readonly q = signal('');
-  protected readonly state = signal('');
-  protected readonly tier = signal('');
-  protected readonly source = signal('');
+  protected readonly q = computed(() => this.params()?.get('q') ?? '');
+  protected readonly state = computed(() => this.params()?.get('state') ?? '');
+  protected readonly tier = computed(() => this.params()?.get('tier') ?? '');
+  protected readonly source = computed(() => this.params()?.get('source') ?? '');
+  /** What the search box shows: ahead of `q` while the user types. */
+  protected readonly qText = signal('');
   protected readonly selected = signal<number | null>(null);
   protected readonly loading = signal(false);
   protected readonly error = signal('');
@@ -139,7 +151,11 @@ export class JobsPage {
     }
     effect(() => {
       this.live.changed(); // new jobs or new scores after each stage
-      this.load();
+      this.load(); // also runs when a filter in the URL changes
+    });
+    effect(() => {
+      const q = this.q(); // a link or a back step changed the URL: follow it, unless the user is mid-word
+      if (this.timer === undefined) this.qText.set(q);
     });
     this.api.get<{ sources: Record<string, unknown> }>('/report').then((r) => this.sources.set(Object.keys(r.sources).sort()));
   }
@@ -148,19 +164,28 @@ export class JobsPage {
   protected num = (n: number | null, o?: Intl.NumberFormatOptions): string => fmtNum(this.loc(), n, o);
 
   search(value: string): void {
-    this.q.set(value);
+    this.qText.set(value);
     clearTimeout(this.timer);
-    this.timer = setTimeout(() => this.load(), 250);
+    this.timer = setTimeout(() => {
+      this.timer = undefined;
+      this.setFilter('q', value);
+    }, 250);
+  }
+
+  protected setFilter(key: 'q' | 'state' | 'tier' | 'source', value: string): void {
+    void this.router.navigate([], { queryParams: { [key]: value || null }, queryParamsHandling: 'merge', replaceUrl: true });
   }
 
   async load(): Promise<void> {
     const params = new URLSearchParams();
-    for (const [k, v] of [['q', this.q()], ['state', this.state()], ['tier', this.tier()], ['source', this.source()]]) {
+    const group = GROUPS[this.state()];
+    for (const [k, v] of [['q', this.q()], ['state', group ? '' : this.state()], ['tier', this.tier()], ['source', this.source()]]) {
       if (v) params.set(k, v);
     }
     this.loading.set(true);
     try {
-      this.all.set(await this.api.get<JobRow[]>(`/jobs?${params}`));
+      const rows = await this.api.get<JobRow[]>(`/jobs?${params}`);
+      this.all.set(group ? rows.filter((j) => group.has(j.state)) : rows);
       this.error.set('');
     } catch (e) {
       this.error.set((e as Error).message);

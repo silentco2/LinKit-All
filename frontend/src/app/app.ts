@@ -3,9 +3,9 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } fro
 import { Api } from './api';
 import { I18n, Lang, TPipe } from './i18n';
 import { Live } from './live';
-import { LiveEvent, Status } from './types';
+import { Shell } from './shell';
+import { LiveEvent, setupDone } from './types';
 
-const NOTIFY_KEY = 'linkit.notify';
 const FRESH_MS = 60_000; // a run that ended longer ago than this is replayed history, not news
 
 @Component({
@@ -27,7 +27,7 @@ const FRESH_MS = 60_000; // a run that ended longer ago than this is replayed hi
         <div class="mb-4 px-2 md:mb-6">
           <div class="text-lg font-bold text-slate-900 dark:text-white">LinKit <span class="text-brand-600">All</span></div>
           <div class="text-xs text-slate-500">{{ 'shell.tagline' | t }}</div>
-          @if (status(); as s) {
+          @if (shell.status(); as s) {
             <span class="badge mt-2" [class]="s.apply_live ? 'tier-mid' : 'tier-low'"
                   [title]="(s.apply_live ? 'shell.liveTitle' : 'shell.dryTitle') | t">
               {{ (s.apply_live ? 'shell.live' : 'shell.dry') | t }}
@@ -35,17 +35,17 @@ const FRESH_MS = 60_000; // a run that ended longer ago than this is replayed hi
           }
         </div>
         @for (item of nav; track item.path) {
-          <a [routerLink]="item.path" (click)="menuOpen.set(false)" routerLinkActive="!bg-brand-50 !text-brand-700 dark:!bg-slate-800 dark:!text-white"
+          <a [routerLink]="item.path" (click)="menuOpen.set(false)" routerLinkActive="!bg-brand-50 !text-brand-700 dark:!bg-slate-800 dark:!text-white" ariaCurrentWhenActive="page"
              class="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-slate-600 no-underline hover:bg-slate-100 hover:no-underline dark:text-slate-300 dark:hover:bg-slate-800">
             {{ item.label | t }}
-            @if (item.path === 'review' && reviewCount() > 0) {
-              <span class="badge tier-mid">{{ reviewCount() }}</span>
+            @if (item.path === 'needs-you' && needsCount() > 0) {
+              <span class="badge tier-mid">{{ needsCount() }}</span>
             }
-            @if (item.path === 'actions' && actionsCount() > 0) {
-              <span class="badge tier-mid">{{ actionsCount() }}</span>
+            @if (item.path === 'activity' && live.run()?.running) {
+              <span class="size-2 animate-pulse rounded-full bg-emerald-500" role="img" [attr.aria-label]="'shell.running' | t"></span>
             }
-            @if (item.path === 'live' && live.run()?.running) {
-              <span class="size-2 animate-pulse rounded-full bg-emerald-500" [attr.aria-label]="'shell.running' | t"></span>
+            @if (item.path === 'settings' && setupLeft(); as n) {
+              <span class="badge tier-mid">{{ 'shell.setupChip' | t: { n: n.done, total: 4 } }}</span>
             }
           </a>
         }
@@ -54,11 +54,11 @@ const FRESH_MS = 60_000; // a run that ended longer ago than this is replayed hi
             <button type="button" class="btn !px-2 !py-1 text-xs" lang="en" dir="ltr" [class.btn-primary]="i18n.lang() === 'en'" [attr.aria-pressed]="i18n.lang() === 'en'" (click)="setLang('en')">English</button>
             <button type="button" class="btn !px-2 !py-1 text-xs" lang="ar" dir="rtl" [class.btn-primary]="i18n.lang() === 'ar'" [attr.aria-pressed]="i18n.lang() === 'ar'" (click)="setLang('ar')">العربية</button>
           </div>
-          @if (notifySupported) {
+          @if (shell.notifySupported) {
             <label class="flex items-center gap-2" [title]="'shell.notifyTitle' | t">
-              <input type="checkbox" [checked]="notify()" (change)="toggleNotify()"> {{ 'shell.notify' | t }}
+              <input type="checkbox" [checked]="shell.notify()" (change)="shell.toggleNotify()"> {{ 'shell.notify' | t }}
             </label>
-            @if (notifyHint()) { <p class="text-amber-600">{{ notifyHint() }}</p> }
+            @if (shell.notifyHint()) { <p class="text-amber-600">{{ shell.notifyHint() }}</p> }
           }
           <div>
           <span class="me-1 inline-block size-2 rounded-full" [class]="live.connected() ? 'bg-emerald-500' : 'bg-rose-500'"></span>
@@ -68,11 +68,6 @@ const FRESH_MS = 60_000; // a run that ended longer ago than this is replayed hi
       </nav>
       }
       <main class="min-w-0 flex-1 overflow-x-auto p-4 md:p-8">
-        @if (status() && !ready() && !welcome()) {
-          <div class="alert alert-info mb-6">
-            {{ 'shell.setupA' | t }}<a routerLink="/welcome">{{ 'shell.setupB' | t }}</a>{{ 'shell.setupC' | t }}
-          </div>
-        }
         <router-outlet />
       </main>
     </div>
@@ -80,38 +75,46 @@ const FRESH_MS = 60_000; // a run that ended longer ago than this is replayed hi
 })
 export class App {
   protected readonly live = inject(Live);
+  protected readonly shell = inject(Shell);
   private readonly api = inject(Api);
   protected readonly i18n = inject(I18n);
   private readonly router = inject(Router);
   private readonly path = signal(window.location.pathname);
-  /** First-run flow: no side nav and no "finish setup" banner, the page is its own guide. */
+  /** First-run flow: no side nav, the page is its own guide. */
   protected readonly welcome = computed(() => this.path().startsWith('/welcome'));
   protected readonly menuOpen = signal(false);
-  protected readonly status = signal<Status | null>(null);
-  protected readonly reviewCount = signal(0);
-  protected readonly actionsCount = signal(0);
-  protected readonly notifySupported = typeof Notification !== 'undefined';
-  protected readonly notify = signal(this.notifySupported && readNotifyPref() && Notification.permission === 'granted');
-  protected readonly notifyHint = signal('');
+  /** One badge for everything waiting on the user: jobs to approve plus applications to finish. */
+  protected readonly needsCount = computed(() => {
+    const s = this.shell.status();
+    return s ? (s.states['awaiting_review'] ?? 0) + s.actions_open : 0;
+  });
+  /** The "Setup N/4" chip on Settings, until the required steps are done. */
+  protected readonly setupLeft = computed(() => {
+    const s = this.shell.status();
+    return s && !s.setup.required_done ? { done: setupDone(s.setup) } : null;
+  });
   private lastRunEnd = '';
+  private lastPath = '';
   protected readonly nav = [
-    { path: 'settings', label: 'shell.nav.settings' },
+    { path: 'home', label: 'shell.nav.home' },
     { path: 'jobs', label: 'shell.nav.jobs' },
-    { path: 'review', label: 'shell.nav.review' },
-    { path: 'actions', label: 'shell.nav.actions' },
-    { path: 'live', label: 'shell.nav.live' },
-    { path: 'report', label: 'shell.nav.report' },
+    { path: 'needs-you', label: 'shell.nav.needsYou' },
+    { path: 'activity', label: 'shell.nav.activity' },
+    { path: 'settings', label: 'shell.nav.settings' },
   ];
 
   constructor() {
     this.router.events.subscribe((e) => {
       if (!(e instanceof NavigationEnd)) return;
-      this.path.set(e.urlAfterRedirects.split(/[?#]/)[0]);
-      void this.refresh(); // leaving /welcome: the "finish setup" banner must see the new status
+      const path = e.urlAfterRedirects.split(/[?#]/)[0];
+      this.path.set(path);
+      void this.shell.refresh(); // leaving /welcome: the setup chip must see the new status
+      if (path !== this.lastPath) focusHeading(); // a tab or filter change in the URL keeps the focus where it is
+      this.lastPath = path;
     });
     effect(() => {
       this.live.changed(); // reload counts whenever a stage finishes
-      this.refresh();
+      void this.shell.refresh();
     });
     effect(() => {
       // the newest run event; "started" means a run is going, anything else is its end
@@ -126,27 +129,10 @@ export class App {
     this.i18n.set(lang);
   }
 
-  async toggleNotify(): Promise<void> {
-    this.notifyHint.set('');
-    if (this.notify()) return this.setNotify(false);
-    if (Notification.permission === 'default') await Notification.requestPermission();
-    const granted = Notification.permission === 'granted';
-    if (!granted) this.notifyHint.set(this.i18n.t('shell.blocked'));
-    this.setNotify(granted);
-  }
-
-  private setNotify(on: boolean): void {
-    this.notify.set(on);
-    try {
-      localStorage.setItem(NOTIFY_KEY, on ? '1' : '0');
-    } catch {
-      // storage can be blocked; the choice then lasts until the tab closes
-    }
-  }
-
   private async runEnded(end: LiveEvent): Promise<void> {
-    if (!this.notify()) return;
-    if (end.error) return this.alert(this.i18n.t('shell.runFailed'), end.error, 'run');
+    if (!this.shell.notify()) return;
+    const alert = (title: string, body: string) => this.shell.alert(title, body, 'run', '/activity');
+    if (end.error) return alert(this.i18n.t('shell.runFailed'), end.error);
     let pause: string | null = null;
     try {
       const { recent } = await this.api.get<{ recent: { status: string; pause_reason: string | null }[] }>('/runs');
@@ -154,49 +140,18 @@ export class App {
     } catch {
       // fall back to the plain message
     }
-    if (pause) this.alert(this.i18n.t('shell.runPaused'), pause, 'run');
-    else this.alert(this.i18n.t('shell.runFinished'), this.i18n.t('shell.runFinishedBody'), 'run');
-  }
-
-  private alert(title: string, body: string, tag: string): void {
-    if (!this.notify() || !this.notifySupported || Notification.permission !== 'granted') return;
-    try {
-      const n = new Notification(title, { body, tag }); // same tag replaces an older alert
-      n.onclick = () => {
-        window.focus();
-        n.close();
-      };
-    } catch {
-      // some browsers refuse the constructor; the in-app badges still show the news
-    }
-  }
-
-  ready(): boolean {
-    const s = this.status();
-    return !!s && s.profile_ready && s.cv_ready && s.search_ready && s.ai_ready;
-  }
-
-  async refresh(): Promise<void> {
-    try {
-      const s = await this.api.get<Status>('/status');
-      const known = this.status() !== null; // the first load is not news
-      this.status.set(s);
-      this.reviewCount.set(s.states['awaiting_review'] ?? 0);
-      if (known && s.actions_open > this.actionsCount()) {
-        this.alert(this.i18n.t('shell.actionNeeded'), this.i18n.t('shell.actionNeededBody', { n: s.actions_open }), 'actions');
-      }
-      this.actionsCount.set(s.actions_open);
-      if (!this.live.run()) this.live.run.set(s.run);
-    } catch {
-      // the server may be restarting; the live socket reconnects and triggers a reload
-    }
+    if (pause) alert(this.i18n.t('shell.runPaused'), pause);
+    else alert(this.i18n.t('shell.runFinished'), this.i18n.t('shell.runFinishedBody'));
   }
 }
 
-function readNotifyPref(): boolean {
-  try {
-    return localStorage.getItem(NOTIFY_KEY) === '1';
-  } catch {
-    return false;
+/** After a page change, move focus to the page's <h1> (once it has rendered) so a screen reader starts there. */
+function focusHeading(tries = 20): void {
+  const h1 = document.querySelector<HTMLElement>('main h1');
+  if (h1) {
+    h1.tabIndex = -1;
+    h1.focus({ preventScroll: true });
+  } else if (tries > 0) {
+    setTimeout(() => focusHeading(tries - 1), 50);
   }
 }

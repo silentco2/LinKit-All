@@ -1,10 +1,11 @@
 import { DatePipe } from '@angular/common';
 import { Component, computed, effect, ElementRef, inject, signal, viewChild } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { Api } from '../api';
 import { I18n, TPipe } from '../i18n';
 import { Live } from '../live';
 import { fmtNum, labelOr, localeOf } from '../locale';
-import { LiveEvent, ScheduleSection, SearchConfig, Stage, STAGES } from '../types';
+import { LiveEvent, ScheduleSection, SEARCH_STAGES, SearchConfig, Stage, STAGES } from '../types';
 
 const STAGE_KEY: Record<Exclude<Stage, 'apply'>, string> = {
   discover: 'live.stage.discover',
@@ -32,34 +33,36 @@ interface RecentRun {
   selector: 'app-live',
   imports: [DatePipe, TPipe],
   template: `
-    <h1>{{ 'live.title' | t }}</h1>
-
-    <section class="card mt-6 space-y-4">
-      <fieldset [disabled]="running()">
-        <legend class="label">{{ 'live.stages' | t }}</legend>
-        <div class="flex flex-wrap gap-4">
-          @for (s of stages; track s) {
-            <label class="flex items-center gap-2 text-sm">
-              <input type="checkbox" [checked]="chosen().has(s)" (change)="toggle(s)"> {{ label(s) }}
-            </label>
-          }
-        </div>
-        <label class="mt-3 flex items-center gap-2 text-sm">
-          <input type="checkbox" [checked]="fresh()" (change)="fresh.set(!fresh())"> {{ 'live.fresh' | t }}
-        </label>
-      </fieldset>
+    <section class="card space-y-4">
       <div class="flex flex-wrap gap-3">
-        <button class="btn btn-primary" (click)="start()" [disabled]="running() || !chosen().size || busy()">{{ 'live.start' | t }}</button>
+        <button class="btn btn-primary" (click)="start()" [disabled]="running() || !chosen().size || busy()">{{ 'smart.find' | t }}</button>
         <button class="btn btn-danger" (click)="cancel()" [disabled]="!running()">{{ 'live.stop' | t }}</button>
       </div>
+      <details>
+        <summary class="cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-300">{{ 'activity.advanced' | t }}</summary>
+        <fieldset class="mt-3" [disabled]="running()">
+          <legend class="label">{{ 'live.stages' | t }}</legend>
+          <div class="flex flex-wrap gap-4">
+            @for (s of stages; track s) {
+              <label class="flex items-center gap-2 text-sm">
+                <input type="checkbox" [checked]="chosen().has(s)" (change)="toggle(s)"> {{ label(s) }}
+              </label>
+            }
+          </div>
+          <label class="mt-3 flex items-center gap-2 text-sm">
+            <input type="checkbox" [checked]="fresh()" (change)="fresh.set(!fresh())"> {{ 'live.fresh' | t }}
+          </label>
+        </fieldset>
+      </details>
       @if (error()) { <div class="alert alert-error" dir="auto">{{ error() }}</div> }
       @if (paused(); as p) {
         <div class="alert alert-info">{{ 'live.paused.a' | t: { id: num(p.id) } }}<bdi>{{ p.pause_reason }}</bdi>{{ 'live.paused.b' | t }}</div>
       }
     </section>
 
-    <section class="card mt-6 space-y-4">
-      <h2>{{ 'live.schedule.title' | t }}</h2>
+    <details id="schedule" class="card mt-6" [open]="openSchedule">
+      <summary class="cursor-pointer text-lg font-semibold text-slate-900 dark:text-white">{{ 'live.schedule.title' | t }}</summary>
+      <div class="mt-4 space-y-4">
       @if (schedule(); as sc) {
         <label class="flex items-center gap-2 text-sm font-medium">
           <input type="checkbox" role="switch" [checked]="sc.enabled" (change)="edit({ enabled: !sc.enabled })">
@@ -104,7 +107,8 @@ interface RecentRun {
         </div>
         @if (scheduleError()) { <div class="alert alert-error" dir="auto">{{ scheduleError() }}</div> }
       }
-    </section>
+      </div>
+    </details>
 
     @if (live.run(); as run) {
       @if (run.run_id) {
@@ -160,8 +164,10 @@ export class LivePage {
   protected readonly live = inject(Live);
   private readonly api = inject(Api);
   protected readonly stages = STAGES;
+  /** Home's "More schedule options" link lands here with #schedule: open the block and scroll to it. */
+  protected readonly openSchedule = inject(ActivatedRoute).snapshot.fragment === 'schedule';
   protected readonly applyLive = signal(false);
-  protected readonly chosen = signal(new Set<Stage>(STAGES));
+  protected readonly chosen = signal(new Set<Stage>(SEARCH_STAGES)); // the default Start is the search; apply is Advanced
   protected readonly fresh = signal(false);
   protected readonly busy = signal(false);
   protected readonly error = signal('');
@@ -180,6 +186,7 @@ export class LivePage {
   constructor() {
     this.api.get<{ apply_live: boolean }>('/status').then((st) => this.applyLive.set(st.apply_live)).catch(() => undefined);
     this.loadSchedule();
+    if (this.openSchedule) setTimeout(() => document.getElementById('schedule')?.scrollIntoView(), 300);
     effect(() => {
       this.live.events(); // keep the log scrolled to the newest line
       const el = this.log()?.nativeElement;

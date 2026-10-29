@@ -716,7 +716,7 @@ export class WelcomePage implements OnInit {
       if (this.salary.trim() !== String(this.saved['answers.salary_expectation'] ?? '')) values['answers.salary_expectation'] = this.salary.trim();
       await this.api.post('/infer/apply', { values, where: this.where().filter((c) => c.on).map((c) => c.text), remote: this.remote(), track: this.track() });
       await this.api.post('/runs', { stages: ['discover', 'enrich', 'rank', 'score'] });
-      await this.router.navigate(['/live']);
+      await this.router.navigate(['/home']);
     } catch (e) {
       this.startError.set((e as Error).message);
     } finally {

@@ -129,6 +129,18 @@ def _web_url(url: str | None) -> bool:
     return u.scheme in ("http", "https") and bool(u.netloc)
 
 
+def is_pickable(j: Job, generic: bool, live: bool) -> bool:
+    """Whether the next apply stage would take this queued/tailored job (before daily caps)."""
+    return bool(
+        (
+            mailto_address(j.data.get("apply_url"))
+            or j.ats in HANDLERS
+            or (generic and _web_url(j.data.get("apply_url") or j.url))
+        )
+        and (live or not j.data.get("dry_run_at"))
+    )
+
+
 async def _settle(page: Page) -> None:
     """Human pace, then let the next page finish loading (pages that long-poll never go idle)."""
     await asyncio.sleep(random.uniform(0.3, 1.0))  # noqa: S311 (human pace, not crypto)
@@ -365,16 +377,7 @@ class Applier:
                 )
             )
         generic = self.cfg.apply.generic_agent
-        jobs = [
-            j
-            for j in jobs
-            if (
-                mailto_address(j.data.get("apply_url"))
-                or j.ats in HANDLERS
-                or (generic and _web_url(j.data.get("apply_url") or j.url))
-            )
-            and (live or not j.data.get("dry_run_at"))
-        ]
+        jobs = [j for j in jobs if is_pickable(j, generic, live)]
         jobs.sort(key=lambda j: (-(j.score or 0), -(j.data.get("rank") or 0)))
         picked: list[int] = []
         per_site: dict[str, int] = {}

@@ -511,7 +511,8 @@ Started 2026-10-29. Orchestrator plans and reviews; Sonnet executors build; Haik
 | T2.1 | UX2 | `pages/welcome.ts` 4-screen first run; `''`/`/setup` routing; commit UX2 | T1.4 | done |
 | T3.1 | UX3 | Settings shell + autosave helper + Profile & CV, Jobs & places (one Where), AI sections | T2.1 | done |
 | T3.2 | UX3 | Settings: Sources (recommended filter), Answers (bank merged), Applying (Pace, Live), Accounts & email (vault, Gmail, keys), Advanced (Pickiness, raw knobs, changed marks); delete `setup.ts`, `answers.ts`, `vault.ts` pages; commit UX3 | T3.1 | done |
-| T4.1 | UX4 | Home + smart button + 5-item nav + Activity (Live + Report tabs) + Needs you (Review + Actions tabs) + redirects + vocabulary rename EN/AR; commit UX4 | T3.2 | todo |
+| T4.1 | UX4 | Home + smart button + 5-item nav + Activity (Live + Report tabs) + Needs you (Review + Actions tabs) + redirects + store owner fix | T3.2 | done |
+| T4.2 | UX4 | Vocabulary sweep EN/AR (section 9) across all strings + AR term consistency; commit UX4 | T4.1 | done |
 | T5.1 | UX5 | Backend: JIT park kinds (vault/email needed), batch answer API, privacy/legal "always" option, resolve_action fix + tests | T1.4 | done |
 | T5.2 | UX5 | Frontend: grouped Needs you, JIT cards, undo toast, J/K/A/S/O shortcuts; commit UX5 | T4.1, T5.1 | todo |
 | T6.1 | UX6 | Guided Live unlock, reason chips on Jobs, first-time hints; commit UX6 | T5.2 | todo |
@@ -524,3 +525,5 @@ Started 2026-10-29. Orchestrator plans and reviews; Sonnet executors build; Haik
 - T1.3: sponsorship compares the country the question names, else the job's country.
 - T1.4: AI-filled values come back as level "suggest", check true; stored in `<cv dir>/infer_ai.json` keyed by CV hash.
 - UX1 committed 2777e78. T2.1 and T5.1 running in parallel (frontend vs backend, no shared files).
+
+- UX3 committed da96a87; UX5a backend 3c9ae0c; UX6a backend da5a346 (presets, job reasons, go-live data). T3.2 split into T3.2a/T3.2b; T4.1 split off the vocabulary sweep (T4.2).

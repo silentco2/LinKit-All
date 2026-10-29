@@ -43,8 +43,7 @@ const FUNNEL: Record<string, string> = {
   selector: 'app-report',
   imports: [DatePipe, KeyValuePipe, NgTemplateOutlet, SourcePipe, TPipe],
   template: `
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <h1>{{ 'report.title' | t }}</h1>
+    <div class="flex flex-wrap items-center justify-end gap-3">
       <div class="flex flex-wrap items-center gap-3 text-sm">
         <label class="flex items-center gap-2">{{ 'report.run' | t }}
           <select class="rounded border border-slate-300 bg-transparent px-2 py-1 dark:border-slate-700" (change)="pick($event)">

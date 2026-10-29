@@ -93,6 +93,7 @@ export class SettingsStore {
     for (const k of [key, ...also]) {
       this.dirty[obj].set(k, rev);
       if (k !== key) this.owner.set(k, key);
+      else this.owner.delete(k); // edited by hand now: it reports for itself again
     }
     this.mark(key, { state: 'saving' });
     clearTimeout(this.timers[obj]);
@@ -123,7 +124,9 @@ export class SettingsStore {
       if (!r.ok) return this.failed(obj, sent, r);
       for (const [k, rev] of sent) {
         if (this.dirty[obj].get(k) === rev) this.dirty[obj].delete(k); // edited again meanwhile: stays for the next round
-        if (!this.dirty[obj].has(k) && !this.owner.has(k)) this.saved(k);
+        if (this.dirty[obj].has(k)) continue;
+        if (!this.owner.has(k)) this.saved(k); // an alias shows no tick of its own; its owner's tick says it
+        this.owner.delete(k); // the save that set the alias is done: later edits of it behave normally
       }
       this.alert.set('');
     }

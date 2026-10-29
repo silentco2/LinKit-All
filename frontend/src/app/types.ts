@@ -1,7 +1,10 @@
 export type Tier = 'high' | 'mid' | 'low';
 export const STAGES = ['discover', 'enrich', 'rank', 'score', 'apply'] as const;
 export type Stage = (typeof STAGES)[number];
-export type Provider = 'codex_cli' | 'claude_cli' | 'litellm';
+/** What "Find new jobs" runs, and what "Apply to N jobs" runs. */
+export const SEARCH_STAGES: Stage[] = ['discover', 'enrich', 'rank', 'score'];
+export const APPLY_STAGES: Stage[] = ['apply'];
+export type Provider ='codex_cli' | 'claude_cli' | 'litellm';
 
 export interface RunState {
   running: boolean;
@@ -23,6 +26,9 @@ export interface SetupState {
   required_done: boolean;
   next_step: 'cv' | 'ai' | 'profile' | 'roles' | 'where' | null;
 }
+
+/** How many of the 4 first-run steps are done (CV, AI, profile, roles + where as one step). */
+export const setupDone = (s: SetupState): number => [s.cv, s.ai, s.profile, s.roles && s.where].filter(Boolean).length;
 
 export interface Status {
   setup: SetupState;

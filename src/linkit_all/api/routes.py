@@ -33,6 +33,7 @@ from linkit_all.apply.email_send import (
     send,
 )
 from linkit_all.apply.email_verify import EmailLoginError, check_login, credentials
+from linkit_all.apply.runner import is_pickable
 from linkit_all.apply.vault import Vault, VaultError, VaultLocked, WrongPassphrase
 from linkit_all.core.api_keys import KNOWN, delete_keys, get_keys, set_keys
 from linkit_all.core.config import Settings
@@ -143,6 +144,14 @@ def status(request: Request) -> dict[str, Any]:
     vault = _vault(request)
     with db() as s:
         states = dict(s.execute(select(Job.state, func.count()).group_by(Job.state)).all())
+        practiced = s.scalar(
+            select(func.count()).where(Job.data["dry_run_at"].as_string().is_not(None))
+        )
+        queue = s.scalars(
+            select(Job).where(Job.state.in_([JobState.queued_apply, JobState.tailored]))
+        )
+        apply_cfg = (cfg or SearchConfig()).apply
+        ready = sum(is_pickable(j, apply_cfg.generic_agent, apply_cfg.live) for j in queue)
     profile_ready = bool(fields.full_name and fields.email)
     cv_ready = bool(cv) and cv_state(db)[1]  # a converted PDF counts once approved
     search_ready = cfg is not None and bool(cfg.search.queries or cfg.sources.companies)
@@ -169,6 +178,8 @@ def status(request: Request) -> dict[str, Any]:
         "states": {str(k): v for k, v in states.items()},
         "actions_open": _open_actions(db),
         "apply_live": bool(cfg and cfg.apply.live),
+        "ready_to_apply": ready,
+        "practiced": practiced or 0,
         "run": _runner(request).state.as_dict(),
         "app_browser": {
             "open": _user_browser(request).is_open,

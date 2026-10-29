@@ -1,5 +1,5 @@
 import { inject } from '@angular/core';
-import { CanActivateFn, Router, Routes } from '@angular/router';
+import { CanActivateFn, RedirectFunction, Router, Routes } from '@angular/router';
 import { Api } from './api';
 import { Status } from './types';
 
@@ -14,8 +14,12 @@ const gate = (done: string): CanActivateFn => async () => {
   }
 };
 
+/** An old page's URL redirected to its tab, keeping whatever query it had. */
+const tab = (path: string, id?: string): RedirectFunction => ({ queryParams }) =>
+  inject(Router).createUrlTree([path], { queryParams: id ? { ...queryParams, tab: id } : queryParams });
+
 export const routes: Routes = [
-  { path: '', pathMatch: 'full', canActivate: [gate('/jobs')], children: [] },
+  { path: '', pathMatch: 'full', canActivate: [gate('/home')], children: [] },
   { path: 'welcome', title: 'Welcome · LinKit All', loadComponent: () => import('./pages/welcome').then((m) => m.WelcomePage) },
   { path: 'settings', title: 'Settings · LinKit All', loadComponent: () => import('./pages/settings/settings').then((m) => m.SettingsPage) },
   { path: 'settings/:section', title: 'Settings · LinKit All', loadComponent: () => import('./pages/settings/settings').then((m) => m.SettingsPage) },
@@ -23,9 +27,12 @@ export const routes: Routes = [
   { path: 'answers', redirectTo: 'settings/answers' },
   { path: 'vault', redirectTo: 'settings/accounts' },
   { path: 'jobs', title: 'Jobs · LinKit All', loadComponent: () => import('./pages/jobs').then((m) => m.JobsPage) },
-  { path: 'review', title: 'Review · LinKit All', loadComponent: () => import('./pages/review').then((m) => m.ReviewPage) },
-  { path: 'actions', title: 'Action Center · LinKit All', loadComponent: () => import('./pages/actions').then((m) => m.ActionsPage) },
-  { path: 'live', title: 'Live run · LinKit All', loadComponent: () => import('./pages/live').then((m) => m.LivePage) },
-  { path: 'report', title: 'Report · LinKit All', loadComponent: () => import('./pages/report').then((m) => m.ReportPage) },
-  { path: '**', redirectTo: 'jobs' },
+  { path: 'home', title: 'Home · LinKit All', loadComponent: () => import('./pages/home').then((m) => m.HomePage) },
+  { path: 'needs-you', title: 'Needs you · LinKit All', loadComponent: () => import('./pages/needs-you').then((m) => m.NeedsYouPage) },
+  { path: 'activity', title: 'Activity · LinKit All', loadComponent: () => import('./pages/activity').then((m) => m.ActivityPage) },
+  { path: 'review', redirectTo: tab('/needs-you', 'approve') },
+  { path: 'actions', redirectTo: tab('/needs-you', 'finish') },
+  { path: 'live', redirectTo: tab('/activity') },
+  { path: 'report', redirectTo: tab('/activity', 'history') },
+  { path: '**', redirectTo: 'home' },
 ];
