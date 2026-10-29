@@ -741,6 +741,32 @@ def test_job_detail_tailoring_redline_and_pdf(client: TestClient, tmp_path: Path
     assert client.get(f"/api/jobs/{job_id}/tailored.pdf").status_code == 404
 
 
+def test_cancel_ends_the_run_row_and_the_next_start_resumes_it(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def slow_stage(stage: str, *args: Any) -> dict[str, Any]:
+        await asyncio.sleep(30)
+        return {}
+
+    monkeypatch.setattr(runner_module, "run_stage", slow_stage)
+    run_id = client.post("/api/runs", json={"stages": ["discover"]}, headers=SAME_ORIGIN).json()[
+        "run_id"
+    ]
+    assert client.post("/api/runs/cancel", headers=SAME_ORIGIN).json() == {"cancelled": True}
+    for _ in range(100):
+        if not client.get("/api/status").json()["run"]["running"]:
+            break
+        time.sleep(0.05)
+    current = client.get("/api/runs").json()
+    assert current["current"]["running"] is False and current["current"]["stopping"] is False
+    (row,) = current["recent"]
+    assert (row["id"], row["status"]) == (run_id, "cancelled") and row["finished_at"]
+    again = client.post("/api/runs", json={"stages": ["discover"]}, headers=SAME_ORIGIN)
+    assert again.json()["run_id"] == run_id  # page checkpoints belong to the run: it resumes
+    assert client.get("/api/runs").json()["recent"][0]["finished_at"] is None
+    client.post("/api/runs/cancel", headers=SAME_ORIGIN)
+
+
 def test_live_screenshot_idle_fresh_and_stale(client: TestClient) -> None:
     assert client.get("/api/live/screenshot").status_code == 404
     assert client.get("/api/status").json()["live_shot"] is None

@@ -517,7 +517,7 @@ Started 2026-10-29. Orchestrator plans and reviews; Sonnet executors build; Haik
 | T5.2 | UX5 | Frontend: grouped Needs you, JIT cards, undo toast, J/K/A/S/O shortcuts; commit UX5 | T4.1, T5.1 | done |
 | T6.1 | UX6 | Guided Live unlock, reason chips on Jobs, first-time hints; commit UX6 | T5.2 | done |
 | T7.1 | — | CLAUDE.md §13 edits (≤ 200 lines), handoff.md note | T6.1 | done |
-| T7.2 | — | Browser E2E pass (Haiku) on a fresh data dir + full test suite | T7.1 | todo |
+| T7.2 | — | Browser E2E pass (Haiku) on a fresh data dir + full test suite | T7.1 | done |
 
 ### 16.5 Log
 
@@ -527,3 +527,4 @@ Started 2026-10-29. Orchestrator plans and reviews; Sonnet executors build; Haik
 - UX1 committed 2777e78. T2.1 and T5.1 running in parallel (frontend vs backend, no shared files).
 
 - UX3 committed da96a87; UX5a backend 3c9ae0c; UX6a backend da5a346 (presets, job reasons, go-live data). T3.2 split into T3.2a/T3.2b; T4.1 split off the vocabulary sweep (T4.2).
+- T7.2 E2E on a fresh install: 10/10 flows pass; 1813 tests, ruff, mypy, ng build clean. Found + fixed: cancelled runs never finalized (now status 'cancelled', resumable, UI shows Stopping…). 'Saved' tick report was a screenshot-timing artifact (tick renders ~2 s).

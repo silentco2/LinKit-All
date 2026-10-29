@@ -22,6 +22,8 @@ export class Live {
     socket.onopen = () => {
       this.connected.set(true);
       this.events.set([]); // the server replays its recent history
+      this.run.set(null); // a restarted server replays nothing: take the run state from the replay or /status
+      this.changed.update((n) => n + 1);
     };
     socket.onclose = () => {
       this.connected.set(false);
@@ -37,8 +39,8 @@ export class Live {
     }
     this.events.update((list) => [...list.slice(-499), event]);
     if (event.type === 'run') {
-      const { running = false, run_id = null, stages = [], stage = null, started_at = null, error = null, results = {} } = event;
-      this.run.set({ running, run_id, stages, stage, started_at, error, results });
+      const { running = false, stopping = false, run_id = null, stages = [], stage = null, started_at = null, error = null, results = {} } = event;
+      this.run.set({ running, stopping: running && stopping, run_id, stages, stage, started_at, error, results });
       if (!running) this.shot.set(null);
     } else if (event.type === 'stage') {
       this.run.update((r) =>

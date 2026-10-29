@@ -36,7 +36,7 @@ interface RecentRun {
     <section class="card space-y-4">
       <div class="flex flex-wrap gap-3">
         <button class="btn btn-primary" (click)="start()" [disabled]="running() || !chosen().size || busy()">{{ 'smart.find' | t }}</button>
-        <button class="btn btn-danger" (click)="cancel()" [disabled]="!running()">{{ 'live.stop' | t }}</button>
+        <button class="btn btn-danger" (click)="cancel()" [disabled]="!running() || live.run()?.stopping">{{ (live.run()?.stopping ? 'live.stopping' : 'live.stop') | t }}</button>
       </div>
       <details>
         <summary class="cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-300">{{ 'activity.advanced' | t }}</summary>

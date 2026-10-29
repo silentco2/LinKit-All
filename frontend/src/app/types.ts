@@ -11,6 +11,8 @@ export type Provider ='codex_cli' | 'claude_cli' | 'litellm';
 
 export interface RunState {
   running: boolean;
+  /** Cancel was asked; the worker is finishing its current step. */
+  stopping?: boolean;
   run_id: number | null;
   stages: Stage[];
   stage: Stage | null;

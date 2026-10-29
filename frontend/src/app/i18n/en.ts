@@ -333,6 +333,8 @@ export const en: Record<string, string> = {
   'live.stages': 'Stages to run',
   'live.fresh': 'Start a new search (otherwise an unfinished search resumes)',
   'live.stop': 'Stop',
+  'live.stopping': 'Stopping…',
+  'live.status.stopping': 'stopping',
   'live.paused.a': 'Search {id} is paused: ',
   'live.paused.b': '. Start again later to continue scoring.',
   'live.schedule.title': 'Schedule',

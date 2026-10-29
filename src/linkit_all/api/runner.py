@@ -11,7 +11,7 @@ from linkit_all.api.events import EventBus
 from linkit_all.apply.vault import Vault
 from linkit_all.core.config import Settings
 from linkit_all.core.models import utcnow
-from linkit_all.core.runs import current_run
+from linkit_all.core.runs import cancel_run, current_run
 from linkit_all.pipeline import STAGES, PipelineError, finish_run, run_stage
 
 
@@ -22,6 +22,7 @@ class RunBusy(RuntimeError):
 @dataclass
 class RunState:
     running: bool = False
+    stopping: bool = False  # cancel asked; the worker is finishing its current step
     run_id: int | None = None
     stages: list[str] = field(default_factory=list)
     stage: str | None = None
@@ -63,6 +64,9 @@ class PipelineRunner:
         if self._task is None or self._task.done():
             return False
         self._task.cancel()  # the run stays resumable: checkpoints and job states are saved
+        if not self.state.stopping:
+            self.state.stopping = True
+            self.bus.publish({"type": "run", "status": "stopping", **self.state.as_dict()})
         return True
 
     async def _run(self, run_id: int, stages: list[str]) -> None:
@@ -89,10 +93,11 @@ class PipelineRunner:
                 finish_run(self.db, run_id)
         except asyncio.CancelledError:
             status = "cancelled"
+            cancel_run(self.db, run_id)
         except Exception as e:  # keep the server alive; show what broke
             logger.exception("run {} crashed", run_id)
             self.state.error, status = f"{type(e).__name__}: {e}", "failed"
         finally:
-            self.state.running, self.state.stage = False, None
+            self.state.running, self.state.stopping, self.state.stage = False, False, None
             self.bus.last_shot = None  # the browser is gone: new viewers get no stale frame
             self.bus.publish({"type": "run", "status": status, **self.state.as_dict()})

@@ -51,7 +51,7 @@ const DEFAULT_TIME = '09:00';
               <button type="button" class="btn btn-primary" (click)="go(sm)" [disabled]="busy()">{{ busy() ? ('home.working' | t) : sm.label }}</button>
             }
             @if (sm.kind === 'running') {
-              <button type="button" class="btn btn-danger" (click)="stop()" [disabled]="busy()">{{ 'live.stop' | t }}</button>
+              <button type="button" class="btn btn-danger" (click)="stop()" [disabled]="busy() || stopping()">{{ (stopping() ? 'live.stopping' : 'live.stop') | t }}</button>
             }
           </div>
           @if (error()) { <div class="alert alert-error mt-3" role="alert" dir="auto">{{ error() }}</div> }
@@ -126,6 +126,7 @@ export class HomePage {
   protected readonly shell = inject(Shell);
   private readonly api = inject(Api);
   private readonly live = inject(Live);
+  protected readonly stopping = computed(() => !!this.live.run()?.stopping);
   private readonly router = inject(Router);
   private readonly i18n = inject(I18n);
   protected readonly loc = computed(() => localeOf(this.i18n.lang()));
@@ -164,7 +165,8 @@ export class HomePage {
       const found = Number(run.results['discover']?.['new'] ?? NaN);
       const applying = run.stage === 'apply';
       const key = applying ? 'smart.applying' : 'smart.searching';
-      return { kind: 'running', message: t('smart.running.msg'), label: Number.isFinite(found) && !applying ? this.i18n.t('smart.searchingN', { n: this.num(found) }) : t(key), link: '/activity' };
+      const label = run.stopping ? t('live.stopping') : Number.isFinite(found) && !applying ? this.i18n.t('smart.searchingN', { n: this.num(found) }) : t(key);
+      return { kind: 'running', message: t('smart.running.msg'), label, link: '/activity' };
     }
     if (s.actions_open > 0) {
       return { kind: 'finish', message: plural('smart.finish.msg', s.actions_open), label: plural('smart.finish', s.actions_open), link: '/needs-you', query: { tab: 'finish' } };

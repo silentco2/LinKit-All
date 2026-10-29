@@ -49,6 +49,7 @@ class RunStatus(StrEnum):
     paused = "paused"
     done = "done"
     failed = "failed"
+    cancelled = "cancelled"
 
 
 def _enum(cls: type[StrEnum]) -> Enum:

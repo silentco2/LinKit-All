@@ -333,6 +333,8 @@ export const ar: Record<string, string> = {
   'live.stages': 'المراحل المراد تنفيذها',
   'live.fresh': 'بدء بحث جديد (وإلا يُستأنف البحث غير المكتمل)',
   'live.stop': 'أوقف',
+  'live.stopping': 'جارٍ الإيقاف…',
+  'live.status.stopping': 'يتوقف',
   'live.paused.a': 'البحث {id} متوقف مؤقتًا: ',
   'live.paused.b': '. ابدأ مرة أخرى لاحقًا لمتابعة التقييم.',
   'live.schedule.title': 'الجدولة',
