@@ -6,6 +6,7 @@ never logged; only counts.
 """
 
 import asyncio
+import imaplib
 import re
 import time
 from collections.abc import Iterator
@@ -20,6 +21,7 @@ from loguru import logger
 from pydantic import BaseModel
 from selectolax.lexbor import LexborHTMLParser
 
+from linkit_all.apply.email_verify import microsoft
 from linkit_all.apply.vault import Vault
 from linkit_all.core.search import EmailSection
 from linkit_all.providers.base import LLMProvider, ProviderError, UsageLimitError, render
@@ -124,6 +126,17 @@ class _Mail:
     html: str
 
 
+def _login(host: str, user: str, secret: str) -> MailBox:
+    """App password, or (Microsoft) an OAuth access token via XOAUTH2."""
+    mb = MailBox(host)
+    if not microsoft.is_host(host):
+        return mb.login(user, secret)
+    try:
+        return mb.xoauth2(user, secret)
+    except imaplib.IMAP4.error as e:  # a refused AUTHENTICATE raises this, not MailboxLoginError
+        raise MailboxLoginError((str(e), []), "OK") from None
+
+
 def _spam_folder(mb: MailBox) -> str | None:
     """The spam folder: the one flagged \\Junk (RFC 6154, any language), else `[Gmail]/Spam`."""
     try:
@@ -144,7 +157,7 @@ def _fetch(
         floor = floor.replace(tzinfo=UTC)
     domains = [d.lower().lstrip(".") for d in site_domains]
     found: list[tuple[datetime, _Mail]] = []
-    with MailBox(host).login(user, password) as mb:
+    with _login(host, user, password) as mb:
         spam = _spam_folder(mb)
         for folder in (INBOX, spam) if spam else (INBOX,):
             mb.folder.set(folder)
@@ -205,13 +218,15 @@ async def wait_for_verification(
 def _login_message(host: str) -> str:
     if "gmail" in host.lower():
         return "Gmail rejected the app password"
+    if microsoft.is_host(host):
+        return "Microsoft rejected the sign-in: sign in with Microsoft again"
     return f"{host} rejected the email address or app password"
 
 
 def check_login(host: str, user: str, password: str) -> None:
     """Connect and log in; raise EmailLoginError with a plain message on failure."""
     try:
-        with MailBox(host).login(user, password):
+        with _login(host, user, password):
             pass
     except MailboxLoginError:
         raise EmailLoginError(_login_message(host)) from None
@@ -221,9 +236,20 @@ def check_login(host: str, user: str, password: str) -> None:
 
 
 def credentials(cfg: EmailSection, vault: Vault, profile_email: str) -> tuple[str, str] | None:
-    """(user, app password) from the vault entry kind="imap", site=<imap host>; None if absent."""
+    """(user, secret) from the vault entry kind="imap", site=<imap host>; None if absent.
+    The secret is the app password, or for Microsoft a fresh access token (the stored token
+    cache is refreshed and saved back). Raises EmailLoginError when that refresh fails."""
     user = (cfg.imap_user or profile_email).strip().lower()
     for e in vault.find("imap", cfg.imap_host):
         if not user or e.username.lower() == user:
-            return e.username, vault.get(e.id)
+            secret = vault.get(e.id)
+            if not microsoft.is_host(cfg.imap_host):
+                return e.username, secret
+            try:
+                token, cache = microsoft.access_token(secret, e.username)
+            except microsoft.MicrosoftAuthError as err:
+                raise EmailLoginError(str(err)) from None
+            if cache:
+                vault.put("imap", cfg.imap_host, e.username, cache, e.meta)
+            return e.username, token
     return None

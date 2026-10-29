@@ -33,7 +33,7 @@ Users bring their own AI: ChatGPT plan via Codex CLI, API keys, and later local 
 - Scraping: httpx (async), python-jobspy, Playwright, selectolax, extruct, trafilatura, rapidfuzz, lingua-py. Embeddings: fastembed.
 - CV: python-docx + lxml, pylatexenc/TexSoup + Tectonic, pdf2docx, LibreOffice headless
   (DOCX->PDF, ODT<->DOCX), PyMuPDF, pdfplumber, Pillow/scikit-image (layout diff).
-- Apply: Playwright (real installed Chrome launched without automation flags, attached over CDP, persistent profile per site), imap-tools, vault via cryptography
+- Apply: Playwright (real installed Chrome launched without automation flags, attached over CDP, persistent profile per site), imap-tools, msal (Outlook OAuth), vault via cryptography
   (AES-GCM) + argon2-cffi + keyring.
 - Frontend: Angular + TypeScript + Tailwind, Chart.js, ngx-fast-diff; built into the wheel.
 - Tooling: ruff, mypy, pre-commit, pytest (+ HTML fixtures), GitHub Actions, MkDocs Material.
@@ -147,7 +147,7 @@ Derived by rules. AI gap-fill must be verbatim from the CV (checked). Nothing is
 - App data under platformdirs user data dir: db, CVs, tailored versions, screenshots, traces.
 - Vault: AES-GCM, key from master passphrase via Argon2id, cached with keyring; export re-asks it.
   Created just in time (first account sign-up or Gmail added), not as a setup step. Crypto unchanged.
-- IMAP: app passwords (Gmail first, Yahoo). Outlook needs an OAuth path (later).
+- IMAP/SMTP: app passwords (Gmail, Yahoo). Outlook/Hotmail: Microsoft OAuth (msal loopback, `LINKIT_MS_CLIENT_ID`), token cache in vault, XOAUTH2.
 - External tools: LibreOffice required (DOCX->PDF), Chrome for applying, Tectonic for LaTeX.
   `linkit doctor` checks them. End-user install: `uv tool install linkit-all`.
 - LibreOffice: minimal portable bundle (Win 1.6 GB -> 439 MB) from `scripts/bundle_libreoffice.py` (removals kept only if renders stay identical);
@@ -190,7 +190,7 @@ Phases 1-12 are built; blocked items: handoff.md.
 4. Apply v1: Greenhouse, Lever, Ashby (no accounts), answer bank, Action Center.
 5. Apply v2: vault, IMAP, account gate built; Workday/iCIMS/Taleo/SuccessFactors blocked (need pages); LinkedIn/Indeed apply not built.
 6. Generic careers extractor and AI form agent: built. Naukrigulf blocked.
-7. Local models, LaTeX/ODT/PDF CVs, scheduler, reports, Arabic UI, docs: built. Pending: Outlook OAuth, macOS/Linux LO bundles, release.
+7. Local models, LaTeX/ODT/PDF CVs, scheduler, reports, Arabic UI, docs, Outlook OAuth: built. Pending: macOS/Linux LO bundles, release.
 8. freehire (MIT) ports: ATS feeds, aggregators, boards, companies, Telegram, discovery: built.
 9. Debt (D1-D7) and 10. Trust filter: built.
 11. LinkedIn hiring posts: built except the scraper (needs a captured page).

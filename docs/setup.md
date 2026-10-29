@@ -106,7 +106,7 @@ The left menu shows **Dry run** or **Live applying** at all times.
 ## 7. Vault
 
 The vault stores, encrypted on this computer, the passwords LinKit All makes for job sites
-and your email app password. It is optional. Without it, applications that need an account
+and your email app password or Microsoft sign-in. It is optional. Without it, applications that need an account
 wait in the Action Center.
 
 Choose a passphrase of at least 8 characters. **It cannot be recovered.** If you forget it,
@@ -119,7 +119,10 @@ Some job sites email a code or link to confirm a new account. If you connect you
 LinKit All can read that email and finish the sign-up. It only reads. It never deletes mail
 or marks it as read.
 
-You need a Gmail **app password**. It is not your normal password.
+Gmail and Yahoo use an **app password**. Outlook, Hotmail, Live and MSN use
+**Sign in with Microsoft** instead (see below).
+
+For Gmail you need an **app password**. It is not your normal password.
 
 1. Turn on 2-Step Verification for your Google account, if it is not on already.
 2. Open your Google Account, then **Security**, then **2-Step Verification**, then
@@ -132,7 +135,34 @@ Unlock the vault first (step 7). The app password is kept in the vault.
 
 Under **Advanced** you can change the IMAP server (default `imap.gmail.com`). Only Gmail
 has been tested. Another IMAP provider that accepts app passwords may work if you enter its
-server. Outlook needs a different sign-in method that is not built yet.
+server.
+
+### Outlook, Hotmail, Live and MSN
+
+Microsoft no longer accepts app passwords, so these addresses sign in with Microsoft:
+
+1. Unlock the vault (step 7) and enter your address.
+2. Press **Sign in with Microsoft**. A Microsoft page opens in your browser.
+3. Sign in and allow LinKit All to read and send your email.
+4. Come back to LinKit All. It says you are connected.
+
+LinKit All keeps the sign-in (a refresh token) in the vault and renews it by itself. If
+Microsoft ends it (password change, or a long time without use), the app asks you to sign in
+again.
+
+This needs a Microsoft app id for LinKit All. If the page says Microsoft sign-in is not set
+up, register one and set it in the `LINKIT_MS_CLIENT_ID` environment variable:
+
+1. Open [the Azure portal](https://portal.azure.com), then **Microsoft Entra ID**, then
+   **App registrations**, then **New registration**. A free Azure account works.
+2. Name it `LinKit All`. Under account types pick **Personal Microsoft accounts only**.
+3. Redirect URI: platform **Public client/native (mobile & desktop)**, value
+   `http://localhost`.
+4. Under **Authentication**, set **Allow public client flows** to **Yes** and save.
+5. Under **API permissions**, add the delegated permissions `IMAP.AccessAsUser.All`,
+   `SMTP.Send` and `offline_access`.
+6. Copy the **Application (client) ID** from **Overview** into `LINKIT_MS_CLIENT_ID` and
+   restart LinKit All. It is not a secret. There is no client secret.
 
 ## 9. API keys
 

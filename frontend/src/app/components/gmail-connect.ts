@@ -12,9 +12,9 @@ export type GmailConnected = { email: EmailState; count: number };
 let nextId = 0;
 
 /**
- * Connect Gmail (or Yahoo) with an app password: how-to steps, the form, the advanced address/server fields and, once
- * connected, the test/disconnect buttons. Used in Settings > Accounts and inline on Needs you.
- * `unlocked`: the password vault is open (the app password is stored there); when it is not, only a hint shows.
+ * Connect Gmail (or Yahoo) with an app password, or Outlook/Hotmail/Live/MSN with "Sign in with Microsoft": how-to
+ * steps, the form, the advanced address/server fields and, once connected, the test/disconnect buttons. Used in Settings > Accounts and inline on Needs you.
+ * `unlocked`: the password vault is open (the app password or Microsoft sign-in is stored there); when it is not, only a hint shows.
  * After a connect it requeues the applications parked for `needs_email` and emits `connected`.
  */
 @Component({
@@ -35,8 +35,18 @@ let nextId = 0;
         @if (eUser()) {
           <p class="text-sm"><span class="text-slate-500">{{ 'setup.email.address' | t }}: </span><bdi dir="ltr" class="font-medium">{{ eUser() }}</bdi></p>
         }
-        @if (unsupported()) {
-          <div class="alert alert-info" role="status">{{ 'settings.acc.outlook' | t }}</div>
+        @if (outlook()) {
+          @if (!email()?.microsoft) {
+            <div class="alert alert-info" role="status">{{ 'settings.acc.outlook' | t }}</div>
+          } @else if (!email()?.connected) {
+            <ol class="list-decimal space-y-1 ps-5 text-sm text-slate-700 dark:text-slate-300">
+              <li>{{ 'settings.acc.ms.step1' | t }}</li>
+              <li>{{ 'settings.acc.ms.step2' | t }}</li>
+              <li>{{ 'settings.acc.ms.step3' | t }}</li>
+            </ol>
+            <button type="button" class="btn btn-primary" (click)="signInMicrosoft()" [disabled]="busy()">{{ 'settings.acc.ms.signIn' | t }}</button>
+            @if (busy()) { <p class="hint" role="status">{{ 'settings.acc.ms.waiting' | t }}</p> }
+          }
         } @else {
           @if (!email()?.connected) {
             <ol class="list-decimal space-y-1 ps-5 text-sm text-slate-700 dark:text-slate-300">
@@ -92,7 +102,7 @@ export class GmailConnect {
   protected readonly eHost = signal('imap.gmail.com');
   protected readonly ePass = signal('');
   private readonly domain = computed(() => (this.eUser().split('@')[1] ?? '').trim().toLowerCase());
-  protected readonly unsupported = computed(() => /^(outlook|hotmail|live|msn)\./.test(this.domain()));
+  protected readonly outlook = computed(() => /^(outlook|hotmail|live|msn)\./.test(this.domain()));
   protected readonly yahoo = computed(() => /^(yahoo\.|ymail\.com$)/.test(this.domain()));
 
   constructor() {
@@ -115,10 +125,11 @@ export class GmailConnect {
     }
   }
 
-  /** Gmail and Yahoo have fixed IMAP servers; any other address keeps what is there. */
+  /** Gmail, Yahoo and Outlook have fixed IMAP servers; any other address keeps what is there. */
   private hostFor(user: string, current: string): string {
     const d = (user.split('@')[1] ?? '').trim().toLowerCase();
     if (d === 'gmail.com' || d === 'googlemail.com') return 'imap.gmail.com';
+    if (/^(outlook|hotmail|live|msn)\./.test(d)) return 'outlook.office365.com';
     return /^(yahoo\.|ymail\.com$)/.test(d) ? 'imap.mail.yahoo.com' : current;
   }
 
@@ -152,15 +163,25 @@ export class GmailConnect {
     return this.run(async () => {
       const e = await this.api.post<EmailState>('/email', { imap_host: this.eHost(), imap_user: this.eUser(), app_password: this.ePass() });
       this.ePass.set('');
-      this.setEmail(e);
-      // 'email_not_connected' (the old code) is requeued by the same call
-      const count = await this.api.post<{ count: number }>('/actions/retry-code', { code: 'needs_email' }).then((r) => r.count).catch(() => 0);
-      this.connected.emit({ email: e, count });
-      const text = this.i18n.t('setup.email.connectedMsg', { user: e.imap_user });
-      if (count <= 0) return text;
-      const n = fmtNum(localeOf(this.i18n.lang()), count);
-      return `${text}. ${this.i18n.t(count === 1 ? 'settings.acc.waiting.one' : 'settings.acc.waiting.other', { n })}`;
+      return this.afterConnect(e);
     });
+  }
+
+  /** The server opens Microsoft's sign-in page in the browser and answers once the user is done (or after 5 minutes). */
+  protected signInMicrosoft(): Promise<void> {
+    return this.run(async () => this.afterConnect(await this.api.post<EmailState>('/email/microsoft', { imap_user: this.eUser() })));
+  }
+
+  /** Requeue the applications that waited for an email, tell the parent, and return the message to show. */
+  private async afterConnect(e: EmailState): Promise<string> {
+    this.setEmail(e);
+    // 'email_not_connected' (the old code) is requeued by the same call
+    const count = await this.api.post<{ count: number }>('/actions/retry-code', { code: 'needs_email' }).then((r) => r.count).catch(() => 0);
+    this.connected.emit({ email: e, count });
+    const text = this.i18n.t('setup.email.connectedMsg', { user: e.imap_user });
+    if (count <= 0) return text;
+    const n = fmtNum(localeOf(this.i18n.lang()), count);
+    return `${text}. ${this.i18n.t(count === 1 ? 'settings.acc.waiting.one' : 'settings.acc.waiting.other', { n })}`;
   }
 
   protected test(): Promise<void> {

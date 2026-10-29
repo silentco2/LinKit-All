@@ -32,7 +32,7 @@ from linkit_all.apply.email_send import (
     build_message,
     send,
 )
-from linkit_all.apply.email_verify import EmailLoginError, check_login, credentials
+from linkit_all.apply.email_verify import EmailLoginError, check_login, credentials, microsoft
 from linkit_all.apply.runner import is_pickable
 from linkit_all.apply.vault import Vault, VaultError, VaultLocked, WrongPassphrase
 from linkit_all.core.api_keys import KNOWN, delete_keys, get_keys, set_keys
@@ -1591,6 +1591,7 @@ def get_email(request: Request) -> dict[str, Any]:
         "imap_host": host,
         "imap_user": user,
         "connected": connected,
+        "microsoft": microsoft.configured(),  # Outlook sign-in is available
         "vault": {"initialized": vault.initialized(), "unlocked": vault.unlocked()},
     }
 
@@ -1614,14 +1615,34 @@ async def connect_email(request: Request, body: EmailConnect) -> dict[str, Any]:
     return get_email(request)
 
 
+class MicrosoftConnect(BaseModel):
+    imap_user: str | None = None  # only a hint for the account picker
+
+
+@router.post("/email/microsoft")
+async def connect_microsoft(request: Request, body: MicrosoftConnect) -> dict[str, Any]:
+    """Outlook/Hotmail: sign in in the browser (loopback OAuth). Token cache -> vault."""
+    vault = _unlocked_vault(request)
+    cfg, _, hint = _email_target(request, microsoft.IMAP_HOST, body.imap_user)
+    try:
+        user, token, cache = await asyncio.to_thread(microsoft.sign_in, hint)
+        await asyncio.to_thread(check_login, microsoft.IMAP_HOST, user, token)
+    except (microsoft.MicrosoftAuthError, EmailLoginError) as e:
+        raise HTTPException(400, str(e)) from None
+    _vault_errors(lambda: vault.put("imap", microsoft.IMAP_HOST, user, cache))
+    cfg.email.imap_host, cfg.email.imap_user = microsoft.IMAP_HOST, user
+    save_search(_db(request), cfg)
+    return get_email(request)
+
+
 @router.post("/email/test")
 async def test_email(request: Request) -> dict[str, bool]:
     vault = _unlocked_vault(request)
     cfg, _, user = _email_target(request)
-    creds = _vault_errors(lambda: credentials(cfg.email, vault, user))
-    if creds is None:
-        raise HTTPException(404, "No email connected yet")
     try:
+        creds = await asyncio.to_thread(_vault_errors, lambda: credentials(cfg.email, vault, user))
+        if creds is None:
+            raise HTTPException(404, "No email connected yet")
         await asyncio.to_thread(check_login, cfg.email.imap_host, *creds)
     except EmailLoginError as e:
         raise HTTPException(400, str(e)) from None

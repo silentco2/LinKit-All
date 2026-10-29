@@ -453,6 +453,7 @@ def test_email_connect_test_disconnect(client: TestClient, monkeypatch: pytest.M
         "imap_host": "imap.gmail.com",
         "imap_user": "",
         "connected": False,
+        "microsoft": False,
         "vault": {"initialized": False, "unlocked": False},
     }
     for path, body in (("/api/email", {"app_password": "x"}), ("/api/email/test", None)):

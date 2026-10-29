@@ -66,7 +66,8 @@ Other people on your network cannot reach it.
 
 ## The vault
 
-The vault keeps site passwords (made by LinKit All) and your email app password.
+The vault keeps site passwords (made by LinKit All) and your email app password or Microsoft
+sign-in (the refresh token).
 
 - Each secret is encrypted separately with **AES-GCM**. The site and username are bound to the
   ciphertext, so an entry cannot be swapped for another.

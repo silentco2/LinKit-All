@@ -1,4 +1,4 @@
-"""Send email over SMTP (Gmail/Yahoo) with the app password stored in the vault."""
+"""Send email over SMTP: Gmail/Yahoo with the vault's app password, Outlook with OAuth (XOAUTH2)."""
 
 import mimetypes
 import re
@@ -11,7 +11,7 @@ from pathlib import Path
 
 from loguru import logger
 
-from linkit_all.apply.email_verify import credentials
+from linkit_all.apply.email_verify import EmailLoginError, credentials, microsoft
 from linkit_all.apply.vault import Vault
 from linkit_all.core.search import EmailSection
 
@@ -89,23 +89,34 @@ def save_eml(msg: EmailMessage, path: Path) -> Path:
 
 def send(cfg: EmailSection, vault: Vault, profile_email: str, msg: EmailMessage) -> str:
     """Send msg as the vault's mailbox user; returns the Message-ID."""
-    creds = credentials(cfg, vault, profile_email)
+    try:
+        creds = credentials(cfg, vault, profile_email)
+    except EmailLoginError as e:
+        raise SmtpAuthError(str(e)) from None
     if creds is None:
         raise NoCredentials("No email connected yet")
     user, password = creds
     host = cfg.effective_smtp_host()
+    oauth = microsoft.is_host(cfg.imap_host)
     message_id = str(msg["Message-ID"])
     domain = str(msg["To"]).rsplit("@", 1)[-1]
     try:
-        with smtplib.SMTP_SSL(
-            host, cfg.smtp_port, timeout=30, context=ssl.create_default_context()
-        ) as smtp:
-            smtp.login(user, password)
-            smtp.send_message(msg)
+        if oauth:  # Outlook: STARTTLS on 587 only, XOAUTH2 instead of a password
+            with smtplib.SMTP(host, microsoft.SMTP_PORT, timeout=30) as smtp:
+                smtp.starttls(context=ssl.create_default_context())
+                smtp.auth("XOAUTH2", lambda _=None: microsoft.xoauth2(user, password))
+                smtp.send_message(msg)
+        else:
+            with smtplib.SMTP_SSL(
+                host, cfg.smtp_port, timeout=30, context=ssl.create_default_context()
+            ) as smtp:
+                smtp.login(user, password)
+                smtp.send_message(msg)
     except smtplib.SMTPAuthenticationError:
-        raise SmtpAuthError(
-            f"{host} rejected the login: check the app password and email address"
-        ) from None
+        fix = (
+            "sign in with Microsoft again" if oauth else "check the app password and email address"
+        )
+        raise SmtpAuthError(f"{host} rejected the login: {fix}") from None
     except (OSError, smtplib.SMTPException) as e:
         logger.warning("SMTP send failed ({})", type(e).__name__)
         raise SmtpError(f"Could not send through {host} ({type(e).__name__})") from None

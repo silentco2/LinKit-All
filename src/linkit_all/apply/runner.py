@@ -915,7 +915,12 @@ class Applier:
                     )
                     job.data = {**job.data, "dry_run_at": utcnow().isoformat()}
                 return Outcome("dry_run", msg)
-            mail = credentials(self.cfg.email, vault, profile.email)
+            try:
+                mail = await asyncio.to_thread(credentials, self.cfg.email, vault, profile.email)
+            except EmailLoginError as e:  # e.g. the Microsoft sign-in expired
+                return await park(
+                    ActionKind.login_issue, str(e), "email_login_failed", {"detail": str(e)}
+                )
             if mail is None:
                 msg = "Connect your email in Setup so the app can read the verification email"
                 return await park(

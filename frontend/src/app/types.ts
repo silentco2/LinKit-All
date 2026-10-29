@@ -372,6 +372,7 @@ export interface EmailState {
   imap_host: string;
   imap_user: string;
   connected: boolean;
+  microsoft?: boolean; // Outlook sign-in available (LINKIT_MS_CLIENT_ID set)
   vault: { initialized: boolean; unlocked: boolean };
 }
 

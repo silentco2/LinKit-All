@@ -90,6 +90,10 @@ linkit ai-check
 - **Email test fails.** Use a Gmail **app password**, not your normal password, with 2-Step
   Verification on. Check that IMAP is allowed and that the address is right. See
   [the Email step](setup.md#8-email).
+- **Outlook: "Microsoft sign-in isn't set up".** Set `LINKIT_MS_CLIENT_ID` (see
+  [Outlook, Hotmail, Live and MSN](setup.md#outlook-hotmail-live-and-msn)).
+- **Outlook: "sign in with Microsoft again".** Microsoft ended the saved sign-in. Press
+  **Disconnect**, then **Sign in with Microsoft**.
 
 ## Windows notes
 
