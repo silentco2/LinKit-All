@@ -1,11 +1,13 @@
 """Tests never reach a live site: the apply runner's posting-liveness check gets no real client.
-Tests that exercise it pass their own mock-transport `Http` to `Applier(http=...)`."""
+Tests that exercise it pass their own mock-transport `Http` to `Applier(http=...)`.
+The exchange-rate refresh at run start fails the same way (it is allowed to fail)."""
 
 from typing import NoReturn
 
 import pytest
 
 from linkit_all.apply import runner
+from linkit_all.core import fx
 
 
 def _no_network(*args: object, **kwargs: object) -> NoReturn:
@@ -15,3 +17,11 @@ def _no_network(*args: object, **kwargs: object) -> NoReturn:
 @pytest.fixture(autouse=True)
 def _offline_liveness(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(runner, "make_client", _no_network)
+
+
+@pytest.fixture(autouse=True)
+def _offline_fx(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _fail() -> NoReturn:
+        raise RuntimeError("no live network in tests")
+
+    monkeypatch.setattr(fx, "_fetch", _fail)

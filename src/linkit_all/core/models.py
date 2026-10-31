@@ -144,7 +144,11 @@ class Profile(Base):
     full_name: Mapped[str] = mapped_column(Text)
     email: Mapped[str] = mapped_column(Text)
     phone: Mapped[str] = mapped_column(Text, default="")
-    location: Mapped[str] = mapped_column(Text, default="")
+    location: Mapped[str] = mapped_column(Text, default="")  # derived from home_city/country
+    address: Mapped[str] = mapped_column(Text, default="")
+    postal_code: Mapped[str] = mapped_column(Text, default="")
+    home_city: Mapped[str] = mapped_column(Text, default="")
+    home_country: Mapped[str] = mapped_column(Text, default="")  # ISO2
     skills: Mapped[list[str]] = mapped_column(default=list)  # the only skills tailoring may add
     cv_path: Mapped[str] = mapped_column(Text)  # base DOCX copied into the data dir
     cv_source_format: Mapped[str] = mapped_column(Text, default="docx")  # docx | odt | pdf

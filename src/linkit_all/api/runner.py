@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from linkit_all.api.events import EventBus
 from linkit_all.apply.vault import Vault
+from linkit_all.core import fx
 from linkit_all.core.config import Settings
 from linkit_all.core.models import utcnow
 from linkit_all.core.runs import cancel_run, current_run
@@ -45,6 +46,7 @@ class PipelineRunner:
         self.db, self.settings, self.bus, self.vault = db, settings, bus, vault
         self.state = RunState()
         self._task: asyncio.Task[None] | None = None
+        self._fx_task: asyncio.Task[bool] | None = None  # kept so it is not collected mid-flight
 
     def start(self, stages: list[str], new: bool = False) -> RunState:
         if self.state.running:
@@ -58,6 +60,8 @@ class PipelineRunner:
                               started_at=utcnow().isoformat(timespec="seconds") + "Z")  # fmt: skip
         self.bus.publish({"type": "run", "status": "started", **self.state.as_dict()})
         self._task = asyncio.create_task(self._run(run_id, ordered))
+        # Fresh exchange rates for the salary rule: never blocks or fails the run, no personal data.
+        self._fx_task = asyncio.create_task(fx.refresh(self.settings.data_dir))
         return self.state
 
     def cancel(self) -> bool:

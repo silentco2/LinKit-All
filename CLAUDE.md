@@ -19,7 +19,7 @@ Users bring their own AI: ChatGPT plan via Codex CLI, API keys, and later local 
 - NO AI-guessed answers for legal/sensitive questions: work authorization, visa,
   sponsorship, salary, EEO/demographics, disability, veteran status, criminal record,
   legal declarations. Answer only from the profile or queue for the user.
-- All user data stays local. Only the chosen model provider receives CV/job text.
+- All user data stays local. Only the chosen model provider receives CV/job text. Suggestions (places, titles, FX rates) come from bundled offline datasets; the only refresh, FX rates, sends no personal data.
 - No telemetry. No hard-coded secrets. Never log passwords, tokens or full CV text.
 - Never click a final Submit in dry-run mode.
 
@@ -77,7 +77,7 @@ Tailoring happens just before applying, never for jobs that will not be applied 
   solve CAPTCHAs/challenges, automate login, use rotating proxies, TLS or fingerprint spoofing (exception 2026-10-29: headless gets a fitted screen +
   real Chrome UA/client hints). OK: what the site's own pages send (Referer, XHR header, CSRF key). robots.txt not enforced.
 - ATS detector routes any pasted URL (or careers-page HTML) to the right plugin.
-- LinkedIn hiring posts (`sources/linkedin_posts/`): opt-in, off by default, ToS/risk warning, no LinkedIn account (maintainer 2026-10-31). Google
+- LinkedIn hiring posts (`sources/linkedin_posts/`): opt-in, off by default (ToS risk noted, no acknowledgement checkbox), no LinkedIn account (maintainer 2026-10-31); keywords default to the search queries. Google
   `site:linkedin.com/posts` in Chrome on a `google` profile (≤5 keywords × ≤5 pages, paced); a Google check -> stop the source, flag it, user solves it
   in the app browser. Post text = public page JSON-LD only (never comments). ATS links -> that ATS; others -> batched AI; no email/link -> dropped.
 - Per-domain rate limits, page checkpoints, dedupe by normalized URL + hash(title, company, location) + rapidfuzz.
@@ -109,14 +109,15 @@ Tailoring happens just before applying, never for jobs that will not be applied 
 ### 5.5 Apply (`apply/`)
 - Order: per-ATS handler -> generic AI form agent (accessibility-tree snapshot -> field map JSON -> fill -> validate -> next) -> Action Center.
   Handlers today: Greenhouse, Lever, Ashby; every other site (Workday, iCIMS, Taleo, ...) falls back to the generic agent.
-- Headed Chrome by default, persistent profile per site, human pacing, per-site daily caps, 1–3 parallel
+- Headed Chrome by default (`apply.headless` is the one window setting, LinkedIn search included), persistent profile per site, human pacing, per-site daily caps, 1–3 parallel
   browsers. Jobs closed on Greenhouse/Lever/Ashby are skipped before tailoring.
 - Account gate: generate unique password (`secrets`, honoring site rules), save to vault BEFORE submitting
   signup, then verify via IMAP (code/link by regex, AI fallback). Dry run never touches sign-up; live mode
   creates accounts when needed; the application still waits for confirmation unless 'submit without asking'.
 - Screening questions: answer bank (embedding match) -> AI draft from profile -> Action Center. Sensitive
-  categories (section 2) never go to the AI. Sponsorship left on "Ask me" is answered per job from
-  `authorized_countries` + the job country; unknown country -> Action Center.
+  categories (section 2) never go to the AI; military status, nationality, date of birth and marital status
+  come from the profile only (an age question is always asked). Sponsorship/work authorization left on "Ask me":
+  job country in `authorized_countries` -> no sponsorship/authorized, in `visa_countries` -> sponsorship needed/not authorized, else Action Center.
 - Missing setup parks the job with `needs_vault`, `vault_locked` or `needs_email`; it continues once done (`retry-code`).
 - LinkedIn Easy Apply and Indeed Apply break those sites' ToS: off by default, explicit opt-in with a ban-risk
   warning, low daily caps. No CAPTCHA solving: CAPTCHAs park for the user.
@@ -141,7 +142,7 @@ demographics) are saved to the profile.
 Applied / failed / skipped / needs_user per platform and career page, per run and over time;
 funnel (found -> ... -> applied); CSV/PDF export.
 ### 5.9 Setup values (`core/infer.py`, `core/presets.py`)
-Derived by rules. AI gap-fill must be verbatim from the CV (checked). Nothing is written until the user confirms.
+Derived by rules. AI gap-fill must be verbatim from the CV (checked). On CV upload/approve the CV fills EMPTY non-sensitive profile fields only (never overwrites, never sensitive; `authorized_countries` stays a suggestion) and its employers, titles, degrees and schools join the locked facts automatically.
 
 ## 6. Data & security
 - App data under platformdirs user data dir: db, CVs, tailored versions, screenshots, traces.
@@ -192,8 +193,7 @@ Phases 1-12 are built; blocked items: handoff.md.
 6. Generic careers extractor and AI form agent: built. Naukrigulf blocked.
 7. Local models, LaTeX/ODT/PDF CVs, scheduler, reports, Arabic UI, docs: built. Pending: Outlook OAuth, macOS/Linux LO bundles, release.
 8. freehire (MIT) ports: ATS feeds, aggregators, boards, companies, Telegram, discovery: built.
-9. Debt (D1-D7) and 10. Trust filter: built.
-11. LinkedIn hiring posts: built (Google search, no LinkedIn login).
+9. Debt (D1-D7), 10. Trust filter, 11. LinkedIn hiring posts (Google search, no LinkedIn login): built.
 12. UX for V1 (ux-plan.md): built. UX7, the usability round with 5 people, is pending with the maintainer.
 
 ## 11. License

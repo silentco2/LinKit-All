@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from linkit_all.core.models import Job, JobState, Profile, Tier, utcnow
 from linkit_all.core.search import SearchConfig
 from linkit_all.core.state import transition
-from linkit_all.matching.rules import rule_violation
+from linkit_all.matching.rules import expectation_of, rule_violation
 from linkit_all.matching.trust_stage import allowed, score_jobs_trust, top_codes
 from linkit_all.sources.text import norm_company
 from linkit_all.tailor.pipeline import cv_segments
@@ -132,13 +132,14 @@ def rank_jobs(db: sessionmaker[Session], cfg: SearchConfig, embed: Embed) -> dic
             norm_company(c) for c in s.scalars(select(Job.company).where(Job.state.in_(TAKEN)))
         }
     cv = cv_text(profile)
+    expect = expectation_of(profile.answers, cfg)
     counts = {"ranked": 0, "filtered_out": 0}
     now = utcnow()
     with db.begin() as s:
         # Jobs a hard rule dropped earlier get another look when they pass today's filters
         # (filters changed, or a rule was fixed). Company-rule drops stay put.
         for job in s.scalars(select(Job).filter_by(state=JobState.filtered_out)):
-            if job.data.get("company_rule") or rule_violation(job, cfg, now) is not None:
+            if job.data.get("company_rule") or rule_violation(job, cfg, now, expect) is not None:
                 continue
             if job.data.get("trust_filter") and _trust_filtered(job, cfg):
                 continue  # still a scam / ghost under today's trust settings
@@ -148,7 +149,7 @@ def rank_jobs(db: sessionmaker[Session], cfg: SearchConfig, embed: Embed) -> dic
         jobs = list(s.scalars(select(Job).filter_by(state=JobState.enriched)))
         keep = []
         for job in jobs:
-            if reason := rule_violation(job, cfg, now):
+            if reason := rule_violation(job, cfg, now, expect):
                 transition(s, job, JobState.filtered_out, reason)
                 counts["filtered_out"] += 1
             else:

@@ -63,7 +63,7 @@ class LinkedInPosts(Source):
 
     def tasks(self, cfg: SearchConfig) -> list[Task]:
         src = cfg.sources
-        self._headless = src.linkedin_headless
+        self._headless = cfg.apply.headless  # one window setting; linkedin_headless is ignored
         return [
             Task(
                 self.name,
@@ -72,7 +72,9 @@ class LinkedInPosts(Source):
                 limit=src.linkedin_max_posts,
                 posted_within_days=WINDOW_DAYS[src.linkedin_window],
             )
-            for kw in dict.fromkeys(k.strip() for k in src.linkedin_keywords if k.strip())
+            for kw in dict.fromkeys(
+                k.strip() for k in (src.linkedin_keywords or cfg.search.queries) if k.strip()
+            )
         ][:MAX_KEYWORDS]
 
     async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:

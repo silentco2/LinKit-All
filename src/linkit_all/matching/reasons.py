@@ -30,7 +30,8 @@ _BY_MESSAGE = [
      "Work mode {mode} is not one you chose"),
     (r"location .* not in your locations", "location", "Location not in your places"),
     (r"seniority (?P<level>\S+) not wanted", "seniority", "Seniority {level} is not one you want"),
-    (r"posted more than (?P<limit>\d+) days ago", "too_old", "Posted more than {limit} days ago"),
+    (r"posted more than (?P<n>\d+) (?P<unit>hours|days) ago", "too_old",
+     "Posted more than {limit} days ago"),
     (r"salary up to (?P<amount>[\d,]+) (?P<currency>\S+)/month is below", "salary",
      "Salary below your floor"),
     (r"company is blacklisted", "blacklist", "Company on your blacklist"),
@@ -51,9 +52,12 @@ def filter_reason(job: Job, event: FilterEvent | None, now: datetime | None = No
         if not (m := re.match(pattern, message)):
             continue
         found: dict[str, Any] = dict(m.groupdict())
-        for k in ("limit", "amount"):
+        for k in ("amount",):
             if k in found:
                 found[k] = int(found[k].replace(",", ""))
+        if name == "too_old":  # new events say hours, old ones said days
+            hours = int(found.pop("n")) * (24 if found.pop("unit") == "days" else 1)
+            found = {"limit": -(-hours // 24), "hours": hours}
         if name == "location":
             found["location"] = job.location
         if name == "too_old" and job.posted_at:

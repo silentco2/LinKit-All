@@ -18,6 +18,7 @@ from docx.opc.constants import RELATIONSHIP_TYPE as RT
 from pydantic import BaseModel
 
 from linkit_all.apply.answers import country_of
+from linkit_all.core import geo
 
 Source = Literal["cv", "country", "roles", "years", "default", "ai"]
 Level = Literal["auto", "suggest", "ask"]
@@ -77,6 +78,12 @@ def _country(text: str) -> str | None:
     if m := _AR_COUNTRY_RX.search(text):
         return _AR_COUNTRIES[m.group(1)]
     return country_of(text)
+
+
+_COUNTRY_NAMES = {
+    *_AR_COUNTRIES.values(),
+    *("مصر", "السعودية", "الإمارات", "قطر", "الكويت", "البحرين", "سلطنة عمان", "الأردن", "المغرب"),
+}
 
 
 def _dedupe(items: Sequence[str]) -> list[str]:
@@ -210,6 +217,31 @@ def cv_links(docx_path: Path) -> list[str]:
 def _phone_digits(raw: str) -> str:
     plus = "+" if raw.strip().startswith("+") else ""
     return plus + re.sub(r"\D", "", raw)
+
+
+def _dial_country(phone: str) -> str:
+    """ISO2 of the country an international number belongs to; "" when it is unknown or the
+    code is shared ("+1" is the US, Canada and others)."""
+    if not phone.startswith("+"):
+        return ""
+    digits = phone[1:]
+    hits = [c for c in geo.countries() if c.phone and digits.startswith(c.phone)]
+    best = max((len(c.phone) for c in hits), default=0)
+    top = [c for c in hits if len(c.phone) == best]
+    return top[0].iso2 if len(top) == 1 else ""
+
+
+def international_phone(raw: str, home_country: str = "") -> str:
+    """ "+<code><digits>". A local number gets the home country's code and loses its trunk "0";
+    without a known country it stays as it was (digits only)."""
+    raw = raw.strip()
+    if raw.startswith("00"):
+        raw = "+" + raw[2:]
+    digits = re.sub(r"\D", "", raw)
+    if raw.startswith("+") or not digits:
+        return "+" + digits if digits else ""
+    home = geo.country(home_country) if home_country else None
+    return f"+{home.phone}{digits.lstrip('0')}" if home and home.phone else digits
 
 
 def _contacts(lines: list[str], links: Sequence[str]) -> dict[str, str]:
@@ -591,19 +623,27 @@ def infer(facts: CvFacts, today: date) -> dict[str, InferredValue]:
 
     put("profile.full_name", facts.full_name, check=facts.name_check)
     put("profile.email", facts.email)
-    put("profile.phone", facts.phone)
     put("profile.location", facts.location)
     put("profile.skills", facts.skills)
+    parts = [x.strip() for x in re.split(r"[,،]", facts.location) if x.strip()]
+    country = _country(parts[-1]) if parts else None
+    iso = c.iso2 if country and (c := geo.country(country)) else ""
+    from_phone = False
+    if not iso and facts.phone.startswith("+"):  # no place in the CV: the number's country code
+        iso = _dial_country(facts.phone)
+        from_phone = bool(iso)
+    put("profile.phone", international_phone(facts.phone, iso))
+    put("profile.home_country", iso, check=from_phone)
+    if parts and (len(parts) > 1 or parts[0].lower() not in _COUNTRY_NAMES):
+        put("profile.home_city", parts[0])
     first, last = split_name(facts.full_name)
     put("answers.first_name", first)
     put("answers.last_name", last)
-    if facts.location:
-        parts = [p.strip() for p in re.split(r"[,،]", facts.location) if p.strip()]
+    if parts:
         put("answers.city", parts[0])
-        if code := _country(parts[-1]):
-            country = code.title()
-            put("answers.country", country)
-            put("answers.authorized_countries", [country], "country", "suggest")
+        if country:
+            put("answers.country", country.title())
+            put("answers.authorized_countries", [country.title()], "country", "suggest")
     if current:
         put("answers.current_company", current.company, check=True)
         put("answers.current_title", current.title, check=True)

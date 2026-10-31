@@ -142,7 +142,7 @@ def test_apply_writes_only_given_keys(client: TestClient, tmp_path: Path) -> Non
     assert profile["phone"] == "+201001234567"
     assert {k: profile[k] for k in keep} == keep  # untouched
     answers = client.get("/api/profile/answers").json()
-    assert answers["city"] == "Cairo" and answers["first_name"] == ""
+    assert answers["city"] == "Cairo" and answers["first_name"] == "Sara"  # first_name: the upload
     assert answers["authorized_countries"] == []  # never written unless given
     cfg = client.get("/api/search").json()
     assert cfg["search"]["queries"] == ["Backend Engineer"]
@@ -313,10 +313,9 @@ def test_status_setup_and_next_step(client: TestClient, tmp_path: Path) -> None:
     }  # fmt: skip
     upload(client, tmp_path)
     assert setup()["cv"] and setup()["next_step"] == "ai"
+    assert setup()["profile"]  # the upload filled name and email from the CV
     connect_ai(client)
-    assert setup()["ai"] and setup()["next_step"] == "profile"
-    apply(client, values={"profile.full_name": "Sara Ahmed", "profile.email": "s@x.io"})
-    assert setup()["profile"] and setup()["next_step"] == "roles"
+    assert setup()["ai"] and setup()["next_step"] == "roles"
     apply(client, values={"search.queries": ["Backend Engineer"]})
     assert setup()["roles"] and setup()["next_step"] == "where"
     status = apply(client, where=["Cairo, Egypt"]).json()

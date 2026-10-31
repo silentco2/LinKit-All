@@ -13,6 +13,7 @@ from linkit_all.api.events import EventBus
 from linkit_all.api.routes import router
 from linkit_all.api.runner import PipelineRunner
 from linkit_all.api.security import LocalOnly
+from linkit_all.api.suggest import router as suggest_router
 from linkit_all.apply.browser import UserBrowser
 from linkit_all.apply.vault import vault_for
 from linkit_all.core.config import Settings, get_settings
@@ -55,6 +56,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.scheduler = make_scheduler(app.state.db.kw["bind"])
     app.add_middleware(LocalOnly, extra_origins=settings.dev_origins)
     app.include_router(router)
+    app.include_router(suggest_router)
 
     @app.get("/{path:path}", include_in_schema=False)
     def spa(path: str) -> FileResponse:

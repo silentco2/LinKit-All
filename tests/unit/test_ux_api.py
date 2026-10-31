@@ -70,7 +70,7 @@ def reason_of(job: Job, event: tuple[str, str | None, dict[str, Any]] | None = N
         ({"seniority": ["junior"]}, {}, {"title": "Senior Developer"}, "seniority",
          "Seniority senior is not one you want", {"level": "senior"}),
         ({}, {"posted_within_days": 14}, {"posted_at": NOW - timedelta(days=40)}, "too_old",
-         "Posted 40 days ago", {"limit": 14, "days": 40}),
+         "Posted 40 days ago", {"limit": 14, "hours": 336, "days": 40}),
         ({"salary_floor_monthly": 50000, "salary_currency": "EGP"}, {},
          {"data": {"salary_max": 20000, "salary_currency": "EGP", "salary_interval": "month"}},
          "salary", "Salary below your floor", {"amount": 20000, "currency": "EGP"}),
@@ -93,7 +93,11 @@ def test_reason_for_each_hard_rule(
 def test_reason_for_posting_without_a_date_uses_the_limit() -> None:
     row = Job(**JOB)
     event = ("posted more than 14 days ago", None, {})
-    assert reason_of(row, event) == ("Posted more than 14 days ago", "too_old", {"limit": 14})
+    assert reason_of(row, event) == (
+        "Posted more than 14 days ago",
+        "too_old",
+        {"limit": 14, "hours": 336},
+    )
 
 
 def test_reason_for_company_rule_and_trust_drops() -> None:
