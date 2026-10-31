@@ -70,8 +70,15 @@ export interface Profile {
   full_name: string;
   email: string;
   phone: string;
+  /** Derived on the server from the home city and country. */
   location: string;
+  address: string;
+  postal_code: string;
+  home_city: string;
+  /** ISO2 */
+  home_country: string;
   skills: string[];
+  /** Not edited in the UI: the server keeps them when a save leaves them out. */
   locked_facts: string[];
   cv_name?: string | null;
   cv_source_format?: 'docx' | 'odt' | 'pdf' | 'tex';
@@ -292,6 +299,19 @@ export interface LiveShot {
 }
 
 /** "a\nb" <-> ["a", "b"] for one-per-line list fields. */
+/** First and last name for forms; a particle (Abdel, El, Bin, عبد ...) joins the token after it. Mirrors `split_name` on the server. */
+const PARTICLES = new Set(['abd', 'abdel', 'abdul', 'abdal', 'abu', 'el', 'al', 'bin', 'ibn', 'عبد', 'أبو', 'ابو', 'بن', 'ابن', 'ال']);
+export function splitName(full: string): { first: string; last: string } {
+  const units: string[] = [];
+  let pending: string[] = [];
+  for (const tok of full.split(/\s+/).filter(Boolean)) {
+    pending.push(tok);
+    if (!PARTICLES.has(tok.toLowerCase().replace(/^\.+|\.+$/g, ''))) { units.push(pending.join(' ')); pending = []; }
+  }
+  units.push(...pending);
+  return units.length < 2 ? { first: units[0] ?? '', last: '' } : { first: units[0], last: units[units.length - 1] };
+}
+
 export const lines = (text: string): string[] => text.split('\n').map((l) => l.trim()).filter(Boolean);
 export const unlines = (list: string[]): string => list.join('\n');
 

@@ -13,7 +13,8 @@ type Sent = { ok: true } | { ok: false; status: number; detail: unknown };
 const DEBOUNCE_MS = 400;
 const TICK_MS = 2000;
 const URLS: Record<Obj, string> = { search: '/search', profile: '/profile', answers: '/profile/answers' };
-const PROFILE_FIELDS = ['full_name', 'email', 'phone', 'location', 'skills', 'locked_facts'] as const;
+// locked_facts is left out on purpose: protection is automatic and the server keeps the stored facts when a save omits them
+const PROFILE_FIELDS = ['full_name', 'email', 'phone', 'location', 'address', 'postal_code', 'home_city', 'home_country', 'skills'] as const;
 
 /**
  * One in-memory copy each of the search config, the profile and the answers, saved as the user edits.
