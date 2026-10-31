@@ -114,7 +114,7 @@ export interface Place { label: string; city: string; country: string; work: 'al
 
 export interface SearchConfig {
   search: { queries: string[]; locations: string[]; places: Place[]; remote: boolean; posted_within_hours: number | null; max_results_per_query: number };
-  sources: { companies: string[]; jobspy: string[]; jobspy_country: string; regional: string[]; enabled: string[]; telegram_channels: string[]; use_discovered_boards: boolean; boards_per_run: number; linkedin_keywords: string[]; linkedin_window: 'day' | 'week'; linkedin_max_posts: number; linkedin_headless: boolean };
+  sources: { companies: string[]; jobspy: string[]; jobspy_country: string; regional: string[]; enabled: string[]; telegram_channels: string[]; use_discovered_boards: boolean; boards_per_run: number; linkedin_keywords: string[]; linkedin_window: 'day' | 'week'; linkedin_max_posts: number };
   filters: {
     title_include: string[];
     title_exclude: string[];
@@ -207,6 +207,12 @@ export interface ApplicationAnswers {
   /** Derived from the places on the Jobs page. */
   visa_countries: string[];
   needs_sponsorship: boolean | null;
+  military_status: 'completed' | 'postponed' | 'exempted' | 'not_applicable' | 'decline' | null;
+  /** ISO2 */
+  nationality: string;
+  /** ISO date, empty = ask */
+  date_of_birth: string;
+  marital_status: 'single' | 'married' | 'divorced' | 'widowed' | 'decline' | null;
   salary_expectation: string;
   salary_currency: string;
   eeo_gender: string | null;

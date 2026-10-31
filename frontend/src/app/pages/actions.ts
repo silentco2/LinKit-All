@@ -17,6 +17,18 @@ const BROWSER_KINDS: ActionKind[] = ['captcha', 'login_issue', 'two_factor', 'va
 const VAULT_CODES = ['needs_vault', 'vault_locked'];
 const EMAIL_CODES = ['needs_email', 'email_not_connected'];
 const EEO_KEYS = ['eeo_gender', 'eeo_race', 'eeo_hispanic', 'eeo_veteran', 'eeo_disability'];
+const FACT_KEYS = ['military_status', 'nationality', 'marital_status', 'date_of_birth'];
+// what a form option says -> the value the profile stores; null = not recognised, so it is not saved
+const FACT_VALUES: Record<string, [string, RegExp][]> = {
+  military_status: [
+    ['not_applicable', /not applicable|n\/a|لا ينطبق/i], ['completed', /(?<!not )(?<!un)complet|served|fulfil|أديت|أنهيت/i], ['postponed', /(?<!not )postpon|defer|مؤجل/i],
+    ['exempted', /(?<!not )(?<!non-)exempt|معفى|معفي/i], ['decline', /prefer not|decline|rather not|أفضل عدم/i],
+  ],
+  marital_status: [
+    ['single', /single|unmarried|أعزب|عزباء/i], ['married', /(?<!not )(?<!un)married|متزوج/i], ['divorced', /(?<!not )divorc|مطلق/i], ['widowed', /(?<!not )widow|أرمل/i],
+    ['decline', /prefer not|decline|rather not|أفضل عدم/i],
+  ],
+};
 const EEO_DECLINE: Remember = Object.fromEntries(EEO_KEYS.map((k) => [k, 'decline']));
 const ACK_CATEGORIES = ['acknowledge_privacy', 'acknowledge_legal'];
 const DECLINE = /decline|prefer not|do(?:n'?t| not) wish|not to (?:say|answer|disclose|identify|specify)|choose not|rather not/i;
@@ -108,6 +120,11 @@ const SOURCES: Record<string, string> = {
       @if (isRelocate(q)) {
         <label class="mt-2 flex items-center gap-2 text-sm">
           <input type="checkbox" [checked]="kept(k, q)" (change)="keep(k, q, checked($event))"> {{ 'fin.keepRelocate' | t }}
+        </label>
+      }
+      @if (isProfileFact(q)) {
+        <label class="mt-2 flex items-center gap-2 text-sm">
+          <input type="checkbox" [checked]="kept(k, q)" (change)="keep(k, q, checked($event))"> {{ 'fin.keepFact' | t }}
         </label>
       }
       @if (isEeo(q) && declineOf(q); as d) {
@@ -438,6 +455,8 @@ export class ActionsPage {
 
   protected isNotice = (q: ActionQuestion): boolean => !q.sensitive && !q.category && /notice/i.test(q.label);
   protected isRelocate = (q: ActionQuestion): boolean => !q.sensitive && !q.category && /relocat/i.test(q.label);
+  /** Personal details the profile can hold (never guessed): military, nationality, marital status, date of birth. */
+  protected isProfileFact = (q: ActionQuestion): boolean => FACT_KEYS.includes(q.category ?? '');
   protected isEeo = (q: ActionQuestion): boolean => !!q.category && EEO_KEYS.includes(q.category);
   /** The "I'd rather not say" option of an option list, if the form has one. */
   protected declineOf = (q: ActionQuestion): string | null => q.options.find((o) => DECLINE.test(o)) ?? null;
@@ -467,6 +486,12 @@ export class ActionsPage {
       if (!this.kept(k, q)) continue;
       const v = this.draft()[k]?.[q.label];
       if (this.isNotice(q) && typeof v === 'string' && v.trim()) r['notice_period'] = v.trim();
+      if (this.isProfileFact(q) && typeof v === 'string' && v.trim()) {
+        const cat = q.category!;
+        const t = v.trim();
+        const val = FACT_VALUES[cat]?.find(([, re]) => re.test(t))?.[0] ?? (cat === 'date_of_birth' ? (/^\d{4}-\d{2}-\d{2}$/.test(t) ? t : null) : cat === 'nationality' ? t : null);
+        if (val) r[cat] = val;
+      }
       if (this.isRelocate(q)) {
         const b = typeof v === 'boolean' ? v : typeof v === 'string' ? (/^(yes|true)/i.test(v) ? true : /^(no|false)/i.test(v) ? false : null) : null;
         if (b !== null) r['willing_to_relocate'] = b;

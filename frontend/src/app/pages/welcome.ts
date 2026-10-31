@@ -339,7 +339,7 @@ export class WelcomePage implements OnInit {
     {
       key: 'eeo_race',
       label: 'setup.eeo.race',
-      options: [['asian', 'setup.eeo.asian'], ['black', 'setup.eeo.black'], ['hispanic', 'setup.eeo.hispanic'], ['white', 'setup.eeo.white'],
+      options: [['asian', 'setup.eeo.asian'], ['black', 'setup.eeo.black'], ['white', 'setup.eeo.white'],
         ['middle_eastern', 'setup.eeo.middleEastern'], ['native', 'setup.eeo.native'],
         ['pacific', 'setup.eeo.pacific'], ['two_or_more', 'setup.eeo.twoOrMore']],
     },
