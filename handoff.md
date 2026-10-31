@@ -24,10 +24,10 @@ changing a decision in either file.
 - Phase 9 (debt D1-D7) is done; what remains of the debt is in "Known issues and debt".
 - Phase 10 (trust filter: scam and ghost scores, offline, EN + AR, in the rank stage; ATS liveness
   check before apply; optional AI legit flags) is done. See `docs/trust.md`.
-- Phase 11 (LinkedIn hiring posts + apply by email) is built except **L2, the Playwright post
-  scraper**: it is blocked until the maintainer captures a LinkedIn search page
-  (`linkit linkedin capture`). Everything else works: sign-in and session check, post filter, ATS
-  routing, batched AI extraction, SMTP sender, email apply (dry-run .eml, confirm, caps), UI.
+- Phase 11 (LinkedIn hiring posts + apply by email) is built. No LinkedIn account: posts are
+  found with Google in Chrome (`google` profile) and read from their public pages; a Google check
+  stops the source and the user solves it from Settings. Post filter, ATS routing, batched AI
+  extraction, SMTP sender, email apply (dry-run .eml, confirm, caps), UI.
   See `docs/linkedin-posts.md` and `plan.md` Phase 11.
 - The unit suite passes (`uv run pytest tests/unit`: 1711 tests collected after Phase 11; 1640 passed, 2 skipped
   before it, the real Tectonic compile),
@@ -146,9 +146,9 @@ src/linkit_all/
   providers/        LLMProvider.complete(prompt, schema); claude_cli, codex_cli, litellm_api;
                     prompts/*.j2 (json_output, json_retry, ping, tailor, score, answer,
                     cover_letter, ...)
-  sources/linkedin_posts/  post (RawPost), extract (hiring/seeker filter, ATS routing, batched AI
-                    extraction -> JobStub), session (linkedin Chrome profile, session check,
-                    page capture); scrape.py (L2) not written yet
+  sources/linkedin_posts/  google (site:linkedin.com/posts search in Chrome, check detection,
+                    /goto resolving), post (RawPost, JSON-LD reader), extract (hiring/seeker
+                    filter, ATS routing, batched AI extraction -> JobStub), source (the plugin)
   sources/          base (JobStub, Task, Source), http (rate limits + retries + Crawl-delay
                     pacing), text (html->text, URL/company normalization, hash),
                     store (Deduper), runner (discover, enrich), ats_detector,
@@ -308,10 +308,7 @@ re-implemented in Python on plain honest HTTP. Plan and not-ported lists: `plan.
 6. **macOS/Linux LibreOffice bundles** (need those OSes or CI).
 7. **GitHub repo + PyPI release** (outward-facing: needs the maintainer's go-ahead).
 
-8. **A captured LinkedIn page** so the post scraper (L2) can be written:
-   `linkit linkedin capture --keywords "hiring python developer"` after signing in from Setup.
-   Review the file first: it is a copy of your own LinkedIn page.
-9. **A first supervised live email application** (Live on, confirm each; send the test email
+8. **A first supervised live email application** (Live on, confirm each; send the test email
    to yourself first).
 
 ## Resolved: robots.txt scope
@@ -357,9 +354,9 @@ anywhere; Crawl-delay pacing and per-host rate limits stay. Recorded in CLAUDE.m
 
 ## Known issues and debt
 
-- LinkedIn markup changes often: the post selectors (once L2 exists) will need upkeep. LinkedIn runs headless by
-  default (real UA + client hints, fitted screen); the Latest + Past week filters gave 1 post, so
-  search is unfiltered and the window is applied to scraped posts past 100. Seeker-tag posts ("open to work")
+- LinkedIn posts depend on Google's result markup (anchors with an <h3> in #search, opaque /goto
+  links since 2026) and on the JSON-LD of public post pages; both can change. No daily cap: a
+  run is ≤5 keywords × ≤5 pages, so several scheduled runs a day multiply the Google load. Seeker-tag posts ("open to work")
   that also contain hiring words are dropped. The email greeting heuristic can misjudge a
   company address versus a person.
 

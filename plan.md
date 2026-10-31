@@ -284,7 +284,16 @@ age), Iron-Mark/Hackathon-HireProof (ISC: scam vocabulary, text normalizer, doma
 floors + signal trace), Farhan89082 (age tiers, fuzzy repost, vague titles; ideas only),
 Arya185 (MIT: fee/contact phrase lists). Rejected: every ML model (English-only 2014 EMSCAD,
 scam-only), aliabdm (one LLM call per job, no rules), paid/search APIs. ghostbust.us: DNS fails.
-Decisions (maintainer, 2026-10-25):
+Decision (maintainer, 2026-10-31): no LinkedIn account. LinkedIn content search is members-only,
+but public post pages are readable logged out. Posts are found with Google
+(`site:linkedin.com/posts <keywords>`, `tbs=qdr:d|w`) in real Chrome on its own `google` profile;
+Google's result links are opaque `/goto` redirects, resolved one request each without following.
+A Google check (`/sorry`) or consent page stops the source for the run and leaves a flag; the user
+solves it in the app browser ("Solve Google check"); the app never solves it. The sign-in, session
+check and `linkit linkedin capture` are removed. Search APIs were compared and not used: Google
+Custom Search is closed to new users, Brave has no free tier, Exa has no date filter, LangSearch
+returned stale posts with wrong dates.
+Decisions (maintainer, 2026-10-25, sign-in and scraping parts superseded 2026-10-31):
 - Two separate scores per job, `scam` and `ghost` (0-100), each with a signal list
   `{code, weight, evidence}`, stored in `jobs.data["trust"]`; EN + AR rules.
 - Scam high (>= 65) -> `filtered_out` with a coded reason; "Not a scam" restores and
@@ -315,7 +324,7 @@ Execution tasks:
 - ✅ G7 Optional `legit` (ok/suspicious/scam) and `trust_flags` in the batched score prompt + schema
 - ✅ G8 Docs: NOTICE, CLAUDE.md §5.3, docs/, handoff
 
-### Phase 11 — LinkedIn hiring posts 🟡
+### Phase 11 — LinkedIn hiring posts ✅
 Goal: find jobs announced as LinkedIn posts (HR/company profiles) and apply through the
 email or form link they give. Reference: pritamdharme/linkedin-hiring-post (no license: ideas
 only — saved session, content-search URL, post markers, HTML dump on zero posts).
@@ -323,7 +332,16 @@ Decision (maintainer, 2026-10-26): LinkedIn hides results from automated Chrome.
 didn't help, so the maintainer chose the stealth-browser-mcp approach (real installed Chrome launched
 without automation flags, Playwright attached over CDP) for ALL browser automation; playwright-stealth
 is removed. Challenges, login, proxies and fingerprint/TLS spoofing stay forbidden.
-Decisions (maintainer, 2026-10-25):
+Decision (maintainer, 2026-10-31): no LinkedIn account. LinkedIn content search is members-only,
+but public post pages are readable logged out. Posts are found with Google
+(`site:linkedin.com/posts <keywords>`, `tbs=qdr:d|w`) in real Chrome on its own `google` profile;
+Google's result links are opaque `/goto` redirects, resolved one request each without following.
+A Google check (`/sorry`) or consent page stops the source for the run and leaves a flag; the user
+solves it in the app browser ("Solve Google check"); the app never solves it. The sign-in, session
+check and `linkit linkedin capture` are removed. Search APIs were compared and not used: Google
+Custom Search is closed to new users, Brave has no free tier, Exa has no date filter, LangSearch
+returned stale posts with wrong dates.
+Decisions (maintainer, 2026-10-25, sign-in and scraping parts superseded 2026-10-31):
 - Opt-in source, off by default, ToS/ban-risk warning, low caps (5 keywords, ~60 posts each,
   past week, one run a day). Dedicated `linkedin` Chrome profile; the user signs in once in a
   visible window, scraping then runs headless (Setup switch to run headed). Logged out or a
@@ -338,18 +356,18 @@ Decisions (maintainer, 2026-10-25):
   Caps: 15 emails/day, never the same address twice. A sent email = applied (by email); the
   sent message is the proof.
 - Form/link posts go through the existing generic form agent.
-Interface (orchestrator): `sources/linkedin_posts/` package — `post.py::RawPost` (frozen
-dataclass: urn, url, author, author_url, headline, posted_text, text, links, emails,
-scraped_at), `extract.py` (RawPost list -> JobStub list), `scrape.py` (Playwright -> RawPost),
-`__init__.py` Source (kind "social", opt-in). Email apply: `apply/email_send/`.
+Interface: `sources/linkedin_posts/` package — `post.py` (`RawPost`: urn, url, author,
+author_url, headline, posted_at, text, links, emails, scraped_at; `read_post` from the page's
+JSON-LD), `google.py` (search, check detection, redirect resolving), `extract.py` (RawPost list ->
+JobStub list), `source.py` (Source, kind "board", opt-in). Email apply: `apply/email_send/`.
 Execution tasks:
 - ✅ L1 `linkedin` profile key, sign-in (headed app browser) + session check API, `linkit linkedin capture`
 - ✅ L1b playwright-stealth on the LinkedIn profile (superseded by S1, removed)
-- ⬜ L2 Scraper: unfiltered search URL + `load_more` pager (live-checked), `post.keep_recent` (window only past 100 posts), per-post extraction, login/checkpoint stop, zero-post HTML dump (needs the maintainer's captured page)
+- ✅ L2 (2026-10-31) Google search instead of a LinkedIn scraper: `google.py` + `source.py`, post date from the activity id (`id >> 22` = epoch ms) before fetching, JSON-LD reader, "Solve Google check" API + Settings button; sign-in/session/capture removed
 - ✅ L3 RawPost model, hiring/seeker filter, ATS routing, batched AI extraction prompt, stubs, trust tweaks
 - ✅ L4 SMTP sender (vault creds) + "send test email to myself" API
 - ✅ L5 Email apply channel in the runner: compose, dry-run .eml, confirm park, caps, recipient dedupe, evidence
 - ✅ L6 UI: Setup LinkedIn posts section, Action Center email preview/edit, post info in drawer
 - ✅ L7 Docs, CLAUDE.md §5.2/§5.5, handoff
 - ✅ S1 Real-Chrome launcher (no automation flags) + Playwright over CDP for all browser work
-- ⬜ S2 LinkedIn read path on nodriver (only if S1 still gets empty results)
+- ❌ S2 LinkedIn read path on nodriver: dropped, LinkedIn is no longer browsed

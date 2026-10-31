@@ -77,9 +77,9 @@ Tailoring happens just before applying, never for jobs that will not be applied 
   solve CAPTCHAs/challenges, automate login, use rotating proxies, TLS or fingerprint spoofing (exception 2026-10-29: headless gets a fitted screen +
   real Chrome UA/client hints). OK: what the site's own pages send (Referer, XHR header, CSRF key). robots.txt not enforced.
 - ATS detector routes any pasted URL (or careers-page HTML) to the right plugin.
-- LinkedIn hiring posts (`sources/linkedin_posts/`): opt-in, off by default, ban-risk warning, low caps. Dedicated `linkedin` Chrome profile; scraping
-  headless by default (setting), search without filters + "Load more". Logged out or security check -> stop and notify. Never automate login, bypass
-  challenges, comment, DM or react. ATS links -> that ATS; other posts -> batched AI extraction; no email/link -> dropped.
+- LinkedIn hiring posts (`sources/linkedin_posts/`): opt-in, off by default, ToS/risk warning, no LinkedIn account (maintainer 2026-10-31). Google
+  `site:linkedin.com/posts` in Chrome on a `google` profile (≤5 keywords × ≤5 pages, paced); a Google check -> stop the source, flag it, user solves it
+  in the app browser. Post text = public page JSON-LD only (never comments). ATS links -> that ATS; others -> batched AI; no email/link -> dropped.
 - Per-domain rate limits, page checkpoints, dedupe by normalized URL + hash(title, company, location) + rapidfuzz.
 
 ### 5.3 Matching (`matching/`)
@@ -193,7 +193,7 @@ Phases 1-12 are built; blocked items: handoff.md.
 7. Local models, LaTeX/ODT/PDF CVs, scheduler, reports, Arabic UI, docs: built. Pending: Outlook OAuth, macOS/Linux LO bundles, release.
 8. freehire (MIT) ports: ATS feeds, aggregators, boards, companies, Telegram, discovery: built.
 9. Debt (D1-D7) and 10. Trust filter: built.
-11. LinkedIn hiring posts: built except the scraper (needs a captured page).
+11. LinkedIn hiring posts: built (Google search, no LinkedIn login).
 12. UX for V1 (ux-plan.md): built. UX7, the usability round with 5 people, is pending with the maintainer.
 
 ## 11. License

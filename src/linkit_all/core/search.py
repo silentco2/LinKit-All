@@ -173,7 +173,8 @@ class SourcesSection(BaseModel):
     # LinkedIn hiring posts; read when "linkedin_posts" is in `enabled`.
     linkedin_keywords: list[str] = []
     linkedin_window: Literal["day", "week"] = "week"
-    linkedin_max_posts: int = Field(60, ge=1, le=200)  # posts read per keyword
+    # posts read per keyword; Google gives at most 50 (linkedin_posts.google.MAX_PAGES)
+    linkedin_max_posts: int = Field(30, ge=1, le=200)
     linkedin_headless: bool = True
 
 

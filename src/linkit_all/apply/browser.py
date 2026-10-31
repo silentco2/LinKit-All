@@ -23,9 +23,8 @@ LIVE_MAX_AGE_S = 30  # a frame older than this is left over from a crashed run
 
 
 def profile_dir(settings: Settings, ats: str | None) -> Path:
-    """One persistent Chrome profile per ATS handler, else a shared "generic" one. "linkedin" is
-    its own profile (the user's LinkedIn sign-in), never shared with the others."""
-    name = ats if ats in HANDLERS or ats == "linkedin" else "generic"
+    """One persistent Chrome profile per ATS handler, else a shared "generic" one."""
+    name = ats if ats in HANDLERS else "generic"
     return settings.data_dir / "browser" / name
 
 

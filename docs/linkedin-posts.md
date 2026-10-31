@@ -5,41 +5,48 @@ Many recruiters and company owners announce jobs as ordinary LinkedIn **posts**
 job board. This source reads such posts, turns the real ones into jobs, and applies through the
 email address or link written in the post.
 
-!!! warning "This breaks LinkedIn's terms of service and can get your account restricted"
-    LinkedIn forbids automated access. Reading posts with a script risks a warning, a temporary
-    restriction or a ban of **your own account**. The source is **off by default** and needs an
-    explicit tick on "I understand the risk". Keep the limits low, and consider using an account
-    you can afford to lose.
+!!! warning "This breaks LinkedIn's terms of service; you use it at your own risk"
+    LinkedIn forbids reading its pages with a script, and Google may decide your searches look
+    automated and ask you to prove you are not a robot. No LinkedIn account is used, so none can
+    be restricted, but Google can slow down or block searches from your network for a while. The
+    source is **off by default** and needs an explicit tick on "I understand the risk". Keep the
+    keywords few.
 
-LinKit All stays on the safe side of what it controls: it never types your password, never
-solves or bypasses a security check, and never comments, messages or reacts to anything. It
-only reads search results.
+LinKit All stays on the safe side of what it controls: it never signs in anywhere, never solves
+or bypasses a check, and never comments, messages or reacts to anything.
 
-## Signing in
+## How posts are found
 
-1. Open **Setup** and find **LinkedIn hiring posts**.
-2. Tick **I understand the risk**, then press **Sign in to LinkedIn**. A real Chrome window opens
-   with its own profile (named `linkedin`, kept apart from the profiles used for applying).
-3. Sign in yourself, finish any check LinkedIn shows, and close the window.
-4. Press **Check session**. It only looks at your saved session and searches nothing. You
-   get one of three answers: *Signed in*, *Signed out* (sign in again) or *Security check*
-   (open the sign-in window and finish the check yourself).
+1. For each keyword, Google is searched for `site:linkedin.com/posts <keyword>`, limited to the
+   last day or week. This runs in a real Chrome window with its own profile (named `google`,
+   kept apart from the profiles used for applying), at a reading pace.
+2. Each result is opened only as far as Google's redirect, to learn the post's address. The
+   date is in the post's address, so older posts are dropped before anything is fetched.
+3. The public post page is read for the post text, author and date. Only the post itself is
+   read, never the comments under it.
 
-You sign in once. Later runs reuse the saved session.
+## When Google asks for a check
+
+If Google shows its "unusual traffic" check (a reCAPTCHA) or asks you to choose cookie
+settings, LinKit All **stops this source for the run**. The other sources carry on. The run log
+says why, and **Settings > Sources > LinkedIn hiring posts** shows a red note.
+
+1. Press **Solve Google check**. Chrome opens Google with the same profile the searches use.
+2. Answer what Google shows yourself, then close the window.
+3. Run again.
+
+LinKit All never solves the check for you. If checks come often, use fewer keywords, run less
+often, or turn off **Run headless**.
 
 ## Settings
 
 | Setting | Meaning |
 |---|---|
 | **Search LinkedIn hiring posts** | The on/off switch (adds `linkedin_posts` to the enabled sources). |
-| **Keywords** | One per line, English or Arabic, for example `python developer hiring` or `مطلوب مهندس`. Each keyword is one search. Keep it to about 5. |
-| **Posted within** | Last 24 hours or last week. LinkedIn is searched without filters; this window only drops older posts when a keyword returns more than 100 posts. |
-| **Run headless** | On by default: no browser window during runs. Turn it off to watch the browser, or if LinkedIn starts returning fewer posts than usual. |
-| **Max posts per keyword** | How many posts are read per search (default 60, at most 200). |
-
-If you are signed out, or LinkedIn shows a security check, LinKit All **stops this source for
-the run** and tells you (a notification and an event in the run log). The other sources carry
-on. Fix it in Setup, then run again. It never tries to get around the check.
+| **Keywords** | One per line, English or Arabic, for example `python developer hiring` or `مطلوب مهندس`. Each keyword is one Google search of up to 5 result pages. Only the first 5 keywords are used. |
+| **Posted within** | Last 24 hours or last week. Google is asked for this window, and posts older than it are dropped. |
+| **Max posts per keyword** | How many posts are read per keyword (default 30; Google gives at most 50). |
+| **Run headless** | On by default: no browser window during runs. Turn it off to watch the browser, or if Google asks for checks often. |
 
 ## What happens to a post
 
@@ -81,19 +88,3 @@ first real application.
 **By form or link.** If the post gives a link instead, the job goes through the normal
 [applying](applying.md) flow: a known ATS handler if there is one, otherwise the generic form
 agent, with the same dry-run and confirm rules.
-
-## Capturing a page for the developers
-
-LinkedIn changes its markup often, and the post reader is written from a saved copy of a real
-page. To help, save one from the command line (sign in through Setup first):
-
-```
-linkit linkedin capture --keywords "hiring python developer"
-```
-
-It opens the search headless (add `--headed` to see it), saves the page as an HTML file under the
-data folder's `captures` directory (or the path given by `--out`), and prints where.
-
-!!! warning "The file is a copy of your own LinkedIn page"
-    It can contain your name, your connections and other account data. Open it and review it
-    before you send it to anyone, and remove what you do not want to share.

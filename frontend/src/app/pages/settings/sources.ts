@@ -150,11 +150,11 @@ const OWN_BLOCK = new Set(['telegram', 'linkedin_posts']);
           </div>
           @if (!liOn() && !liAck()) { <p class="hint">{{ 'setup.linkedin.needAck' | t }}</p> }
         </div>
-        <div class="flex flex-wrap gap-3">
-          <button type="button" class="btn" (click)="liSignin()" [disabled]="liBusy()">{{ 'setup.linkedin.signin' | t }}</button>
-          <button type="button" class="btn" (click)="liCheck()" [disabled]="liBusy()">{{ 'setup.linkedin.check' | t }}</button>
+        @if (liCheckNeeded()) { <div class="alert alert-error" role="alert">{{ 'setup.linkedin.google.needed' | t }}</div> }
+        <div>
+          <button type="button" class="btn" (click)="liSolve()" [disabled]="liBusy()">{{ 'setup.linkedin.google.solve' | t }}</button>
+          <p class="hint">{{ 'setup.linkedin.google.hint' | t }}</p>
         </div>
-        <p class="hint">{{ 'setup.linkedin.checkHint' | t }}</p>
         @if (liNote(); as n) { <div class="alert" [class.alert-ok]="n.kind === 'ok'" [class.alert-info]="n.kind === 'info'" [class.alert-error]="n.kind === 'error'" role="status" dir="auto">{{ n.text }}</div> }
         <app-field key="sources.linkedin_keywords" for="li-keywords" [label]="'setup.linkedin.keywords' | t" [hint]="'setup.linkedin.keywordsHint' | t">
           <textarea id="li-keywords" dir="auto" class="input h-28" [value]="unlines(store.cfg.sources.linkedin_keywords)" (change)="store.update('sources.linkedin_keywords', lines(val($event)))"
@@ -168,7 +168,7 @@ const OWN_BLOCK = new Set(['telegram', 'linkedin_posts']);
             </select>
           </app-field>
           <app-field key="sources.linkedin_max_posts" for="li-max" [label]="'setup.linkedin.maxPosts' | t">
-            <input id="li-max" type="number" min="1" max="200" class="input" [value]="store.cfg.sources.linkedin_max_posts" (change)="store.update('sources.linkedin_max_posts', num($event))">
+            <input id="li-max" type="number" min="1" max="50" class="input" [value]="store.cfg.sources.linkedin_max_posts" (change)="store.update('sources.linkedin_max_posts', num($event))">
           </app-field>
         </div>
         <app-field key="sources.linkedin_headless" for="li-headless" [check]="true" [label]="'setup.linkedin.headless' | t" [hint]="'setup.linkedin.headlessHint' | t">
@@ -219,12 +219,14 @@ export class SourcesSection implements OnInit {
   protected readonly liAck = signal(readAck());
   protected readonly liBusy = signal(false);
   protected readonly liNote = signal<Note | null>(null);
+  protected readonly liCheckNeeded = signal(false);
 
   ngOnInit(): void {
     this.api.get<SourceList>('/sources').then((l) => this.list.set(l)).catch(() => this.loadFailed.set(true)).finally(() => this.loading.set(false));
     void this.loadKeys();
     // no CV or country yet: nothing is recommended, which is fine
     this.api.get<InferPayload>('/infer').then((p) => this.rec.set(new Set(p.sources.enabled))).catch(() => undefined);
+    this.api.get<{ needed: boolean }>('/linkedin/google-check').then((r) => this.liCheckNeeded.set(r.needed)).catch(() => undefined);
   }
 
   protected val(e: Event): string {
@@ -307,25 +309,13 @@ export class SourcesSection implements OnInit {
     }
   }
 
-  protected async liSignin(): Promise<void> {
-    await this.li(async () => {
-      await this.api.post('/linkedin/signin');
-      return { kind: 'info', text: this.i18n.t('setup.linkedin.signinHint') };
-    });
-  }
-
-  protected async liCheck(): Promise<void> {
-    await this.li(async () => {
-      const r = await this.api.get<{ state: 'ok' | 'logged_out' | 'challenge' }>('/linkedin/session');
-      return { kind: r.state === 'ok' ? 'ok' : 'error', text: this.i18n.t('setup.linkedin.session.' + r.state) };
-    });
-  }
-
-  private async li(action: () => Promise<Note>): Promise<void> {
+  /** Opens Google in the app browser, on the searches' own profile; the user solves the check there. */
+  protected async liSolve(): Promise<void> {
     this.liBusy.set(true);
     this.liNote.set(null);
     try {
-      this.liNote.set(await action());
+      await this.api.post('/linkedin/google-check');
+      this.liNote.set({ kind: 'info', text: this.i18n.t('setup.linkedin.google.opened') });
     } catch (e) {
       this.liNote.set({ kind: 'error', text: (e as Error).message });
     } finally {

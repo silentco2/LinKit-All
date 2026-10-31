@@ -99,7 +99,7 @@ def test_linkedin_search_fields_default_and_round_trip(client: TestClient) -> No
 
     old = SearchConfig.model_validate({"sources": {"enabled": ["telegram"]}}).sources
     assert (old.linkedin_keywords, old.linkedin_window) == ([], "week")
-    assert (old.linkedin_max_posts, old.linkedin_headless) == (60, True)
+    assert (old.linkedin_max_posts, old.linkedin_headless) == (30, True)
     fields = {"linkedin_keywords": ["python dev", "مهندس"], "linkedin_window": "day",
               "linkedin_max_posts": 25, "linkedin_headless": False}  # fmt: skip
     body = {"sources": {"enabled": ["linkedin_posts"], **fields}}
