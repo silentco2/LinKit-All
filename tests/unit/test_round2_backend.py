@@ -230,20 +230,24 @@ def test_places_derive_filters_and_answers(client: TestClient) -> None:  # noqa:
         {"label": "Cairo, Egypt", "city": "Cairo", "country": "EG", "work": "allowed"},
         {"label": "Dubai", "city": "Dubai", "country": "ae", "work": "visa"},
     ]
-    body = {"search": {"places": places, "remote": False, "locations": ["junk"]}}
+    modes = ["hybrid", "onsite"]
+    body = {
+        "search": {"places": places, "remote": True, "locations": ["junk"]},
+        "filters": {"work_modes": modes},
+    }
     got = client.put("/api/search", json=body, headers=SAME_ORIGIN).json()
     assert got["search"]["locations"] == ["Cairo, Egypt", "Dubai"]
     assert got["filters"]["locations"] == ["cairo, egypt", "dubai"]
-    assert got["filters"]["work_modes"] == ["hybrid", "onsite"]
+    assert got["filters"]["work_modes"] == modes and got["search"]["remote"] is False
     assert got["sources"]["jobspy_country"] == "egypt"
     answers = client.get("/api/profile/answers").json()
     assert answers["authorized_countries"] == ["EG"] and answers["visa_countries"] == ["AE"]
     assert answers["willing_to_relocate"] is True  # Dubai is outside Egypt
 
-    body["search"] = {"places": places[:1], "remote": True}
+    body = {"search": {"places": places[:1]}, "filters": {"work_modes": ["remote"]}}
     got = client.put("/api/search", json=body, headers=SAME_ORIGIN).json()
     assert got["search"]["locations"] == ["Cairo, Egypt", "Remote"]
-    assert got["filters"]["work_modes"] == ["remote", "hybrid", "onsite"]
+    assert got["filters"]["work_modes"] == ["remote"] and got["search"]["remote"] is True
     answers = client.get("/api/profile/answers").json()
     assert answers["visa_countries"] == [] and answers["willing_to_relocate"] is True  # kept
 
@@ -265,13 +269,54 @@ def test_old_locations_show_as_places_without_saving(client: TestClient) -> None
     client.put("/api/search", json=old, headers=SAME_ORIGIN)
     got = client.get("/api/search").json()["search"]
     assert [(p["label"], p["country"], p["work"]) for p in got["places"]] == [
-        ("Cairo, Egypt", "EG", "allowed"),
-        ("Dubai", "AE", "allowed"),
+        ("Cairo, Egypt", "EG", "ask"),
+        ("Dubai", "AE", "ask"),
     ]
     assert got["locations"] == ["Cairo, Egypt", "Dubai", "Remote"]
     saved = load_search(client.app.state.db)  # type: ignore[attr-defined]
     assert saved is not None and saved.search.places == []  # nothing was written
     assert client.get("/api/profile/answers").json()["authorized_countries"] == []
+
+
+def test_saving_synthesized_places_writes_no_work_rights(client: TestClient) -> None:  # noqa: F811
+    save_profile(client, home_country="EG")
+    client.put(
+        "/api/search",
+        json={"search": {"locations": ["Cairo, Egypt", "Dubai"]}},
+        headers=SAME_ORIGIN,
+    )
+    shown = client.get("/api/search").json()
+    assert {p["work"] for p in shown["search"]["places"]} == {"ask"}
+    got = client.put(
+        "/api/search", json=shown, headers=SAME_ORIGIN
+    ).json()  # any later edit saves them
+    assert [p["work"] for p in got["search"]["places"]] == ["ask", "ask"]
+    answers = client.get("/api/profile/answers").json()
+    assert answers["authorized_countries"] == [] and answers["visa_countries"] == []
+    assert answers["willing_to_relocate"] is None
+
+
+def test_only_explicit_places_change_the_country_lists(client: TestClient) -> None:  # noqa: F811
+    save_profile(client, home_country="EG")
+    answers = client.get("/api/profile/answers").json() | {
+        "authorized_countries": ["Germany", "EG"]
+    }
+    assert client.put("/api/profile/answers", json=answers, headers=SAME_ORIGIN).status_code == 200
+
+    def put(places: list[dict[str, str]]) -> dict[str, Any]:
+        body = {"search": {"places": places}}
+        client.put("/api/search", json=body, headers=SAME_ORIGIN)
+        return client.get("/api/profile/answers").json()  # type: ignore[no-any-return]
+
+    ask = [{"label": "Cairo", "country": "EG"}, {"label": "Dubai", "country": "AE"}]
+    got = put(ask)  # unanswered places add nothing and remove nothing
+    assert got["authorized_countries"] == ["Germany", "EG"] and got["visa_countries"] == []
+    got = put([{**ask[0], "work": "visa"}, {**ask[1], "work": "allowed"}])
+    assert got["authorized_countries"] == ["Germany", "AE"] and got["visa_countries"] == ["EG"]
+    got = put([{**ask[0], "work": "visa"}, ask[1]])  # Dubai back to unanswered: taken off again
+    assert got["authorized_countries"] == ["Germany"] and got["visa_countries"] == ["EG"]
+    got = put([])  # clearing keeps what no place ever decided
+    assert got["authorized_countries"] == ["Germany"] and got["visa_countries"] == []
 
 
 def test_place_needs_label_and_iso2() -> None:

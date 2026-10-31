@@ -138,12 +138,13 @@ def normalize_channel(raw: str) -> str:
 
 
 class Place(BaseModel):
-    """A place you would work: `allowed` = you may work there, `visa` = you would need a visa."""
+    """A place you would work: `allowed` = you may work there, `visa` = you would need a visa,
+    `ask` (the default) = not answered yet: work rights are never assumed, forms ask you."""
 
     label: str
     city: str = ""
     country: str = ""  # ISO2; empty only for a place migrated from an old free-text location
-    work: Literal["allowed", "visa"]
+    work: Literal["allowed", "visa", "ask"] = "ask"
 
     @field_validator("label", "city")
     @classmethod

@@ -1,220 +1,212 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
-import { TPipe } from '../../i18n';
-import { expandQueries, lines, unlines } from '../../types';
-import { Saved, Field } from './saved';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Api } from '../../api';
+import { ChipOption, ChipSelect } from '../../components/chip-select';
+import { Countries } from '../../components/countries';
+import { PlacesList } from '../../components/places-list';
+import { TagInput } from '../../components/tag-input';
+import { I18n, TPipe } from '../../i18n';
+import { expandQueries, Place, WorkMode } from '../../types';
+import { Field } from './saved';
 import { SettingsStore } from './store';
 
-const CHIP = 'inline-flex items-center gap-1 rounded-full border border-brand-500 bg-brand-50 py-0.5 ps-3 pe-1 text-sm font-medium text-brand-700 dark:bg-slate-800 dark:text-white';
+const WORK_MODES: WorkMode[] = ['remote', 'hybrid', 'onsite'];
+const SENIORITIES = ['intern', 'junior', 'mid', 'senior', 'lead', 'manager', 'executive'];
+const POSTED: [string, number | null, string][] = [
+  ['24', 24, 'posted.h24'], ['72', 72, 'posted.d3'], ['168', 168, 'posted.w1'], ['336', 336, 'posted.w2'], ['720', 720, 'posted.m1'], ['any', null, 'posted.any'],
+];
+const ONE: Record<string, string[]> = Object.fromEntries([...POSTED.map(([k]) => k), 'custom'].map((k) => [k, [k]])); // stable arrays for [selected]
+const FALLBACK_CURRENCIES = ['EGP', 'SAR', 'AED', 'QAR', 'KWD', 'BHD', 'OMR', 'JOD', 'USD', 'EUR', 'GBP'];
 
 /** Settings > Jobs & places: what to look for and where. Everything saves as you edit. */
 @Component({
   selector: 'app-settings-jobs',
-  imports: [Field, Saved, TPipe],
+  imports: [ChipSelect, Field, PlacesList, TagInput, TPipe],
   template: `
     <div class="space-y-6">
       <section class="card space-y-5">
         <h2>{{ 'welcome.jobs.title' | t }}</h2>
 
         <app-field key="search.queries" for="role-add" [label]="'welcome.jobs.roles' | t" [hint]="'setup.search.queriesHint' | t">
-          <div class="flex flex-wrap items-center gap-2" role="list">
-            @for (r of store.cfg.search.queries; track r) {
-              <span role="listitem" [class]="chip">
-                <bdi>{{ r }}</bdi>
-                <button type="button" class="rounded-full px-1.5 hover:bg-brand-100 dark:hover:bg-slate-700" [attr.aria-label]="'settings.jobs.remove' | t: { name: r }" (click)="removeRole(r)"><span aria-hidden="true">×</span></button>
-              </span>
-            }
-          </div>
-          <div class="mt-2 flex max-w-md gap-2">
-            <input #roleIn id="role-add" class="input" dir="auto" [placeholder]="'welcome.jobs.addRole' | t" (keydown.enter)="addRole(roleIn)" (change)="addRole(roleIn)">
-            <button type="button" class="btn" (click)="addRole(roleIn)">{{ 'welcome.jobs.add' | t }}</button>
-          </div>
+          <app-tag-input inputId="role-add" [values]="store.cfg.search.queries" [suggest]="titles" [split]="expand" [placeholder]="'welcome.jobs.addRole' | t"
+                         (changed)="store.update('search.queries', $event)" />
         </app-field>
 
-        <app-field key="search.locations" for="place-add" [label]="'welcome.jobs.where' | t" [hint]="'setup.search.locationsHint' | t">
-          <div class="flex flex-wrap items-center gap-2" role="list">
-            @for (p of places(); track p) {
-              <span role="listitem" [class]="chip">
-                <bdi>{{ p }}</bdi>
-                <button type="button" class="rounded-full px-1.5 hover:bg-brand-100 dark:hover:bg-slate-700" [attr.aria-label]="'settings.jobs.remove' | t: { name: p }" (click)="removePlace(p)"><span aria-hidden="true">×</span></button>
-              </span>
-            }
-          </div>
-          <div class="mt-2 flex max-w-md gap-2">
-            <input #placeIn id="place-add" class="input" dir="auto" [placeholder]="'welcome.jobs.addPlace' | t" (keydown.enter)="addPlace(placeIn)" (change)="addPlace(placeIn)">
-            <button type="button" class="btn" (click)="addPlace(placeIn)">{{ 'welcome.jobs.add' | t }}</button>
-          </div>
-          <label class="mt-3 flex items-center gap-2 text-sm">
-            <input type="checkbox" role="switch" [checked]="remoteOn()" (change)="setRemote($event)"> {{ 'welcome.jobs.remote' | t }}
-          </label>
+        <app-field key="search.places" [label]="'welcome.jobs.where' | t">
+          <app-places-list [places]="shown()" (changed)="setPlaces($event)" />
+        </app-field>
+
+        <app-field key="filters.work_modes" [label]="'welcome.jobs.modes' | t">
+          <app-chip-select [options]="modeOptions()" [selected]="store.cfg.filters.work_modes" [label]="'welcome.jobs.modes' | t" (changed)="setModes($event)" />
+          @if (modesNote()) { <p class="mt-1 text-xs text-rose-700 dark:text-rose-400" role="alert">{{ 'settings.jobs.modesNeed' | t }}</p> }
         </app-field>
 
         <app-field key="filters.seniority" [label]="'welcome.jobs.level' | t" [hint]="'settings.jobs.levelHint' | t">
-          <div class="flex flex-wrap items-center gap-2" role="group">
-            @for (s of seniorities; track s) {
-              <button type="button" [class]="levelClass(has(s))" [attr.aria-pressed]="has(s)" (click)="toggleLevel(s)">{{ 'setup.seniority.' + s | t }}</button>
-            }
-          </div>
+          <app-chip-select [options]="levelOptions()" [selected]="store.cfg.filters.seniority" [label]="'welcome.jobs.level' | t" (changed)="store.update('filters.seniority', $event)" />
         </app-field>
 
-        <div class="max-w-xs">
-          <app-field key="search.posted_within_days" for="days" [label]="'setup.search.days' | t">
-            <input id="days" type="number" min="1" step="1" class="input" [value]="store.cfg.search.posted_within_days" (change)="store.update('search.posted_within_days', num($event))">
-          </app-field>
-        </div>
+        <app-field key="search.posted_within_hours" [label]="'settings.jobs.posted' | t">
+          <app-chip-select [options]="postedOptions()" [selected]="postedSelected()" [single]="true" [label]="'settings.jobs.posted' | t" (changed)="setPosted($event[0])" />
+          @if (custom()) {
+            <div class="mt-3 flex max-w-xs gap-2" dir="ltr">
+              <input type="number" min="1" step="1" class="input" [attr.aria-label]="'posted.custom' | t" [value]="customAmount()" (change)="setCustom($event)">
+              <select class="input !w-auto" [attr.aria-label]="'posted.unit' | t" (change)="setUnit($event)">
+                <option value="hours" [selected]="unit() === 'hours'">{{ 'posted.hours' | t }}</option>
+                <option value="days" [selected]="unit() === 'days'">{{ 'posted.days' | t }}</option>
+              </select>
+            </div>
+          }
+        </app-field>
       </section>
 
       <section class="card space-y-5">
         <h2>{{ 'setup.filters.title' | t }}</h2>
         <p class="text-sm text-slate-600 dark:text-slate-400">{{ 'setup.filters.intro' | t }}</p>
-        <div class="grid gap-4 sm:grid-cols-2">
-          <app-field key="filters.title_exclude" for="exc" [label]="'setup.filters.exclude' | t" [hint]="'settings.oneLine' | t">
-            <textarea id="exc" dir="auto" class="input h-24" [value]="unlines(store.cfg.filters.title_exclude)" (change)="store.update('filters.title_exclude', lines(val($event)))" placeholder="intern&#10;director"></textarea>
-          </app-field>
-          <app-field key="filters.company_blacklist" for="black" [label]="'setup.filters.blacklist' | t" [hint]="'settings.oneLine' | t">
-            <textarea id="black" dir="auto" class="input h-24" [value]="unlines(store.cfg.filters.company_blacklist)" (change)="store.update('filters.company_blacklist', lines(val($event)))"></textarea>
-          </app-field>
-        </div>
-
-        <app-field key="filters.one_per_company" for="one" [check]="true" [label]="'setup.filters.onePer' | t">
-          <input id="one" type="checkbox" class="mt-1" [checked]="store.cfg.filters.one_per_company" (change)="store.update('filters.one_per_company', checked($event))">
+        <app-field key="filters.title_exclude" for="exc" [label]="'setup.filters.exclude' | t">
+          <app-tag-input inputId="exc" [values]="store.cfg.filters.title_exclude" placeholder="intern" (changed)="store.update('filters.title_exclude', $event)" />
         </app-field>
+        <app-field key="filters.company_blacklist" for="black" [label]="'setup.filters.blacklist' | t">
+          <app-tag-input inputId="black" [values]="store.cfg.filters.company_blacklist" (changed)="store.update('filters.company_blacklist', $event)" />
+        </app-field>
+      </section>
 
-        <div>
-          <div class="flex items-center gap-2">
-            <label class="flex items-center gap-2 text-sm font-medium">
-              <input type="checkbox" role="switch" [checked]="salaryOn()" (change)="setSalary($event)"> {{ 'settings.jobs.salaryOn' | t }}
-            </label>
-            <app-saved class="ms-auto" field="filters.salary_floor_monthly" />
-          </div>
-          @if (salaryOn()) {
-            <div class="mt-3 grid gap-4 sm:grid-cols-2">
-              <app-field key="filters.salary_floor_monthly" for="salary" [label]="'setup.filters.salary' | t">
-                <input id="salary" type="number" min="1" step="1" class="input" [value]="store.cfg.filters.salary_floor_monthly || ''" (change)="store.update('filters.salary_floor_monthly', num($event, 0))">
-              </app-field>
-              <app-field key="filters.salary_currency" for="cur" [label]="'setup.filters.currency' | t">
-                <select id="cur" class="input" dir="ltr" (change)="store.update('filters.salary_currency', val($event))">
-                  @for (c of currencies(); track c) { <option [value]="c" [selected]="c === store.cfg.filters.salary_currency">{{ c }}</option> }
-                </select>
-              </app-field>
-            </div>
-            <p class="hint">{{ 'settings.jobs.salaryHint' | t }}</p>
-          }
+      <section class="card space-y-5">
+        <h2>{{ 'settings.jobs.salary' | t }}</h2>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <app-field key="answers.salary_expectation" for="salary" [label]="'settings.jobs.salaryMonthly' | t">
+            <input id="salary" type="number" min="0" step="1" dir="ltr" class="input" [value]="store.answers.salary_expectation" (change)="setSalary($event)">
+          </app-field>
+          <app-field key="answers.salary_currency" for="cur" [label]="'setup.filters.currency' | t">
+            @if (ratesTried()) {
+              <select id="cur" class="input" dir="ltr" (change)="store.update('answers.salary_currency', val($event))">
+                @for (c of currencyList(); track c) { <option [value]="c" [selected]="c === currency()">{{ c }}</option> }
+              </select>
+            }
+          </app-field>
         </div>
+        <app-field key="filters.skip_below_expectation" for="skip" [check]="true" [label]="'settings.jobs.skipBelow' | t">
+          <input id="skip" type="checkbox" class="mt-1" [checked]="store.cfg.filters.skip_below_expectation" (change)="store.update('filters.skip_below_expectation', checked($event))">
+        </app-field>
+        @if (fxDate()) { <p class="hint !mt-0">{{ 'settings.jobs.salaryNote' | t: { date: fxDate() } }}</p> }
       </section>
     </div>
   `,
 })
 export class JobsSection implements OnInit {
   protected readonly store = inject(SettingsStore);
-  protected readonly lines = lines;
-  protected readonly unlines = unlines;
-  protected readonly chip = CHIP;
-  protected readonly seniorities = ['intern', 'junior', 'mid', 'senior', 'lead', 'manager', 'executive'];
-  private readonly allCurrencies = ['EGP', 'SAR', 'AED', 'QAR', 'KWD', 'BHD', 'OMR', 'JOD', 'USD', 'EUR', 'GBP'];
-  protected readonly salaryOn = signal(false);
+  private readonly api = inject(Api);
+  private readonly i18n = inject(I18n);
+  private readonly countries = inject(Countries);
+
+  protected readonly expand = expandQueries;
+  protected readonly titles = (q: string) => this.api.get<string[]>(`/suggest/titles?q=${encodeURIComponent(q)}`);
+
+  protected readonly shown = signal<Place[]>([]);
+  protected readonly modesNote = signal(false);
+  protected readonly custom = signal(false);
+  protected readonly unit = signal<'hours' | 'days'>('days');
+  protected readonly currencies = signal<string[]>(FALLBACK_CURRENCIES);
+  protected readonly fxDate = signal('');
+  /** The currency list is drawn once the rates answered (or failed): a list that changes under a <select> loses its selection. */
+  protected readonly ratesTried = signal(false);
+  /** The user took the pre-added home country off the list (nothing saved: no places means anywhere). */
+  private homeOff = false;
 
   ngOnInit(): void {
-    this.salaryOn.set(this.store.cfg.filters.salary_floor_monthly > 0);
+    this.unit.set(this.hours() !== null && this.hours()! % 24 !== 0 ? 'hours' : 'days');
+    this.custom.set(this.hours() !== null && !POSTED.some(([, h]) => h === this.hours()));
+    this.syncPlaces();
+    void this.countries.load().then(() => this.syncPlaces());
+    this.api.get<{ date: string; currencies: string[] }>('/fx').then((fx) => {
+      if (fx.currencies.length) this.currencies.set(fx.currencies);
+      this.fxDate.set(fx.date);
+    }).catch(() => {}).finally(() => this.ratesTried.set(true));
   }
 
   protected val(e: Event): string {
-    return (e.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value;
+    return (e.target as HTMLInputElement | HTMLSelectElement).value;
   }
 
   protected checked(e: Event): boolean {
     return (e.target as HTMLInputElement).checked;
   }
 
-  /** The number in the box; an empty box is NaN, which the server rejects with a message for this field. */
-  protected num(e: Event, empty = NaN): number {
-    const box = e.target as HTMLInputElement;
-    return box.value.trim() === '' ? empty : box.valueAsNumber;
+  // ---- places ------------------------------------------------------------------------------
+
+  /** The saved places; with none saved, the home country with no work right chosen (written only when the user edits). */
+  private syncPlaces(): void {
+    const saved = this.store.cfg.search.places;
+    const iso = this.store.profile.home_country;
+    const home = iso ? this.countries.byIso(iso) : undefined;
+    this.shown.set(saved.length ? saved : home && !this.homeOff ? [{ label: home.name, city: '', country: home.iso2, work: 'ask' }] : saved);
   }
 
-  // ---- roles ---------------------------------------------------------------------------
-
-  /** The text of an "add" box, which is emptied; "" when there is none. */
-  private take(box: HTMLInputElement): string {
-    const v = box.value.trim();
-    box.value = '';
-    return v;
+  protected setPlaces(list: Place[]): void {
+    if (!list.length) this.homeOff = true;
+    if (list.length || this.store.cfg.search.places.length) this.store.update('search.places', list);
+    this.syncPlaces();
   }
 
-  protected addRole(box: HTMLInputElement): void {
-    const v = this.take(box);
-    if (!v) return;
-    // "React/Next.JS Developer" becomes two chips
-    this.store.update('search.queries', expandQueries([...this.store.cfg.search.queries, v]));
+  // ---- work modes, level, posted within ----------------------------------------------------
+
+  // computed: a new array on every check would make Angular think the input keeps changing
+  protected readonly modeOptions = computed<ChipOption[]>(() => WORK_MODES.map((m) => ({ value: m, label: this.i18n.t(`mode.${m}`) })));
+  protected readonly levelOptions = computed<ChipOption[]>(() => SENIORITIES.map((s) => ({ value: s, label: this.i18n.t(`setup.seniority.${s}`) })));
+  protected readonly postedOptions = computed<ChipOption[]>(() => [...POSTED.map(([value, , key]) => ({ value, label: this.i18n.t(key) })), { value: 'custom', label: this.i18n.t('posted.customChip') }]);
+
+  protected setModes(modes: string[]): void {
+    this.modesNote.set(!modes.length);
+    if (modes.length) this.store.update('filters.work_modes', modes);
   }
 
-  protected removeRole(r: string): void {
-    this.store.update('search.queries', this.store.cfg.search.queries.filter((q) => q !== r));
+  private hours(): number | null {
+    return this.store.cfg.search.posted_within_hours;
   }
 
-  // ---- one "Where" list: search.locations as typed, filters.locations lowercased -------------------
-
-  /** The union of both lists without "Remote" (that is the switch), so lists that drifted apart show everything. */
-  protected places(): string[] {
-    const seen = new Map<string, string>();
-    for (const p of [...this.store.cfg.search.locations, ...this.store.cfg.filters.locations]) {
-      const t = p.trim();
-      if (t && t.toLowerCase() !== 'remote' && !seen.has(t.toLowerCase())) seen.set(t.toLowerCase(), t);
-    }
-    return [...seen.values()];
+  protected postedSelected(): string[] {
+    return ONE[this.custom() ? 'custom' : (POSTED.find(([, h]) => h === this.hours())?.[0] ?? 'custom')];
   }
 
-  protected remoteOn(): boolean {
-    return this.store.cfg.filters.work_modes.includes('remote');
+  protected setPosted(v: string): void {
+    this.custom.set(v === 'custom');
+    if (v === 'custom') return this.unit.set(this.hours() !== null && this.hours()! % 24 !== 0 ? 'hours' : 'days');
+    this.store.update('search.posted_within_hours', POSTED.find(([k]) => k === v)?.[1] ?? null);
   }
 
-  /** Write both lists (and the work modes when `remote` changed) from one list of places. */
-  private writeWhere(places: string[], remote: boolean, modesToo: boolean): void {
-    const all = remote ? [...places, 'Remote'] : places;
-    const { search, filters } = this.store.cfg;
-    search.locations = all;
-    filters.locations = all.map((p) => p.toLowerCase());
-    if (modesToo) filters.work_modes = remote ? ['remote', 'hybrid', 'onsite'] : ['hybrid', 'onsite'];
-    this.store.touch('search.locations', ['filters.locations', ...(modesToo ? ['filters.work_modes'] : [])]);
+  protected customAmount(): number | string {
+    const h = this.hours();
+    return h === null ? '' : this.unit() === 'days' ? Math.max(1, Math.round(h / 24)) : h;
   }
 
-  protected addPlace(box: HTMLInputElement): void {
-    const v = this.take(box);
-    if (!v || this.places().some((p) => p.toLowerCase() === v.toLowerCase())) return;
-    this.writeWhere([...this.places(), v], this.remoteOn(), false);
+  protected setCustom(e: Event): void {
+    const n = Math.round((e.target as HTMLInputElement).valueAsNumber);
+    if (n >= 1) this.store.update('search.posted_within_hours', n * (this.unit() === 'days' ? 24 : 1));
+    else (e.target as HTMLInputElement).value = String(this.customAmount()); // empty or 0: keep the saved period
   }
 
-  protected removePlace(p: string): void {
-    this.writeWhere(this.places().filter((x) => x !== p), this.remoteOn(), false);
+  protected setUnit(e: Event): void {
+    const was = this.customAmount();
+    this.unit.set(this.val(e) === 'hours' ? 'hours' : 'days');
+    if (typeof was === 'number') this.store.update('search.posted_within_hours', was * (this.unit() === 'days' ? 24 : 1));
   }
 
-  protected setRemote(e: Event): void {
-    this.writeWhere(this.places(), this.checked(e), true);
+  // ---- salary ------------------------------------------------------------------------------
+
+  /** The saved currency, else the home country's. */
+  protected currency(): string {
+    const home = this.countries.byIso(this.store.profile.home_country)?.currency;
+    return this.store.answers.salary_currency || home || this.currencies()[0];
   }
 
-  // ---- level, salary ---------------------------------------------------------------------
-
-  protected has(level: string): boolean {
-    return this.store.cfg.filters.seniority.includes(level as never);
+  /** The list, plus the current currency when the rates do not know it. */
+  protected currencyList(): string[] {
+    const cur = this.currency();
+    return this.currencies().includes(cur) ? this.currencies() : [cur, ...this.currencies()];
   }
 
-  protected levelClass(on: boolean): string {
-    return `rounded-full border px-3 py-1 text-sm ${on ? 'border-brand-500 bg-brand-50 font-medium text-brand-700 dark:bg-slate-800 dark:text-white' : 'border-slate-300 text-slate-500 dark:border-slate-700 dark:text-slate-400'}`;
-  }
-
-  protected toggleLevel(level: string): void {
-    const cur = this.store.cfg.filters.seniority as string[];
-    this.store.update('filters.seniority', this.seniorities.filter((s) => (s === level ? !cur.includes(s) : cur.includes(s))));
-  }
-
-  /** Off saves "no floor" (0); on only shows the box, nothing changes until a number is entered. */
+  /** Saving an amount also saves the currency that is showing, so the pair always travels together. */
   protected setSalary(e: Event): void {
-    const on = this.checked(e);
-    this.salaryOn.set(on);
-    if (!on) this.store.update('filters.salary_floor_monthly', 0);
-  }
-
-  protected currencies(): string[] {
-    const cur = this.store.cfg.filters.salary_currency;
-    return this.allCurrencies.includes(cur) ? this.allCurrencies : [cur, ...this.allCurrencies];
+    const v = this.val(e).trim();
+    this.store.update('answers.salary_expectation', v);
+    if (v && !this.store.answers.salary_currency) this.store.update('answers.salary_currency', this.currency());
   }
 }

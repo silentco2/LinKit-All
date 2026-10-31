@@ -109,8 +109,11 @@ export function expandQueries(queries: string[]): string[] {
   return [...seen.values()];
 }
 
+/** A place you would work: `allowed` = you may work there, `visa` = you would need a visa, `ask` = not answered (never assumed). `country` is ISO2. */
+export interface Place { label: string; city: string; country: string; work: 'allowed' | 'visa' | 'ask' }
+
 export interface SearchConfig {
-  search: { queries: string[]; locations: string[]; posted_within_days: number; max_results_per_query: number };
+  search: { queries: string[]; locations: string[]; places: Place[]; remote: boolean; posted_within_hours: number | null; max_results_per_query: number };
   sources: { companies: string[]; jobspy: string[]; jobspy_country: string; regional: string[]; enabled: string[]; telegram_channels: string[]; use_discovered_boards: boolean; boards_per_run: number; linkedin_keywords: string[]; linkedin_window: 'day' | 'week'; linkedin_max_posts: number; linkedin_headless: boolean };
   filters: {
     title_include: string[];
@@ -120,6 +123,7 @@ export interface SearchConfig {
     seniority: string[];
     salary_floor_monthly: number;
     salary_currency: string;
+    skip_below_expectation: boolean;
     company_blacklist: string[];
     one_per_company: boolean;
   };
@@ -200,6 +204,8 @@ export interface ApplicationAnswers {
   heard_about: string;
   willing_to_relocate: boolean | null;
   authorized_countries: string[];
+  /** Derived from the places on the Jobs page. */
+  visa_countries: string[];
   needs_sponsorship: boolean | null;
   salary_expectation: string;
   salary_currency: string;
