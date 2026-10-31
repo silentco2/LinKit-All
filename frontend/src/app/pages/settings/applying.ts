@@ -77,10 +77,33 @@ const MODE = 'rounded-lg border p-3 text-start text-sm focus-visible:outline-2 f
         }
       </section>
 
+
+      <section class="card space-y-4">
+        <h2>{{ 'settings.apply.limits' | t }}</h2>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <app-field key="apply.max_per_run" for="lim-run" [label]="'setup.apply.maxRun' | t">
+            <input id="lim-run" type="number" min="1" max="100" class="input" [value]="store.cfg.apply.max_per_run" (change)="store.update('apply.max_per_run', num($event))">
+          </app-field>
+          <app-field key="apply.daily_cap_per_site" for="lim-day" [label]="'setup.apply.daily' | t" [hint]="'setup.apply.dailyHint' | t">
+            <input id="lim-day" type="number" min="1" max="200" class="input" [value]="store.cfg.apply.daily_cap_per_site" (change)="store.update('apply.daily_cap_per_site', num($event))">
+          </app-field>
+          <app-field key="apply.email_daily_cap" for="lim-mail" [label]="'setup.email.cap' | t" [hint]="'setup.email.capHint' | t">
+            <input id="lim-mail" type="number" min="1" max="100" class="input" [value]="store.cfg.apply.email_daily_cap" (change)="store.update('apply.email_daily_cap', num($event))">
+          </app-field>
+        </div>
+      </section>
+
       <section class="card space-y-4">
         <h2>{{ 'settings.apply.how' | t }}</h2>
-        <app-field key="apply.headless" for="show-window" [check]="true" [label]="'settings.apply.showWindow' | t" [hint]="'settings.apply.showWindowHint' | t">
-          <input id="show-window" type="checkbox" class="mt-1" [checked]="!store.cfg.apply.headless" (change)="store.update('apply.headless', !checked($event))">
+        <app-field key="apply.headless" [label]="'settings.apply.browser' | t" [hint]="'settings.apply.showWindowHint' | t">
+          <div class="grid gap-3 sm:grid-cols-2" role="radiogroup" [attr.aria-label]="'settings.apply.browser' | t">
+            @for (hide of [false, true]; track hide) {
+              <label [class]="card(store.cfg.apply.headless === hide)">
+                <input type="radio" name="browser" class="sr-only" [checked]="store.cfg.apply.headless === hide" (change)="store.update('apply.headless', hide)">
+                <span class="block font-medium">{{ (hide ? 'settings.apply.hideWindow' : 'settings.apply.showWindow') | t }}</span>
+              </label>
+            }
+          </div>
         </app-field>
         <app-field key="apply.generic_agent" for="agent" [check]="true" [label]="'settings.apply.agent' | t" [hint]="'settings.apply.agentHint' | t">
           <input id="agent" type="checkbox" class="mt-1" [checked]="store.cfg.apply.generic_agent" (change)="store.update('apply.generic_agent', checked($event))">
@@ -115,6 +138,12 @@ export class ApplyingSection implements OnInit {
 
   protected checked(e: Event): boolean {
     return (e.target as HTMLInputElement).checked;
+  }
+
+  /** The number in the box; an empty box is NaN, which the server rejects with a message for this field. */
+  protected num(e: Event): number {
+    const box = e.target as HTMLInputElement;
+    return box.value.trim() === '' ? NaN : box.valueAsNumber;
   }
 
   protected modeClass(on: boolean): string {

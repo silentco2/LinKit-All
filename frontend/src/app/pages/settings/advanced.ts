@@ -7,10 +7,9 @@ import { Field } from './saved';
 import { SettingsStore } from './store';
 import { cardClass, Tuning } from './tuning';
 
-const MATCHING = ['matching.tier_high', 'matching.tier_mid', 'matching.ai_max_jobs', 'matching.batch_size', 'matching.auto_apply_low', 'filters.title_include', 'search.max_results_per_query'];
-const APPLYING = ['apply.max_per_run', 'apply.daily_cap_per_site', 'apply.min_pause_s', 'apply.max_pause_s', 'apply.parallel_sites', 'apply.submit_without_asking'];
+const MATCHING = ['matching.tier_high', 'matching.tier_mid', 'matching.ai_max_jobs', 'matching.batch_size', 'matching.auto_apply_low', 'filters.one_per_company', 'search.max_results_per_query'];
+const APPLYING = ['apply.min_pause_s', 'apply.max_pause_s', 'apply.parallel_sites', 'apply.submit_without_asking'];
 const TRUST = ['trust.enabled', 'trust.scam_threshold', 'trust.ghost_threshold', 'trust.filter_ghost', 'trust.allow_companies'];
-const DISCOVERY = ['sources.boards_per_run'];
 
 /** "Changed" and "Reset to preset / default" under one field, when its value is not the preset's or the default. */
 @Component({
@@ -106,10 +105,10 @@ export class Changed {
             </div>
 
             <div>
-              <app-field key="filters.title_include" for="adv-inc" [label]="'setup.filters.include' | t" [hint]="'settings.oneLine' | t">
-                <textarea id="adv-inc" dir="auto" class="input h-24" [value]="unlines(store.cfg.filters.title_include)" (change)="store.update('filters.title_include', lines(val($event)))" placeholder="engineer&#10;developer"></textarea>
+              <app-field key="filters.one_per_company" for="adv-one" [check]="true" [label]="'setup.filters.onePer' | t" [hint]="'settings.adv.onePerHint' | t">
+                <input id="adv-one" type="checkbox" class="mt-1" [checked]="store.cfg.filters.one_per_company" (change)="store.update('filters.one_per_company', checked($event))">
               </app-field>
-              <app-changed key="filters.title_include" [label]="'setup.filters.include' | t" />
+              <app-changed key="filters.one_per_company" [label]="'setup.filters.onePer' | t" />
             </div>
 
             <div class="max-w-xs">
@@ -126,18 +125,6 @@ export class Changed {
           <div class="mt-4 space-y-5">
             <p class="hint">{{ 'settings.adv.paceNote' | t }} <a routerLink="/settings/applying">{{ 'settings.s.applying' | t }}</a></p>
             <div class="grid gap-4 sm:grid-cols-2">
-              <div>
-                <app-field key="apply.max_per_run" for="adv-run" [label]="'setup.apply.maxRun' | t">
-                  <input id="adv-run" type="number" min="1" max="100" class="input" [value]="store.cfg.apply.max_per_run" (change)="store.update('apply.max_per_run', num($event))">
-                </app-field>
-                <app-changed key="apply.max_per_run" [label]="'setup.apply.maxRun' | t" />
-              </div>
-              <div>
-                <app-field key="apply.daily_cap_per_site" for="adv-day" [label]="'setup.apply.daily' | t" [hint]="'setup.apply.dailyHint' | t">
-                  <input id="adv-day" type="number" min="1" max="200" class="input" [value]="store.cfg.apply.daily_cap_per_site" (change)="store.update('apply.daily_cap_per_site', num($event))">
-                </app-field>
-                <app-changed key="apply.daily_cap_per_site" [label]="'setup.apply.daily' | t" />
-              </div>
               <div>
                 <app-field key="apply.min_pause_s" for="adv-min" [label]="'setup.apply.minPause' | t">
                   <input id="adv-min" type="number" min="0" class="input" [value]="store.cfg.apply.min_pause_s" (change)="store.update('apply.min_pause_s', num($event))">
@@ -215,16 +202,6 @@ export class Changed {
             </div>
           </div>
         </details>
-
-        <details class="card">
-          <summary [class]="summary">{{ 'settings.adv.discovery' | t }}@if (count(discovery) > 0) { <span class="ms-2 text-xs font-normal text-amber-700 dark:text-amber-300">{{ 'settings.adv.nChanged' | t: { n: count(discovery) } }}</span> }</summary>
-          <div class="mt-4 max-w-xs">
-            <app-field key="sources.boards_per_run" for="adv-boards" [label]="'setup.sources.perRun' | t">
-              <input id="adv-boards" type="number" min="0" max="20000" class="input" [value]="store.cfg.sources.boards_per_run" (change)="store.update('sources.boards_per_run', num($event))">
-            </app-field>
-            <app-changed key="sources.boards_per_run" [label]="'setup.sources.perRun' | t" />
-          </div>
-        </details>
       } @else if (tuning.error(); as e) {
         <div class="alert alert-error" role="alert" dir="auto">{{ e }}
           <button type="button" class="btn ms-2" (click)="tuning.load()">{{ 'welcome.retry' | t }}</button>
@@ -247,7 +224,6 @@ export class AdvancedSection implements OnInit {
   protected readonly matching = MATCHING;
   protected readonly applying = APPLYING;
   protected readonly trust = TRUST;
-  protected readonly discovery = DISCOVERY;
   protected readonly busy = signal(false);
   protected readonly result = signal<{ ok: boolean; text: string } | null>(null);
 
