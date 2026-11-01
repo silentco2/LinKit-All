@@ -13,7 +13,8 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from linkit_all.core.models import Job, JobState, Profile, Run, RunStatus, Tier
+from linkit_all.core.models import Job, JobState, Profile, Tier
+from linkit_all.core.runs import pause_run
 from linkit_all.core.search import SearchConfig
 from linkit_all.core.state import transition
 from linkit_all.matching.rank import LOW_OPT_IN, cv_text
@@ -73,16 +74,18 @@ async def score_jobs(
         if opt_in:  # opt-in turned on later: pick up earlier lows too
             old_lows = list(s.scalars(select(Job).filter_by(state=JobState.below_threshold)))
             for job in old_lows:
-                transition(s, job, JobState.queued_apply, LOW_OPT_IN)
+                transition(s, job, JobState.queued_apply, LOW_OPT_IN, code="low_opt_in")
             counts["requeued_low"] = len(old_lows)
         ranked = list(s.scalars(select(Job).filter_by(state=JobState.ranked)))
         ranked.sort(key=lambda j: -j.data.get("rank", 0))
         top, rest = ranked[: cfg.matching.ai_max_jobs], ranked[cfg.matching.ai_max_jobs :]
         for job in rest:  # the free prefilter decided: low tier, no AI spent
             job.tier = Tier.low
-            transition(s, job, JobState.below_threshold, "outside the top ranked jobs")
+            transition(
+                s, job, JobState.below_threshold, "outside the top ranked jobs", code="below_top"
+            )
             if opt_in:
-                transition(s, job, JobState.queued_apply, LOW_OPT_IN)
+                transition(s, job, JobState.queued_apply, LOW_OPT_IN, code="low_opt_in")
         counts["low"] += len(rest)
         batches = [
             [{"id": j.id, "title": j.title, "company": j.company, "location": j.location,
@@ -102,11 +105,14 @@ async def score_jobs(
                 render("score.j2", cv=cv, prefs=prefs, jobs=batch), ScoreBatch
             )
         except UsageLimitError as e:  # pause cleanly; ranked jobs are scored on resume
-            logger.warning("AI usage limit reached after {} batches: {}", n - 1, e)
+            logger.bind(code="ai_usage_limit", params={"batches": n - 1}).warning(
+                "AI usage limit reached after {} batches: {}", n - 1, e
+            )
             if run_id is not None:
-                with db.begin() as s:
-                    run = s.get_one(Run, run_id)
-                    run.status, run.pause_reason = RunStatus.paused, f"AI usage limit: {e}"
+                pause_run(
+                    db, run_id, e.message, "ai_usage_limit",
+                    {"provider": e.provider, "until": e.until},
+                )  # fmt: skip
             counts["not_scored"] += sum(len(b) for b in batches[n - 1 :])
             break
         scores = {r.job_id: r for r in result.results}
@@ -126,11 +132,19 @@ async def score_jobs(
                     job.tier = (
                         Tier.mid
                     )  # the AI calls it a scam: a person decides, never auto-apply
-                transition(s, job, JobState.scored, f"AI score {r.score}")
+                transition(
+                    s, job, JobState.scored, f"AI score {r.score}",
+                    code="ai_scored", params={"score": r.score},
+                )  # fmt: skip
                 if job.tier == Tier.low and opt_in:
-                    transition(s, job, JobState.queued_apply, LOW_OPT_IN)
+                    transition(s, job, JobState.queued_apply, LOW_OPT_IN, code="low_opt_in")
                 else:
-                    transition(s, job, _NEXT[job.tier], f"tier {job.tier}")
+                    transition(
+                        s, job, _NEXT[job.tier], f"tier {job.tier}",
+                        code="tier_set", params={"tier": str(job.tier)},
+                    )  # fmt: skip
                 counts[job.tier] += 1
-        logger.info("scored batch {}/{}", n, len(batches))
+        logger.bind(code="score_batch", params={"n": n, "total": len(batches)}).info(
+            "scored batch {}/{}", n, len(batches)
+        )
     return counts

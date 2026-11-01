@@ -10,9 +10,11 @@ def parse_output(code: int, out: str, err: str) -> str:
     try:
         data = json.loads(out)
     except json.JSONDecodeError:
-        raise classify(err.strip() or out.strip() or f"claude exited with {code}") from None
+        raise classify(
+            err.strip() or out.strip() or f"claude exited with {code}", "claude_cli"
+        ) from None
     if code != 0 or data.get("is_error"):
-        raise classify(str(data.get("result") or err or f"claude exited with {code}"))
+        raise classify(str(data.get("result") or err or f"claude exited with {code}"), "claude_cli")
     result = data.get("result")
     if not isinstance(result, str):
         raise ProviderError("claude: no result in output")

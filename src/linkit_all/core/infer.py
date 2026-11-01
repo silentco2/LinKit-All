@@ -19,6 +19,7 @@ from pydantic import BaseModel
 
 from linkit_all.apply.answers import country_of
 from linkit_all.core import geo
+from linkit_all.matching.rules import seniority
 
 Source = Literal["cv", "country", "roles", "years", "default", "ai"]
 Level = Literal["auto", "suggest", "ask"]
@@ -29,6 +30,7 @@ class InferredValue(BaseModel):
     source: Source
     level: Level
     check: bool = False  # True = the rule is unsure; the UI asks the user to look
+    note: str = ""  # stable code for a caveat the UI words itself, e.g. "under_one_year"
 
 
 class Experience(BaseModel):
@@ -157,7 +159,7 @@ _PRESENT = (
     r"(?:حتى\s*الآن|حتي\s*الان|حتى\s*الان|الآن|الان|حاليا|حاليًا|حالياً|present|current(?:ly)?"
     r"|now|today|ongoing|till\s+date|to\s+date)"
 )
-_SEP = r"(?:[-–—]|(?<!\w)(?:to|until|till|إلى|الى|حتى|حتي)(?!\w))"
+_SEP = r"(?:[-–—‒·•]|(?<!\w)(?:to|until|till|إلى|الى|حتى|حتي)(?!\w))"
 _RANGE = re.compile(
     rf"(?<!\w)(?P<a>{_DATE})\s*{_SEP}\s*(?P<b>{_DATE}|(?<!\w){_PRESENT}(?!\w))(?!\w)", re.I
 )
@@ -488,7 +490,20 @@ _LEX_CI = _lexicon_rx([w for w in _LEX if w not in _CASE_SENSITIVE], re.I)
 _LEX_CS = _lexicon_rx([w for w in _LEX if w in _CASE_SENSITIVE], 0)
 
 
-def _skills(lines: list[str]) -> list[str]:
+# A link in the text ("https://github.com/x", "github.com/x") or the word of a linked site.
+_LINKISH = re.compile(
+    r"(?:https?://|www\.)[^\s<>\"')\],;|]+"
+    r"|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|net|org|io|dev|me|app|co)/\S*",
+    re.I,
+)
+
+
+def _site_word(url: str) -> str:
+    labels = _host(url).split(".")
+    return labels[-2] if len(labels) > 1 else ""
+
+
+def _skills(lines: list[str], links: Sequence[str] = ()) -> list[str]:
     out: list[str] = []
     section: str | None = None
     for ln in lines:
@@ -506,8 +521,14 @@ def _skills(lines: list[str]) -> list[str]:
             item = item.strip(" -–—*")
             if 1 < len(item) <= 40 and len(item.split()) <= 4:
                 out.append(item)
+    # The lexicon is scanned outside links: "github" in a profile URL, or as the label of a link
+    # to github.com, is a contact and not a skill (a Skills list that names it still counts).
     blob = "\n".join(lines)
-    out += [m[0] for rx in (_LEX_CI, _LEX_CS) for m in rx.finditer(blob)]
+    linked = {_site_word(u) for u in [*links, *_LINKISH.findall(blob)]} - {""}
+    blob = _LINKISH.sub(" ", blob)
+    out += [
+        m[0] for rx in (_LEX_CI, _LEX_CS) for m in rx.finditer(blob) if m[0].lower() not in linked
+    ]
     return _dedupe(out)
 
 
@@ -524,7 +545,7 @@ def read_cv(texts: list[str], links: Sequence[str] = ()) -> CvFacts:
         location=_find_location(lines),
         experiences=_experiences(lines),
         education=_education(lines),
-        skills=_skills(lines),
+        skills=_skills(lines, links),
         **_contacts(lines, links),
     )
 
@@ -558,7 +579,7 @@ def years_experience(facts: CvFacts, today: date) -> int | None:
 
 # --- suggestions -----------------------------------------------------------------------------
 
-# Seniority bands (ux-plan 4.2): years pick a band, a senior-sounding current title raises it.
+# Seniority bands (ux-plan 4.2): years pick a band when the current title names no level.
 _BANDS: list[list[str]] = [
     ["intern", "junior"],
     ["junior", "mid"],
@@ -566,11 +587,23 @@ _BANDS: list[list[str]] = [
     ["senior", "lead"],
     ["lead", "manager", "executive"],
 ]
+# A level the current title names (matching.rules.seniority, plus Arabic): that level and the
+# one above it, and the band whose far-away title words are excluded.
+_TITLE_LEVELS: dict[str, tuple[list[str], int]] = {
+    "intern": (["intern", "junior"], 0),
+    "junior": (["junior", "mid"], 1),
+    "senior": (["senior", "lead"], 3),
+    "lead": (["lead", "manager"], 4),
+    "manager": (["manager", "executive"], 4),
+    "executive": (["manager", "executive"], 4),
+}
+_AR_LEVEL_RX = [
+    (re.compile("متدرب"), "intern"),
+    (re.compile("مدير|رئيس"), "manager"),
+    (re.compile("كبير|أول"), "senior"),
+]
 # Title words that rule a job out when it is two or more bands away from the chosen band.
 _BAND_WORDS = [["intern"], ["junior"], [], ["senior"], ["director", "vp", "head of"]]
-_RAISE_RX = re.compile(
-    r"\b(senior|sr\.?|lead|head|manager|director|principal|vp)\b|كبير|رئيس|مدير|أول", re.I
-)
 _SENIORITY_WORDS = {
     "senior",
     "junior",
@@ -591,11 +624,22 @@ _TECH_TITLE_RX = re.compile(
 _NON_TECH_ENG_RX = re.compile(r"civil|mechanical|chemical|petroleum|structural|مدني|ميكانيك", re.I)
 
 
-def _band(years: int | None, title: str) -> int | None:
+def _title_level(title: str) -> str | None:
+    """The level a title states ("Senior Accountant" -> senior), else None."""
+    if level := seniority(title):
+        return level
+    return next((lv for rx, lv in _AR_LEVEL_RX if rx.search(title)), None)
+
+
+def _levels(years: int | None, title: str) -> tuple[list[str], int] | None:
+    """(seniority levels to look for, band index). A level named in the current title wins, with
+    the level above it; otherwise the years band. None when there is nothing to go on."""
+    if (named := _title_level(title)) in _TITLE_LEVELS:
+        return _TITLE_LEVELS[named]
     if years is None:
         return None
     band = 0 if years < 1 else 1 if years < 3 else 2 if years < 6 else 3 if years < 10 else 4
-    return min(band + 1, 4) if _RAISE_RX.search(title) else band
+    return _BANDS[band], band
 
 
 def _query_of(title: str) -> str:
@@ -614,12 +658,20 @@ def infer(facts: CvFacts, today: date) -> dict[str, InferredValue]:
     out: dict[str, InferredValue] = {}
     roles = _newest_first(facts)
     current = roles[0] if roles and roles[0].current else None
+    newest = current or (roles[0] if roles else None)  # no current job: the newest one, to check
 
     def put(
-        key: str, value: Any, source: Source = "cv", level: Level = "auto", check: bool = False
+        key: str,
+        value: Any,
+        source: Source = "cv",
+        level: Level = "auto",
+        check: bool = False,
+        note: str = "",
     ) -> None:
         if value not in ("", None, []):
-            out[key] = InferredValue(value=value, source=source, level=level, check=check)
+            out[key] = InferredValue(
+                value=value, source=source, level=level, check=check, note=note
+            )
 
     put("profile.full_name", facts.full_name, check=facts.name_check)
     put("profile.email", facts.email)
@@ -644,9 +696,10 @@ def infer(facts: CvFacts, today: date) -> dict[str, InferredValue]:
         if country:
             put("answers.country", country.title())
             put("answers.authorized_countries", [country.title()], "country", "suggest")
-    if current:
-        put("answers.current_company", current.company, check=True)
-        put("answers.current_title", current.title, check=True)
+    if newest:  # only a job the CV calls current is filled in without asking
+        lv: Level = "auto" if current else "suggest"
+        put("answers.current_company", newest.company, level=lv, check=True)
+        put("answers.current_title", newest.title, level=lv, check=True)
     put("answers.linkedin", facts.linkedin)
     put("answers.github", facts.github)
     put("answers.portfolio", facts.portfolio)
@@ -659,16 +712,18 @@ def infer(facts: CvFacts, today: date) -> dict[str, InferredValue]:
         tech_skills = sum(s.lower() in _TECH_SET for s in facts.skills)
         tech_title = bool(_TECH_TITLE_RX.search(recent)) and not _NON_TECH_ENG_RX.search(recent)
         put("track", "tech" if tech_skills >= 3 or tech_title else "general", level="suggest")
-    # Internship titles only become queries when there is nothing else to search for.
-    query_titles = [e.title for e in roles if e.title and not e.intern] or titles
-    queries = _dedupe([q for t in query_titles if (q := _query_of(t))])[:5]
+    # Internship titles only become queries when there is nothing else to search for, and then
+    # they stay as written ("Marketing Intern" is the search; "Marketing" alone is not).
+    query_titles = [e.title for e in roles if e.title and not e.intern]
+    queries = _dedupe([q for t in query_titles if (q := _query_of(t))] or titles)[:5]
     put("search.queries", queries, level="suggest")
 
     years = years_experience(facts, today)
-    put("answers.years_experience", years, "years")
-    band = _band(years, current.title if current else (titles[0] if titles else ""))
-    if band is not None:
-        put("filters.seniority", _BANDS[band], "years")
+    put("answers.years_experience", years, "years", note="under_one_year" if years == 0 else "")
+    picked = _levels(years, newest.title if newest else (titles[0] if titles else ""))
+    if picked is not None:
+        levels, band = picked
+        put("filters.seniority", levels, "years")
         far = [w for i, ws in enumerate(_BAND_WORDS) if abs(i - band) >= 2 for w in ws]
         put("filters.title_exclude", far, "years")
     return out

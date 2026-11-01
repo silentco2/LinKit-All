@@ -17,11 +17,13 @@ from test_matching import fake_embed
 from test_park_codes import NoAI
 from test_tailor import FakeProvider, fake_render
 
+from linkit_all.api import routes
 from linkit_all.apply import runner
 from linkit_all.core.config import Settings
 from linkit_all.core.models import Job, JobState
 from linkit_all.core.search import SearchConfig
 from linkit_all.core.tools import soffice_path
+from linkit_all.tailor import pipeline
 from linkit_all.tailor.pipeline import tailor_job
 
 H = SAME_ORIGIN
@@ -39,8 +41,10 @@ def queue_job(client: TestClient) -> int:
 
 
 def test_pdf_cv_needs_approval_before_tailoring_and_applying(
-    client: TestClient, tmp_path: Path
+    client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setattr(pipeline, "soffice_path", lambda: "soffice")  # tailoring is on
+    monkeypatch.setattr(routes, "soffice_path", lambda: "soffice")
     fields = {"full_name": "Jane", "email": "j@x.io", "locked_facts": ["Acme"]}
     client.put("/api/profile", json=fields, headers=H)
     r = client.post(
@@ -58,7 +62,10 @@ def test_pdf_cv_needs_approval_before_tailoring_and_applying(
     assert client.get("/api/profile").json()["cv_approved"] is False
     status = client.get("/api/status").json()
     assert status["cv_ready"] is False and status["setup"]["cv"] is False
-    assert client.get("/api/golive").json()["checklist"]["cv_approved"] is False
+    assert client.get("/api/golive").json()["checklist"]["cv_ready"] == {
+        "ok": False,
+        "detail": "needs_approval",
+    }
 
     # tailoring refuses, and so does the applier (before it touches a browser)
     job_id = queue_job(client)
@@ -78,7 +85,7 @@ def test_pdf_cv_needs_approval_before_tailoring_and_applying(
     assert client.get("/api/profile").json()["cv_approved"] is True
     status = client.get("/api/status").json()
     assert status["cv_ready"] is True and status["setup"]["cv"] is True
-    assert client.get("/api/golive").json()["checklist"]["cv_approved"] is True
+    assert client.get("/api/golive").json()["checklist"]["cv_ready"]["ok"] is True
     reply = '{"patches": []}'
     row = asyncio.run(tailor_job(db, job_id, FakeProvider(reply), settings, render=fake_render))
     assert Path(row.pdf_path).exists()

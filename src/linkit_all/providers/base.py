@@ -6,6 +6,7 @@ import json
 import re
 import shutil
 from abc import ABC, abstractmethod
+from datetime import UTC, date, datetime
 from typing import TypeVar
 
 from jinja2 import Environment, PackageLoader, StrictUndefined
@@ -34,16 +35,68 @@ class ProviderError(RuntimeError):
     pass
 
 
+PROVIDER_NAMES = {"codex_cli": "ChatGPT (Codex)", "claude_cli": "Claude", "litellm": "Your AI"}
+_MONTHS = ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
+_MON = "(" + "|".join(_MONTHS) + r")[a-z]*\.?"
+_DAY = r"(\d{1,2})(?:st|nd|rd|th)?"
+# "Nov 4th, 2026" | "4 Nov 2026" | "2026-11-04" | Claude's "usage limit reached|1793750400" (epoch)
+_UNTIL = [
+    re.compile(rf"(?i)\b{_MON}\s+{_DAY},?\s+(\d{{4}})\b"),
+    re.compile(rf"(?i)\b{_DAY}\s+{_MON}\s+(\d{{4}})\b"),
+    re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b"),
+    re.compile(r"(?i)limit reached\s*\|\s*(\d{9,10})\b"),
+]
+
+
+def parse_until(text: str) -> str | None:
+    """The ISO date a usage-limit message says to come back on, if it names one."""
+    try:
+        if m := _UNTIL[0].search(text):
+            return date(int(m[3]), _MONTHS.index(m[1].lower()) + 1, int(m[2])).isoformat()
+        if m := _UNTIL[1].search(text):
+            return date(int(m[3]), _MONTHS.index(m[2].lower()) + 1, int(m[1])).isoformat()
+        if m := _UNTIL[2].search(text):
+            return date(int(m[1]), int(m[2]), int(m[3])).isoformat()
+        if m := _UNTIL[3].search(text):
+            return datetime.fromtimestamp(int(m[1]), UTC).date().isoformat()
+    except (ValueError, OverflowError, OSError):
+        pass  # not a real date: say nothing rather than guess
+    return None
+
+
+def tidy(message: str) -> str:
+    """One clean line: parts printed twice (vendors repeat the same error) are kept once."""
+    parts = [p.strip() for p in re.split(r"\n+|;\s+", message) if p.strip()]
+    return "; ".join(dict.fromkeys(parts))
+
+
 class UsageLimitError(ProviderError):
-    """Plan or quota limit hit: pause the run cleanly instead of failing jobs."""
+    """Plan or quota limit hit: pause the run cleanly instead of failing jobs.
+
+    `str(e)` and `.message` are one short English sentence, never the vendor's text (links,
+    upsells); `until` is an ISO date when the vendor said when the limit lifts."""
+
+    kind = "usage_limit"
+
+    def __init__(self, raw: str = "", provider: str = "", until: str | None = None) -> None:
+        self.provider = provider
+        self.until = until or parse_until(raw)
+        when = ""
+        if self.until:
+            d = date.fromisoformat(self.until)
+            when = f"; try again after {d:%b} {d.day}, {d.year}"
+        self.message = f"{PROVIDER_NAMES.get(provider, 'Your AI')} usage limit reached{when}."
+        super().__init__(self.message)
 
 
 _LIMIT = re.compile(r"(?i)usage.?limit|rate.?limit|quota|limit reached|too many requests|\b429\b")
 _FENCE = re.compile(r"```(?:json)?\s*(.*?)```", re.S)
 
 
-def classify(message: str) -> ProviderError:
-    return (UsageLimitError if _LIMIT.search(message) else ProviderError)(message)
+def classify(message: str, provider: str = "") -> ProviderError:
+    if _LIMIT.search(message):
+        return UsageLimitError(message, provider)
+    return ProviderError(tidy(message) or message)
 
 
 def extract_json(text: str) -> str:

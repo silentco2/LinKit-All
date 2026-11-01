@@ -43,6 +43,7 @@ from linkit_all.core.profile import ProfileFields, save_cv, save_fields
 from linkit_all.core.search import (
     AISection,
     FiltersSection,
+    Place,
     SearchConfig,
     SearchSection,
     SourcesSection,
@@ -364,6 +365,8 @@ def seed(data_dir: Path, lang: str = "en") -> dict[str, int]:
             email="layla.sample@example.com",
             phone="+20 100 000 0000",
             location=city,
+            home_city="Cairo",
+            home_country="EG",
             skills=skills,
             locked_facts=locked,
         ),
@@ -384,6 +387,7 @@ def seed(data_dir: Path, lang: str = "en") -> dict[str, int]:
         search=SearchSection(
             queries=["Backend Developer", "Python Developer", "مطور بايثون"],
             locations=["Egypt", "Remote"],
+            places=[Place(label="Cairo, Egypt", city="Cairo", country="EG", work="ask")],
         ),
         sources=SourcesSection(regional=["wuzzuf"]),
         filters=FiltersSection(

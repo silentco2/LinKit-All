@@ -5,7 +5,7 @@ import shutil
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol
 
 from docx import Document
 from sqlalchemy import select
@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from linkit_all.core.config import Settings
 from linkit_all.core.models import Job, JobState, LockedFact, Profile, TailoredCV
 from linkit_all.core.state import transition
+from linkit_all.core.tools import soffice_path, tectonic_path
 from linkit_all.providers.base import LLMProvider
 from linkit_all.providers.base import render as render_prompt
 from linkit_all.tailor import latex
@@ -44,6 +45,45 @@ class CvSegment(Protocol):
     def id(self) -> int: ...
     @property
     def text(self) -> str: ...
+
+
+@dataclass(frozen=True)
+class CvPlan:
+    """What an application sends: a tailored CV, the CV as uploaded, or nothing yet."""
+
+    mode: Literal["tailor", "original", "blocked"]
+    reason: str = ""  # original: "declined" | "no_libreoffice"; blocked: the park code
+
+
+def cv_plan(fmt: str, tailor_cv: bool | None, live: bool) -> CvPlan:
+    """Decide tailoring from the user's choice (`apply.tailor_cv`) and the render tool.
+
+    No LibreOffice (Tectonic for LaTeX) and not declined: practice mode sends the original CV,
+    real applications wait (`blocked`), they never send an untailored CV by accident."""
+    tex = fmt == "tex"
+    tool_ok = (tectonic_path() if tex else soffice_path()) is not None
+    code = "needs_tectonic" if tex else "needs_libreoffice"
+    if tailor_cv is False:  # a LaTeX original still needs Tectonic to become a PDF
+        return CvPlan("blocked", code) if tex and not tool_ok else CvPlan("original", "declined")
+    if tool_ok:
+        return CvPlan("tailor")
+    return CvPlan("blocked", code) if tex or live else CvPlan("original", "no_libreoffice")
+
+
+def original_cv(profile: Profile) -> Path:
+    """The file the user uploaded: the PDF/ODT kept beside the converted base, else the base
+    (DOCX as uploaded; LaTeX is rendered to a PDF without any patches)."""
+    base = Path(profile.cv_path)
+    fmt = profile.cv_source_format
+    if fmt in ("pdf", "odt"):
+        saved = sorted((base.parent / "original").glob(f"{base.stem}.*"))
+        found = next((f for f in saved if f.suffix.lower() == f".{fmt}"), None)
+        if found is None:
+            raise TailorError("Your original CV file is missing: upload it again in Settings")
+        return found
+    if fmt == "tex":
+        return ensure_base_pdf(base)
+    return base
 
 
 def cv_segments(cv: Path) -> list[CvSegment]:

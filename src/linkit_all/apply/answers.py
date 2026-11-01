@@ -102,6 +102,27 @@ class Missing:
     sensitive: bool = False
 
 
+_REASON_CODES: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"^(?P<what>[^:]+?):? (?:country unknown or )?not set in your profile$"), "not_in_profile"),
+    (re.compile(r"^(?P<what>salary expectation) needed$"), "not_in_profile"),
+    (re.compile(r"^(?P<what>.+?) question: only you can answer$"), "own_answer"),
+    (re.compile(r"^no option matches"), "no_option"),
+    (re.compile(r"^file the app cannot provide$"), "file_missing"),
+    (re.compile(r"^The AI wrote the cover letter in Arabic"), "arabic_letter"),
+    (re.compile(r"^not answerable from your CV or profile$"), "not_answerable"),
+    (re.compile(r"^no saved answer$"), "no_saved_answer"),
+]  # fmt: skip
+
+
+def reason_code(reason: str) -> tuple[str, dict[str, str]]:
+    """Stable (code, params) for a `Missing.reason`, so the UI can word the hint itself.
+    "other" when a new reason has no code yet (the English text still shows)."""
+    for rx, code in _REASON_CODES:
+        if m := rx.match(reason):
+            return code, m.groupdict()
+    return "other", {}
+
+
 # --- sensitive questions -----------------------------------------------------------
 
 # Checked in order: "require sponsorship ... authorization to work" is about sponsorship.

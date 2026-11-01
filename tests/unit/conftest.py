@@ -33,3 +33,11 @@ def _in_memory_keyring() -> Iterator[None]:
     keyring.set_keyring(_MemoryKeyring())
     yield
     keyring.set_keyring(previous)
+
+
+@pytest.fixture(autouse=True)
+def _libreoffice_present(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tailoring is on by default in tests, whether or not this machine has LibreOffice."""
+    from linkit_all.tailor import pipeline
+
+    monkeypatch.setattr(pipeline, "soffice_path", lambda: "soffice")

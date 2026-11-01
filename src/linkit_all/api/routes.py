@@ -23,7 +23,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from linkit_all.api.events import EventBus
-from linkit_all.api.runner import PipelineRunner, RunBusy
+from linkit_all.api.runner import PipelineRunner, RunBlocked, RunBusy
 from linkit_all.apply.answers import ApplicationAnswers, Question, sensitive_category
 from linkit_all.apply.assist import AnswerBank
 from linkit_all.apply.browser import UserBrowser, fresh_live_shot, profile_dir
@@ -40,6 +40,7 @@ from linkit_all.apply.vault import Vault, VaultError, VaultLocked, WrongPassphra
 from linkit_all.core.api_keys import KNOWN, delete_keys, get_keys, set_keys
 from linkit_all.core.config import Settings
 from linkit_all.core.infer import InferredValue, infer, read_cv
+from linkit_all.core.lo_install import LibreOfficeInstaller
 from linkit_all.core.models import (
     ActionItem,
     ActionKind,
@@ -76,6 +77,7 @@ from linkit_all.core.profile import (
     save_cv,
     save_fields,
 )
+from linkit_all.core.runs import run_kind
 from linkit_all.core.scheduler import apply_schedule, next_runs
 from linkit_all.core.search import (
     DEFAULT_TELEGRAM_CHANNELS,
@@ -304,6 +306,33 @@ async def cv_pdf(request: Request) -> FileResponse:
     return FileResponse(pdf, media_type="application/pdf")
 
 
+# --- optional LibreOffice install -----------------------------------------------------
+
+
+def _installer(request: Request) -> LibreOfficeInstaller:
+    installer: LibreOfficeInstaller = request.app.state.lo_installer
+    return installer
+
+
+@router.get("/tools/libreoffice")
+def libreoffice_status(request: Request) -> dict[str, Any]:
+    """{installed, path, installing, progress 0..1, error, available (URL and hash set)}."""
+    return _installer(request).status()
+
+
+@router.post("/tools/libreoffice/install", status_code=202)
+async def install_libreoffice_route(request: Request) -> dict[str, Any]:
+    """Download LinKit's trimmed LibreOffice into its own folder, in the background. Optional:
+    the user may decline and send the CV as it is."""
+    installer = _installer(request)
+    if not installer.available():
+        raise HTTPException(409, {"code": "lo_not_available", "message":
+                            "The LibreOffice download is not published yet. Install LibreOffice "
+                            "yourself, or send your CV as it is."})  # fmt: skip
+    installer.start()  # already running: the status below simply says so
+    return installer.status()
+
+
 # --- search config and AI ----------------------------------------------------------
 
 
@@ -382,15 +411,42 @@ def go_live(request: Request) -> dict[str, Any]:
         ]
         profile = s.get(Profile, 1)
         answers = ApplicationAnswers.model_validate(profile.answers if profile else {})
+        example = s.execute(
+            select(TailoredCV, Job).join(Job, Job.id == TailoredCV.job_id)
+            .where(func.json_array_length(TailoredCV.applied) > 0)
+            .order_by(TailoredCV.id.desc()).limit(1)
+        ).first()  # fmt: skip
+    fmt, approved = cv_state(db)
+    mode = {True: "tailor", False: "original", None: "undecided"}[cfg.apply.tailor_cv]
+    count = _open_actions(db)
+    cv_ok = bool(cv) and (approved or mode == "original")  # a CV sent as uploaded needs no approval
+    ex_job = example[1] if example else None
     return {
         "eligible": bool(samples),
         "live": cfg.apply.live,
         "samples": samples,
+        "tailored_example": (
+            {"job_id": ex_job.id, "title": ex_job.title, "company": ex_job.company}
+            if ex_job
+            else None
+        ),
         "checklist": {
-            "cv_approved": bool(cv) and cv_state(db)[1],
-            "answers_reviewed": answers != ApplicationAnswers(),
-            "caps_set": cfg.apply.daily_cap_per_site <= 40,
-            "confirm_each": not cfg.apply.submit_without_asking,
+            "cv_ready": {
+                "ok": cv_ok,
+                "detail": "ready" if cv_ok else "needs_approval" if cv else "no_cv",
+            },
+            "tailoring": {
+                "ok": mode == "original" or (mode == "tailor" and _renderer_ok(fmt)),
+                "mode": mode,
+                "libreoffice": soffice_path() is not None,
+            },
+            "answers_reviewed": {"ok": answers != ApplicationAnswers()},
+            "open_items": {"ok": count == 0, "count": count},
+            "confirm_each": {"ok": not cfg.apply.submit_without_asking},
+            "caps_set": {
+                "ok": cfg.apply.daily_cap_per_site <= 40,
+                "daily_cap_per_site": cfg.apply.daily_cap_per_site,
+            },
         },
     }
 
@@ -451,7 +507,8 @@ class AICheck(BaseModel):
 
 @router.post("/ai/check")
 async def check_ai(request: Request, body: AICheck) -> dict[str, Any]:
-    from linkit_all.providers import ProviderError, get_provider
+    from linkit_all.providers import ProviderError, UsageLimitError, get_provider
+    from linkit_all.providers.base import tidy
 
     cfg = SearchConfig.model_validate(
         {
@@ -464,8 +521,11 @@ async def check_ai(request: Request, body: AICheck) -> dict[str, Any]:
     )
     try:
         message = await get_provider(ai_settings(_settings(request), cfg)).check()
+    except UsageLimitError as e:  # a plan limit is not a broken setup: one calm sentence
+        return {"ok": False, "kind": e.kind, "provider": e.provider or body.provider,
+                "until": e.until, "message": e.message}  # fmt: skip
     except (ProviderError, PipelineError) as e:
-        return {"ok": False, "message": str(e)}
+        return {"ok": False, "kind": "error", "message": tidy(str(e))}
     return {"ok": True, "message": message}
 
 
@@ -925,7 +985,9 @@ def list_runs(request: Request) -> dict[str, Any]:
         runs = s.scalars(select(Run).order_by(Run.id.desc()).limit(20))
         recent = [{"id": r.id, "status": r.status, "started_at": r.started_at.isoformat(),
                    "finished_at": r.finished_at.isoformat() if r.finished_at else None,
-                   "pause_reason": r.pause_reason, "stats": r.stats} for r in runs]  # fmt: skip
+                   "kind": run_kind(r), "stages": r.stages or list(r.stats),
+                   "pause_reason": r.pause_reason, "reason_code": r.reason_code,
+                   "reason_params": r.reason_params, "stats": r.stats} for r in runs]  # fmt: skip
     return {"current": _runner(request).state.as_dict(), "recent": recent, "stages": STAGES}
 
 
@@ -942,6 +1004,8 @@ async def start_run(request: Request, body: RunRequest) -> dict[str, Any]:
         return _runner(request).start(body.stages, body.new).as_dict()
     except RunBusy as e:
         raise HTTPException(409, str(e)) from e
+    except RunBlocked as e:  # e.g. needs_libreoffice: the UI offers the install or the choice
+        raise HTTPException(409, {"code": e.code, "message": str(e)}) from e
     except ValueError as e:
         raise HTTPException(422, str(e)) from e
 

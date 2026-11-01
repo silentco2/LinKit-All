@@ -10,6 +10,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ProviderName = Literal["codex_cli", "claude_cli", "litellm"]
 
+# The trimmed LibreOffice bundle (scripts/bundle_libreoffice.py) as a release asset.
+# TODO(release): there is no public repo yet. Upload the zip, put its real URL and SHA-256 here;
+# until the hash is set, the in-app install stays unavailable (never installs unverified code).
+LO_BUNDLE_URL = "https://github.com/OWNER/linkit-all/releases/download/libreoffice-bundle/linkit-libreoffice-win-x64.zip"
+LO_BUNDLE_SHA256 = ""
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="LINKIT_")
@@ -31,6 +37,9 @@ class Settings(BaseSettings):
 
     # Multilingual (Arabic + English), 220 MB, downloaded once into data_dir/models.
     embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+
+    lo_bundle_url: str = LO_BUNDLE_URL  # LINKIT_LO_BUNDLE_URL
+    lo_bundle_sha256: str = LO_BUNDLE_SHA256  # LINKIT_LO_BUNDLE_SHA256: hex digest of the zip
 
     @property
     def db_path(self) -> Path:

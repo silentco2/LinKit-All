@@ -247,6 +247,7 @@ def test_ai_fill_keeps_only_values_found_in_the_cv(
     values = r.json()["values"]
     assert values["answers.portfolio"] == {
         "value": "behance.net/sara", "source": "ai", "level": "suggest", "check": True,
+        "note": "",
     }  # fmt: skip
     assert "answers.github" not in values
     assert values["answers.current_title"]["source"] == "cv"  # found by the rules, not asked

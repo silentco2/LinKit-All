@@ -20,7 +20,12 @@ def parse_output(code: int, out: str, err: str, last_message: str) -> str:
             errors.append(str(event.get("message", "")))
         elif event.get("type") == "turn.failed":
             errors.append(str((event.get("error") or {}).get("message", "")))
-    raise classify("; ".join(filter(None, errors)) or err.strip() or f"codex exited with {code}")
+    raise classify(
+        "; ".join(dict.fromkeys(filter(None, errors)))
+        or err.strip()
+        or f"codex exited with {code}",
+        CodexCLI.name,
+    )
 
 
 class CodexCLI(CLIProvider):

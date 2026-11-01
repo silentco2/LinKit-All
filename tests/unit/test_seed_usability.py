@@ -51,7 +51,11 @@ def test_seeded_state_reads_back(seeded: tuple[TestClient, dict[str, int]]) -> N
 
     golive = client.get("/api/golive").json()
     assert golive["eligible"] and len(golive["samples"]) == 3
-    assert golive["checklist"]["cv_approved"]
+    assert golive["checklist"]["cv_ready"]["ok"]
+    profile = client.get("/api/profile").json()
+    assert (profile["home_city"], profile["home_country"]) == ("Cairo", "EG")
+    place = client.get("/api/search").json()["search"]["places"][0]
+    assert (place["city"], place["country"], place["work"]) == ("Cairo", "EG", "ask")
     shot = client.get(golive["samples"][0]["screenshots"][0])
     assert shot.status_code == 200 and shot.content.startswith(b"\x89PNG")
 

@@ -10,7 +10,7 @@ from rapidfuzz import fuzz
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from linkit_all.core.models import Job, JobSighting, JobState, SourceCheckpoint
+from linkit_all.core.models import Job, JobEvent, JobSighting, JobState, SourceCheckpoint
 from linkit_all.sources.ats_detector import detect
 from linkit_all.sources.base import JobStub, Source
 from linkit_all.sources.text import job_hash, norm, norm_company, normalize_url
@@ -179,6 +179,9 @@ def store_page(
             )
             s.add(job)
             s.flush()  # the id lets a later, better duplicate find this row
+            s.add(JobEvent(job_id=job.id, to_state=JobState.discovered,
+                           message=f"found by {st.source}", code="found_by",
+                           params={"source": st.source}))  # fmt: skip
             known.job_id = job.id
             seen.setdefault(job.id, st)
             new += 1

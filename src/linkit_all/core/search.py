@@ -295,6 +295,9 @@ class ApplySection(BaseModel):
     parallel_sites: int = Field(3, ge=1, le=3)  # sites worked on at the same time
     generic_agent: bool = True  # use the AI form agent for sites without a dedicated handler
     email_daily_cap: int = Field(15, ge=1, le=100)  # live application emails per day
+    # None = not decided yet, True = tailor the CV per job (needs LibreOffice), False = send
+    # the CV as uploaded. Without LibreOffice, practice mode sends it as uploaded either way.
+    tailor_cv: bool | None = None
 
 
 class AISection(BaseModel):

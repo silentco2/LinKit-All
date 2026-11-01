@@ -111,3 +111,12 @@ def test_titles_extra_first_deduped_and_filtered() -> None:
     assert "Chef" not in got
     assert len({t.casefold() for t in got}) == len(got)
     assert geo.search_titles("engineer", limit=3, extra=["Zeta Engineer"])[0] == "Zeta Engineer"
+
+
+def test_every_jobspy_key_belongs_to_one_country() -> None:
+    """Settings names the Indeed country by looking the key up: a shared key showed "U.S. Virgin
+    Islands" for the United States."""
+    keys = [c.jobspy for c in geo.countries() if c.jobspy]
+    assert len(keys) == len(set(keys))
+    owner = {c.jobspy: c.iso2 for c in geo.countries() if c.jobspy}
+    assert owner["usa"] == "US" and owner["netherlands"] == "NL"

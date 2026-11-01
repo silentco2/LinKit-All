@@ -48,6 +48,10 @@ class EventBus:
     def log_sink(self, message: "Message") -> None:
         """loguru sink: app log lines (already secret-redacted) become live events."""
         record = message.record
-        self.publish_threadsafe(
-            {"type": "log", "level": record["level"].name, "message": record["message"]}
-        )
+        event: Event = {
+            "type": "log", "level": record["level"].name, "message": record["message"],
+        }  # fmt: skip
+        extra = record["extra"]  # logger.bind(code=..., params=...): the UI translates it
+        if "code" in extra:
+            event |= {"code": extra["code"], "params": extra.get("params") or {}}
+        self.publish_threadsafe(event)

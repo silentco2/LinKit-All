@@ -4,7 +4,6 @@ import asyncio
 import shutil
 import sys
 import tomllib
-import zipfile
 from datetime import datetime
 from importlib.metadata import version
 from pathlib import Path
@@ -16,12 +15,13 @@ from sqlalchemy import func, select
 
 from linkit_all.core.config import Settings, get_settings
 from linkit_all.core.db import init_db
+from linkit_all.core.lo_install import install_libreoffice as install_libreoffice_bundle
 from linkit_all.core.log import setup_logging
 from linkit_all.core.models import Job
 from linkit_all.core.profile import ProfileIn, import_profile
 from linkit_all.core.runs import current_run
 from linkit_all.core.search import import_search
-from linkit_all.core.tools import bundled_libreoffice, chrome_path, soffice_path, tectonic_path
+from linkit_all.core.tools import chrome_path, soffice_path, tectonic_path
 from linkit_all.providers import ProviderError, get_provider
 
 if TYPE_CHECKING:
@@ -114,17 +114,11 @@ def install_libreoffice(
     source: Annotated[Path, typer.Argument(help="Minimal LibreOffice zip or folder.")],
 ) -> None:
     """Install the minimal portable LibreOffice (from scripts/bundle_libreoffice.py)."""
-    dest = bundled_libreoffice()
-    shutil.rmtree(dest, ignore_errors=True)
-    if source.is_dir():
-        shutil.copytree(source, dest)
-    else:
-        with zipfile.ZipFile(source) as z:
-            z.extractall(dest)  # zipfile strips absolute paths and ".." parts
-    if not (dest / "program" / "soffice.exe").is_file():
-        shutil.rmtree(dest, ignore_errors=True)
-        typer.echo(f"{source} does not contain program/soffice.exe", err=True)
-        raise typer.Exit(1)
+    try:
+        dest = install_libreoffice_bundle(source)
+    except ValueError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1) from e
     typer.echo(f"LibreOffice installed to {dest}")
 
 

@@ -103,7 +103,7 @@ Tailoring happens just before applying, never for jobs that will not be applied 
 - LaTeX: edit text nodes only, compile with Tectonic. ODT: LibreOffice round-trip. PDF input: convert once via
   pdf2docx, user approves the base, then treat as DOCX.
 - Output: LibreOffice -> PDF (submitted file). Verify: same page count, pixel/SSIM diff vs original within
-  tolerance, pdfplumber text extract succeeds. On failure roll back patches.
+  tolerance, pdfplumber text extract succeeds. On failure roll back patches. Tailoring is optional (`apply.tailor_cv`: None undecided, True tailor, False send the CV as uploaded): declined, or no LibreOffice in practice mode -> the original file, no AI call, event `tailor_skipped`; real applications without it wait (`needs_libreoffice`/`needs_tectonic`, run start answers 409).
 - Store every tailored version + patch list per job (UI red-line diff). Debug: `linkit tailor jd.txt`. Numbers/dates/contacts are auto-locked.
 
 ### 5.5 Apply (`apply/`)
@@ -152,7 +152,7 @@ Derived by rules. AI gap-fill must be verbatim from the CV (checked). On CV uplo
 - External tools: LibreOffice required (DOCX->PDF), Chrome for applying, Tectonic for LaTeX.
   `linkit doctor` checks them. End-user install: `uv tool install linkit-all`.
 - LibreOffice: minimal portable bundle (Win 1.6 GB -> 439 MB) from `scripts/bundle_libreoffice.py` (removals kept only if renders stay identical);
-  `linkit install-libreoffice <zip>` installs it to the data dir, ahead of any system install. Keep its MPL-2.0 license files.
+  `linkit install-libreoffice <zip>` installs it to the data dir, ahead of any system install. Keep its MPL-2.0 license files. Optional in-app install (`POST /api/tools/libreoffice/install`): downloads `lo_bundle_url`, pinned `lo_bundle_sha256` checked before unpacking, never without a hash; the user may refuse and apply with the original CV.
 - Profile, preferences, locked facts, answer bank stored in DB; JSON/YAML import/export.
 
 ## 7. UI screens

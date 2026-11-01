@@ -62,7 +62,10 @@ class Run(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     status: Mapped[RunStatus] = mapped_column(_enum(RunStatus), default=RunStatus.running)
-    pause_reason: Mapped[str | None] = mapped_column(Text)
+    pause_reason: Mapped[str | None] = mapped_column(Text)  # English; the code below is translated
+    reason_code: Mapped[str | None] = mapped_column(String(48))  # why paused / last failed
+    reason_params: Mapped[dict[str, Any]] = mapped_column(default=dict)
+    stages: Mapped[list[str]] = mapped_column(default=list)  # stages started on this run
     started_at: Mapped[datetime] = mapped_column(default=utcnow)
     finished_at: Mapped[datetime | None]
     stats: Mapped[dict[str, Any]] = mapped_column(default=dict)

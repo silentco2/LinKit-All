@@ -108,14 +108,20 @@ def _apply_trust(
             # Low tier without embeddings or AI; the low-tier opt-in decides whether it is applied.
             job.data = {**job.data, "trust": {**trust, "ghost_demoted": True}}
             job.tier = Tier.low
-            transition(s, job, JobState.ranked, "local rank skipped: likely a ghost job")
+            transition(
+                s,
+                job,
+                JobState.ranked,
+                "local rank skipped: likely a ghost job",
+                code="rank_skipped",
+            )
             transition(
                 s, job, JobState.below_threshold,
                 f"likely a ghost job (score {ghost}): {top_codes(trust, 'ghost')}",
                 code="ghost_likely", params={"score": ghost},
             )  # fmt: skip
             if cfg.matching.auto_apply_low:
-                transition(s, job, JobState.queued_apply, LOW_OPT_IN)
+                transition(s, job, JobState.queued_apply, LOW_OPT_IN, code="low_opt_in")
             counts["ghost_demoted"] = counts.get("ghost_demoted", 0) + 1
         else:
             survivors.append(job)
@@ -144,7 +150,13 @@ def rank_jobs(db: sessionmaker[Session], cfg: SearchConfig, embed: Embed) -> dic
             if job.data.get("trust_filter") and _trust_filtered(job, cfg):
                 continue  # still a scam / ghost under today's trust settings
             job.data = {k: v for k, v in job.data.items() if k != "trust_filter"}
-            transition(s, job, JobState.enriched, "passes your filters now: checked again")
+            transition(
+                s,
+                job,
+                JobState.enriched,
+                "passes your filters now: checked again",
+                code="rechecked",
+            )
             counts["rechecked"] = counts.get("rechecked", 0) + 1
         jobs = list(s.scalars(select(Job).filter_by(state=JobState.enriched)))
         keep = []
@@ -178,7 +190,10 @@ def rank_jobs(db: sessionmaker[Session], cfg: SearchConfig, embed: Embed) -> dic
                 transition(s, job, JobState.filtered_out, why)
             else:
                 best[company] = job
-                transition(s, job, JobState.ranked, f"local rank {job.data['rank']:.3f}")
+                transition(
+                    s, job, JobState.ranked, f"local rank {job.data['rank']:.3f}",
+                    code="local_rank", params={"rank": job.data["rank"]},
+                )  # fmt: skip
                 counts["ranked"] += 1
                 continue
             counts["filtered_out"] += 1
