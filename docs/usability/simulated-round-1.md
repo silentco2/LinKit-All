@@ -7,7 +7,7 @@ Raw notes: `build/ux7/P1-notes.md` to `P5-notes.md`. Structure follows `results-
 | Item | Value |
 |---|---|
 | Dates | 2026-11-01 (one day; Task 5 was **not** run 7 days later) |
-| App version / commit | not recorded in the notes (repo HEAD was `a11af9f` when this was written) |
+| App version / commit | not recorded in the notes (repo HEAD was `a11af9f` when the round was run) |
 | AI provider used | Codex CLI was pre-selected and failed for all five (plan usage limit until Nov 4). Claude Code CLI 2.1.305 was used instead |
 | Moderator(s) | none; each agent was its own moderator and note-taker |
 
@@ -101,28 +101,28 @@ Help level was 0 everywhere. Task 4: nobody pressed Confirm and the badge stayed
 
 ## 4. Issues list
 
-Severity: 1 cosmetic, 2 minor, 3 major, 4 blocker. Impact = worst severity x participants. Effort: S under half a day, M 1-2 days, L more. **Status "fix in progress" = being fixed in the current round (X1 backend, X2 frontend).** The X1/X2 tags show where each change lives; the split is my reading of the fix, so check it against the dispatch.
+Severity: 1 cosmetic, 2 minor, 3 major, 4 blocker. Impact = worst severity x participants. Effort: S under half a day, M 1-2 days, L more. **Status shows the fix commit: 92709c3 (frontend), ba46591 (backend), 717f827 (frontend).** Status as of HEAD 717f827.
 
 | ID | Issue (theme) | Sev | Part. | Impact | Effort | Suggested fix | Status |
 |---|---|---|---|---|---|---|---|
-| U1 | No path to apply after approving (T1) | 3 | 5 | 15 | M | Home's main button points at "Apply to N jobs (practice)" as soon as any job is approved or queued, ahead of review work. Label the Activity button "Apply". Say how many jobs a run will take | fix in progress (X1 backend / X2 frontend) |
-| U2 | Usage-limit error raw, doubled, run "failed" (T2) | 3 | 5 | 15 | M | One plain sentence ("Your ChatGPT plan is out of messages until Nov 4"), shown once, with a "Use another AI" button. Park the run as paused, not failed. Translate | fix in progress (X1 backend / X2 frontend) |
-| U3 | LibreOffice blocks practice, fix is a terminal command (T3) | 3 | 5 | 15 | M | Explain in plain words, not a red alert. Offer an in-app install action, not `linkit doctor`. Do not hard-fail practice apply, or say clearly why. Drop the "open the preview" text when there is no preview | fix in progress (X1 backend / X2 frontend) |
-| U4 | Go-live checklist ticks are static (T4) | 3 | 4 | 12 | S | Compute each tick from real state (CV approved, limits changed, LibreOffice present). Show the value and link to its setting. An untrue tick shows as a to-do | fix in progress (X1 backend / X2 frontend) |
-| U5 | Privacy over-claim (T5) | 3 | 4 | 12 | S-M | Replace the claim with the exact one: files stay here, CV text goes only to the AI you pick, searches go to the sources you list. Add a "What leaves this computer" panel linked from welcome and from the go-live card. State English-only AI text. `script.md` repeats the claim in its intro: fix it too | fix in progress (X2 frontend copy) |
-| U6 | Filter reason with no way to change it (T6) | 3 | 5 | 15 | S | A button on the reason ("Allow 'sales'") or a link to Settings > Jobs & places > Filters. Add a "filtered" step to the funnel | fix in progress (X1 backend / X2 frontend) |
-| U7 | Arabic leftovers and bidi (T7) | 3 | 1* | 3 | M | Translate generated strings (errors, reasons, log and history lines). Show the original parked question with an Arabic gloss beside it. Use `dir=ltr` or `bdi` for scores and numbers. Fix plurals and the digit style | fix in progress (X1 backend / X2 frontend) |
-| U8 | Phone width: badge and count hidden (T8) | 3 | 1* | 3 | M | Keep the Practice mode badge and Needs-you count in the top bar. Scroll expanded panels into view. Raise tap targets to 40 px. Move the toast clear of buttons | fix in progress (X2 frontend) |
-| U9 | CV inference wrong or empty (T9) | 3 | 5 | 15 | M | Do not infer manager/executive from years alone. Count internships. Take skills only from a skills section. Keep the rule that nothing is written until the user confirms | fix in progress (X1 backend) |
-| U10 | Stale and conflicting counts (T10) | 2 | 5 | 10 | S-M | One source for Home and Needs-you counts. Update tabs and badge on Approve. Do not show 0 before the load finishes | fix in progress (X1 backend / X2 frontend) |
-| U11 | Indeed country mapping (T11) | 3 | 1 | 3 | S | Reproduce with a fresh Egypt place. If it is real, fix the place-to-country map | fix in progress (X1 backend); unverified |
-| U12 | Salary input (T12) | 2 | 4 | 8 | S | Example text, not a number, as placeholder. Default the currency from the home country. Searchable list. Text input with thousands separators | fix in progress (X1 backend / X2 frontend) |
-| U13 | "Use this for every application" wording (T13) | 2 | 4 | 8 | S | Say what it does ("Also use this answer for similar questions later"). Check that an unticked box does not save a standing answer (P5 saw one) | fix in progress (X1 backend / X2 frontend) |
-| U14 | Real-apply confirm does not say each one still asks (T14) | 3 | 4 | 12 | S | State the actual setting in the confirm ("LinKit will still ask before each one"). Make Cancel the safe default. Link to "Submit without asking" | open |
-| U15 | Go-live entry, thumbnails, no CV diff (T15) | 2 | 5 | 10 | S-M | Put "Ready to apply for real?" in the main Home card when practice has run. Open thumbnails in an in-app viewer. Add the CV red-line diff | open |
-| U16 | Internal words (T16) | 2 | 5 | 10 | S | Hide internal states in the filter. Rename "Practised". Name the apply button "Apply". Do not print `claude_cli (default model) ok` | open |
-| U17 | Silent runs, raw log text, no "stopped" notice (T17) | 2 | 4 | 8 | S-M | Per-job lines during apply, a plain-words version of known errors, a "Stopped" state | open |
-| U18 | Needs-you card has too many controls (T18) | 2 | 3 | 6 | S | One main button. Move the rest into a menu. A select answer needs a Save button | open |
+| U1 | No path to apply after approving (T1) | 3 | 5 | 15 | M | Home's main button points at "Apply to N jobs (practice)" as soon as any job is approved or queued, ahead of review work. Label the Activity button "Apply". Say how many jobs a run will take | Fixed (717f827, ba46591) |
+| U2 | Usage-limit error raw, doubled, run "failed" (T2) | 3 | 5 | 15 | M | One plain sentence ("Your ChatGPT plan is out of messages until Nov 4"), shown once, with a "Use another AI" button. Park the run as paused, not failed. Translate | Fixed (ba46591, 717f827) |
+| U3 | LibreOffice blocks practice, fix is a terminal command (T3) | 3 | 5 | 15 | M | Explain in plain words, not a red alert. Offer an in-app install action, not `linkit doctor`. Do not hard-fail practice apply, or say clearly why. Drop the "open the preview" text when there is no preview | Fixed (ba46591, 717f827) |
+| U4 | Go-live checklist ticks are static (T4) | 3 | 4 | 12 | S | Compute each tick from real state (CV approved, limits changed, LibreOffice present). Show the value and link to its setting. An untrue tick shows as a to-do | Fixed (ba46591, 717f827) |
+| U5 | Privacy over-claim (T5) | 3 | 4 | 12 | S-M | Replace the claim with the exact one: files stay here, CV text goes only to the AI you pick, searches go to the sources you list. Add a "What leaves this computer" panel linked from welcome and from the go-live card. State English-only AI text. `script.md` repeats the claim in its intro: fix it too | Fixed (717f827; `script.md` intro fixed) |
+| U6 | Filter reason with no way to change it (T6) | 3 | 5 | 15 | S | A button on the reason ("Allow 'sales'") or a link to Settings > Jobs & places > Filters. Add a "filtered" step to the funnel | Fixed (92709c3) |
+| U7 | Arabic leftovers and bidi (T7) | 3 | 1* | 3 | M | Translate generated strings (errors, reasons, log and history lines). Show the original parked question with an Arabic gloss beside it. Use `dir=ltr` or `bdi` for scores and numbers. Fix plurals and the digit style | Fixed (92709c3, ba46591) |
+| U8 | Phone width: badge and count hidden (T8) | 3 | 1* | 3 | M | Keep the Practice mode badge and Needs-you count in the top bar. Scroll expanded panels into view. Raise tap targets to 40 px. Move the toast clear of buttons | Fixed (92709c3) |
+| U9 | CV inference wrong or empty (T9) | 3 | 5 | 15 | M | Do not infer manager/executive from years alone. Count internships. Take skills only from a skills section. Keep the rule that nothing is written until the user confirms | Fixed (ba46591) |
+| U10 | Stale and conflicting counts (T10) | 2 | 5 | 10 | S-M | One source for Home and Needs-you counts. Update tabs and badge on Approve. Do not show 0 before the load finishes | Fixed (92709c3) |
+| U11 | Indeed country mapping (T11) | 3 | 1 | 3 | S | Reproduce with a fresh Egypt place. If it is real, fix the place-to-country map | Fixed (ba46591); not re-checked on a real Egypt place |
+| U12 | Salary input (T12) | 2 | 4 | 8 | S | Example text, not a number, as placeholder. Default the currency from the home country. Searchable list. Text input with thousands separators | Fixed (92709c3) |
+| U13 | "Use this for every application" wording (T13) | 2 | 4 | 8 | S | Say what it does ("Also use this answer for similar questions later"). Check that an unticked box does not save a standing answer (P5 saw one) | Fixed (92709c3) |
+| U14 | Real-apply confirm does not say each one still asks (T14) | 3 | 4 | 12 | S | State the actual setting in the confirm ("LinKit will still ask before each one"). Make Cancel the safe default. Link to "Submit without asking" | Fixed (717f827) |
+| U15 | Go-live entry, thumbnails, no CV diff (T15) | 2 | 5 | 10 | S-M | Put "Ready to apply for real?" in the main Home card when practice has run. Open thumbnails in an in-app viewer. Add the CV red-line diff | Open (lightbox and tailored-CV link in 717f827; no CV diff) |
+| U16 | Internal words (T16) | 2 | 5 | 10 | S | Hide internal states in the filter. Rename "Practised". Name the apply button "Apply". Do not print `claude_cli (default model) ok` | Open |
+| U17 | Silent runs, raw log text, no "stopped" notice (T17) | 2 | 4 | 8 | S-M | Per-job lines during apply, a plain-words version of known errors, a "Stopped" state | Open (log lines translated in 717f827) |
+| U18 | Needs-you card has too many controls (T18) | 2 | 3 | 6 | S | One main button. Move the rest into a menu. A select answer needs a Save button | Open |
 
 \* One person tested this condition (Arabic UI, 375 px). Impact is low only because of the sample. For Arabic readers and phone users it applies to everyone.
 
@@ -163,16 +163,16 @@ Smaller items, one line each:
 - **Timing is estimated** (10-20 s per step plus waits), not measured. Five agents shared one machine and browser pane: focus was stolen, screenshots glitched, and ports were shared (P2 stopped an `http.server` on 8830 that may have been P3's).
 - **Task 5 was not after 7 days.** It ran straight after Tasks 2-4 on the same folder, so a parked application from Task 3 changed what Home showed. This measured "can you get from Home to applying", not memory.
 - **P5's derived-field check** was not compared with the CV file. The fixture accuracy is measured separately.
-- **The script is out of step with the app:** "Show me why", "Filtered: ..." chip and "Use this for similar questions" do not exist as written. The app has "Why is this here?" and "Use this for every application".
+- **The script was out of step with the app** ("Show me why", "Use this for similar questions"). Fixed: `script.md` now uses "Why was this left out?" and the Needs-you wording.
 
 ## 7. Next step
 
-1. Land the X1/X2 fixes (U1-U13), then do U14-U18.
+1. U1-U14 are fixed (92709c3, ba46591, 717f827). Still to do: U15-U18 and the smaller items.
 2. **Rerun with five real people** using the kit (`README.md`, `script.md`). Before that:
    - install LibreOffice (or run `linkit install-libreoffice`);
    - sign in to an AI that has quota;
    - seed a prepared folder that matches each participant (the seed script gives Layla's data to everyone);
-   - update `script.md` to the app's words;
+   - (done) `script.md` uses the app's words;
    - run Task 5 seven days later on a restored folder.
 3. Retest first: U1 (apply from Home), U2 (limit error), U3 (LibreOffice), U4/U14 (go-live), U6 (filter reason), U9 (CV inference).
 4. Keep this file as the baseline. Targets not met here: first search 3 min, decisions 5, Task 5, SUS 75.

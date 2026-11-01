@@ -15,9 +15,18 @@ changing a decision in either file.
   - UX4 `986969a`: Home, Needs you, Activity and the plain-word vocabulary (EN + AR).
   - UX5a `3c9ae0c` + UX5 `60eb327`: just-in-time park codes, batch answers, a Needs you that clears fast.
   - UX6a `da5a346` + UX6 `6ee5dc3`: presets, job reasons, the guided switch to real applications, first-visit hints.
-  - Not verified: a real Gmail connect; the PDF approve path without LibreOffice; the local-model pick; a
-    native-speaker review of the new Arabic terms (the executors wrote them from the `ux-plan.md` section 9 list).
-  - Remaining: **UX7**, the usability round with 5 people (`ux-plan.md` section 14), pending with the maintainer.
+  - Round 2 (2026-10-31/11-01): `ec1d220` backend (places with work rights, offline GeoNames/O*NET suggestions, FX,
+    new sensitive answers), `ea22b5e` shared inputs + Profile & CV, `dd5e4d2` Jobs & places + first-run places,
+    `bc15cd3` Job sources + Answers, `a11af9f` Applying limits, one browser setting, Advanced clean-up.
+  - UX7 simulated round (5 AI personas, mean SUS 60; results in `docs/usability/simulated-round-1.md`) and its fixes:
+    `92709c3` (frontend: reasons, phone width, Arabic), `ba46591` (backend: AI limits pause, optional LibreOffice,
+    real go-live checks), `717f827` (frontend: apply path, LibreOffice choice, honest go-live, privacy panel).
+    U1-U14 fixed; U15-U18 and the smaller items are still open (`ux-plan.md` section 3.7). No more simulated rounds.
+  - Not verified: a real Gmail connect; real Outlook (branch `claude/outlook-oauth-898770`, not merged, needs an
+    Azure client id); the LibreOffice install (needs a hosted bundle URL and SHA-256, not set); the local-model pick on
+    a real server; the Arabic SUS and new Arabic terms (no native review yet).
+  - Remaining: the usability study with 5 real people (kit in `docs/usability/`); host the LibreOffice bundle; merge
+    the Outlook branch; native Arabic review; open items U15-U18.
 - Phases 0-8 are built, except the items blocked on the maintainer (see "Needs the
   maintainer"). Every task in `plan.md` is done or marked blocked.
 - Phase 8 (sources ported from freehire) is built too: see "Phase 8 - sources from freehire".

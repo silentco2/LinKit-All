@@ -14,7 +14,7 @@ Keep your voice warm and calm. Never explain the app. Never say "just click...".
 
 "Hi, and thank you for coming. I'm going to tell you a few things before we start, and I'll read them so I don't forget any.
 
-Today we're trying out an app called LinKit All. It finds jobs, adjusts your CV and fills in applications for you. Everything stays on this computer.
+Today we're trying out an app called LinKit All. It finds jobs, adjusts your CV and fills in applications for you. Your data stays on this computer, except what you send to your AI provider and job sites. The app shows exactly what.
 
 We're testing the app, not you. You can't do anything wrong. If something is confusing, that's the app's fault, and that is exactly what I want to find out. So please be honest, even if it feels rude.
 
@@ -65,9 +65,9 @@ If they ask "Is this right?": "What do you think?". If they ask "What does this 
 - Do they find the CV upload (drop or Choose a file)? Do they understand which formats work?
 - Do they notice the language switch (English / العربية)?
 - On "Connect your AI": do they understand what it is? Do they know which card to pick? Does the automatic test make sense? Do they wait or click away?
-- On "Check what we found": do they read the values? Do they notice the "From your CV" source badges and the "check this" warnings? Do they fix a wrong value? Do they know what "Never changed in your CV" means?
-- The sensitive questions (work authorization, demographic, salary): do they understand "Ask me"? Do they feel pressure to answer?
-- On "What jobs?": do they understand the job titles, level, and Where? Do they see that this is practice mode?
+- On "Check what we found": do they read the values? Do they notice the "From your CV" source badges and the "check this" warnings? Do they fix a wrong value? Do they understand the source badges and the "check this" marks?
+- The sensitive questions (demographic, monthly salary): do they understand "Ask me"? Do they feel pressure to answer?
+- On "What jobs?": do they understand the job titles, level, and places ("I can work here" / "I'd need a visa")? Do they see that this is practice mode?
 - Count the decisions. Count hesitations over 10 seconds. Note anything they say about LibreOffice.
 - Does the step counter ("Step 2 of 4") and Back work for them?
 
@@ -89,10 +89,10 @@ If they ask "Is this right?": "What do you think?". If they ask "What does this 
 
 **Observe:**
 - Where do they go first: Home funnel numbers, Jobs, a filter, a search box?
-- Do they find the reason chip on the job ("Filtered: ...")? Do they find "Show me why" in the job detail?
+- Do they find the reason chip on the job? Do they find "Why was this left out?" in the job detail?
 - Do they notice that the funnel numbers on Home are links?
 - Do they understand "Filtered", "Strong / Possible / Weak match" and "Stale posting"?
-- Can they say what they would change if they disagree? Do they find the setting?
+- Can they say what they would change if they disagree? Do they use the link on the reason to reach the setting?
 
 **Mark:** yes / partial / no, time, errors, quotes, severity.
 
@@ -112,7 +112,7 @@ If they ask "Is this right?": "What do you think?". If they ask "What does this 
 - Do they notice the "Needs you" badge and open it? Which tab do they choose: "Approve jobs" or "Finish applications"?
 - Do they understand that four applications are grouped under one question?
 - Do they answer once, or open each application one by one?
-- Do they see "Use this for similar questions"? Do they understand it? Do they leave it on?
+- Do they see "Answer all 4" and "LinKit remembers this answer for the same question next time"? Do they understand that the answer is reused?
 - Do they understand what happens after they answer? Do they see the four retries?
 - Do they understand each card: what happened, why, and the one main button?
 - Is the empty state ("Nothing needs you...") clear?
@@ -136,8 +136,8 @@ If they move to press Confirm, say gently: "Please stop there and tell me what y
 
 **Observe:**
 - Do they find the Home task "Ready to apply for real?" Do they look in Settings first?
-- Do they look at the screenshots of the filled forms and the CV diff? Do they understand the red-line diff?
-- Do they understand the checklist: CV approved, sensitive answers set or on "Ask me", daily caps (Pace), "Confirm each submission" on?
+- Do they look at the screenshots of the filled forms and the tailored CV link?
+- Do they understand the checklist: CV approved, the CV ready, how it is sent (tailoring mode), open items, "Confirm each submission" on? Do the values and fix links make sense?
 - Do they understand the difference between "Practice mode" and "Applying for real"?
 - Do they understand the confirm dialog? Are they afraid, or surprised? What do they think "Submit real applications from now on?" means?
 - Do they understand that "Submit without asking" is a separate setting? Do they find it by accident?
