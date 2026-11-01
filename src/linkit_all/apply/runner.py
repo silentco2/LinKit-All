@@ -187,6 +187,7 @@ class Outcome:
     status: str  # dry_run | applied | needs_user | failed | skipped
     message: str
     artifacts: list[str] = field(default_factory=list)
+    reason: str = ""  # stable code for an outcome that leaves no job event (else the last event's)
 
 
 def job_info(job: Job) -> JobInfo | None:
@@ -446,7 +447,9 @@ class Applier:
                 async with make_client() as client:
                     live = await source.is_live(Http(client), stub)
         except Exception as e:  # our own failure never blocks an application
-            logger.warning("job {}: liveness check failed: {}", job.id, e)
+            logger.bind(
+                code="liveness_check_failed", params={"job": job.id, "error": type(e).__name__}
+            ).warning("job {}: liveness check failed: {}", job.id, e)
             return False
         if live is not False:
             return False
@@ -497,12 +500,18 @@ class Applier:
         if is_mailto(job.data.get("apply_url")):
             addr = mailto_address(job.data.get("apply_url"))
             if addr is None:
-                return Outcome("skipped", "the apply link is not a single valid email address")
+                return Outcome(
+                    "skipped",
+                    "the apply link is not a single valid email address",
+                    reason="bad_email",
+                )
             return await self._apply_email(job_id, addr)
         handler = HANDLERS.get(job.ats or "")
         generic = self.cfg.apply.generic_agent
         if info is None or (handler is None and not (generic and _web_url(info.apply_url))):
-            return Outcome("skipped", f"no form handler for this posting ({job.ats})")
+            return Outcome(
+                "skipped", f"no form handler for this posting ({job.ats})", reason="no_handler"
+            )
         if await self._posting_closed(job, info):  # a read-only check; costs no AI
             return Outcome("skipped", f"the posting is no longer open on {job.ats}")
         cv_pdf = await self._cv_pdf(job_id)
@@ -548,7 +557,10 @@ class Applier:
             raise usage_blocked(e) from e
         except Exception as e:
             keep_trace = True
-            logger.exception("job {}: apply crashed", job_id)
+            logger.bind(
+                code="apply_crashed",
+                params={"job": job_id, "error": f"{type(e).__name__}: {str(e)[:120]}"},
+            ).exception("job {}: apply crashed", job_id)
             with self.db.begin() as s:
                 job = s.get_one(Job, job_id)
                 if job.state != JobState.applying:
@@ -654,7 +666,9 @@ class Applier:
             except UsageLimitError as e:
                 raise usage_blocked(e) from e
             except Exception as e:
-                logger.warning("job {}: could not write the email: {}", job_id, type(e).__name__)
+                logger.bind(
+                    code="email_draft_failed", params={"job": job_id, "error": type(e).__name__}
+                ).warning("job {}: could not write the email: {}", job_id, type(e).__name__)
                 return fail(
                     f"could not write the email ({type(e).__name__})", {"error": type(e).__name__}
                 )
@@ -1176,6 +1190,32 @@ class Applier:
             return Outcome("failed", "no confirmation seen", [shot, done])
 
 
+_END_STATE = {"needs_user": JobState.needs_user, "failed": JobState.failed,
+              "skipped": JobState.skipped}  # fmt: skip
+
+
+def _outcome_params(db: sessionmaker[Session], job_id: int, outcome: Outcome) -> dict[str, Any]:
+    """`apply_job` params: job, status and, for needs_user/failed/skipped, a stable `reason` code
+    (the job's last event if it ended in that state) plus `questions` for a parked job."""
+    params: dict[str, Any] = {"job": job_id, "status": outcome.status}
+    end = _END_STATE.get(outcome.status)
+    if end is None:
+        return params
+    with db() as s:
+        last = s.scalars(
+            select(JobEvent).where(JobEvent.job_id == job_id).order_by(JobEvent.id.desc()).limit(1)
+        ).first()
+        params["reason"] = (
+            outcome.reason or (last.code if last and last.to_state == end else None) or "unknown"
+        )
+        if end == JobState.needs_user:
+            item = s.scalars(
+                select(ActionItem).where(ActionItem.job_id == job_id).order_by(ActionItem.id.desc())
+            ).first()
+            params["questions"] = len(item.questions) if item else 0
+    return params
+
+
 async def apply_jobs(
     db: sessionmaker[Session],
     settings: Settings,
@@ -1214,11 +1254,18 @@ async def apply_jobs(
                 for n, job_id in enumerate(ids):
                     if n:  # pace between two applications on the same site
                         await asyncio.sleep(random.uniform(lo, max(lo, hi)))  # noqa: S311
+                    with db() as s:
+                        row = s.get_one(Job, job_id)
+                        title, company = row.title, row.company
+                    logger.bind(
+                        code="apply_job_start",
+                        params={"job": job_id, "title": title, "company": company},
+                    ).info("job {}: starting ({} at {})", job_id, title, company)
                     outcome = await applier.apply(job_id)
                     counts[outcome.status] += 1  # no await in between: no race
-                    logger.bind(
-                        code="apply_job", params={"job": job_id, "status": outcome.status}
-                    ).info("job {}: {} ({})", job_id, outcome.status, outcome.message)
+                    logger.bind(code="apply_job", params=_outcome_params(db, job_id, outcome)).info(
+                        "job {}: {} ({})", job_id, outcome.status, outcome.message
+                    )
 
         try:
             async with asyncio.TaskGroup() as tg:

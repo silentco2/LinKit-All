@@ -140,7 +140,9 @@ async def ai_drafts(
         if q is None or not d.known or (value := _fit(q, d.answer)) is None:
             continue
         if has_arabic(" ".join(value) if isinstance(value, list) else str(value)):
-            logger.warning("AI draft for {} discarded: not English", q.key)  # goes to Needs you
+            logger.bind(code="ai_draft_discarded", params={"key": q.key}).warning(
+                "AI draft for {} discarded: not English", q.key
+            )  # goes to Needs you
             continue
         out[q.key] = value
     return out
@@ -228,7 +230,9 @@ async def answer_questions(
         except UsageLimitError:
             raise  # pause the run; the job is retried later instead of parked
         except Exception as e:  # a bad AI answer must not lose the application
-            logger.warning("AI drafts failed: {}", e)
+            logger.bind(code="ai_drafts_failed", params={"error": type(e).__name__}).warning(
+                "AI drafts failed: {}", e
+            )
             drafted = {}
         for q in for_ai:
             if q.key in drafted:
