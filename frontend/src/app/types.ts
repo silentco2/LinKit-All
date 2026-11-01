@@ -472,6 +472,30 @@ export interface InferPayload {
   has_cv: boolean;
 }
 
+/** Where the setting behind a filter reason lives: the Settings section and the field (an element id) to scroll to. */
+const REASON_SETTING: Record<string, { section: string; focus: string }> = {
+  title_not_included: { section: 'jobs', focus: 'role-add' },
+  title_excluded: { section: 'jobs', focus: 'exc' },
+  work_mode: { section: 'jobs', focus: 'fld-modes' },
+  location: { section: 'jobs', focus: 'place-add' },
+  seniority: { section: 'jobs', focus: 'fld-level' },
+  too_old: { section: 'jobs', focus: 'fld-posted' },
+  salary: { section: 'jobs', focus: 'salary' },
+  blacklist: { section: 'jobs', focus: 'black' },
+  one_per_company: { section: 'advanced', focus: 'adv-one' },
+  one_per_company_better: { section: 'advanced', focus: 'adv-one' },
+  scam: { section: 'advanced', focus: 'adv-scam' },
+  ghost: { section: 'advanced', focus: 'adv-ghost' },
+  low_score: { section: 'advanced', focus: 'adv-high' },
+  low_rank: { section: 'advanced', focus: 'adv-high' },
+};
+
+/** The Settings field that decides a job's reason (`reason_code`), or null when none does (a job you reported, an unknown code). */
+export const reasonSetting = (code: string | null | undefined): { section: string; focus: string } | null => (code ? REASON_SETTING[code] ?? null : null);
+
+/** A job that is out of the running (filtered out or a weak match): its reason reads "why was this left out". */
+export const isLeftOut = (j: { state: string; tier: Tier | null }): boolean => j.state === 'filtered_out' || j.state === 'below_threshold' || j.tier === 'low';
+
 /** Why a job sits where it is, in the UI language: `reason.<code>` with the server's params, else its English `reason`. */
 export function reasonText(i18n: I18n, j: { reason?: string | null; reason_code?: string | null; reason_params?: Record<string, unknown> }): string {
   const key = j.reason_code ? `reason.${j.reason_code}` : '';

@@ -1,4 +1,5 @@
 import { ScrollingModule } from '@angular/cdk/scrolling';
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, computed, DestroyRef, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -8,7 +9,7 @@ import { I18n, SourcePipe, TPipe } from '../i18n';
 import { Live } from '../live';
 import { fmtNum, localeOf } from '../locale';
 import { Hint } from '../components/hint';
-import { GHOST_HIGH, GHOST_MEDIUM, JobRow, reasonText, SCAM_HIGH, SCAM_MEDIUM } from '../types';
+import { GHOST_HIGH, GHOST_MEDIUM, JobRow, reasonSetting, reasonText, SCAM_HIGH, SCAM_MEDIUM } from '../types';
 
 interface Risk { key: string; cls: string }
 const RISK_RED = 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300';
@@ -31,14 +32,16 @@ import { JobDetailPanel } from './job-detail';
 const GROUPS: Record<string, Set<string>> = {
   // ranked or later: what Home calls "passed filters"
   passed: new Set(['ranked', 'scored', 'below_threshold', 'awaiting_review', 'queued_apply', 'tailored', 'applying', 'needs_user', 'applied', 'failed', 'skipped']),
+  // the steps LinKit does by itself: nothing for the user to look at, so one line in the filter
+  processing: new Set(['discovered', 'enriched', 'ranked', 'scored', 'tailored']),
 };
-const STATES = ['discovered', 'enriched', 'filtered_out', 'ranked', 'scored', 'below_threshold', 'awaiting_review',
-  'queued_apply', 'tailored', 'applying', 'needs_user', 'applied', 'failed', 'skipped'];
+/** The state filter in plain words: where a job is for the user. The internal steps are one "Being processed" line. */
+const STATES = ['filtered_out', 'below_threshold', 'awaiting_review', 'queued_apply', 'applying', 'needs_user', 'applied', 'failed', 'skipped'];
 
 @Component({
   selector: 'app-jobs',
-  host: { '(document:keydown.escape)': 'selected.set(null)' },
-  imports: [ScrollingModule, FormsModule, Hint, RouterLink, JobDetailPanel, SourcePipe, TPipe],
+  host: { '(document:keydown.escape)': 'select(null)' },
+  imports: [ScrollingModule, FormsModule, Hint, NgTemplateOutlet, RouterLink, JobDetailPanel, SourcePipe, TPipe],
   template: `
     <div class="flex items-baseline justify-between">
       <h1>{{ 'jobs.title' | t }}</h1>
@@ -53,6 +56,7 @@ const STATES = ['discovered', 'enriched', 'filtered_out', 'ranked', 'scored', 'b
       <select class="input w-44" [attr.aria-label]="'jobs.filter.state' | t" [ngModel]="state()" (ngModelChange)="setFilter('state', $event)">
         <option value="">{{ 'jobs.filter.allStates' | t }}</option>
         <option value="passed">{{ 'jobs.filter.passed' | t }}</option>
+        <option value="processing">{{ 'jobs.filter.processing' | t }}</option>
         @for (s of states; track s) { <option [value]="s">{{ 'common.state.' + s | t }}</option> }
       </select>
       <select class="input w-36" [attr.aria-label]="'jobs.filter.tier' | t" [ngModel]="tier()" (ngModelChange)="setFilter('tier', $event)">
@@ -77,23 +81,26 @@ const STATES = ['discovered', 'enriched', 'filtered_out', 'ranked', 'scored', 'b
         </div>
         @if (rows().length) {
           <cdk-virtual-scroll-viewport [itemSize]="rowHeight()" class="h-[calc(100vh-260px)]">
-            <button *cdkVirtualFor="let j of rows(); trackBy: trackId" type="button" (click)="selected.set(j.id)"
+            <div *cdkVirtualFor="let j of rows(); trackBy: trackId" role="button" tabindex="0" (click)="select(j.id)" (keydown.enter)="select(j.id)" (keydown.space)="select(j.id); $event.preventDefault()"
                     [style.height.px]="rowHeight()"
                     [class]="compact() ? 'grid-cols-[2.5rem_minmax(0,1fr)]' : 'grid-cols-[3rem_minmax(0,1fr)_7rem_5rem]'"
-                    class="grid w-full items-center gap-3 border-b border-slate-100 px-4 text-start hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                    class="grid w-full cursor-pointer items-center gap-3 border-b border-slate-100 px-4 text-start hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
                     [class.bg-brand-50]="selected() === j.id" [attr.aria-pressed]="selected() === j.id">
               <span>
                 @if (j.score) { <span class="badge tier-{{ j.tier }}">{{ num(j.score) }}</span> } @else { <span class="text-slate-400">–</span> }
               </span>
               <span class="min-w-0">
                 <span [class]="compact() ? 'line-clamp-2' : 'block truncate'" class="text-sm font-medium break-words" dir="auto">{{ j.title }}</span>
-                <span class="block truncate text-xs text-slate-500" dir="auto">@if (reasonOf(j); as why) { <span class="badge tier-low me-1.5 inline-block max-w-[55%] truncate px-1.5 py-0 align-middle text-[11px] leading-4" [attr.title]="why" dir="auto">{{ why }}</span> }@if (risk(j); as r) { <span class="badge me-1.5 px-1.5 py-0 text-[11px] leading-4 {{ r.cls }}">{{ 'trust.badge.' + r.key | t }}</span> }@if (compact()) { <span>{{ 'common.state.' + j.state | t }} · </span> }<bdi>{{ j.company }}</bdi> · <bdi>{{ j.location }}</bdi> · <bdi>{{ j.source | src }}</bdi></span>
+                @if (!wide() && reasonOf(j); as why) {
+                  <span class="mt-0.5 block"><ng-container *ngTemplateOutlet="chip; context: { $implicit: j, why: why, wrap: true }" /></span>
+                }
+                <span class="block truncate text-xs text-slate-500" dir="auto">@if (wide() && reasonOf(j); as why) { <ng-container *ngTemplateOutlet="chip; context: { $implicit: j, why: why, wrap: false }" /> }@if (risk(j); as r) { <span class="badge me-1.5 px-1.5 py-0 text-[11px] leading-4 {{ r.cls }}">{{ 'trust.badge.' + r.key | t }}</span> }@if (compact()) { <span>{{ 'common.state.' + j.state | t }} · </span> }<bdi>{{ j.company }}</bdi> · <bdi>{{ j.location }}</bdi> · <bdi>{{ j.source | src }}</bdi></span>
               </span>
               @if (!compact()) {
                 <span class="truncate text-xs text-slate-600 dark:text-slate-400">{{ 'common.state.' + j.state | t }}</span>
                 <span class="text-end text-xs text-slate-500">{{ j.rank === null ? '' : num(j.rank, { style: 'percent', maximumFractionDigits: 0 }) }}</span>
               }
-            </button>
+            </div>
           </cdk-virtual-scroll-viewport>
         } @else if (!loading()) {
           <p class="p-8 text-center text-sm text-slate-500">{{ 'jobs.empty.a' | t }}<a routerLink="/home">{{ 'shell.nav.home' | t }}</a>{{ 'jobs.empty.b' | t }}</p>
@@ -101,13 +108,24 @@ const STATES = ['discovered', 'enriched', 'filtered_out', 'ranked', 'scored', 'b
       </div>
 
       @if (selected(); as id) {
-        <button type="button" tabindex="-1" aria-hidden="true" class="fixed inset-0 z-10 cursor-default bg-slate-900/30 xl:hidden" (click)="selected.set(null)"></button>
+        <button type="button" tabindex="-1" aria-hidden="true" class="fixed inset-0 z-10 cursor-default bg-slate-900/30 xl:hidden" (click)="select(null)"></button>
         <aside class="fixed inset-y-0 end-0 z-20 w-full max-w-xl overflow-auto border-s border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900" [attr.aria-label]="'common.drawer.label' | t">
-          <button type="button" class="btn float-end ms-3 px-2 py-1" [attr.aria-label]="'common.drawer.close' | t" (click)="selected.set(null)">✕</button>
+          <button type="button" class="btn float-end ms-3 px-2 py-1" [attr.aria-label]="'common.drawer.close' | t" (click)="select(null)">✕</button>
           <app-job-detail [jobId]="id" (changed)="load()" />
         </aside>
       }
     </div>
+
+    <!-- The reason chip. A reason with a setting behind it is a link to that setting; a click on it does not open the drawer. -->
+    <ng-template #chip let-j let-why="why" let-wrap="wrap">
+      @if (settingOf(j); as tg) {
+        <a [routerLink]="['/settings', tg.section]" [fragment]="tg.focus" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()" (keydown.space)="$event.stopPropagation()"
+           [attr.title]="'fix.openSetting' | t" dir="auto"
+           [class]="'badge tier-low me-1.5 px-1.5 py-0 align-middle text-[11px] leading-4 no-underline hover:underline max-sm:min-h-8 max-sm:py-1 ' + (wrap ? 'max-w-full whitespace-normal' : 'inline-block max-w-[55%] truncate')">{{ why }}</a>
+      } @else {
+        <span [class]="'badge tier-low me-1.5 px-1.5 py-0 align-middle text-[11px] leading-4 ' + (wrap ? 'max-w-full whitespace-normal' : 'inline-block max-w-[55%] truncate')" [attr.title]="why" dir="auto">{{ why }}</span>
+      }
+    </ng-template>
   `,
 })
 export class JobsPage {
@@ -126,21 +144,24 @@ export class JobsPage {
     this.hideRisky() ? this.all().filter((j) => (j.scam_score ?? 0) < SCAM_HIGH && (j.ghost_score ?? 0) < GHOST_HIGH) : this.all());
   protected readonly risk = riskOf;
   protected readonly reasonOf = (j: JobRow): string => reasonText(this.i18n, j);
+  protected readonly settingOf = (j: JobRow) => reasonSetting(j.reason_code);
   protected readonly q = computed(() => this.params()?.get('q') ?? '');
   protected readonly state = computed(() => this.params()?.get('state') ?? '');
   protected readonly tier = computed(() => this.params()?.get('tier') ?? '');
   protected readonly source = computed(() => this.params()?.get('source') ?? '');
   /** What the search box shows: ahead of `q` while the user types. */
   protected readonly qText = signal('');
-  protected readonly selected = signal<number | null>(null);
+  /** The open job lives in the URL (`?job=12`), so a reload or a shared link opens the same drawer. */
+  protected readonly selected = computed(() => Number(this.params()?.get('job')) || null);
   protected readonly loading = signal(false);
   protected readonly error = signal('');
   protected readonly sources = signal<string[]>([]);
   /** Phones, and the list narrowed beside the open drawer (xl+), show title + score only on two-line rows. */
-  private readonly wide = signal(true);
+  protected readonly wide = signal(true);
   private readonly xl = signal(true);
   protected readonly compact = computed(() => !this.wide() || (this.xl() && this.selected() !== null));
-  protected readonly rowHeight = computed(() => (this.compact() ? 76 : 60));
+  /** A phone row has room for the reason chip on its own line, wrapped over two lines at most. */
+  protected readonly rowHeight = computed(() => (this.compact() ? (!this.wide() && this.rows().some(this.reasonOf) ? 116 : 76) : 60));
   private timer?: ReturnType<typeof setTimeout>;
 
   constructor() {
@@ -174,6 +195,12 @@ export class JobsPage {
       this.timer = undefined;
       this.setFilter('q', value);
     }, 250);
+  }
+
+  /** Open a job in the drawer (or close it with null) by changing the URL; closing replaces the entry so Back does not reopen it. */
+  protected select(id: number | null): void {
+    if (id === null && this.selected() === null) return;
+    void this.router.navigate([], { queryParams: { job: id }, queryParamsHandling: 'merge', replaceUrl: id === null });
   }
 
   protected setFilter(key: 'q' | 'state' | 'tier' | 'source', value: string): void {

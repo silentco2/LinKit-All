@@ -152,8 +152,8 @@ export class ApplyingSection implements OnInit {
 
   /** "1 site at a time · 60–120 s between applications · up to 10 a day per site · 5 per search" */
   protected line(v: Record<string, number>): string {
-    const t = (k: string) => this.i18n.t(k, { n: v['parallel_sites'], min: v['min_pause_s'], max: v['max_pause_s'], cap: v['daily_cap_per_site'], run: v['max_per_run'] });
-    return [t(v['parallel_sites'] === 1 ? 'settings.apply.sitesOne' : 'settings.apply.sitesMany'), t('settings.apply.paceRest')].join(' · ');
+    const t = (k: string) => this.i18n.t(k, { min: v['min_pause_s'], max: v['max_pause_s'], cap: v['daily_cap_per_site'], run: v['max_per_run'] });
+    return [this.i18n.plural('settings.apply.sites', v['parallel_sites']), t('settings.apply.paceRest')].join(' · ');
   }
 
   /**

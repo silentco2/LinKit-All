@@ -5,6 +5,7 @@ import { Toast } from '../components/toast';
 import { I18n, TPipe } from '../i18n';
 import { Live } from '../live';
 import { fmtNum, localeOf } from '../locale';
+import { Shell } from '../shell';
 import { JobRow } from '../types';
 import { JobDetailPanel } from './job-detail';
 
@@ -19,13 +20,20 @@ interface Pending {
   id: number;
   action: Verb;
   ids: number[];
+  /** Taken from the "waiting for your OK" list (not the weak-match list), so it counts against the badge until it is sent. */
+  review: boolean;
   timer: ReturnType<typeof setTimeout>;
 }
+
+/** Input types where a letter key is not typed text, so the list shortcuts still work. */
+const NON_TEXT_INPUTS = new Set(['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'file']);
 
 const SHORTCUTS: [string, string][] = [
   ['J / K', 'review.keys.move'],
   ['A', 'review.keys.approve'],
   ['S', 'review.keys.skip'],
+  ['Shift + A', 'review.keys.approveSel'],
+  ['Z', 'review.keys.undo'],
   ['O', 'review.keys.open'],
   ['X', 'review.keys.select'],
   ['?', 'review.keys.help'],
@@ -40,7 +48,7 @@ const SHORTCUTS: [string, string][] = [
   },
   imports: [AllClear, JobDetailPanel, Toast, TPipe],
   template: `
-    <p class="text-sm text-slate-500">{{ 'review.intro' | t }} <button type="button" class="text-brand-600 hover:underline" (click)="help.set(true)">{{ 'review.keys.link' | t }}</button></p>
+    <p class="text-sm text-slate-500">{{ 'review.intro' | t }} <button type="button" class="text-brand-600 hover:underline max-sm:min-h-10" (click)="help.set(true)">{{ 'review.keys.link' | t }}</button></p>
 
     <div class="mt-5 flex flex-wrap gap-2" role="tablist">
       @for (t of tabs; track t.id) {
@@ -69,17 +77,18 @@ const SHORTCUTS: [string, string][] = [
               [class.ring-2]="open() === j.id" [class.ring-brand-500]="open() === j.id"
               [class.outline-3]="focus() === j.id" [class.outline-brand-600]="focus() === j.id" [class.outline]="focus() === j.id"
               (click)="focus.set(j.id)">
-            <input type="checkbox" class="mt-1.5" [checked]="picked().has(j.id)" (change)="toggle(j.id)"
-                   [attr.aria-label]="'review.select' | t: { title: j.title }">
+            <label class="flex shrink-0 items-start pt-1.5 max-sm:-m-2 max-sm:size-10 max-sm:items-center max-sm:justify-center max-sm:pt-0">
+              <input type="checkbox" [checked]="picked().has(j.id)" (change)="toggle(j.id)" [attr.aria-label]="'review.select' | t: { title: j.title }">
+            </label>
             <div class="min-w-0 flex-1">
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
                   <div class="truncate font-medium" dir="auto">{{ j.title }}</div>
                   <div class="truncate text-sm text-slate-500" dir="auto"><bdi>{{ j.company }}</bdi> · <bdi>{{ j.location }}</bdi></div>
                 </div>
-                <div class="flex shrink-0 items-center gap-2">
-                  @if (j.reason) { <span class="badge tier-low" dir="auto">{{ why(j) }}</span> }
-                  @if (j.score) { <span class="badge tier-{{ j.tier }}">{{ num(j.score) }}/10</span> }
+                <div class="flex shrink-0 flex-wrap items-center justify-end gap-2 max-sm:max-w-[45%]">
+                  @if (j.reason) { <span class="badge tier-low text-start whitespace-normal" dir="auto">{{ why(j) }}</span> }
+                  @if (j.score) { <span class="badge tier-{{ j.tier }}"><bdi>{{ 'review.score' | t: { n: j.score, out: 10 } }}</bdi></span> }
                 </div>
               </div>
               @if (j.ai; as ai) {
@@ -90,9 +99,9 @@ const SHORTCUTS: [string, string][] = [
                 @if (ai.red_flags.length) { <p class="mt-1 text-xs text-rose-600 dark:text-rose-400">{{ 'review.redFlags' | t }} <bdi>{{ ai.red_flags.join(', ') }}</bdi></p> }
               }
               <div class="mt-2 flex flex-wrap items-center gap-3">
-                <button type="button" class="btn px-3 py-1" (click)="queue('approve', [j.id])">{{ 'review.approveBtn' | t }}</button>
-                <button type="button" class="btn btn-danger px-3 py-1" (click)="queue('reject', [j.id])">{{ 'review.skipBtn' | t }}</button>
-                <button type="button" class="text-sm text-brand-600 hover:underline" (click)="open.set(j.id)">{{ 'review.details' | t }}</button>
+                <button type="button" class="btn px-3 py-1 max-sm:min-h-10" (click)="queue('approve', [j.id])">{{ 'review.approveBtn' | t }}</button>
+                <button type="button" class="btn btn-danger px-3 py-1 max-sm:min-h-10" (click)="queue('reject', [j.id])">{{ 'review.skipBtn' | t }}</button>
+                <button type="button" class="text-sm text-brand-600 hover:underline max-sm:min-h-10 max-sm:px-2" (click)="open.set(j.id)">{{ 'review.details' | t }}</button>
               </div>
             </div>
           </li>
@@ -134,6 +143,7 @@ const SHORTCUTS: [string, string][] = [
 export class ReviewPage implements OnDestroy {
   private readonly api = inject(Api);
   private readonly live = inject(Live);
+  private readonly shell = inject(Shell);
   private readonly i18n = inject(I18n);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly loc = computed(() => localeOf(this.i18n.lang()));
@@ -197,8 +207,9 @@ export class ReviewPage implements OnDestroy {
   /** Hide the jobs now; send the request after 10 seconds unless the user presses Undo. */
   queue(action: Verb, ids: number[]): void {
     if (!ids.length) return;
-    const batch: Pending = { id: ++this.seq, action, ids, timer: setTimeout(() => void this.send(batch, false), UNDO_MS) };
+    const batch: Pending = { id: ++this.seq, action, ids, review: this.tab() === 'awaiting_review', timer: setTimeout(() => void this.send(batch, false), UNDO_MS) };
     this.pending.push(batch);
+    this.syncPending();
     this.hide(ids, true);
     const taken = new Set(ids);
     this.picked.update((s) => new Set([...s].filter((id) => !taken.has(id))));
@@ -216,9 +227,15 @@ export class ReviewPage implements OnDestroy {
     if (!batch) return;
     clearTimeout(batch.timer);
     this.hide(batch.ids, false);
+    this.syncPending();
     this.toast.set('');
-    this.announce.set(this.i18n.t('review.restored', { n: this.num(batch.ids.length) }));
+    this.announce.set(this.i18n.plural('review.restored', batch.ids.length));
     this.focus.set(batch.ids[0]);
+  }
+
+  /** Tell the shell how many jobs sit in the Undo window, so the badge, the tab and Home count them as gone right away. */
+  private syncPending(): void {
+    this.shell.pendingReview.set(this.pending.filter((b) => b.review).reduce((n, b) => n + b.ids.length, 0));
   }
 
   private hide(ids: number[], on: boolean): void {
@@ -246,11 +263,13 @@ export class ReviewPage implements OnDestroy {
       this.error.set('');
     } catch (e) {
       this.hide(batch.ids, false); // not saved: show them again
+      this.syncPending();
       this.error.set(e instanceof Error ? e.message : String(e));
       return;
     }
-    this.live.changed.update((n) => n + 1); // reloads the badge in the shell
-    await this.load();
+    // the shell's status first, then the pending count: the other way round the badge would jump up for a moment
+    await Promise.all([this.shell.refresh(), this.load()]);
+    this.syncPending();
     this.hide(batch.ids, false); // only once the list no longer holds them, so they cannot flash back
   }
 
@@ -269,7 +288,8 @@ export class ReviewPage implements OnDestroy {
   protected onKey(e: KeyboardEvent): void {
     if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
     const t = e.target as HTMLElement | null;
-    if (t && (/^(input|select|textarea)$/i.test(t.tagName) || t.isContentEditable)) return;
+    // typing places ignore the shortcuts; a checkbox or button that kept the focus (after "Select all") does not
+    if (t && (/^(select|textarea)$/i.test(t.tagName) || t.isContentEditable || (t instanceof HTMLInputElement && !NON_TEXT_INPUTS.has(t.type)))) return;
     const k = e.key.toLowerCase();
     if (k === '?') {
       this.help.update((v) => !v);
@@ -277,6 +297,18 @@ export class ReviewPage implements OnDestroy {
       return;
     }
     if (this.help() || this.open() !== null) return;
+    if (k === 'z') {
+      if (!this.pending.length) return;
+      this.undo();
+      e.preventDefault();
+      return;
+    }
+    if (k === 'a' && e.shiftKey) {
+      if (!this.picked().size) return;
+      this.queue('approve', [...this.picked()]);
+      e.preventDefault();
+      return;
+    }
     const list = this.shown();
     const cur = list.findIndex((j) => j.id === this.focus());
     const job = list[cur];

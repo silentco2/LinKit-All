@@ -1,4 +1,4 @@
-import { inject, Injectable, signal } from '@angular/core';
+import { computed, inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { Api } from './api';
 import { I18n } from './i18n';
@@ -15,6 +15,12 @@ export class Shell {
   private readonly live = inject(Live);
   private readonly router = inject(Router);
   readonly status = signal<Status | null>(null);
+  /** Jobs just approved or skipped whose request waits out the Undo window: already gone from the count the user sees. */
+  readonly pendingReview = signal(0);
+  /** Jobs waiting for a yes or no, as the user sees it (the server count minus what was just approved or skipped). */
+  readonly reviewCount = computed(() => Math.max(0, (this.status()?.states['awaiting_review'] ?? 0) - this.pendingReview()));
+  /** The one number for everything waiting on the user: nav badge, Needs you tabs and Home all read it. */
+  readonly needsCount = computed(() => this.reviewCount() + (this.status()?.actions_open ?? 0));
   readonly notifySupported = typeof Notification !== 'undefined';
   readonly notify = signal(this.notifySupported && readNotifyPref() && Notification.permission === 'granted');
   readonly notifyHint = signal('');
@@ -26,7 +32,7 @@ export class Shell {
       const before = this.status()?.actions_open ?? 0;
       this.status.set(s);
       if (known && s.actions_open > before) {
-        this.alert(this.i18n.t('shell.actionNeeded'), this.i18n.t('shell.actionNeededBody', { n: s.actions_open }), 'actions', '/needs-you?tab=finish');
+        this.alert(this.i18n.t('shell.actionNeeded'), this.i18n.plural('shell.actionNeededBody', s.actions_open), 'actions', '/needs-you?tab=finish');
       }
       if (!this.live.run()) this.live.run.set(s.run);
     } catch {

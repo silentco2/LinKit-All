@@ -276,7 +276,7 @@ export class AdvancedSection implements OnInit {
     this.result.set(null);
     try {
       const r = await this.api.filterGhost(n);
-      this.result.set({ ok: true, text: this.i18n.t('settings.adv.staleDone', { n: r.count }) });
+      this.result.set({ ok: true, text: this.i18n.plural('settings.adv.staleDone', r.count) });
     } catch (e) {
       this.result.set({ ok: false, text: (e as Error).message });
     } finally {

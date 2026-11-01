@@ -1,4 +1,4 @@
-import { Component, computed, ElementRef, inject, OnInit, signal, viewChild } from '@angular/core';
+import { Component, computed, effect, ElementRef, inject, OnInit, signal, untracked, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Api } from '../api';
@@ -10,6 +10,7 @@ import { PlacePick, PlacePicker } from '../components/place-picker';
 import { PlacesList } from '../components/places-list';
 import { TagInput } from '../components/tag-input';
 import { I18n, Lang, SourcePipe, TPipe } from '../i18n';
+import { currencyLabel } from '../locale';
 import { expandQueries, InferPayload, Place, Profile, SearchConfig, Segment, Status, WorkMode } from '../types';
 
 type StepNo = 1 | 2 | 3 | 4;
@@ -117,7 +118,7 @@ const SRC_TEXT: Record<string, string> = {
               @if (cv(); as c) {
                 <div class="flex flex-wrap items-center gap-3 text-sm">
                   <bdi class="font-medium">{{ c.name }}</bdi>
-                  @if (c.parts) { <span class="text-slate-500">{{ 'welcome.cv.parts' | t: { n: c.parts } }}</span> }
+                  @if (c.parts) { <span class="text-slate-500">{{ i18n.plural('welcome.cv.parts', c.parts) }}</span> }
                   @if (c.rendererOk ?? status()!.libreoffice) {
                     <a class="btn" href="/api/profile/cv/pdf" target="_blank" rel="noopener">{{ 'setup.cv.preview' | t }}</a>
                   }
@@ -218,8 +219,8 @@ const SRC_TEXT: Record<string, string> = {
                   </div>
 
                   <div class="max-w-xs">
-                    <label class="label" for="salary">{{ (currency() ? 'welcome.forms.salary' : 'welcome.forms.salaryPlain') | t: { cur: currency() } }}</label>
-                    <input id="salary" dir="ltr" inputmode="numeric" class="input" [(ngModel)]="salary" placeholder="30000">
+                    <label class="label" for="salary">{{ (currency() ? 'welcome.forms.salary' : 'welcome.forms.salaryPlain') | t: { cur: curName() } }}</label>
+                    <input id="salary" dir="ltr" inputmode="numeric" class="input placeholder:italic" [(ngModel)]="salary" [placeholder]="'welcome.forms.salaryPh' | t">
                     <p class="hint">{{ 'welcome.forms.salaryHint' | t }}</p>
                   </div>
                 </div>
@@ -254,6 +255,10 @@ const SRC_TEXT: Record<string, string> = {
                 <p class="label">{{ 'welcome.jobs.kind' | t }}</p>
                 <app-chip-select [options]="trackOptions()" [selected]="trackSel()" [single]="true" [label]="'welcome.jobs.kind' | t" (changed)="setTrack($event[0])" />
                 <p class="hint">{{ 'welcome.jobs.kindHint' | t }}</p>
+                <ul class="hint list-disc ps-5">
+                  <li>{{ 'welcome.jobs.techHint' | t }}</li>
+                  <li>{{ 'welcome.jobs.generalHint' | t }}</li>
+                </ul>
               </div>
 
               @if (infer(); as inf) {
@@ -261,7 +266,7 @@ const SRC_TEXT: Record<string, string> = {
                   <p class="label">{{ 'welcome.jobs.sources' | t }}</p>
                   <p class="text-sm">
                     @for (s of sourceNames(); track s; let last = $last) { <bdi>{{ s | src }}</bdi>@if (!last) {<span>, </span>} }
-                    @if (inf.sources.enabled.length) { <span class="text-slate-500"> {{ 'welcome.jobs.sourcesMore' | t: { n: inf.sources.enabled.length } }}</span> }
+                    @if (inf.sources.enabled.length) { <span class="text-slate-500"> {{ more(inf.sources.enabled.length) }}</span> }
                   </p>
                 </div>
               }
@@ -350,6 +355,10 @@ export class WelcomePage implements OnInit {
   /** The salary currency: the home country's, else the one the CV's country implies. */
   protected currency(): string {
     return this.countries.byIso(this.text('profile.home_country'))?.currency || this.infer()?.country.currency || '';
+  }
+  /** The currency as the label shows it: the code, plus its name ("EGP · الجنيه المصري") so a code alone is never the whole story. */
+  protected curName(): string {
+    return currencyLabel(this.i18n.lang(), this.currency());
   }
 
   // screen 4
@@ -618,9 +627,34 @@ export class WelcomePage implements OnInit {
     if (c) this.set('answers.country', c.name);
   }
 
+  /** "City, Country" in the UI language: the country by its Arabic name and an Arabic comma when the UI is Arabic. */
+  protected more = (n: number): string => this.i18n.plural('welcome.jobs.sourcesMore', n);
+
   protected homeText(): string {
-    const c = this.countries.byIso(this.text('profile.home_country'));
-    return [this.text('profile.home_city'), c?.name ?? this.text('profile.home_country')].filter(Boolean).join(', ');
+    const iso = this.text('profile.home_country');
+    const c = this.countries.byIso(iso);
+    const city = this.text('profile.home_city');
+    const ar = this.i18n.lang() === 'ar';
+    return [(ar && this.arCity()[`${city}|${iso}`]) || city, c ? this.countries.name(c) : iso].filter(Boolean).join(ar ? '، ' : ', ');
+  }
+
+  /** The Arabic name of an English city ("Alexandria" -> "الإسكندرية"), looked up once; a city already written in Arabic needs none. */
+  private readonly arCity = signal<Record<string, string>>({});
+  private async loadArCity(city: string, iso: string): Promise<void> {
+    const key = `${city}|${iso}`;
+    if (key in this.arCity() || /[؀-ۿ]/.test(city)) return;
+    this.arCity.update((m) => ({ ...m, [key]: '' }));
+    const rows = await this.api.get<{ city: string; iso2: string; label_ar: string }[]>(`/suggest/places?q=${encodeURIComponent(city)}&lang=ar`).catch(() => []);
+    const name = rows.find((r) => r.city === city && r.iso2 === iso)?.label_ar ?? '';
+    this.arCity.update((m) => ({ ...m, [key]: name.split('،')[0].split(',')[0].trim() }));
+  }
+
+  constructor() {
+    effect(() => {
+      const city = this.text('profile.home_city');
+      const iso = this.text('profile.home_country');
+      if (this.i18n.lang() === 'ar' && city && iso) untracked(() => void this.loadArCity(city, iso));
+    });
   }
 
   /** The small source label under a value; null when the CV said nothing about it. */

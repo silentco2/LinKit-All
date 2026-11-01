@@ -1,4 +1,4 @@
-import { DatePipe, KeyValuePipe, NgTemplateOutlet } from '@angular/common';
+import { KeyValuePipe, NgTemplateOutlet } from '@angular/common';
 import { Component, computed, effect, ElementRef, inject, OnDestroy, signal, viewChild } from '@angular/core';
 import {
   ArcElement, BarController, BarElement, CategoryScale, Chart, DoughnutController, Legend, LinearScale, LineController,
@@ -7,7 +7,7 @@ import {
 import { Api } from '../api';
 import { I18n, SourcePipe, TPipe } from '../i18n';
 import { Live } from '../live';
-import { fmtNum, labelOr, localeOf } from '../locale';
+import { DtPipe, fmtNum, labelOr, localeOf } from '../locale';
 import { Report } from '../types';
 
 Chart.register(
@@ -41,7 +41,7 @@ const FUNNEL: Record<string, string> = {
 
 @Component({
   selector: 'app-report',
-  imports: [DatePipe, KeyValuePipe, NgTemplateOutlet, SourcePipe, TPipe],
+  imports: [DtPipe, KeyValuePipe, NgTemplateOutlet, SourcePipe, TPipe],
   template: `
     <div class="flex flex-wrap items-center justify-end gap-3">
       <div class="flex flex-wrap items-center gap-3 text-sm">
@@ -119,7 +119,7 @@ const FUNNEL: Record<string, string> = {
             @for (run of runs(); track run.id) {
               <tr class="border-t border-slate-100 dark:border-slate-800">
                 <td class="py-2">#{{ num(run.id) }}</td>
-                <td>{{ run.started_at + 'Z' | date: 'medium' : undefined : loc() }}</td>
+                <td>{{ run.started_at + 'Z' | dt: 'medium' }}</td>
                 <td>{{ runStatus(run.status) }}</td>
                 <td class="text-end">{{ stat(run, 'discover', 'new') }}</td>
                 <td class="text-end">{{ stat(run, 'rank', 'ranked') }}</td>

@@ -1,4 +1,3 @@
-import { DatePipe } from '@angular/common';
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { Api } from '../api';
@@ -6,7 +5,7 @@ import { GoLiveCard } from '../components/golive';
 import { Hint } from '../components/hint';
 import { I18n, TPipe } from '../i18n';
 import { Live } from '../live';
-import { fmtNum, localeOf } from '../locale';
+import { DtPipe, fmtNum, localeOf } from '../locale';
 import { Shell } from '../shell';
 import { APPLY_STAGES, GoLive, Report, ScheduleSection, SEARCH_STAGES, SearchConfig, setupDone, Stage } from '../types';
 
@@ -34,7 +33,7 @@ const DEFAULT_TIME = '09:00';
 
 @Component({
   selector: 'app-home',
-  imports: [DatePipe, GoLiveCard, Hint, RouterLink, TPipe],
+  imports: [DtPipe, GoLiveCard, Hint, RouterLink, TPipe],
   template: `
     <h1>{{ 'home.title' | t }}</h1>
     <app-hint id="home">{{ 'hint.home' | t }}</app-hint>
@@ -43,7 +42,7 @@ const DEFAULT_TIME = '09:00';
       @if (smart(); as sm) {
         <section class="card mt-6" aria-labelledby="home-next">
           <h2 id="home-next" class="text-sm font-medium tracking-wide text-slate-500 uppercase rtl:tracking-normal dark:text-slate-400">{{ 'home.next' | t }}</h2>
-          <p class="mt-2 text-lg text-slate-900 dark:text-white" dir="auto">{{ sm.message }}</p>
+          <p class="mt-2 text-lg text-slate-900 dark:text-white">{{ sm.message }}</p>
           <div class="mt-4 flex flex-wrap items-center gap-3">
             @if (sm.link) {
               <a class="btn btn-primary no-underline hover:no-underline" [routerLink]="sm.link" [queryParams]="sm.query">{{ sm.label }}</a>
@@ -77,8 +76,8 @@ const DEFAULT_TIME = '09:00';
         <h2 id="home-sched">{{ 'home.search.title' | t }}</h2>
         <p class="text-sm text-slate-600 dark:text-slate-400">
           {{ 'home.last' | t }}
-          @if (lastSearch(); as at) { <bdi>{{ at | date: 'EEE d MMM, HH:mm' : undefined : loc() }}</bdi> } @else { {{ 'home.never' | t }} }
-          @if (s.next_run; as next) { · {{ 'home.next.run' | t }} <bdi>{{ next | date: 'EEE d MMM, HH:mm' : undefined : loc() }}</bdi> }
+          @if (lastSearch(); as at) { <bdi>{{ at | dt: 'when' }}</bdi> } @else { {{ 'home.never' | t }} }
+          @if (s.next_run; as next) { · {{ 'home.next.run' | t }} <bdi>{{ next | dt: 'when' }}</bdi> }
         </p>
         @if (schedule(); as sc) {
           <div class="flex flex-wrap items-center gap-3 text-sm">
@@ -171,7 +170,7 @@ export class HomePage {
     if (s.actions_open > 0) {
       return { kind: 'finish', message: plural('smart.finish.msg', s.actions_open), label: plural('smart.finish', s.actions_open), link: '/needs-you', query: { tab: 'finish' } };
     }
-    const review = this.count('awaiting_review');
+    const review = this.shell.reviewCount();
     if (review > 0) {
       return { kind: 'review', message: plural('smart.review.msg', review), label: plural('smart.review', review), link: '/needs-you', query: { tab: 'approve' } };
     }

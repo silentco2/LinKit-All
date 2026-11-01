@@ -1,10 +1,9 @@
-import { DatePipe } from '@angular/common';
 import { Component, computed, effect, ElementRef, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { Api } from '../api';
 import { I18n, TPipe } from '../i18n';
 import { Live } from '../live';
-import { fmtNum, labelOr, localeOf } from '../locale';
+import { DtPipe, fmtNum, labelOr, localeOf } from '../locale';
 import { LiveEvent, ScheduleSection, SEARCH_STAGES, SearchConfig, Stage, STAGES } from '../types';
 
 const STAGE_KEY: Record<Exclude<Stage, 'apply'>, string> = {
@@ -31,7 +30,7 @@ interface RecentRun {
 
 @Component({
   selector: 'app-live',
-  imports: [DatePipe, TPipe],
+  imports: [DtPipe, TPipe],
   template: `
     <section class="card space-y-4">
       <div class="flex flex-wrap gap-3">
@@ -101,7 +100,7 @@ interface RecentRun {
           @if (sc.enabled && !scheduleDirty() && nextRuns().length) {
             <span class="text-sm text-slate-600 dark:text-slate-400">
               {{ 'live.schedule.next' | t }}
-              @for (t of nextRuns(); track t; let last = $last) { <bdi>{{ t | date: 'EEE d MMM, HH:mm' : undefined : loc() }}</bdi>@if (!last) {<ng-container>{{ 'live.schedule.sep' | t }}</ng-container>} }
+              @for (t of nextRuns(); track t; let last = $last) { <bdi>{{ t | dt: 'when' }}</bdi>@if (!last) {<ng-container>{{ 'live.schedule.sep' | t }}</ng-container>} }
             </span>
           }
         </div>
@@ -150,7 +149,7 @@ interface RecentRun {
       <div #log class="card mt-3 h-[45vh] overflow-auto p-3 font-mono text-xs" role="log" aria-live="polite">
         @for (e of live.events(); track $index) {
           <div class="flex gap-3 py-0.5" [class]="eventClass(e)">
-            <span class="shrink-0 text-slate-400" dir="ltr">{{ e.at | date: 'HH:mm:ss' : undefined : loc() }}</span>
+            <span class="shrink-0 text-slate-400" dir="ltr">{{ e.at | dt: 'time' }}</span>
             <span class="min-w-0 break-words" dir="auto">{{ describe(e) }}</span>
           </div>
         } @empty {

@@ -85,7 +85,7 @@ const OWN_ROW = new Set(['telegram', 'linkedin_posts']);
             <button type="submit" class="btn btn-primary" [disabled]="adding()">{{ 'welcome.jobs.add' | t }}</button>
           </form>
           @if (addNote(); as n) { <div class="alert mt-2" [class.alert-ok]="n.kind === 'ok'" [class.alert-error]="n.kind === 'error'" role="status" dir="auto">{{ n.text }}</div> }
-          <p class="hint">{{ 'src.add.hint' | t }}@if (list().ats_count) { {{ 'setup.sources.ats' | t: { n: list().ats_count } }} }</p>
+          <p class="hint">{{ 'src.add.hint' | t }}@if (list().ats_count) { {{ i18n.plural('setup.sources.ats', list().ats_count) }} }</p>
         </div>
 
         @if (loadFailed()) { <div class="alert alert-error" role="alert">{{ 'setup.sources.loadFailed' | t }}</div> }
@@ -155,7 +155,7 @@ const OWN_ROW = new Set(['telegram', 'linkedin_posts']);
 export class SourcesSection implements OnInit {
   protected readonly store = inject(SettingsStore);
   private readonly api = inject(Api);
-  private readonly i18n = inject(I18n);
+  protected readonly i18n = inject(I18n);
   private readonly countries = inject(Countries);
   protected readonly savedKeys = ['sources.enabled', 'sources.jobspy', 'sources.regional', 'sources.companies', 'sources.telegram_channels'];
   protected readonly list = signal<SourceList>({ ats_count: 0, sources: [] });

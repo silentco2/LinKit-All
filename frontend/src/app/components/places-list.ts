@@ -24,8 +24,8 @@ import { PlacePick, PlacePicker } from './place-picker';
             <li class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700">
               <bdi class="min-w-0 flex-1 basis-40 break-words font-medium">{{ shown(p) }}</bdi>
               <app-chip-select class="order-3 w-full sm:order-2 sm:w-auto" [options]="workOptions()" [selected]="p.work === 'ask' ? [] : [p.work]" [single]="true" [label]="'places.workIn' | t: { name: shown(p) }" (changed)="setWork(p, $event[0])" />
-              <button type="button" class="order-2 rounded-full px-2 text-slate-500 sm:order-3 hover:bg-slate-100 dark:hover:bg-slate-800" [attr.aria-label]="'settings.jobs.remove' | t: { name: shown(p) }" (click)="remove(p)"><span aria-hidden="true">×</span></button>
-              @if (p.work === 'ask') { <p class="order-4 w-full text-xs text-slate-600 dark:text-slate-400" dir="auto">{{ 'places.ask' | t }}</p> }
+              <button type="button" class="order-2 rounded-full px-2 text-slate-500 max-sm:min-h-10 max-sm:min-w-10 sm:order-3 hover:bg-slate-100 dark:hover:bg-slate-800" [attr.aria-label]="'settings.jobs.remove' | t: { name: shown(p) }" (click)="remove(p)"><span aria-hidden="true">×</span></button>
+              @if (p.work === 'ask') { <p class="order-4 w-full text-xs text-slate-600 dark:text-slate-400">{{ 'places.ask' | t }}</p> }
             </li>
           }
         </ul>

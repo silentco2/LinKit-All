@@ -5,6 +5,7 @@ import { Countries } from '../../components/countries';
 import { PlacesList } from '../../components/places-list';
 import { TagInput } from '../../components/tag-input';
 import { I18n, TPipe } from '../../i18n';
+import { currencyLabel } from '../../locale';
 import { expandQueries, Place, WorkMode } from '../../types';
 import { Field } from './saved';
 import { SettingsStore } from './store';
@@ -35,16 +36,16 @@ const FALLBACK_CURRENCIES = ['EGP', 'SAR', 'AED', 'QAR', 'KWD', 'BHD', 'OMR', 'J
           <app-places-list [places]="shown()" (changed)="setPlaces($event)" />
         </app-field>
 
-        <app-field key="filters.work_modes" [label]="'welcome.jobs.modes' | t">
+        <app-field id="fld-modes" key="filters.work_modes" [label]="'welcome.jobs.modes' | t">
           <app-chip-select [options]="modeOptions()" [selected]="store.cfg.filters.work_modes" [label]="'welcome.jobs.modes' | t" (changed)="setModes($event)" />
           @if (modesNote()) { <p class="mt-1 text-xs text-rose-700 dark:text-rose-400" role="alert">{{ 'settings.jobs.modesNeed' | t }}</p> }
         </app-field>
 
-        <app-field key="filters.seniority" [label]="'welcome.jobs.level' | t" [hint]="'settings.jobs.levelHint' | t">
+        <app-field id="fld-level" key="filters.seniority" [label]="'welcome.jobs.level' | t" [hint]="'settings.jobs.levelHint' | t">
           <app-chip-select [options]="levelOptions()" [selected]="store.cfg.filters.seniority" [label]="'welcome.jobs.level' | t" (changed)="store.update('filters.seniority', $event)" />
         </app-field>
 
-        <app-field key="search.posted_within_hours" [label]="'settings.jobs.posted' | t">
+        <app-field id="fld-posted" key="search.posted_within_hours" [label]="'settings.jobs.posted' | t">
           <app-chip-select [options]="postedOptions()" [selected]="postedSelected()" [single]="true" [label]="'settings.jobs.posted' | t" (changed)="setPosted($event[0])" />
           @if (custom()) {
             <div class="mt-3 flex max-w-xs gap-2" dir="ltr">
@@ -73,12 +74,12 @@ const FALLBACK_CURRENCIES = ['EGP', 'SAR', 'AED', 'QAR', 'KWD', 'BHD', 'OMR', 'J
         <h2>{{ 'settings.jobs.salary' | t }}</h2>
         <div class="grid gap-4 sm:grid-cols-2">
           <app-field key="answers.salary_expectation" for="salary" [label]="'settings.jobs.salaryMonthly' | t">
-            <input id="salary" type="number" min="0" step="1" dir="ltr" class="input" [value]="store.answers.salary_expectation" (change)="setSalary($event)">
+            <input id="salary" type="number" min="0" step="1" dir="ltr" class="input placeholder:italic placeholder:text-slate-400" [placeholder]="'welcome.forms.salaryPh' | t" [value]="store.answers.salary_expectation" (change)="setSalary($event)">
           </app-field>
           <app-field key="answers.salary_currency" for="cur" [label]="'setup.filters.currency' | t">
-            @if (ratesTried()) {
-              <select id="cur" class="input" dir="ltr" (change)="store.update('answers.salary_currency', val($event))">
-                @for (c of currencyList(); track c) { <option [value]="c" [selected]="c === currency()">{{ c }}</option> }
+            @if (ratesTried() && countriesReady()) {
+              <select id="cur" class="input" (change)="store.update('answers.salary_currency', val($event))">
+                @for (c of currencyList(); track c) { <option [value]="c" [selected]="c === currency()">{{ label(c) }}</option> }
               </select>
             }
           </app-field>
@@ -108,6 +109,8 @@ export class JobsSection implements OnInit {
   protected readonly fxDate = signal('');
   /** The currency list is drawn once the rates answered (or failed): a list that changes under a <select> loses its selection. */
   protected readonly ratesTried = signal(false);
+  /** The country list answered: the home currency is known before the select is drawn (else it would show the first code, AED). */
+  protected readonly countriesReady = signal(false);
   /** The user took the pre-added home country off the list (nothing saved: no places means anywhere). */
   private homeOff = false;
 
@@ -115,7 +118,7 @@ export class JobsSection implements OnInit {
     this.unit.set(this.hours() !== null && this.hours()! % 24 !== 0 ? 'hours' : 'days');
     this.custom.set(this.hours() !== null && !POSTED.some(([, h]) => h === this.hours()));
     this.syncPlaces();
-    void this.countries.load().then(() => this.syncPlaces());
+    void this.countries.load().then(() => { this.syncPlaces(); this.countriesReady.set(true); });
     this.api.get<{ date: string; currencies: string[] }>('/fx').then((fx) => {
       if (fx.currencies.length) this.currencies.set(fx.currencies);
       this.fxDate.set(fx.date);
@@ -191,17 +194,26 @@ export class JobsSection implements OnInit {
 
   // ---- salary ------------------------------------------------------------------------------
 
-  /** The saved currency, else the home country's. */
-  protected currency(): string {
-    const home = this.countries.byIso(this.store.profile.home_country)?.currency;
-    return this.store.answers.salary_currency || home || this.currencies()[0];
+  /** The home country's currency: from the profile, else from the first place with a country, else from the country name in the answers. */
+  private homeCurrency(): string {
+    const iso = this.store.profile.home_country || this.store.cfg.search.places.find((p) => p.country)?.country || '';
+    const named = (this.store.answers.country || '').trim().toLowerCase();
+    const c = iso ? this.countries.byIso(iso) : named ? this.countries.list().find((x) => x.name.toLowerCase() === named || x.name_ar === named) : undefined;
+    return c?.currency ?? '';
   }
 
-  /** The list, plus the current currency when the rates do not know it. */
-  protected currencyList(): string[] {
-    const cur = this.currency();
-    return this.currencies().includes(cur) ? this.currencies() : [cur, ...this.currencies()];
+  /** The saved currency, else the home country's, else USD (never the first code of the list). */
+  protected currency(): string {
+    return this.store.answers.salary_currency || this.homeCurrency() || 'USD';
   }
+
+  /** The list with the saved or home currency first, then USD, then the rest. */
+  protected currencyList(): string[] {
+    const first = [this.currency(), 'USD'];
+    return [...new Set([...first, ...this.currencies()])];
+  }
+
+  protected label = (code: string): string => currencyLabel(this.i18n.lang(), code);
 
   /** Saving an amount also saves the currency that is showing, so the pair always travels together. */
   protected setSalary(e: Event): void {

@@ -1,9 +1,13 @@
-import { DatePipe, NgTemplateOutlet } from '@angular/common';
-import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+import { Component, computed, effect, inject, input, OnDestroy, output, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { Api } from '../api';
 import { I18n, MsgPipe, SourcePipe, TPipe } from '../i18n';
-import { fmtNum, labelOr, localeOf } from '../locale';
-import { JobDetail, reasonText, SCAM_MEDIUM, TailorPatch, TrustVerdict } from '../types';
+import { DtPipe, fmtNum, labelOr, localeOf } from '../locale';
+import { Toast } from '../components/toast';
+import { Shell } from '../shell';
+import { isLeftOut, JobDetail, reasonSetting, reasonText, SCAM_MEDIUM, TailorPatch, TrustVerdict } from '../types';
+import { SettingsStore } from './settings/store';
 
 interface Filled { value: unknown; source: string }
 type Detail = Omit<JobDetail, 'events'> & {
@@ -41,7 +45,7 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
 
 @Component({
   selector: 'app-job-detail',
-  imports: [DatePipe, NgTemplateOutlet, MsgPipe, SourcePipe, TPipe],
+  imports: [DtPipe, NgTemplateOutlet, MsgPipe, RouterLink, SourcePipe, Toast, TPipe],
   template: `
     @if (error()) {
       <div class="alert alert-error" dir="auto">{{ error() }}</div>
@@ -59,10 +63,18 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
             <span class="badge tier-low">{{ 'common.state.' + j.state | t }}</span>
             <span class="badge tier-low"><bdi>{{ j.source | src }}</bdi></span>
             @if (j.rank !== null) { <span class="badge tier-low">{{ 'detail.match' | t: { pct: num(j.rank, { style: 'percent', maximumFractionDigits: 0 }) } }}</span> }
-            @if (j.posted_at) { <span class="text-slate-500">{{ 'detail.posted' | t }} {{ j.posted_at | date: 'mediumDate' : undefined : loc() }}</span> }
+            @if (j.posted_at) { <span class="text-slate-500">{{ 'detail.posted' | t }} {{ j.posted_at | dt: 'date' }}</span> }
           </div>
           @if (why(j); as text) {
-            <p class="mt-2 text-sm"><span class="font-medium">{{ 'detail.why' | t }} </span><span dir="auto">{{ text }}</span></p>
+            <p class="mt-2 text-sm"><span class="font-medium">{{ (leftOut(j) ? 'detail.whyOut' : 'detail.why') | t }} </span><span dir="auto">{{ text }}</span></p>
+            @if (target(j); as tg) {
+              <p class="mt-1 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+                <a [routerLink]="['/settings', tg.section]" [fragment]="tg.focus" class="inline-flex min-h-10 items-center">{{ (j.reason_code === 'location' ? 'fix.addPlace' : 'fix.openSetting') | t }}</a>
+                @if (quickFix(j); as q) {
+                  <button type="button" class="btn" (click)="runFix(j)" [disabled]="busy()">{{ q.label }}</button>
+                }
+              </p>
+            }
           }
           <div class="mt-3 flex flex-wrap gap-2">
             <a class="btn" [href]="j.url" target="_blank" rel="noopener noreferrer">{{ 'detail.open' | t }}</a>
@@ -98,7 +110,7 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
 
         @if (j.ai; as ai) {
           <section class="rounded-lg bg-slate-50 p-4 dark:bg-slate-950">
-            <h3 class="font-semibold">{{ 'detail.ai.score' | t: { score: num(ai.score) } }}</h3>
+            <h3 class="font-semibold">{{ 'detail.ai.score' | t: { score: ai.score, out: 10 } }}</h3>
             <ul class="mt-2 list-disc space-y-1 ps-5 text-sm">
               @for (r of ai.reasons; track r) { <li dir="auto">{{ r }}</li> }
             </ul>
@@ -169,7 +181,7 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
               {{ 'detail.tailor.title' | t }}
               <span class="badge text-xs font-normal {{ tailorClass(t.status) }}">{{ 'detail.tailor.status.' + t.status | t }}</span>
             </h3>
-            <p class="mt-1 text-xs text-slate-500">{{ t.created_at | date: 'medium' : undefined : loc() }}</p>
+            <p class="mt-1 text-xs text-slate-500">{{ t.created_at | dt: 'medium' }}</p>
             @if (t.status === 'rolled_back') { <div class="alert alert-error mt-2">{{ 'detail.tailor.rolledBack' | t }}</div> }
             @if (t.status === 'unchanged') { <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">{{ 'detail.tailor.unchanged' | t }}</p> }
             <ul class="mt-2 space-y-3">
@@ -223,9 +235,9 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
 
         <section>
           <h3 class="font-semibold">{{ 'detail.history' | t }}</h3>
-          <ol class="mt-2 space-y-1 border-s border-slate-200 ps-4 text-xs dark:border-slate-700">
+          <ol class="mt-2 space-y-2 border-s border-slate-200 ps-4 text-xs sm:space-y-1 dark:border-slate-700">
             @for (e of j.events; track $index) {
-              <li><span class="text-slate-500">{{ e.at | date: 'short' : undefined : loc() }}</span> <span class="inline-block rtl:rotate-180">→</span> <span class="font-medium">{{ 'common.state.' + e.to | t }}</span> <span dir="auto">{{ e | msg }}</span>
+              <li class="max-sm:flex max-sm:flex-col max-sm:gap-0.5"><span class="text-slate-500">{{ e.at | dt: 'short' }}</span> <span><span class="inline-block rtl:rotate-180">→</span> <span class="font-medium">{{ 'common.state.' + e.to | t }}</span> <span dir="auto">{{ e | msg }}</span></span>
                 @if (e.screenshots) {
                   <span class="ms-1">
                     @for (n of range(e.screenshots); track n) {
@@ -239,6 +251,8 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
         </section>
       </article>
     }
+
+    @if (fixNote(); as note) { <app-toast [text]="note" [action]="'review.undo' | t" (act)="undoFix()" /> }
 
     <ng-template #patch let-p>
       <div class="rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-700">
@@ -256,9 +270,11 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
     </ng-template>
   `,
 })
-export class JobDetailPanel {
+export class JobDetailPanel implements OnDestroy {
   private readonly api = inject(Api);
   private readonly i18n = inject(I18n);
+  private readonly store = inject(SettingsStore);
+  private readonly shell = inject(Shell);
   protected readonly loc = computed(() => localeOf(this.i18n.lang()));
   readonly jobId = input.required<number>();
   readonly changed = output<void>();
@@ -266,6 +282,10 @@ export class JobDetailPanel {
   protected readonly busy = signal(false);
   protected readonly error = signal('');
   protected readonly notice = signal('');
+  /** The toast after a one-click fix ("sales" allowed) and how to take it back. */
+  protected readonly fixNote = signal('');
+  private undo?: () => void;
+  private fixTimer?: ReturnType<typeof setTimeout>;
   protected readonly kinds = ['scam', 'ghost'] as const;
   protected readonly scamMedium = SCAM_MEDIUM;
 
@@ -287,6 +307,53 @@ export class JobDetailPanel {
   protected verdict = (tr: NonNullable<Detail['trust']>, kind: 'scam' | 'ghost'): TrustVerdict => tr[kind] ?? { score: 0, band: 'low', signals: [] };
   protected bandClass = (b: string): string => ({ high: 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300', medium: 'tier-mid' })[b] ?? 'tier-low';
   protected why = (j: Detail): string => reasonText(this.i18n, j);
+  protected leftOut = isLeftOut;
+  protected target = (j: Detail) => reasonSetting(j.reason_code);
+
+  /** A safe one-click fix for the reason, if there is one: allow the word, or unblock the company. */
+  protected quickFix(j: Detail): { label: string } | null {
+    if (j.reason_code === 'title_excluded' && j.reason_params?.['word']) return { label: this.i18n.t('fix.allowWord', { word: String(j.reason_params['word']) }) };
+    if (j.reason_code === 'blacklist' && j.company) return { label: this.i18n.t('fix.unblock') };
+    return null;
+  }
+
+  /** Take the word (or company) off its list in the saved settings; Undo puts it back. Jobs already left out stay until the next search. */
+  protected async runFix(j: Detail): Promise<void> {
+    const word = j.reason_code === 'title_excluded' ? String(j.reason_params?.['word'] ?? '') : j.company;
+    const key = j.reason_code === 'title_excluded' ? 'filters.title_exclude' : 'filters.company_blacklist';
+    if (!word) return;
+    this.busy.set(true);
+    try {
+      await this.store.load();
+      if (!this.store.loaded()) throw new Error(this.store.loadError());
+      const list: string[] = this.store.get(key);
+      const same = (w: string) => w.trim().toLowerCase() === word.trim().toLowerCase();
+      const entries = list.filter(same);
+      if (!entries.length) throw new Error(this.i18n.t('fix.notFound'));
+      this.store.update(key, list.filter((w) => !same(w)));
+      this.undo = () => this.store.update(key, [...this.store.get(key), ...entries]);
+      this.say(this.i18n.t(j.reason_code === 'title_excluded' ? 'fix.allowed' : 'fix.unblocked', { word }));
+    } catch (e) {
+      this.error.set((e as Error).message);
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected undoFix(): void {
+    this.undo?.();
+    this.say('');
+  }
+
+  private say(text: string): void {
+    clearTimeout(this.fixTimer);
+    this.fixNote.set(text);
+    if (text) this.fixTimer = setTimeout(() => this.fixNote.set(''), 10_000);
+  }
+
+  ngOnDestroy(): void {
+    clearTimeout(this.fixTimer);
+  }
   protected signalLabel = (code: string): string => labelOr(this.i18n, 'trust.', code);
   protected sgn = (w: number): string => '\u2066' + (w > 0 ? '+' : '') + fmtNum(this.loc(), w) + '\u2069';
 
@@ -382,6 +449,7 @@ export class JobDetailPanel {
       if (!r.done) this.error.set(Object.values(r.errors)[0] ?? this.i18n.t('detail.notPossible'));
       await this.load(this.jobId());
       this.changed.emit();
+      void this.shell.refresh(); // the nav badge and Home count it as decided
     } finally {
       this.busy.set(false);
     }

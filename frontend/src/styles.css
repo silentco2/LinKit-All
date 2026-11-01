@@ -16,6 +16,11 @@
   h2 { @apply text-lg font-semibold text-slate-900 dark:text-white; }
   a { @apply text-brand-600 hover:underline dark:text-brand-500; }
   :focus-visible { @apply outline-2 outline-offset-2 outline-brand-500; }
+  /* phone: a checkbox or switch row is at least 40px tall (the whole label is the tap target) */
+  @media (max-width: 640px) {
+    label:has(> input[type='checkbox']), label:has(> input[type='radio']) { display: flex; align-items: center; gap: 0.5rem; min-height: 2.5rem; }
+    input[type='checkbox'], input[type='radio'] { width: 1.25rem; height: 1.25rem; }
+  }
 }
 
 @layer components {
@@ -32,6 +37,7 @@
       text-sm font-medium text-slate-700 shadow-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50
       dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800;
   }
+  @media (max-width: 640px) { .btn, .input { min-height: 2.5rem; } } /* phone: every button is a 40px target */
   .btn-primary {
     @apply border-brand-600 bg-brand-600 text-white hover:bg-brand-700
       dark:border-brand-600 dark:bg-brand-600 dark:text-white dark:hover:bg-brand-700;
@@ -49,3 +55,6 @@
   .alert-ok { @apply border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200; }
   .alert-info { @apply border-brand-100 bg-brand-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300; }
 }
+
+/* a toast sits at the bottom: leave room under the last card so it never covers a button (unlayered, so it beats the p-4 on <main>) */
+body.has-toast main { padding-bottom: 7rem; }

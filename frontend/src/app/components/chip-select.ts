@@ -14,7 +14,7 @@ export interface ChipOption { value: string; label: string }
     <div class="flex flex-wrap items-center gap-2" role="group" [attr.aria-label]="label() || null">
       @for (o of options(); track o.value) {
         <button type="button" [attr.aria-pressed]="on(o.value)" (click)="toggle(o.value)"
-                [class]="'rounded-full border px-3 py-1 text-sm ' + (on(o.value) ? 'border-brand-500 bg-brand-50 font-medium text-brand-700 dark:bg-slate-800 dark:text-white' : 'border-slate-300 text-slate-500 dark:border-slate-700 dark:text-slate-400')">{{ o.label }}</button>
+                [class]="'rounded-full border px-3 py-1 text-sm max-sm:min-h-10 max-sm:px-4 ' + (on(o.value) ? 'border-brand-500 bg-brand-50 font-medium text-brand-700 dark:bg-slate-800 dark:text-white' : 'border-slate-300 text-slate-500 dark:border-slate-700 dark:text-slate-400')">{{ o.label }}</button>
       }
     </div>
   `,

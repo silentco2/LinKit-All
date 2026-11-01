@@ -37,7 +37,7 @@ export class NeedsYouPage {
   protected readonly tabs = computed<TabItem[]>(() => {
     const s = this.shell.status();
     return [
-      { id: 'approve', label: 'needs.tab.approve', count: s?.states['awaiting_review'] ?? 0 },
+      { id: 'approve', label: 'needs.tab.approve', count: this.shell.reviewCount() },
       { id: 'finish', label: 'needs.tab.finish', count: s?.actions_open ?? 0 },
     ];
   });

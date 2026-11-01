@@ -65,15 +65,15 @@ const CHECKS: { id: Check; label: string; link: string }[] = [
           @if (confirming()) {
             <div class="alert alert-error" role="alertdialog" [attr.aria-label]="'golive.confirm' | t">
               <p><strong>{{ 'golive.confirm' | t }}</strong> {{ 'golive.confirmBody' | t }}</p>
-              <div class="mt-3 flex flex-wrap gap-2">
+              <div class="mt-3 flex flex-wrap gap-3 max-sm:flex-col">
                 <button type="button" class="btn btn-primary" (click)="turnOn()" [disabled]="busy()">{{ 'golive.confirmYes' | t }}</button>
                 <button type="button" class="btn" (click)="confirming.set(false)" [disabled]="busy()">{{ 'golive.confirmNo' | t }}</button>
               </div>
             </div>
           } @else {
-            <div class="flex flex-wrap items-center gap-3">
-              <button type="button" class="btn btn-primary" [disabled]="!ready(d) || busy()" (click)="confirming.set(true)">{{ 'golive.turnOn' | t }}</button>
-              <button type="button" class="btn" (click)="cancel.emit()">{{ 'golive.notNow' | t }}</button>
+            <div class="flex flex-wrap items-center gap-3 max-sm:flex-col max-sm:items-stretch max-sm:gap-4">
+              <button type="button" class="btn btn-primary max-sm:min-h-11" [disabled]="!ready(d) || busy()" (click)="confirming.set(true)">{{ 'golive.turnOn' | t }}</button>
+              <button type="button" class="btn max-sm:min-h-11" (click)="cancel.emit()">{{ 'golive.notNow' | t }}</button>
               @if (!ready(d)) { <span class="hint mt-0">{{ 'golive.needs' | t }}</span> }
             </div>
           }

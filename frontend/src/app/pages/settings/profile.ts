@@ -53,7 +53,7 @@ type Row = { key: string; id: string; label: string; type?: string; dir?: 'ltr';
         }
         @if (segments().length) {
           <details class="text-sm">
-            <summary class="cursor-pointer font-medium">{{ 'setup.cv.reads' | t: { n: segments().length } }}</summary>
+            <summary class="cursor-pointer font-medium">{{ i18n.plural('setup.cv.reads', segments().length) }}</summary>
             <ol class="mt-2 max-h-72 space-y-1 overflow-auto rounded-lg bg-slate-50 p-3 dark:bg-slate-950">
               @for (s of segments(); track s.id) { <li class="whitespace-pre-wrap" dir="auto"><span class="text-slate-400">{{ s.id }}</span> {{ s.text }}</li> }
             </ol>
@@ -144,7 +144,7 @@ type Row = { key: string; id: string; label: string; type?: string; dir?: 'ltr';
 export class ProfileSection implements OnInit {
   protected readonly store = inject(SettingsStore);
   private readonly api = inject(Api);
-  private readonly i18n = inject(I18n);
+  protected readonly i18n = inject(I18n);
   private readonly countries = inject(Countries);
   protected readonly status = signal<Status | null>(null);
   protected readonly segments = signal<Segment[]>([]);
@@ -246,7 +246,7 @@ export class ProfileSection implements OnInit {
     if (ar) return ar;
     const c = p.home_country ? this.countries.byIso(p.home_country) : undefined;
     const country = c ? this.countries.name(c) : p.home_country;
-    return [p.home_city, country].filter(Boolean).join(', ');
+    return [p.home_city, country].filter(Boolean).join(this.i18n.lang() === 'ar' ? '، ' : ', ');
   }
 
   /** A picked city sets city and country; a country sets country only; typed text keeps the country; cleared clears both. */
@@ -341,7 +341,7 @@ export class ProfileSection implements OnInit {
       input.value = ''; // the same file can be chosen again
       Object.assign(this.store.profile, { cv_name: r.cv_name, cv_renderer_ok: r.cv_renderer_ok, cv_source_format: r.cv_source_format, cv_approved: r.cv_approved });
       this.segments.set(r.segments);
-      const text = this.i18n.t(r.cv_approved ? 'setup.cv.uploaded' : 'setup.cv.converted', { n: r.segments.length });
+      const text = this.i18n.plural(r.cv_approved ? 'setup.cv.uploaded' : 'setup.cv.converted', r.segments.length);
       return this.join(text, await this.refresh(r.filled ?? []));
     });
   }

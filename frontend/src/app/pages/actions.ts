@@ -8,6 +8,7 @@ import { VaultGate, VaultReady } from '../components/vault-gate';
 import { I18n, MsgPipe, TPipe } from '../i18n';
 import { Live } from '../live';
 import { fmtNum, labelOr, localeOf } from '../locale';
+import { Shell } from '../shell';
 import { ActionDecision, ActionGroup, ActionItem, ActionKind, ActionQuestion, AnswerValue, Remember, Status } from '../types';
 
 /** Kinds where signing in / solving it by hand in a real Chrome window can unblock the job. */
@@ -107,6 +108,8 @@ const SOURCES: Record<string, string> = {
       @if (q.reason) { <p class="hint" dir="auto">{{ q.reason }}</p> }
       @if (q.sensitive || q.category) {
         <p class="hint !text-amber-700 dark:!text-amber-400">{{ 'actions.sensitive' | t }}</p>
+      } @else {
+        <p class="hint">{{ 'fin.remembers' | t }}</p>
       }
     </ng-template>
 
@@ -162,7 +165,7 @@ const SOURCES: Record<string, string> = {
 
       @for (c of groupCards(); track c.key) {
         <section class="card" [attr.aria-label]="c.g.label">
-          <h2><span>{{ 'fin.group.asks' | t: { n: num(c.g.count) } }}</span>&ngsp;<bdi dir="auto" class="font-semibold">{{ c.g.label }}</bdi></h2>
+          <h2><span>{{ plural('fin.group.asks', c.g.count) }}</span>&ngsp;<bdi dir="auto" class="font-semibold">{{ c.g.label }}</bdi></h2>
           @if (companies(c.g); as co) { <p class="mt-1 text-sm text-slate-500" dir="auto">{{ co }}</p> }
           <div class="mt-4">
             <ng-container *ngTemplateOutlet="ctl; context: { k: c.key, q: c.q, i: 0 }" />
@@ -194,7 +197,7 @@ const SOURCES: Record<string, string> = {
               <div class="truncate text-sm text-slate-500" dir="auto"><bdi>{{ a.job.company }}</bdi> · <bdi>{{ a.job.location }}</bdi></div>
             </div>
             <div class="flex shrink-0 flex-col items-end gap-1">
-              @if (a.job.score) { <span class="text-xs text-slate-500">{{ 'actions.score' | t: { n: num(a.job.score) } }}</span> }
+              @if (a.job.score) { <span class="text-xs text-slate-500"><bdi>{{ 'actions.score' | t: { n: a.job.score, out: 10 } }}</bdi></span> }
               <span class="text-xs text-slate-400">{{ when(a.created_at) }}</span>
             </div>
           </header>
@@ -331,6 +334,7 @@ const SOURCES: Record<string, string> = {
 export class ActionsPage {
   private readonly api = inject(Api);
   private readonly live = inject(Live);
+  private readonly shell = inject(Shell);
   private readonly i18n = inject(I18n);
   private readonly loc = computed(() => localeOf(this.i18n.lang()));
   protected readonly VAULT_CODES = VAULT_CODES;
@@ -425,7 +429,8 @@ export class ActionsPage {
 
   private continued(n: number): void {
     if (n > 0) this.showToast(this.plural('fin.continue', n));
-    this.live.changed.update((c) => c + 1); // reloads this list and the badge in the shell
+    this.live.changed.update((c) => c + 1); // reloads this list
+    void this.shell.refresh(); // and the nav badge, the tab counts and Home
   }
 
   protected onVault(r: VaultReady): void {
@@ -531,13 +536,20 @@ export class ActionsPage {
         ...(Object.keys(remember).length ? { remember } : {}),
       });
       this.draft.update(({ [c.key]: _drop, ...rest }) => rest);
-      this.showToast(this.i18n.t('fin.group.done', { resolved: this.num(r.resolved), still: this.num(r.still_open) }));
+      this.showToast(this.groupDone(r.resolved, r.still_open));
       this.live.changed.update((n) => n + 1);
+      void this.shell.refresh();
     } catch (e) {
       this.errors.update((m) => ({ ...m, [c.key]: e instanceof Error ? e.message : String(e) }));
     } finally {
       this.busy.set(false);
     }
+  }
+
+  /** "4 continue, 1 still needs you": each half is a plural of its own noun, and an empty half is left out. */
+  private groupDone(resolved: number, still: number): string {
+    const parts = [resolved > 0 ? this.plural('fin.group.resolved', resolved) : '', still > 0 ? this.plural('fin.group.still', still) : ''].filter(Boolean);
+    return parts.join(this.i18n.t('fin.group.sep')) || this.plural('fin.group.resolved', 0);
   }
 
   protected companies(g: ActionGroup): string {
@@ -668,8 +680,9 @@ export class ActionsPage {
       const remember = decision === 'answer' ? { ...this.keepRemember(a.id, a.questions), ...extra } : {};
       await this.api.post(`/actions/${a.id}`, { decision, answers, ...(Object.keys(remember).length ? { remember } : {}) });
       this.draft.update(({ [a.id]: _drop, ...rest }) => rest);
-      // bumping `changed` reloads this list and the nav badge in the shell
+      // bumping `changed` reloads this list; the shell refresh keeps the nav badge, the tab counts and Home in step
       this.live.changed.update((n) => n + 1);
+      void this.shell.refresh();
     } catch (e) {
       this.errors.update((m) => ({ ...m, [a.id]: e instanceof Error ? e.message : String(e) }));
     } finally {

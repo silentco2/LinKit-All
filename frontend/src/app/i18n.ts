@@ -5,6 +5,8 @@ import { en } from './i18n/en';
 export type Lang = 'en' | 'ar';
 export type Params = Record<string, string | number>;
 
+const shown = (v: string | number, loc: string): string => (typeof v === 'number' ? new Intl.NumberFormat(loc).format(v) : String(v));
+
 const LANG_KEY = 'linkit.lang';
 const DICTS: Record<Lang, Record<string, string>> = { en, ar };
 
@@ -44,7 +46,9 @@ export class I18n {
   /** Reads the `lang` signal, so any template or computed that calls it re-renders on a language change. */
   t(key: string, params?: Params): string {
     const text = DICTS[this.lang()][key] ?? en[key] ?? key;
-    return params ? text.replace(/\{(\w+)\}/g, (m, name: string) => (name in params ? String(params[name]) : m)) : text;
+    // a number param is written in the language's own digits (٣ in Arabic), so a sentence never mixes two numeral systems
+    const loc = this.lang() === 'ar' ? 'ar-EG' : 'en';
+    return params ? text.replace(/\{(\w+)\}/g, (m, name: string) => (name in params ? shown(params[name], loc) : m)) : text;
   }
 
   /**
@@ -58,7 +62,7 @@ export class I18n {
     for (const dict of [DICTS[lang], en]) {
       for (const c of cats) {
         const text = dict[`${base}.${c}`];
-        if (text !== undefined) return this.t(`${base}.${c}`, { n: new Intl.NumberFormat(lang === 'ar' ? 'ar-EG' : 'en').format(n), ...params });
+        if (text !== undefined) return this.t(`${base}.${c}`, { n, ...params });
       }
     }
     return base;
@@ -70,11 +74,11 @@ export class I18n {
    */
   msg(item: { message: string; code?: string | null; params?: Record<string, unknown> | null }): string {
     const key = item.code ? `park.${item.code}` : '';
-    if (!key || !(key in en)) return item.message;
-    const loc = this.lang() === 'ar' ? 'ar-EG' : 'en';
+    const plural = `${key}.other` in en; // a message about a count ("3 questions need your answer") has its plural forms
+    if (!key || !(key in en || plural)) return item.message;
     const params: Params = {};
-    for (const [k, v] of Object.entries(item.params ?? {})) params[k] = typeof v === 'number' ? new Intl.NumberFormat(loc).format(v) : String(v);
-    return this.t(key, params);
+    for (const [k, v] of Object.entries(item.params ?? {})) params[k] = typeof v === 'number' ? v : String(v);
+    return plural && typeof params['n'] === 'number' ? this.plural(key, params['n'], params) : this.t(key, params);
   }
 
   /** A job source / ATS key as a readable name: `source.<key>` when listed, else the key title-cased (`zip_recruiter` -> "Zip Recruiter"). */
