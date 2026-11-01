@@ -96,6 +96,7 @@ from linkit_all.reports import build_report, export_csv, export_pdf
 from linkit_all.sources import registry
 from linkit_all.sources.ats_detector import detect
 from linkit_all.sources.base import OPT_IN_KINDS, Source
+from linkit_all.sources.labels import label_for, offline_label
 from linkit_all.sources.text import norm_company
 
 router = APIRouter(prefix="/api")
@@ -340,6 +341,8 @@ async def install_libreoffice_route(request: Request) -> dict[str, Any]:
 def get_search(request: Request) -> SearchConfig:
     """The saved config. An old one with only `search.locations` shows them as places (unsaved)."""
     cfg = load_search(_db(request)) or SearchConfig()
+    src = cfg.sources  # names for entries added before labels existed: computed, not saved
+    src.company_labels = {c: offline_label(c) for c in src.companies} | src.company_labels
     return synthesize_places(cfg, load_fields(_db(request))[0].home_country)
 
 
@@ -351,6 +354,8 @@ def put_search(request: Request, cfg: SearchConfig) -> SearchConfig:
     before = load_search(db)
     prev = before.search.places if before else []
     cfg = apply_places(cfg, prev)
+    src = cfg.sources
+    src.company_labels = {c: v for c, v in src.company_labels.items() if c in src.companies}
     save_search(db, cfg)
     if cfg.search.places or prev:
         home = load_fields(db)[0].home_country
@@ -505,6 +510,9 @@ class AICheck(BaseModel):
     api_base: str | None = None
 
 
+_AI_LABELS = {"codex_cli": "ChatGPT (Codex)", "claude_cli": "Claude", "litellm": "API key"}
+
+
 @router.post("/ai/check")
 async def check_ai(request: Request, body: AICheck) -> dict[str, Any]:
     from linkit_all.providers import ProviderError, UsageLimitError, get_provider
@@ -519,14 +527,18 @@ async def check_ai(request: Request, body: AICheck) -> dict[str, Any]:
             }
         }
     )
+    label = _AI_LABELS[body.provider]
+    if body.provider == "litellm" and body.api_base:
+        label = "Local model"
+    who = {"provider": body.provider, "provider_label": label, "model": body.model or None}
     try:
-        message = await get_provider(ai_settings(_settings(request), cfg)).check()
+        provider = get_provider(ai_settings(_settings(request), cfg))
+        message = await provider.check()
     except UsageLimitError as e:  # a plan limit is not a broken setup: one calm sentence
-        return {"ok": False, "kind": e.kind, "provider": e.provider or body.provider,
-                "until": e.until, "message": e.message}  # fmt: skip
+        return {"ok": False, "kind": e.kind, **who, "until": e.until, "message": e.message}
     except (ProviderError, PipelineError) as e:
-        return {"ok": False, "kind": "error", "message": tidy(str(e))}
-    return {"ok": True, "message": message}
+        return {"ok": False, "kind": "error", **who, "message": tidy(str(e))}
+    return {"ok": True, **who, "version": provider.version, "message": message}
 
 
 # --- first-run setup: what the CV says, and writing what the user confirmed ---------------
@@ -1884,8 +1896,9 @@ def add_source(request: Request, body: AddSource) -> dict[str, Any]:
                 raise ValueError("this page is already in your list")
             src.companies = [*src.companies, url]
             kind = "ats" if found else "careers"
-            label = f"{found[0]}:{found[1]}" if found else urlparse(url).netloc
-            config = {"companies": src.companies}
+            label = label_for(url)  # a careers page costs one fetch (5 s at most)
+            src.company_labels = {**src.company_labels, url: label}
+            config = {"companies": src.companies, "company_labels": src.company_labels}
     except ValueError as e:
         raise HTTPException(422, str(e)) from e
     save_search(db, cfg)

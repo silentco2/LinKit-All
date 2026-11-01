@@ -205,6 +205,7 @@ class SearchSection(BaseModel):
 
 class SourcesSection(BaseModel):
     companies: list[str] = []  # career-page URLs or "greenhouse:stripe" style shorthands
+    company_labels: dict[str, str] = {}  # companies entry -> "Stripe · Greenhouse" (display only)
     jobspy: list[Literal["linkedin", "indeed", "glassdoor", "google", "zip_recruiter"]] = []
     jobspy_country: str = "usa"  # Indeed only (Glassdoor gets none); e.g. "egypt", "qatar"
     regional: list[Literal["wuzzuf", "bayt", "forasna"]] = []

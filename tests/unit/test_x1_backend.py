@@ -124,12 +124,21 @@ def test_ai_check_reports_usage_limit_and_plain_errors(
         "ok": False,
         "kind": "usage_limit",
         "provider": "codex_cli",
+        "provider_label": "ChatGPT (Codex)",
+        "model": None,
         "until": "2026-11-04",
         "message": "ChatGPT (Codex) usage limit reached; try again after Nov 4, 2026.",
     }
     failure[:] = [ProviderError("no such file; no such file")]
     got = client.post("/api/ai/check", json=body, headers=H).json()
-    assert got == {"ok": False, "kind": "error", "message": "no such file"}
+    assert got == {
+        "ok": False,
+        "kind": "error",
+        "provider": "codex_cli",
+        "provider_label": "ChatGPT (Codex)",
+        "model": None,
+        "message": "no such file",
+    }
 
 
 # --- a usage limit pauses the run -----------------------------------------------------

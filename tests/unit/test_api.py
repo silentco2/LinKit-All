@@ -569,6 +569,12 @@ def test_ai_check_passes_local_server_to_litellm(
     }
     r = client.post("/api/ai/check", json=body, headers=SAME_ORIGIN).json()
     assert r["ok"] and "openai/gemma-3" in r["message"]
+    assert (r["provider"], r["provider_label"], r["model"], r["version"]) == (
+        "litellm",
+        "Local model",
+        "openai/gemma-3",
+        None,
+    )
     assert seen["api_base"] == "http://127.0.0.1:1234/v1" and seen["api_key"] == "local"
 
 

@@ -113,6 +113,7 @@ class Ping(BaseModel):
 
 class LLMProvider(ABC):
     name: str
+    version: str | None = None  # set by `check()` for the CLI adapters
 
     def __init__(
         self,
@@ -206,4 +207,5 @@ class CLIProvider(LLMProvider):
 
     async def check(self) -> str:
         _, out, err = await run_cli([self.path(), "--version"], "", ".", 30)
-        return f"{await super().check()}, {(out or err).strip()}"
+        self.version = (out or err).strip() or None
+        return f"{await super().check()}, {self.version or ''}"

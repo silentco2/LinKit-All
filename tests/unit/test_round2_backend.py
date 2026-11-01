@@ -436,11 +436,11 @@ def test_add_telegram_channel(client: TestClient) -> None:  # noqa: F811
 
 def test_add_careers_and_ats_pages(client: TestClient) -> None:  # noqa: F811
     ats = add(client, "https://boards.greenhouse.io/stripe").json()
-    assert (ats["kind"], ats["label"]) == ("ats", "greenhouse:stripe")
+    assert (ats["kind"], ats["label"]) == ("ats", "Stripe · Greenhouse")
     shorthand = add(client, "lever:acme").json()
-    assert (shorthand["kind"], shorthand["label"]) == ("ats", "lever:acme")
+    assert (shorthand["kind"], shorthand["label"]) == ("ats", "Acme · Lever")
     careers = add(client, "careers.example.com/jobs").json()
-    assert (careers["kind"], careers["label"]) == ("careers", "careers.example.com")
+    assert (careers["kind"], careers["label"]) == ("careers", "example.com · careers page")
     saved = client.get("/api/search").json()["sources"]["companies"]
     assert saved == [
         "https://boards.greenhouse.io/stripe", "lever:acme", "https://careers.example.com/jobs",
