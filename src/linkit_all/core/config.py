@@ -10,11 +10,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ProviderName = Literal["codex_cli", "claude_cli", "litellm"]
 
-# The trimmed LibreOffice bundle (scripts/bundle_libreoffice.py) as a release asset.
-# TODO(release): there is no public repo yet. Upload the zip, put its real URL and SHA-256 here;
-# until the hash is set, the in-app install stays unavailable (never installs unverified code).
-LO_BUNDLE_URL = "https://github.com/OWNER/linkit-all/releases/download/libreoffice-bundle/linkit-libreoffice-win-x64.zip"
-LO_BUNDLE_SHA256 = ""
+# The trimmed LibreOffice bundle (scripts/bundle_libreoffice.py), Windows x64 only, hosted as a
+# release asset (152,201,685 bytes, unpacks to about 439 MB). The hash is checked before unpacking.
+LO_BUNDLE_URL = "https://github.com/silentco2/LinKit-All/releases/download/libreoffice-26.2.6-win-x64/libreoffice-minimal-26.2.6-win-x64.zip"
+LO_BUNDLE_SHA256 = "9f5e05e456393c91108f3c48cca4f74c095867a5ef806714102c86a7706cfb28"
 
 
 class Settings(BaseSettings):

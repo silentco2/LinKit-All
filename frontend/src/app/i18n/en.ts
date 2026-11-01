@@ -1115,7 +1115,7 @@ export const en: Record<string, string> = {
   'ai.switched': '{from} is out of uses, so we tried {to} instead.',
   'lo.title': 'LibreOffice (optional)',
   'lo.text': 'To tailor your CV for each job, LinKit needs LibreOffice (free). Without it, LinKit applies with your CV exactly as you uploaded it.',
-  'lo.install': "Install it for me (about 440 MB, into LinKit's folder)",
+  'lo.install': "Install it for me (a 145 MB download, about 440 MB installed, in LinKit's folder)",
   'lo.installing': 'Installing LibreOffice… {pct}',
   'lo.get': 'Get LibreOffice',
   'lo.getHint': 'Install it, then come back and press "Check again".',

@@ -327,8 +327,8 @@ async def install_libreoffice_route(request: Request) -> dict[str, Any]:
     installer = _installer(request)
     if not installer.available():
         raise HTTPException(409, {"code": "lo_not_available", "message":
-                            "The LibreOffice download is not published yet. Install LibreOffice "
-                            "yourself, or send your CV as it is."})  # fmt: skip
+                            "LinKit's LibreOffice download is only for Windows (64-bit). Install "
+                            "LibreOffice yourself, or send your CV as it is."})  # fmt: skip
     installer.start()  # already running: the status below simply says so
     return installer.status()
 

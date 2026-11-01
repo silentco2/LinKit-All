@@ -1233,7 +1233,7 @@ export const ar: Record<string, string> = {
   'ai.switched': 'استُنفدت حصة {from}، لذلك جرّبنا {to} بدلًا منه.',
   'lo.title': 'LibreOffice (اختياري)',
   'lo.text': 'لتخصيص سيرتك الذاتية لكل وظيفة، يحتاج LinKit إلى LibreOffice (مجاني). بدونه سيقدّم LinKit بسيرتك كما رفعتها تمامًا.',
-  'lo.install': 'ثبّته لي (نحو 440 ميغابايت، داخل مجلد LinKit)',
+  'lo.install': 'ثبّته لي (تنزيل 145 ميغابايت، ويصبح نحو 440 ميغابايت بعد التثبيت، داخل مجلد LinKit)',
   'lo.installing': 'جارٍ تثبيت LibreOffice… {pct}',
   'lo.get': 'احصل على LibreOffice',
   'lo.getHint': 'ثبّته ثم عُد واضغط «تحقق مرة أخرى».',

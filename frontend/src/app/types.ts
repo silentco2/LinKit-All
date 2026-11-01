@@ -40,7 +40,7 @@ export interface LibreOfficeStatus {
   installing: boolean;
   progress: number;
   error: string | null;
-  /** False until a download is published: then only "Get LibreOffice" and "No thanks" make sense. */
+  /** False when no download fits this computer (hosted bundle is Windows x64 only): then only "Get LibreOffice" and "No thanks" make sense. */
   available: boolean;
 }
 

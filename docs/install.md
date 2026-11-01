@@ -58,7 +58,7 @@ not change. You have two choices.
 === "Use the minimal bundle"
 
     The full Windows install is about 1.6 GB. The minimal bundle is about 439 MB
-    (a 152 MB zip). It is built from an existing LibreOffice install by
+    (a 145 MB zip). It is built from an existing LibreOffice install by
     `scripts/bundle_libreoffice.py`. Install it into LinKit All's data folder with:
 
     ```bash
@@ -69,7 +69,13 @@ not change. You have two choices.
     `program/soffice.exe`, and refuses it if not. LinKit All uses this copy before any
     system install.
 
-    The bundle is for Windows today. On macOS and Linux, install LibreOffice normally.
+    You do not need to download it yourself on Windows (64-bit): the app offers an
+    **Install it for me** button when LibreOffice is missing (a 145 MB download, about
+    440 MB installed). It downloads the zip from the GitHub release
+    `libreoffice-26.2.6-win-x64` of the project, checks its SHA-256 before unpacking, and
+    installs it into the data folder.
+
+    The bundle is for Windows x64 only. On macOS and Linux, install LibreOffice normally.
 
 ## Chrome
 

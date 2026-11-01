@@ -5,6 +5,8 @@ import asyncio
 import hashlib
 import io
 import json
+import platform
+import sys
 import time
 import zipfile
 from collections.abc import Callable
@@ -25,7 +27,7 @@ from test_ux_api import put_cfg
 from linkit_all import pipeline
 from linkit_all.api.events import EventBus
 from linkit_all.apply import runner
-from linkit_all.core.config import Settings
+from linkit_all.core.config import LO_BUNDLE_SHA256, Settings
 from linkit_all.core.db import init_db
 from linkit_all.core.lo_install import LibreOfficeInstaller
 from linkit_all.core.models import Job, JobEvent, JobState, Profile, Run, RunStatus
@@ -318,10 +320,14 @@ def test_install_download_error_is_reported(client: TestClient) -> None:
     assert "Download failed" in wait_installed(client)["error"]
 
 
-def test_install_unavailable_without_hash_or_https(client: TestClient) -> None:
+def test_install_unavailable_without_hash_or_https(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     status = client.get("/api/tools/libreoffice").json()
     assert set(status) == {"installed", "path", "installing", "progress", "error", "available"}
-    assert status["available"] is False  # the default has no pinned hash yet
+    # Default bundle is Windows x64 only: pin a non-Windows platform for a stable result here.
+    monkeypatch.setattr(sys, "platform", "linux")
+    assert client.get("/api/tools/libreoffice").json()["available"] is False
     r = client.post("/api/tools/libreoffice/install", headers=H)
     assert r.status_code == 409 and r.json()["detail"]["code"] == "lo_not_available"
     installing_client(client, lambda r: httpx.Response(200), "a" * 64)
@@ -329,6 +335,36 @@ def test_install_unavailable_without_hash_or_https(client: TestClient) -> None:
     assert installer.available() is True
     installer.settings.lo_bundle_url = "http://example.test/lo.zip"
     assert client.get("/api/tools/libreoffice").json()["available"] is False
+
+
+@pytest.mark.parametrize(
+    ("plat", "machine", "expected"),
+    [
+        ("win32", "AMD64", True),
+        ("win32", "ARM64", False),
+        ("linux", "x86_64", False),
+        ("darwin", "arm64", False),
+    ],
+)
+def test_default_bundle_is_windows_x64_only(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, plat: str, machine: str, expected: bool
+) -> None:
+    monkeypatch.setattr(sys, "platform", plat)
+    monkeypatch.setattr(platform, "machine", lambda: machine)
+    installer = LibreOfficeInstaller(Settings(data_dir=tmp_path))
+    assert installer.settings.lo_bundle_sha256 == LO_BUNDLE_SHA256 and LO_BUNDLE_SHA256
+    assert installer.available() is expected
+    assert installer.status()["available"] is expected
+
+
+def test_own_bundle_from_env_is_available_on_any_platform(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setattr(platform, "machine", lambda: "x86_64")
+    monkeypatch.setenv("LINKIT_LO_BUNDLE_URL", "https://example.test/mine.zip")
+    monkeypatch.setenv("LINKIT_LO_BUNDLE_SHA256", "b" * 64)
+    assert LibreOfficeInstaller(Settings(data_dir=tmp_path)).available() is True
 
 
 # --- 2. tailor, or the CV as uploaded -------------------------------------------------

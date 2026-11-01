@@ -5,14 +5,16 @@ The trimmed bundle is downloaded from `lo_bundle_url`, checked against the pinne
 
 import asyncio
 import hashlib
+import platform
 import shutil
+import sys
 import zipfile
 from pathlib import Path
 
 import httpx
 from loguru import logger
 
-from linkit_all.core.config import Settings
+from linkit_all.core.config import LO_BUNDLE_SHA256, LO_BUNDLE_URL, Settings
 from linkit_all.core.tools import bundled_libreoffice, soffice_path
 
 CHUNK = 1 << 16
@@ -51,7 +53,12 @@ class LibreOfficeInstaller:
 
     def available(self) -> bool:
         s = self.settings
-        return s.lo_bundle_url.startswith("https://") and bool(s.lo_bundle_sha256.strip())
+        if not (s.lo_bundle_url.startswith("https://") and s.lo_bundle_sha256.strip()):
+            return False
+        own = (s.lo_bundle_url, s.lo_bundle_sha256) != (LO_BUNDLE_URL, LO_BUNDLE_SHA256)
+        # The hosted bundle is Windows x64 only; a bundle the user pointed us at is theirs to judge.
+        x64 = platform.machine().lower() in ("amd64", "x86_64")
+        return own or (sys.platform == "win32" and x64)
 
     def status(self) -> dict[str, object]:
         installing, progress, error = self.installing, self.progress, self.error

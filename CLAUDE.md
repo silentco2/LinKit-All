@@ -152,7 +152,7 @@ Derived by rules. AI gap-fill must be verbatim from the CV (checked). On CV uplo
 - External tools: LibreOffice required (DOCX->PDF), Chrome for applying, Tectonic for LaTeX.
   `linkit doctor` checks them. End-user install: `uv tool install linkit-all`.
 - LibreOffice: minimal portable bundle (Win 1.6 GB -> 439 MB) from `scripts/bundle_libreoffice.py` (removals kept only if renders stay identical);
-  `linkit install-libreoffice <zip>` installs it to the data dir, ahead of any system install. Keep its MPL-2.0 license files. Optional in-app install (`POST /api/tools/libreoffice/install`): downloads `lo_bundle_url`, pinned `lo_bundle_sha256` checked before unpacking, never without a hash; the user may refuse and apply with the original CV.
+  `linkit install-libreoffice <zip>` installs it to the data dir, ahead of any system install. Keep its MPL-2.0 license files. Optional in-app install (`POST /api/tools/libreoffice/install`, Windows x64 only unless env URL/hash are set): downloads `lo_bundle_url` (GitHub release `libreoffice-26.2.6-win-x64` of silentco2/LinKit-All, 145 MB), pinned `lo_bundle_sha256` checked before unpacking, never without a hash; the user may refuse and apply with the original CV.
 - Profile, preferences, locked facts, answer bank stored in DB; JSON/YAML import/export.
 
 ## 7. UI screens
