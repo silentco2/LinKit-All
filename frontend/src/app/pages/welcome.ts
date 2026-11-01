@@ -5,6 +5,8 @@ import { Api } from '../api';
 import { AiConnect, AiState } from '../components/ai-connect';
 import { ChipOption, ChipSelect } from '../components/chip-select';
 import { Countries } from '../components/countries';
+import { LibreOfficeCard } from '../components/libreoffice-card';
+import { Privacy } from '../components/privacy';
 import { PhoneInput } from '../components/phone-input';
 import { PlacePick, PlacePicker } from '../components/place-picker';
 import { PlacesList } from '../components/places-list';
@@ -61,7 +63,7 @@ const SRC_TEXT: Record<string, string> = {
 // The first-run flow: four screens that replace the ten-tab Setup. Labels in the arrays are i18n keys.
 @Component({
   selector: 'app-welcome',
-  imports: [FormsModule, RouterLink, AiConnect, ChipSelect, PhoneInput, PlacePicker, PlacesList, SourcePipe, TagInput, TPipe],
+  imports: [FormsModule, RouterLink, AiConnect, ChipSelect, LibreOfficeCard, PhoneInput, PlacePicker, PlacesList, Privacy, SourcePipe, TagInput, TPipe],
   template: `
     <div class="mx-auto max-w-3xl">
       <div class="flex flex-wrap items-center justify-between gap-3">
@@ -74,6 +76,7 @@ const SRC_TEXT: Record<string, string> = {
         </div>
       </div>
       <p class="mt-4 text-sm text-slate-600 dark:text-slate-400">{{ 'welcome.promise' | t }}</p>
+      <app-privacy class="mt-1 block" />
 
       @if (!status()) {
         <p class="mt-8 text-sm text-slate-500">{{ 'common.loading' | t }}</p>
@@ -131,10 +134,10 @@ const SRC_TEXT: Record<string, string> = {
                 }
                 @if (c.format === 'tex') {
                   @if (c.rendererOk === false) {
-                    <div class="alert alert-error">{{ 'setup.cv.tectonicA' | t }}<a href="https://tectonic-typesetting.github.io" target="_blank" rel="noopener">Tectonic</a>{{ 'setup.cv.tectonicB' | t }}<code dir="ltr">linkit doctor</code>{{ 'setup.cv.tectonicC' | t }}</div>
+                    <div class="alert alert-warn">{{ 'setup.cv.tectonicA' | t }}<a href="https://tectonic-typesetting.github.io" target="_blank" rel="noopener">Tectonic</a>{{ 'setup.cv.tectonicB' | t }}</div>
                   }
                 } @else if (!status()!.libreoffice) {
-                  <div class="alert alert-error">{{ 'setup.cv.noLibreA' | t }}<code dir="ltr">linkit doctor</code>{{ 'setup.cv.noLibreB' | t }}</div>
+                  <app-libreoffice-card />
                 }
               }
             }
@@ -248,7 +251,7 @@ const SRC_TEXT: Record<string, string> = {
               <div>
                 <p class="label">{{ 'welcome.jobs.level' | t }}</p>
                 <app-chip-select [options]="levelOptions()" [selected]="level()" [label]="'welcome.jobs.level' | t" (changed)="set('filters.seniority', $event)" />
-                @if (years() !== null && !touched.has('filters.seniority')) { <p class="hint">{{ 'welcome.jobs.levelYears' | t: { n: years()! } }}</p> }
+                @if (years() !== null && !touched.has('filters.seniority')) { <p class="hint">{{ (underYear() ? 'welcome.jobs.levelUnderYear' : 'welcome.jobs.levelYears') | t: { n: years()! } }}</p> }
               </div>
 
               <div>
@@ -282,6 +285,7 @@ const SRC_TEXT: Record<string, string> = {
           }
 
           <app-ai-connect [hidden]="step() !== 2" [active]="step() === 2" intro="welcome.ai.intro" (stateChange)="ai.set($event)" (connected)="aiConnected()" />
+          @if (step() === 2) { <app-privacy [lead]="false" /> }
 
           <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
             @if (step() > 1) {
@@ -374,6 +378,8 @@ export class WelcomePage implements OnInit {
     const y = this.vals()['answers.years_experience'];
     return typeof y === 'number' ? y : null;
   });
+  /** The CV shows less than a year of experience (an internship, say): the level hint says so instead of "0 years". */
+  protected readonly underYear = computed(() => this.infer()?.values['answers.years_experience']?.note === 'under_one_year');
   private readonly homePlace = computed<Place[]>(() => {
     const c = this.countries.byIso(String(this.vals()['profile.home_country'] ?? ''));
     return c ? [{ label: c.name, city: '', country: c.iso2, work: 'ask' }] : [];

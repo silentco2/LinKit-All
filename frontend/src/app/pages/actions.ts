@@ -105,7 +105,7 @@ const SOURCES: Record<string, string> = {
                  (input)="set(k, q.label, val($event))">
         }
       }
-      @if (q.reason) { <p class="hint" dir="auto">{{ q.reason }}</p> }
+      @if (q.reason) { <p class="hint" dir="auto">{{ why(q) }}</p> }
       @if (q.sensitive || q.category) {
         <p class="hint !text-amber-700 dark:!text-amber-400">{{ 'actions.sensitive' | t }}</p>
       } @else {
@@ -411,6 +411,8 @@ export class ActionsPage {
   // ---- setup cards ---------------------------------------------------------------------------------------
 
   protected plural = (base: string, n: number): string => this.i18n.plural(base, n);
+  /** Why a question was parked, in the UI language (the server sends a code like `not_in_profile` and its params). */
+  protected why = (q: ActionQuestion): string => this.i18n.msg({ message: q.reason, code: q.reason_code, params: q.reason_params });
   protected isSetup = (a: ActionItem): boolean => VAULT_CODES.includes(a.code ?? '') || EMAIL_CODES.includes(a.code ?? '');
   /** The first three sites the waiting applications are for, then "+N". */
   protected sites(list: ActionItem[]): string {

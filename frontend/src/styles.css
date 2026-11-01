@@ -46,6 +46,7 @@
     @apply border-rose-300 text-rose-700 hover:bg-rose-50
       dark:border-rose-900 dark:text-rose-300 dark:hover:bg-rose-950;
   }
+  .linkish { @apply cursor-pointer text-brand-600 underline hover:no-underline dark:text-brand-500; }
   .badge { @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium; }
   .tier-high { @apply bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300; }
   .tier-mid { @apply bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300; }
@@ -53,6 +54,7 @@
   .alert { @apply rounded-lg border px-4 py-3 text-sm; }
   .alert-error { @apply border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200; }
   .alert-ok { @apply border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200; }
+  .alert-warn { @apply border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200; }
   .alert-info { @apply border-brand-100 bg-brand-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300; }
 }
 

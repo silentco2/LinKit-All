@@ -1,16 +1,18 @@
 import { Component, inject } from '@angular/core';
 import { AiBody, AiConnect } from '../../components/ai-connect';
+import { Privacy } from '../../components/privacy';
 import { TPipe } from '../../i18n';
 import { SettingsStore } from './store';
 
 /** Settings > AI: the same connect box as the first run. A passing test saves the choice through the store. */
 @Component({
   selector: 'app-settings-ai',
-  imports: [AiConnect, TPipe],
+  imports: [AiConnect, Privacy, TPipe],
   template: `
     <section class="card space-y-5">
       <h2>{{ 'welcome.ai.title' | t }}</h2>
       <app-ai-connect intro="setup.ai.intro" [testOnLoad]="false" [persist]="save" />
+      <app-privacy />
     </section>
   `,
 })

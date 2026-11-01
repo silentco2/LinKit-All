@@ -69,16 +69,30 @@ export class I18n {
   }
 
   /**
-   * A server message (Action Center item, job event) in the UI language. The server sends an English `message` plus a
-   * stable `code` and `params`; `park.<code>` is used when it exists, else the English message (old rows have no code).
+   * A server message (Action Center item, job event, live log line) in the UI language. The server sends an English
+   * `message` plus a stable `code` and `params`; `<prefix><code>` is used when it exists (`park.` by default, `log.` for
+   * the live log), else the English message (old rows have no code). A `reason` param may pick a variant
+   * (`park.tailor_skipped.declined`).
    */
-  msg(item: { message: string; code?: string | null; params?: Record<string, unknown> | null }): string {
-    const key = item.code ? `park.${item.code}` : '';
-    const plural = `${key}.other` in en; // a message about a count ("3 questions need your answer") has its plural forms
-    if (!key || !(key in en || plural)) return item.message;
+  msg(item: { message: string; code?: string | null; params?: Record<string, unknown> | null }, prefix = 'park.'): string {
+    let key = item.code ? `${prefix}${item.code}` : '';
     const params: Params = {};
     for (const [k, v] of Object.entries(item.params ?? {})) params[k] = typeof v === 'number' ? v : String(v);
+    if (typeof params['reason'] === 'string' && `${key}.${params['reason']}` in en) key = `${key}.${params['reason']}`;
+    const plural = `${key}.other` in en; // a message about a count ("3 questions need your answer") has its plural forms
+    if (!key || !(key in en || plural)) return item.message;
+    // codes whose params are keys of something else: say them in words
+    if (typeof params['source'] === 'string') params['source'] = this.source(params['source']);
+    if (typeof params['tier'] === 'string' && `common.tier.${params['tier']}` in en) params['tier'] = this.t(`common.tier.${params['tier']}`);
+    if (item.code === 'apply_start') params['mode'] = this.t(item.params?.['live'] ? 'live.mode.real' : 'live.mode.practice');
+    if (item.code === 'apply_job' && typeof params['status'] === 'string') params['status'] = this.t(`live.job.${params['status']}`);
     return plural && typeof params['n'] === 'number' ? this.plural(key, params['n'], params) : this.t(key, params);
+  }
+
+  /** The AI behind a provider key, as a person would say it ("ChatGPT (Codex)", "Claude", "your AI"). */
+  provider(key: string | null | undefined): string {
+    const k = `ai.name.${key ?? ''}`;
+    return this.t(k in en ? k : 'ai.name.other');
   }
 
   /** A job source / ATS key as a readable name: `source.<key>` when listed, else the key title-cased (`zip_recruiter` -> "Zip Recruiter"). */

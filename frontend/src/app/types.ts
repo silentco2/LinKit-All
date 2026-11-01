@@ -18,7 +18,30 @@ export interface RunState {
   stage: Stage | null;
   started_at: string | null;
   error: string | null;
+  /** Why the run stopped or paused, as a stable code the UI words itself (`run.reason.<code>`). */
+  reason_code?: string | null;
+  reason_params?: Record<string, unknown>;
+  /** The socket's last `run` event: started | stopping | finished | failed | paused | cancelled. */
+  status?: string;
   results: Record<string, Record<string, unknown>>;
+}
+
+/** What a run did, from its stages: titles say "Search 3", "Applying 4" or "Search and apply 5". */
+export const runKind = (stages: readonly string[]): 'search' | 'apply' | 'mixed' => {
+  const apply = stages.includes('apply');
+  const search = stages.some((s) => s !== 'apply');
+  return apply && search ? 'mixed' : apply ? 'apply' : 'search';
+};
+
+/** GET /tools/libreoffice. */
+export interface LibreOfficeStatus {
+  installed: boolean;
+  path: string | null;
+  installing: boolean;
+  progress: number;
+  error: string | null;
+  /** False until a download is published: then only "Get LibreOffice" and "No thanks" make sense. */
+  available: boolean;
 }
 
 /** What first-run setup still needs; the server computes it once (`/status`). */
@@ -63,7 +86,16 @@ export interface GoLive {
   eligible: boolean;
   live: boolean;
   samples: { job_id: number; title: string; company: string; screenshots: string[]; tailored: boolean }[];
-  checklist: { cv_approved: boolean; answers_reviewed: boolean; caps_set: boolean; confirm_each: boolean };
+  /** A job whose CV was really tailored, for "See how your CV was tailored". */
+  tailored_example: { job_id: number; title: string; company: string } | null;
+  checklist: {
+    cv_ready: { ok: boolean; detail: 'ready' | 'needs_approval' | 'no_cv' };
+    tailoring: { ok: boolean; mode: 'tailor' | 'original' | 'undecided'; libreoffice: boolean };
+    answers_reviewed: { ok: boolean };
+    open_items: { ok: boolean; count: number };
+    confirm_each: { ok: boolean };
+    caps_set: { ok: boolean; daily_cap_per_site: number };
+  };
 }
 
 export interface Profile {
@@ -186,6 +218,8 @@ export interface ApplySection {
   parallel_sites: number;
   generic_agent: boolean;
   email_daily_cap: number;
+  /** null = not decided yet, true = tailor the CV per job, false = send the CV as uploaded. */
+  tailor_cv: boolean | null;
 }
 
 /** Null / empty means "ask me in the Action Center" for the sensitive fields. */
@@ -289,6 +323,11 @@ export interface LiveEvent {
   type: 'log' | 'stage' | 'run' | 'live_shot';
   level?: string;
   message?: string;
+  /** Log lines and stopped stages: a stable code and its params (`log.<code>` / `run.reason.<code>`). */
+  code?: string;
+  params?: Record<string, unknown>;
+  reason_code?: string | null;
+  reason_params?: Record<string, unknown>;
   stage?: Stage;
   status?: string;
   error?: string;
@@ -347,6 +386,9 @@ export interface ActionQuestion {
   options: string[];
   required: boolean;
   reason: string;
+  /** Stable code of the reason (`park.<code>`): not_in_profile, own_answer, no_option, file_missing, ... */
+  reason_code?: string | null;
+  reason_params?: Record<string, unknown>;
   sensitive: boolean;
   /** Server's sensitive category (acknowledge_privacy, acknowledge_legal, eeo_gender, ...), null for ordinary questions. */
   category?: string | null;
@@ -462,6 +504,8 @@ export interface InferredValue {
   source: 'cv' | 'country' | 'roles' | 'years' | 'default' | 'ai';
   level: 'auto' | 'suggest' | 'ask';
   check: boolean;
+  /** A caveat the UI words itself, e.g. `under_one_year`. */
+  note?: string;
 }
 
 /** `GET /infer`, `POST /infer/ai-fill`. A key is missing when the CV says nothing about it. */

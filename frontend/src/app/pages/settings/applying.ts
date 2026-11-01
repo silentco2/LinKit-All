@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { GoLiveCard } from '../../components/golive';
+import { LibreOffice, LibreOfficeCard } from '../../components/libreoffice-card';
 import { I18n, TPipe } from '../../i18n';
 import { Field } from './saved';
 import { SettingsStore } from './store';
@@ -11,7 +12,7 @@ const MODE = 'rounded-lg border p-3 text-start text-sm focus-visible:outline-2 f
 /** Settings > Applying: practice or real, the pace, and how the browser behaves. Everything saves as you edit. */
 @Component({
   selector: 'app-settings-applying',
-  imports: [Field, GoLiveCard, RouterLink, TPipe],
+  imports: [Field, GoLiveCard, LibreOfficeCard, RouterLink, TPipe],
   template: `
     <div class="space-y-6">
       <section class="card space-y-4">
@@ -45,6 +46,14 @@ const MODE = 'rounded-lg border p-3 text-start text-sm focus-visible:outline-2 f
             <div class="alert alert-error" role="alert"><strong>{{ 'setup.apply.noConfirmTitle' | t }}</strong> {{ 'setup.apply.noConfirmBody' | t }}</div>
           }
         }
+      </section>
+
+      <section class="card space-y-4">
+        <h2>{{ 'settings.apply.cv' | t }}</h2>
+        <app-field key="apply.tailor_cv" for="tailor-cv" [check]="true" [label]="'settings.apply.tailor' | t" [hint]="(lo.tailor() === null ? 'settings.apply.tailorUndecided' : 'settings.apply.tailorHint') | t">
+          <input id="tailor-cv" type="checkbox" role="switch" class="mt-1" [checked]="lo.tailor() === true" (change)="lo.setTailor(checked($event))">
+        </app-field>
+        <app-libreoffice-card />
       </section>
 
       <section class="card space-y-4">
@@ -115,6 +124,7 @@ const MODE = 'rounded-lg border p-3 text-start text-sm focus-visible:outline-2 f
 export class ApplyingSection implements OnInit {
   protected readonly store = inject(SettingsStore);
   protected readonly tuning = inject(Tuning);
+  protected readonly lo = inject(LibreOffice);
   private readonly i18n = inject(I18n);
   protected readonly card = cardClass;
   /** Switching to "Applying for real" opens the guided card instead of flipping the switch. */
@@ -122,6 +132,7 @@ export class ApplyingSection implements OnInit {
 
   ngOnInit(): void {
     void this.tuning.load();
+    void this.lo.load();
   }
 
   protected live(): boolean {

@@ -1,13 +1,25 @@
 import { Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Api } from '../api';
-import { TPipe } from '../i18n';
+import { I18n, TPipe } from '../i18n';
+import { dayOf, fmtDate, localeOf } from '../locale';
 import { Provider, SearchConfig } from '../types';
 
 type AiMode = Provider | 'local';
 type LocalServer = 'ollama' | 'lmstudio';
 export type AiBody = { provider: Provider; model: string | null; api_base: string | null };
-export type AiState = { state: 'idle' | 'testing' | 'ok' | 'fail'; msg: string };
+export type AiState = {
+  state: 'idle' | 'testing' | 'ok' | 'fail';
+  msg: string;
+  /** A failed test: `usage_limit` = the plan is used up for now (not a broken setup), `error` = anything else. */
+  kind?: 'usage_limit' | 'error';
+  provider?: string;
+  until?: string | null;
+};
+type CheckResult = { ok: boolean; message: string; kind?: 'usage_limit' | 'error'; provider?: string; until?: string | null };
+
+/** The server's message once, without vendor links. */
+const clean = (msg: string): string => msg.replace(/https?:\/\/\S+/g, '').replace(/\s{2,}/g, ' ').trim();
 
 /**
  * Provider cards, auto-test and save-on-success: used by the first-run welcome and by Settings > AI.
@@ -21,16 +33,18 @@ export type AiState = { state: 'idle' | 'testing' | 'ok' | 'fail'; msg: string }
   template: `
     @if (intro()) { <p class="text-sm text-slate-600 dark:text-slate-400">{{ intro() | t }}</p> }
     @if (loaded() && !hasCli()) { <p class="text-sm text-slate-500">{{ 'welcome.ai.none' | t }}</p> }
+    @if (notice()) { <p class="alert alert-warn" role="status">{{ notice() }}</p> }
     <fieldset class="space-y-2">
       <legend class="sr-only">{{ 'setup.ai.provider' | t }}</legend>
       @for (p of providers; track p.id) {
         <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700"
-               [class.border-brand-500]="mode() === p.id">
+               [class.border-brand-500]="mode() === p.id" [class.ring-2]="other(p.id)" [class.ring-amber-400]="other(p.id)">
           <input type="radio" name="provider" class="mt-1" [checked]="mode() === p.id" (change)="pick(p.id)">
           <span>
             <span class="font-medium">{{ p.label | t }}</span>
             @if ((p.id === 'codex_cli' || p.id === 'claude_cli') && available()[p.id]) { <span class="badge tier-high ms-2">{{ 'welcome.ai.found' | t }}</span> }
             <span class="block text-xs text-slate-500">{{ p.hint | t }}</span>
+            @if (other(p.id)) { <span class="mt-1 block text-xs font-medium text-amber-800 dark:text-amber-300">{{ 'ai.limit.try' | t }}</span> }
           </span>
         </label>
       }
@@ -71,10 +85,14 @@ export type AiState = { state: 'idle' | 'testing' | 'ok' | 'fail'; msg: string }
           </div>
         }
         @case ('fail') {
-          <div class="alert alert-error" role="alert">
-            <p><strong>{{ 'welcome.ai.fail' | t }}</strong></p>
-            <p class="mt-1" dir="auto">{{ ai().msg }}</p>
-            @if (mode() === 'litellm') { <p class="mt-1 text-xs">{{ 'setup.ai.keyHintA' | t }}<code dir="ltr">LINKIT_API_KEY</code>{{ 'setup.ai.keyHintB' | t }}</p> }
+          <div class="alert" [class]="ai().kind === 'usage_limit' ? 'alert-warn' : 'alert-error'" role="alert">
+            @if (ai().kind === 'usage_limit') {
+              <p><strong>{{ limitText() }}</strong></p>
+              <p class="mt-1">{{ 'ai.limit.other' | t }}</p>
+            } @else {
+              <p dir="auto">{{ ai().msg }}</p>
+              @if (mode() === 'litellm') { <p class="mt-1 text-xs">{{ 'setup.ai.keyHintA' | t }}<code dir="ltr">LINKIT_API_KEY</code>{{ 'setup.ai.keyHintB' | t }}</p> }
+            }
             <button type="button" class="btn mt-3" (click)="test()">{{ 'welcome.retry' | t }}</button>
           </div>
         }
@@ -109,6 +127,7 @@ export type AiState = { state: 'idle' | 'testing' | 'ok' | 'fail'; msg: string }
 })
 export class AiConnect {
   private readonly api = inject(Api);
+  private readonly i18n = inject(I18n);
 
   /** i18n key of a short paragraph above the cards (the host's wording); empty for none. */
   readonly intro = input('');
@@ -138,6 +157,9 @@ export class AiConnect {
   protected readonly mode = signal<AiMode | null>(null);
   protected readonly ai = signal<AiState>({ state: 'idle', msg: '' });
   protected readonly local = signal<Record<LocalServer, { running: boolean; models: string[] }> | null>(null);
+  /** Said when the first choice was out of uses and another detected AI was tried instead. */
+  protected readonly notice = signal('');
+  private readonly limited = new Set<AiMode>();
   protected model = '';
   protected apiBase = '';
   private testId = 0;
@@ -180,7 +202,7 @@ export class AiConnect {
         await this.scanLocal();
         if (!this.model || !this.apiBase) return; // nothing to test until a model is picked
       }
-      if (this.testOnLoad() || !saved?.provider) void this.test();
+      if (this.testOnLoad() || !saved?.provider) void this.test(true);
     } catch (e) {
       this.loaded.set(true);
       this.setAi({ state: 'fail', msg: (e as Error).message });
@@ -189,6 +211,7 @@ export class AiConnect {
 
   protected pick(id: AiMode): void {
     this.mode.set(id);
+    this.notice.set('');
     this.setAi({ state: 'idle', msg: '' });
     this.testId++; // an older test must not overwrite this choice
     this.apiBase = '';
@@ -217,23 +240,50 @@ export class AiConnect {
     if (this.mode() && (this.mode() !== 'local' || (this.model && this.apiBase))) void this.test();
   }
 
-  /** Test the chosen connection; when it works, save it. */
-  protected async test(): Promise<void> {
+  /** After a usage-limit failure: the other cards worth trying (a detected CLI, or any API / local option). */
+  protected other(id: AiMode): boolean {
+    return this.ai().kind === 'usage_limit' && id !== this.mode() && (id === 'litellm' || id === 'local' || !!this.available()[id]);
+  }
+
+  protected limitText(): string {
+    const a = this.ai();
+    const until = dayOf(a.until);
+    const provider = this.i18n.provider(a.provider ?? this.mode());
+    return until ? this.i18n.t('ai.limit.until', { provider, until: fmtDate(localeOf(this.i18n.lang()), until, 'date') }) : this.i18n.t('ai.limit.now', { provider });
+  }
+
+  /**
+   * Test the chosen connection; when it works, save it. `auto` (the first, unasked test): a detected AI that is out of
+   * uses is not kept; the next detected one is tried instead, and the user is told.
+   */
+  protected async test(auto = false): Promise<void> {
     const mode = this.mode();
     if (!mode) return;
     const id = ++this.testId;
     this.setAi({ state: 'testing', msg: '' });
     const body: AiBody = { provider: mode === 'local' ? 'litellm' : mode, model: this.model.trim() || null, api_base: mode === 'local' ? this.apiBase.trim() || null : null };
     try {
-      const r = await this.api.post<{ ok: boolean; message: string }>('/ai/check', body);
+      const r = await this.api.post<CheckResult>('/ai/check', body);
       if (id !== this.testId) return;
-      if (!r.ok) return this.setAi({ state: 'fail', msg: r.message });
+      if (!r.ok) {
+        if (r.kind === 'usage_limit') {
+          this.limited.add(mode);
+          const next = auto ? (['codex_cli', 'claude_cli'] as const).find((p) => this.available()[p] && !this.limited.has(p)) : undefined;
+          if (next) {
+            this.notice.set(this.i18n.t('ai.switched', { from: this.i18n.provider(mode), to: this.i18n.provider(next) }));
+            this.mode.set(next);
+            return this.test(true);
+          }
+          return this.setAi({ state: 'fail', msg: clean(r.message), kind: 'usage_limit', provider: r.provider ?? mode, until: r.until ?? null });
+        }
+        return this.setAi({ state: 'fail', msg: clean(r.message), kind: 'error' });
+      }
       await (this.persist() ?? this.saveToSearch)(body);
       if (id !== this.testId) return;
       this.setAi({ state: 'ok', msg: r.message });
       this.connected.emit();
     } catch (e) {
-      if (id === this.testId) this.setAi({ state: 'fail', msg: (e as Error).message });
+      if (id === this.testId) this.setAi({ state: 'fail', msg: clean((e as Error).message), kind: 'error' });
     }
   }
 

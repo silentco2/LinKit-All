@@ -1,12 +1,13 @@
 import { Component, computed, effect, ElementRef, inject, OnDestroy, signal } from '@angular/core';
-import { Api } from '../api';
+import { Router } from '@angular/router';
+import { Api, ApiError } from '../api';
 import { AllClear } from '../components/all-clear';
 import { Toast } from '../components/toast';
 import { I18n, TPipe } from '../i18n';
 import { Live } from '../live';
 import { fmtNum, localeOf } from '../locale';
 import { Shell } from '../shell';
-import { JobRow } from '../types';
+import { APPLY_STAGES, JobRow } from '../types';
 import { JobDetailPanel } from './job-detail';
 
 type Tab = 'awaiting_review' | 'below_threshold';
@@ -137,7 +138,9 @@ const SHORTCUTS: [string, string][] = [
       </div>
     }
 
-    @if (toast(); as m) { <app-toast [text]="m" [action]="'review.undo' | t" (act)="undo()" /> }
+    @if (toast(); as m) {
+      <app-toast [text]="m" [action]="pending.length ? ('review.undo' | t) : ''" (act)="undo()" [action2]="offerApply() ? applyLabel() : ''" (act2)="applyNow()" />
+    }
   `,
 })
 export class ReviewPage implements OnDestroy {
@@ -145,6 +148,7 @@ export class ReviewPage implements OnDestroy {
   private readonly live = inject(Live);
   private readonly shell = inject(Shell);
   private readonly i18n = inject(I18n);
+  private readonly router = inject(Router);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly loc = computed(() => localeOf(this.i18n.lang()));
   protected readonly shortcuts = SHORTCUTS;
@@ -162,9 +166,13 @@ export class ReviewPage implements OnDestroy {
   protected readonly focus = signal<number | null>(null);
   protected readonly help = signal(false);
   protected readonly toast = signal('');
+  /** The toast follows an approval: it also offers to apply right away. */
+  protected readonly offerApply = signal(false);
+  protected readonly applyLabel = computed(() => this.i18n.t(this.shell.status()?.apply_live ? 'review.applyNow' : 'review.applyNowPractice'));
+  private offerTimer: ReturnType<typeof setTimeout> | undefined;
   protected readonly announce = signal('');
   protected readonly error = signal('');
-  private pending: Pending[] = [];
+  protected pending: Pending[] = [];
   private seq = 0;
 
   constructor() {
@@ -175,6 +183,7 @@ export class ReviewPage implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    clearTimeout(this.offerTimer);
     this.flushAll(false);
   }
 
@@ -217,6 +226,8 @@ export class ReviewPage implements OnDestroy {
     if (o !== null && taken.has(o)) this.open.set(null);
     this.focusNear(ids);
     const text = this.i18n.plural(`review.${action === 'approve' ? 'approved' : 'skipped'}`, ids.length);
+    clearTimeout(this.offerTimer);
+    this.offerApply.set(action === 'approve');
     this.toast.set(text);
     this.announce.set(`${text}. ${this.i18n.t('review.undo')}`);
   }
@@ -261,6 +272,7 @@ export class ReviewPage implements OnDestroy {
       }
       await this.api.post('/jobs/actions', body);
       this.error.set('');
+      if (batch.action === 'approve' && !this.pending.length) this.keepOffer(batch.ids.length);
     } catch (e) {
       this.hide(batch.ids, false); // not saved: show them again
       this.syncPending();
@@ -271,6 +283,31 @@ export class ReviewPage implements OnDestroy {
     await Promise.all([this.shell.refresh(), this.load()]);
     this.syncPending();
     this.hide(batch.ids, false); // only once the list no longer holds them, so they cannot flash back
+  }
+
+  /** Approved and sent: the confirmation stays a while longer with just "Apply now". */
+  private keepOffer(n: number): void {
+    this.offerApply.set(true);
+    this.toast.set(this.i18n.plural('review.approved', n));
+    clearTimeout(this.offerTimer);
+    this.offerTimer = setTimeout(() => {
+      if (!this.pending.length) this.toast.set('');
+    }, 15_000);
+  }
+
+  /** Send what is still in the Undo window, then start the apply stage and show it on Activity. */
+  protected async applyNow(): Promise<void> {
+    this.error.set('');
+    try {
+      await Promise.all([...this.pending].map((b) => this.send(b, false)));
+      this.toast.set('');
+      await this.api.post('/runs', { stages: APPLY_STAGES, new: false });
+      await this.router.navigate(['/activity']);
+    } catch (e) {
+      // a missing tool (409 + code): Home has the offer to install it or to use the CV as it is
+      if (e instanceof ApiError && e.code) await this.router.navigate(['/']);
+      else this.error.set((e as Error).message);
+    }
   }
 
   /** Send everything still waiting for its Undo window: on leaving the page or closing the tab. */

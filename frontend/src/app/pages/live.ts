@@ -1,10 +1,11 @@
 import { Component, computed, effect, ElementRef, inject, signal, viewChild } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
-import { Api } from '../api';
+import { ActivatedRoute, RouterLink } from '@angular/router';
+import { Api, ApiError } from '../api';
+import { LibreOfficeCard } from '../components/libreoffice-card';
 import { I18n, TPipe } from '../i18n';
 import { Live } from '../live';
-import { DtPipe, fmtNum, labelOr, localeOf } from '../locale';
-import { LiveEvent, ScheduleSection, SEARCH_STAGES, SearchConfig, Stage, STAGES } from '../types';
+import { dayOf, DtPipe, fmtDate, fmtNum, labelOr, localeOf } from '../locale';
+import { LiveEvent, RunState, runKind, ScheduleSection, SEARCH_STAGES, SearchConfig, Stage, STAGES } from '../types';
 
 const STAGE_KEY: Record<Exclude<Stage, 'apply'>, string> = {
   discover: 'live.stage.discover',
@@ -16,25 +17,42 @@ const STATE_KEY = {
   done: 'live.state.done',
   failed: 'live.state.failed',
   running: 'live.state.running',
+  paused: 'live.state.paused',
   waiting: 'live.state.waiting',
   notRun: 'live.state.notRun',
 };
+const STAGES_KEY = 'linkit.stages'; // the steps ticked under Advanced: a per-viewer convenience
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']; // Python weekday order, as the schedule stores it
 
 interface RecentRun {
   id: number;
   status: string;
   started_at: string;
+  kind: 'search' | 'apply' | 'mixed';
   pause_reason: string | null;
+  reason_code: string | null;
+  reason_params: Record<string, unknown>;
+}
+
+/** The steps ticked last time; the search when nothing was stored (or storage is blocked). */
+function rememberedStages(): Set<Stage> {
+  try {
+    const v = JSON.parse(localStorage.getItem(STAGES_KEY) ?? '[]');
+    const ok = Array.isArray(v) ? STAGES.filter((s) => v.includes(s)) : [];
+    if (ok.length) return new Set(ok);
+  } catch {
+    // storage blocked or garbled: the default
+  }
+  return new Set(SEARCH_STAGES);
 }
 
 @Component({
   selector: 'app-live',
-  imports: [DtPipe, TPipe],
+  imports: [DtPipe, LibreOfficeCard, RouterLink, TPipe],
   template: `
     <section class="card space-y-4">
       <div class="flex flex-wrap gap-3">
-        <button class="btn btn-primary" (click)="start()" [disabled]="running() || !chosen().size || busy()">{{ 'smart.find' | t }}</button>
+        <button class="btn btn-primary" (click)="start()" [disabled]="running() || !chosen().size || busy()">{{ startLabel() | t }}</button>
         <button class="btn btn-danger" (click)="cancel()" [disabled]="!running() || live.run()?.stopping">{{ (live.run()?.stopping ? 'live.stopping' : 'live.stop') | t }}</button>
       </div>
       <details>
@@ -54,8 +72,14 @@ interface RecentRun {
         </fieldset>
       </details>
       @if (error()) { <div class="alert alert-error" dir="auto">{{ error() }}</div> }
+      @if (needsLibreOffice()) { <app-libreoffice-card /> }
       @if (paused(); as p) {
-        <div class="alert alert-info">{{ 'live.paused.a' | t: { id: num(p.id) } }}<bdi>{{ p.pause_reason }}</bdi>{{ 'live.paused.b' | t }}</div>
+        <div class="alert alert-warn space-y-2" role="status">
+          <p><strong>{{ runTitle(p.kind, p.id) }}</strong> {{ 'live.paused.is' | t }} <span dir="auto">{{ reasonText(p.reason_code, p.reason_params, p.pause_reason ?? '') }}</span></p>
+          @if (p.reason_code === 'ai_usage_limit') { <p><a [routerLink]="'/settings/ai'">{{ 'run.fix.ai' | t }}</a></p> }
+          @if (p.reason_code === 'needs_libreoffice') { <app-libreoffice-card /> }
+          <p class="text-xs">{{ 'live.paused.resume' | t }}</p>
+        </div>
       }
     </section>
 
@@ -112,7 +136,7 @@ interface RecentRun {
     @if (live.run(); as run) {
       @if (run.run_id) {
         <section class="mt-6">
-          <h2>{{ 'live.runTitle' | t: { id: num(run.run_id) } }} @if (run.running) { <span class="text-sm font-normal text-emerald-600">{{ 'live.running' | t }}</span> }</h2>
+          <h2>{{ runTitle(kindOf(run), run.run_id) }} @if (run.running) { <span class="text-sm font-normal text-emerald-600">{{ 'live.running' | t }}</span> }</h2>
           <ol class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             @for (s of run.stages; track s) {
               <li class="card p-4" [class.ring-2]="run.stage === s && run.running" [class.ring-brand-500]="run.stage === s && run.running">
@@ -126,7 +150,7 @@ interface RecentRun {
               </li>
             }
           </ol>
-          @if (run.error) { <div class="alert alert-error mt-3" dir="auto">{{ run.error }}</div> }
+          @if (run.error && paused()?.id !== run.run_id) { <div class="alert alert-error mt-3" dir="auto">{{ reasonText(run.reason_code, run.reason_params, run.error) }}</div> }
         </section>
       }
     }
@@ -166,7 +190,14 @@ export class LivePage {
   /** Home's "More schedule options" link lands here with #schedule: open the block and scroll to it. */
   protected readonly openSchedule = inject(ActivatedRoute).snapshot.fragment === 'schedule';
   protected readonly applyLive = signal(false);
-  protected readonly chosen = signal(new Set<Stage>(SEARCH_STAGES)); // the default Start is the search; apply is Advanced
+  protected readonly chosen = signal(rememberedStages()); // the default Start is the search; apply is Advanced
+  /** The Start button says what it will do. */
+  protected readonly startLabel = computed(() => {
+    const kind = runKind([...this.chosen()]);
+    return kind === 'apply' ? 'live.start.apply' : kind === 'mixed' ? 'live.start.mixed' : 'smart.find';
+  });
+  /** A run was refused for want of LibreOffice (409 + code): the offer shows instead of an error. */
+  protected readonly needsLibreOffice = signal(false);
   protected readonly fresh = signal(false);
   protected readonly busy = signal(false);
   protected readonly error = signal('');
@@ -193,7 +224,7 @@ export class LivePage {
     });
     effect(() => {
       this.live.changed();
-      this.api.get<{ recent: RecentRun[] }>('/runs').then((r) => this.paused.set(r.recent.find((x) => x.status === 'paused') ?? null));
+      this.api.get<{ recent: RecentRun[] }>('/runs').then((r) => this.paused.set(r.recent.find((x) => x.status === 'paused') ?? null)).catch(() => undefined);
     });
   }
 
@@ -260,17 +291,45 @@ export class LivePage {
     this.chosen.update((set) => {
       const next = new Set(set);
       if (!next.delete(s)) next.add(s);
+      try {
+        localStorage.setItem(STAGES_KEY, JSON.stringify([...next]));
+      } catch {
+        // the choice then lasts until the tab closes
+      }
       return next;
     });
+  }
+
+  protected kindOf = (run: RunState): 'search' | 'apply' | 'mixed' => runKind(run.stages);
+
+  /** "Search 3" / "Applying 4" / "Search and apply 5". */
+  protected runTitle(kind: 'search' | 'apply' | 'mixed', id: number | null): string {
+    return this.i18n.t('live.runTitle.' + kind, { id: this.num(id) });
+  }
+
+  /** Why a run stopped or paused, in the UI language; the server's English text when it sent no code we know. */
+  protected reasonText(code: string | null | undefined, params: Record<string, unknown> | undefined, fallback: string): string {
+    if (!code) return fallback;
+    const p = { ...params };
+    let key = code;
+    if (code === 'ai_usage_limit') {
+      p['provider'] = this.i18n.provider(String(p['provider'] ?? ''));
+      const until = dayOf(typeof p['until'] === 'string' ? p['until'] : null);
+      if (until) p['until'] = fmtDate(this.loc(), until, 'date');
+      else key = 'ai_usage_limit.noDate';
+    }
+    return this.i18n.msg({ message: fallback, code: key, params: p }, 'run.reason.');
   }
 
   async start(): Promise<void> {
     this.busy.set(true);
     this.error.set('');
+    this.needsLibreOffice.set(false);
     try {
       await this.api.post('/runs', { stages: [...this.chosen()], new: this.fresh() });
     } catch (e) {
-      this.error.set((e as Error).message);
+      if (e instanceof ApiError && e.code === 'needs_libreoffice') this.needsLibreOffice.set(true);
+      else this.error.set(e instanceof ApiError && e.code === 'needs_tectonic' ? this.i18n.t('run.reason.needs_tectonic') : (e as Error).message);
     } finally {
       this.busy.set(false);
     }
@@ -280,12 +339,13 @@ export class LivePage {
     await this.api.post('/runs/cancel');
   }
 
-  private stageState(s: Stage): 'done' | 'failed' | 'running' | 'waiting' | 'notRun' | '' {
+  private stageState(s: Stage): 'done' | 'failed' | 'paused' | 'running' | 'waiting' | 'notRun' | '' {
     const run = this.live.run();
     if (!run) return '';
     const last = [...this.live.events()].reverse().find((e) => e.type === 'stage' && e.stage === s);
     if (run.results[s]) return 'done';
     if (last?.status === 'failed') return 'failed';
+    if (last?.status === 'paused') return 'paused';
     if (run.running && run.stage === s) return 'running';
     return run.running ? 'waiting' : 'notRun';
   }
@@ -296,7 +356,7 @@ export class LivePage {
   }
 
   stageClass(s: Stage): string {
-    const colours: Record<string, string> = { done: 'text-emerald-600', failed: 'text-rose-600', running: 'text-brand-600' };
+    const colours: Record<string, string> = { done: 'text-emerald-600', failed: 'text-rose-600', paused: 'text-amber-700 dark:text-amber-400', running: 'text-brand-600' };
     return colours[this.stageState(s)] ?? 'text-slate-400';
   }
 
@@ -331,12 +391,14 @@ export class LivePage {
   }
 
   describe(e: LiveEvent): string {
-    if (e.type === 'log') return e.message ?? '';
+    if (e.type === 'log') return e.code ? this.i18n.msg({ message: e.message ?? '', code: e.code, params: e.params }, 'log.') : (e.message ?? '');
     const status = labelOr(this.i18n, 'live.status.', e.status ?? '');
     if (e.type === 'stage') {
-      return this.i18n.t(e.error ? 'live.event.stageErr' : 'live.event.stage', { stage: this.label(e.stage!), status, error: e.error ?? '' });
+      const error = e.error ? this.reasonText(e.code, e.params, e.error) : '';
+      return this.i18n.t(e.error ? 'live.event.stageErr' : 'live.event.stage', { stage: this.label(e.stage!), status, error });
     }
-    return this.i18n.t(e.error ? 'live.event.runErr' : 'live.event.run', { status, error: e.error ?? '' });
+    const error = e.error ? this.reasonText(e.reason_code, e.reason_params, e.error) : '';
+    return this.i18n.t(e.error ? 'live.event.runErr' : 'live.event.run', { status, error });
   }
 
   eventClass(e: LiveEvent): string {

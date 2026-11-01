@@ -2,6 +2,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { Component, effect, inject, OnInit, signal, untracked } from '@angular/core';
 import { Api } from '../../api';
 import { Countries } from '../../components/countries';
+import { LibreOfficeCard } from '../../components/libreoffice-card';
 import { PhoneInput } from '../../components/phone-input';
 import { PlacePick, PlacePicker } from '../../components/place-picker';
 import { TagInput } from '../../components/tag-input';
@@ -17,7 +18,7 @@ type Row = { key: string; id: string; label: string; type?: string; dir?: 'ltr';
 /** Settings > Profile & CV. The CV upload is an action (not autosave); everything else saves as you leave the field. */
 @Component({
   selector: 'app-settings-profile',
-  imports: [Field, NgTemplateOutlet, TPipe, TagInput, PlacePicker, PhoneInput],
+  imports: [Field, LibreOfficeCard, NgTemplateOutlet, TPipe, TagInput, PlacePicker, PhoneInput],
   template: `
     <div class="space-y-6">
       <section class="card space-y-4">
@@ -46,10 +47,10 @@ type Row = { key: string; id: string; label: string; type?: string; dir?: 'ltr';
         }
         @if (store.profile.cv_source_format === 'tex') {
           @if (store.profile.cv_renderer_ok === false) {
-            <div class="alert alert-error">{{ 'setup.cv.tectonicA' | t }}<a href="https://tectonic-typesetting.github.io" target="_blank" rel="noopener">Tectonic</a>{{ 'setup.cv.tectonicB' | t }}<code dir="ltr">linkit doctor</code>{{ 'setup.cv.tectonicC' | t }}</div>
+            <div class="alert alert-warn">{{ 'setup.cv.tectonicA' | t }}<a href="https://tectonic-typesetting.github.io" target="_blank" rel="noopener">Tectonic</a>{{ 'setup.cv.tectonicB' | t }}</div>
           }
         } @else if (status() && !status()!.libreoffice) {
-          <div class="alert alert-error">{{ 'setup.cv.noLibreA' | t }}<code dir="ltr">linkit doctor</code>{{ 'setup.cv.noLibreB' | t }}</div>
+          <app-libreoffice-card />
         }
         @if (segments().length) {
           <details class="text-sm">

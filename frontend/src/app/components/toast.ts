@@ -14,6 +14,9 @@ import { Component, DestroyRef, inject, input, output } from '@angular/core';
       @if (action()) {
         <button type="button" class="rounded px-2 py-0.5 font-semibold underline max-sm:min-h-10 max-sm:px-3 hover:bg-white/10 dark:hover:bg-slate-900/10" (click)="act.emit()">{{ action() }}</button>
       }
+      @if (action2()) {
+        <button type="button" class="rounded px-2 py-0.5 font-semibold underline max-sm:min-h-10 max-sm:px-3 hover:bg-white/10 dark:hover:bg-slate-900/10" (click)="act2.emit()">{{ action2() }}</button>
+      }
     </div>
   `,
 })
@@ -26,4 +29,7 @@ export class Toast {
   readonly text = input.required<string>();
   readonly action = input('');
   readonly act = output<void>();
+  /** An optional second button ("Apply now"). */
+  readonly action2 = input('');
+  readonly act2 = output<void>();
 }
