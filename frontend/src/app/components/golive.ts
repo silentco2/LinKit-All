@@ -4,8 +4,9 @@ import { Api } from '../api';
 import { I18n, TPipe } from '../i18n';
 import { SettingsStore } from '../pages/settings/store';
 import { Shell } from '../shell';
-import { GoLive, SearchConfig } from '../types';
+import { GoLive, JobDetail, SearchConfig, Tailoring } from '../types';
 import { LibreOffice, LibreOfficeCard } from './libreoffice-card';
+import { PatchDiff } from './patch-diff';
 import { Privacy } from './privacy';
 
 /** One checklist line as the user sees it: its real state, its words and the page that fixes it. */
@@ -24,7 +25,7 @@ interface Row {
  */
 @Component({
   selector: 'app-golive',
-  imports: [LibreOfficeCard, Privacy, RouterLink, TPipe],
+  imports: [LibreOfficeCard, PatchDiff, Privacy, RouterLink, TPipe],
   template: `
     @if (error()) { <div class="alert alert-error mb-3" role="alert" dir="auto">{{ error() }}</div> }
     @if (data(); as d) {
@@ -50,9 +51,28 @@ interface Row {
               </li>
             }
           </ul>
-          @if (d.tailored_example; as ex) {
-            <p class="text-sm"><a [routerLink]="['/jobs']" [queryParams]="{ job: ex.job_id }">{{ 'golive.seeTailored' | t }}</a></p>
-          }
+          <section class="space-y-2" aria-labelledby="golive-diff-title">
+            <h3 id="golive-diff-title" class="text-sm font-semibold">{{ 'golive.diff.title' | t }}</h3>
+            @if (d.tailored_example; as ex) {
+              <p class="text-xs text-slate-500" dir="auto">{{ 'golive.diff.job' | t: { title: ex.title, company: ex.company } }}</p>
+              @if (diffError()) {
+                <p class="text-sm text-slate-600 dark:text-slate-400">{{ 'golive.diff.error' | t }}</p>
+              } @else if (diff(); as tl) {
+                @if (!tl.patches.length) { <p class="text-sm text-slate-600 dark:text-slate-400">{{ 'detail.tailor.unchanged' | t }}</p> }
+                <ul class="space-y-2">
+                  @for (p of shownPatches(tl); track $index) { <li><app-patch-diff [patch]="p" /></li> }
+                </ul>
+                @if (tl.patches.length > PREVIEW && !allPatches()) {
+                  <button type="button" class="btn" (click)="allPatches.set(true)">{{ 'golive.diff.all' | t }}</button>
+                }
+              } @else {
+                <p class="text-sm text-slate-500">{{ 'common.loading' | t }}</p>
+              }
+              <p class="text-sm"><a [routerLink]="['/jobs']" [queryParams]="{ job: ex.job_id }">{{ 'golive.seeTailored' | t }}</a></p>
+            } @else {
+              <p class="text-sm text-slate-600 dark:text-slate-400">{{ (tailoring(d).mode === 'original' ? 'golive.diff.original' : 'golive.diff.none') | t }}</p>
+            }
+          </section>
 
           <ul class="space-y-1.5 text-sm" [attr.aria-label]="'golive.checklist' | t">
             @for (r of rows(d); track r.id) {
@@ -132,6 +152,11 @@ export class GoLiveCard implements OnInit {
   protected readonly confirming = signal(false);
   protected readonly busy = signal(false);
   protected readonly on = signal(false);
+  /** The tailored CV of `tailored_example`, for the red-line under the screenshots. */
+  protected readonly diff = signal<Tailoring | null>(null);
+  protected readonly diffError = signal(false);
+  protected readonly allPatches = signal(false);
+  protected readonly PREVIEW = 5;
   /** The screenshot open in the lightbox. */
   protected readonly shot = signal<{ src: string; alt: string } | null>(null);
   private readonly box = viewChild<ElementRef<HTMLDialogElement>>('box');
@@ -152,9 +177,23 @@ export class GoLiveCard implements OnInit {
       const d = await this.api.get<GoLive>('/golive');
       this.data.set(d);
       this.on.set(d.live);
+      if (d.tailored_example) void this.loadDiff(d.tailored_example.job_id);
     } catch (e) {
       this.error.set((e as Error).message);
     }
+  }
+
+  private async loadDiff(id: number): Promise<void> {
+    try {
+      this.diff.set((await this.api.get<JobDetail>(`/jobs/${id}`)).tailoring);
+      if (!this.diff()) this.diffError.set(true);
+    } catch {
+      this.diffError.set(true);
+    }
+  }
+
+  protected shownPatches(t: Tailoring) {
+    return this.allPatches() ? t.patches : t.patches.slice(0, this.PREVIEW);
   }
 
   /** The checklist as the user sees it: what is true now, and where to fix what is not. */

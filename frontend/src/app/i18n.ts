@@ -89,6 +89,11 @@ export class I18n {
     return plural && typeof params['n'] === 'number' ? this.plural(key, params['n'], params) : this.t(key, params);
   }
 
+  /** Is there a translation for `key` (English is the complete dictionary)? */
+  has(key: string): boolean {
+    return key in en;
+  }
+
   /** The AI behind a provider key, as a person would say it ("ChatGPT (Codex)", "Claude", "your AI"). */
   provider(key: string | null | undefined): string {
     const k = `ai.name.${key ?? ''}`;

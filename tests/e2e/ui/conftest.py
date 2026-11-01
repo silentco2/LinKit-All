@@ -67,6 +67,8 @@ def fake_local_ai(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     from linkit_all import providers
 
     class Checked:
+        version = None  # the check reports the CLI version (None for a local server)
+
         async def check(self) -> str:
             return "Fake local model answered."
 

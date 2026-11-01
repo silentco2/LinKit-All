@@ -15,8 +15,21 @@ export type AiState = {
   kind?: 'usage_limit' | 'error';
   provider?: string;
   until?: string | null;
+  /** A passed test, in plain words: who it connected to, with which model (null = the default one) and the tool's version. */
+  label?: string;
+  model?: string | null;
+  version?: string | null;
 };
-type CheckResult = { ok: boolean; message: string; kind?: 'usage_limit' | 'error'; provider?: string; until?: string | null };
+type CheckResult = {
+  ok: boolean;
+  message: string;
+  kind?: 'usage_limit' | 'error';
+  provider?: string;
+  until?: string | null;
+  provider_label?: string;
+  model?: string | null;
+  version?: string | null;
+};
 
 /** The server's message once, without vendor links. */
 const clean = (msg: string): string => msg.replace(/https?:\/\/\S+/g, '').replace(/\s{2,}/g, ' ').trim();
@@ -81,7 +94,9 @@ const clean = (msg: string): string => msg.replace(/https?:\/\/\S+/g, '').replac
         @case ('ok') {
           <div class="alert alert-ok" role="status">
             <p><strong>{{ 'welcome.ai.ok' | t }}</strong></p>
-            @if (ai().msg) { <p class="mt-1" dir="auto">{{ ai().msg }}</p> }
+            <p class="mt-1" dir="auto" [attr.title]="ai().version ? ('ai.version' | t: { v: ai().version ?? '' }) : null">
+              {{ 'ai.connected' | t: { provider: ai().label ?? '' } }}@if (ai().model) { · <bdi dir="ltr">{{ ai().model }}</bdi> }
+            </p>
           </div>
         }
         @case ('fail') {
@@ -280,7 +295,9 @@ export class AiConnect {
       }
       await (this.persist() ?? this.saveToSearch)(body);
       if (id !== this.testId) return;
-      this.setAi({ state: 'ok', msg: r.message });
+      // never the raw server text ("claude_cli (default model) ok, 2.1.305"): the name, the model and (as a tooltip) the version
+      const model = 'model' in r ? (r.model ?? null) : body.model;
+      this.setAi({ state: 'ok', msg: '', label: r.provider_label || this.i18n.provider(mode === 'local' ? 'local' : mode), model, version: r.version ?? null });
       this.connected.emit();
     } catch (e) {
       if (id === this.testId) this.setAi({ state: 'fail', msg: clean((e as Error).message), kind: 'error' });

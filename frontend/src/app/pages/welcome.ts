@@ -67,7 +67,12 @@ const SRC_TEXT: Record<string, string> = {
   template: `
     <div class="mx-auto max-w-3xl">
       <div class="flex flex-wrap items-center justify-between gap-3">
-        <div class="text-lg font-bold text-slate-900 dark:text-white">LinKit <span class="text-brand-600">All</span></div>
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <div class="text-lg font-bold text-slate-900 dark:text-white">LinKit <span class="text-brand-600">All</span></div>
+          @if (status(); as st) {
+            <span class="badge" [class]="st.apply_live ? 'tier-mid' : 'tier-low'" [title]="(st.apply_live ? 'shell.liveTitle' : 'shell.dryTitle') | t">{{ (st.apply_live ? 'shell.live' : 'welcome.practicePill') | t }}</span>
+          }
+        </div>
         <div class="flex items-center gap-2">
           <div class="flex items-center gap-1" role="group" [attr.aria-label]="'shell.language' | t">
             <button type="button" class="btn !px-2 !py-1 text-xs" lang="en" dir="ltr" [class.btn-primary]="i18n.lang() === 'en'" [attr.aria-pressed]="i18n.lang() === 'en'" (click)="setLang('en')">English</button>

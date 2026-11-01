@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, computed, effect, ElementRef, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Api, ApiError } from '../api';
@@ -48,7 +49,7 @@ function rememberedStages(): Set<Stage> {
 
 @Component({
   selector: 'app-live',
-  imports: [DtPipe, LibreOfficeCard, RouterLink, TPipe],
+  imports: [DtPipe, LibreOfficeCard, NgTemplateOutlet, RouterLink, TPipe],
   template: `
     <section class="card space-y-4">
       <div class="flex flex-wrap gap-3">
@@ -75,7 +76,9 @@ function rememberedStages(): Set<Stage> {
       @if (needsLibreOffice()) { <app-libreoffice-card /> }
       @if (paused(); as p) {
         <div class="alert alert-warn space-y-2" role="status">
-          <p><strong>{{ runTitle(p.kind, p.id) }}</strong> {{ 'live.paused.is' | t }} <span dir="auto">{{ reasonText(p.reason_code, p.reason_params, p.pause_reason ?? '') }}</span></p>
+          @let why = plainError(p.reason_code, p.reason_params, p.pause_reason ?? '', null);
+          <p><strong>{{ runTitle(p.kind, p.id) }}</strong> {{ 'live.paused.is' | t }} <span dir="auto">{{ why.text }}</span></p>
+          @if (why.detail) { <ng-container *ngTemplateOutlet="details; context: { $implicit: why.detail }" /> }
           @if (p.reason_code === 'ai_usage_limit') { <p><a [routerLink]="'/settings/ai'">{{ 'run.fix.ai' | t }}</a></p> }
           @if (p.reason_code === 'needs_libreoffice') { <app-libreoffice-card /> }
           <p class="text-xs">{{ 'live.paused.resume' | t }}</p>
@@ -136,7 +139,14 @@ function rememberedStages(): Set<Stage> {
     @if (live.run(); as run) {
       @if (run.run_id) {
         <section class="mt-6">
-          <h2>{{ runTitle(kindOf(run), run.run_id) }} @if (run.running) { <span class="text-sm font-normal text-emerald-600">{{ 'live.running' | t }}</span> }</h2>
+          <h2>{{ runTitle(kindOf(run), run.run_id) }} @if (run.running) { <span class="text-sm font-normal" [class]="run.stopping ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-600'">{{ (run.stopping ? 'live.stopping' : 'live.running') | t }}</span> }</h2>
+          @if (run.running && run.stopping) { <div class="alert alert-warn mt-3" role="status">{{ 'live.stoppingNote' | t }}</div> }
+          @if (endKind(run); as end) {
+            <div class="alert mt-3" [class]="end === 'stopped' ? 'alert-info' : 'alert-ok'" role="status">
+              <p><strong>{{ (end === 'stopped' ? 'live.stopped.title' : 'live.done.title') | t }}</strong></p>
+              <p class="mt-1" dir="auto">{{ endSummary(run, end) }}</p>
+            </div>
+          }
           <ol class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             @for (s of run.stages; track s) {
               <li class="card p-4" [class.ring-2]="run.stage === s && run.running" [class.ring-brand-500]="run.stage === s && run.running">
@@ -150,7 +160,13 @@ function rememberedStages(): Set<Stage> {
               </li>
             }
           </ol>
-          @if (run.error && paused()?.id !== run.run_id) { <div class="alert alert-error mt-3" dir="auto">{{ reasonText(run.reason_code, run.reason_params, run.error) }}</div> }
+          @if (run.error && paused()?.id !== run.run_id) {
+            @let why = plainError(run.reason_code, run.reason_params, run.error, failedStage());
+            <div class="alert alert-error mt-3" role="alert">
+              <p dir="auto">{{ why.text }}</p>
+              @if (why.detail) { <ng-container *ngTemplateOutlet="details; context: { $implicit: why.detail }" /> }
+            </div>
+          }
         </section>
       }
     }
@@ -181,6 +197,13 @@ function rememberedStages(): Set<Stage> {
         }
       </div>
     </section>
+
+    <ng-template #details let-raw>
+      <details class="mt-2 text-xs">
+        <summary class="cursor-pointer font-medium">{{ 'common.details' | t }}</summary>
+        <p class="mt-1 break-words" dir="auto">{{ raw }}</p>
+      </details>
+    </ng-template>
   `,
 })
 export class LivePage {
@@ -390,18 +413,80 @@ export class LivePage {
     }
   }
 
+  /** The error of a stage or run event in plain words; an unknown one is left out here (the banner has it under "Details"). */
+  private eventError(code: string | null | undefined, params: Record<string, unknown> | undefined, raw: string | undefined): string {
+    if (!raw) return '';
+    const why = this.plainError(code, params, raw, null);
+    return why.detail ? '' : why.text;
+  }
+
+  /** "Filling Stripe — Backend Engineer…" / "Filled (practice) ✓ · Stripe — Backend Engineer": one line per job. */
+  private jobLine(e: LiveEvent): string | null {
+    const j = this.live.jobs()[Number(e.params?.['job'])];
+    const isolate = (s: string) => '\u2068' + s + '\u2069'; // names in any script keep their own direction
+    const job = j ? (j.company ? `${isolate(j.company)} — ${isolate(j.title)}` : isolate(j.title)) : this.i18n.t('live.line.thisJob');
+    const key = 'live.line.' + (e.code === 'apply_filling' ? 'filling' : String(e.params?.['status']));
+    return this.i18n.has(key) ? this.i18n.t(key, { job }) : null;
+  }
+
   describe(e: LiveEvent): string {
-    if (e.type === 'log') return e.code ? this.i18n.msg({ message: e.message ?? '', code: e.code, params: e.params }, 'log.') : (e.message ?? '');
+    if (e.type === 'log') {
+      const line = e.code === 'apply_filling' || e.code === 'apply_job' ? this.jobLine(e) : null;
+      if (line) return line;
+      return e.code ? this.i18n.msg({ message: e.message ?? '', code: e.code, params: e.params }, 'log.') : (e.message ?? '');
+    }
     const status = labelOr(this.i18n, 'live.status.', e.status ?? '');
     if (e.type === 'stage') {
-      const error = e.error ? this.reasonText(e.code, e.params, e.error) : '';
-      return this.i18n.t(e.error ? 'live.event.stageErr' : 'live.event.stage', { stage: this.label(e.stage!), status, error });
+      const error = this.eventError(e.code, e.params, e.error);
+      return this.i18n.t(error ? 'live.event.stageErr' : 'live.event.stage', { stage: this.label(e.stage!), status, error });
     }
-    const error = e.error ? this.reasonText(e.reason_code, e.reason_params, e.error) : '';
-    return this.i18n.t(e.error ? 'live.event.runErr' : 'live.event.run', { status, error });
+    const error = this.eventError(e.reason_code, e.reason_params, e.error);
+    return this.i18n.t(error ? 'live.event.runErr' : 'live.event.run', { status, error });
+  }
+
+  /** The stage that failed in this run, for "Something went wrong in ...". */
+  protected failedStage(): Stage | null {
+    const e = [...this.live.events()].reverse().find((x) => x.type === 'stage' && x.status === 'failed');
+    return e?.stage ?? null;
+  }
+
+  /**
+   * Why a run stopped, in plain words. A code we have words for is translated; anything else becomes "Something went
+   * wrong in {stage}." with the raw text kept for a "Details" toggle.
+   */
+  protected plainError(code: string | null | undefined, params: Record<string, unknown> | undefined, raw: string, stage: Stage | null): { text: string; detail: string } {
+    if (code && code !== 'pipeline_error' && this.i18n.has('run.reason.' + code)) return { text: this.reasonText(code, params, raw), detail: '' };
+    return { text: stage ? this.i18n.t('live.err.in', { stage: this.label(stage) }) : this.i18n.t('live.err.generic'), detail: raw };
+  }
+
+  /** How the run ended, once it is not running: a clear end state for "Finished" and for "Stopped". */
+  protected endKind(run: RunState): 'finished' | 'stopped' | null {
+    if (run.running) return null;
+    return run.status === 'finished' ? 'finished' : run.status === 'cancelled' ? 'stopped' : null;
+  }
+
+  protected endSummary(run: RunState, end: 'finished' | 'stopped'): string {
+    if (end === 'finished') {
+      const last = [...run.stages].reverse().find((s) => run.results[s]);
+      return last ? this.summary(last, run.results[last]) : '';
+    }
+    const events = this.live.events();
+    let from = events.length - 1;
+    while (from >= 0 && !(events[from].type === 'run' && events[from].status === 'started')) from--;
+    const jobs = events.slice(from + 1).filter((x) => x.type === 'log' && x.code === 'apply_job').length;
+    const steps = run.stages.filter((s) => run.results[s]).length;
+    return jobs > 0 || (steps === 0 && run.stages.includes('apply') && run.stages.length === 1)
+      ? this.i18n.plural('live.stopped.jobs', jobs)
+      : this.i18n.plural('live.stopped.steps', steps);
   }
 
   eventClass(e: LiveEvent): string {
+    if (e.code === 'apply_job') {
+      const s = String(e.params?.['status']);
+      if (s === 'failed') return 'text-rose-700 dark:text-rose-400';
+      if (s === 'needs_user') return 'text-amber-700 dark:text-amber-400';
+      if (s === 'applied' || s === 'dry_run') return 'text-emerald-700 dark:text-emerald-400';
+    }
     if (e.level === 'WARNING' || e.status === 'failed') return 'text-amber-700 dark:text-amber-400';
     if (e.level === 'ERROR') return 'text-rose-700 dark:text-rose-400';
     if (e.type !== 'log') return 'font-semibold text-slate-900 dark:text-white';

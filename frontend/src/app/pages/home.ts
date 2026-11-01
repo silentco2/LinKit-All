@@ -26,12 +26,19 @@ interface HomeTask {
   title: string;
   /** The LibreOffice offer: the card is the whole row. */
   card?: boolean;
-  /** The go-live task: its title toggles the guided card. */
-  golive?: boolean;
 }
 
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
 const DEFAULT_TIME = '09:00';
+const GOLIVE_SEEN_KEY = 'linkit.golive.seen'; // the "New" badge on the go-live offer: a per-viewer convenience
+
+function goLiveSeen(): boolean {
+  try {
+    return localStorage.getItem(GOLIVE_SEEN_KEY) === '1';
+  } catch {
+    return false; // storage blocked: the badge just shows again
+  }
+}
 
 @Component({
   selector: 'app-home',
@@ -61,6 +68,19 @@ const DEFAULT_TIME = '09:00';
               <p class="hint">{{ ap.message }}</p>
             </div>
           }
+          @if (goLiveOffer()) {
+            <div class="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
+              <div class="flex flex-wrap items-center gap-3">
+                <button type="button" class="btn max-sm:min-h-11" [attr.aria-expanded]="goLiveOpen()" aria-controls="home-golive" (click)="toggleGoLive()">{{ 'golive.offer' | t }}</button>
+                @if (!goLiveSeen()) { <span class="badge tier-high">{{ 'golive.new' | t }}</span> }
+              </div>
+              @if (goLiveOpen()) {
+                <div id="home-golive" class="mt-3 rounded-lg border border-slate-200 p-4 dark:border-slate-700">
+                  <app-golive (enabled)="justOn.set(true)" (cancel)="goLiveOpen.set(false)" />
+                </div>
+              }
+            </div>
+          }
           @if (error()) { <div class="alert alert-error mt-3" role="alert" dir="auto">{{ error() }}</div> }
           @if (needsLibreOffice()) { <div class="mt-3"><app-libreoffice-card /></div> }
         </section>
@@ -72,14 +92,7 @@ const DEFAULT_TIME = '09:00';
           <ul class="mt-3 space-y-3 text-sm">
             @for (task of tasks(); track task.id) {
               <li>
-                @if (task.golive) {
-                  <button type="button" class="font-medium text-brand-700 hover:underline dark:text-brand-300" [attr.aria-expanded]="goLiveOpen()" aria-controls="home-golive" (click)="toggleGoLive()">{{ task.title }}</button>
-                  @if (goLiveOpen()) {
-                    <div id="home-golive" class="mt-3 rounded-lg border border-slate-200 p-4 dark:border-slate-700">
-                      <app-golive (enabled)="justOn.set(true)" (cancel)="goLiveOpen.set(false)" />
-                    </div>
-                  }
-                } @else if (task.card) {
+                @if (task.card) {
                   <app-libreoffice-card />
                 } @else {
                   <div class="font-medium">{{ task.title }}</div>
@@ -155,6 +168,7 @@ export class HomePage {
   protected readonly goLiveOpen = signal(false);
   /** Real applications were turned on from the card: the card stays, showing its "now on" message. */
   protected readonly justOn = signal(false);
+  protected readonly goLiveSeen = signal(goLiveSeen());
 
   /** A schedule made on Activity (some days, or several times) is shown as such, not flattened to one daily time. */
   protected readonly custom = computed(() => {
@@ -239,8 +253,6 @@ export class HomePage {
     const s = this.shell.status();
     if (!s) return [];
     const list: HomeTask[] = [];
-    const goLive = this.goLiveTask();
-    if (goLive) list.push(goLive);
     if (!s.libreoffice) list.push({ id: 'libreoffice', title: '', card: true });
     return list;
   });
@@ -260,12 +272,11 @@ export class HomePage {
 
   protected num = (n: number): string => fmtNum(this.loc(), n);
 
-  /** "Ready to apply for real?" once a practice run filled a form (ux-plan 8.2); the card opens under it. */
-  protected goLiveTask(): HomeTask | null {
-    const live = this.shell.status()?.apply_live;
-    if (!this.justOn() && (live || !this.golive()?.eligible)) return null;
-    return { id: 'golive', title: this.i18n.t('golive.title'), golive: true };
-  }
+  /** "Ready to apply for real?" in the Next card once a practice run filled a form (ux-plan 8.2); the card opens under it. */
+  protected readonly goLiveOffer = computed(() => {
+    const s = this.shell.status();
+    return !!s && (this.justOn() || (!s.apply_live && (s.practiced > 0 || !!this.golive()?.eligible)));
+  });
 
   /** How many of the jobs ready to apply to are strong matches; the rest were approved by the user. */
   private async loadMix(ready: number): Promise<void> {
@@ -281,6 +292,14 @@ export class HomePage {
   /** Opening the guided card scrolls it into view: it can be taller than the screen. */
   protected toggleGoLive(): void {
     this.goLiveOpen.set(!this.goLiveOpen());
+    if (!this.goLiveSeen()) {
+      this.goLiveSeen.set(true);
+      try {
+        localStorage.setItem(GOLIVE_SEEN_KEY, '1');
+      } catch {
+        // the badge shows again next visit
+      }
+    }
     if (this.goLiveOpen()) setTimeout(() => document.getElementById('home-golive')?.scrollIntoView({ block: 'start' }));
   }
 

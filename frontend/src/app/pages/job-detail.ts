@@ -1,12 +1,12 @@
-import { NgTemplateOutlet } from '@angular/common';
 import { Component, computed, effect, inject, input, OnDestroy, output, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Api } from '../api';
 import { I18n, MsgPipe, SourcePipe, TPipe } from '../i18n';
 import { DtPipe, fmtNum, labelOr, localeOf } from '../locale';
+import { PatchDiff } from '../components/patch-diff';
 import { Toast } from '../components/toast';
 import { Shell } from '../shell';
-import { isLeftOut, JobDetail, reasonSetting, reasonText, SCAM_MEDIUM, TailorPatch, TrustVerdict } from '../types';
+import { isLeftOut, JobDetail, reasonSetting, reasonText, SCAM_MEDIUM, TrustVerdict } from '../types';
 import { SettingsStore } from './settings/store';
 
 interface Filled { value: unknown; source: string }
@@ -15,37 +15,12 @@ type Detail = Omit<JobDetail, 'events'> & {
   events: { id: number; at: string; to: string; message: string; code?: string | null; params?: Record<string, unknown> | null; screenshots: number }[];
 };
 
-interface DiffOp { kind: 'same' | 'del' | 'ins'; word: string }
-
-/** Word-level diff by longest common subsequence; CV segments are short, so O(n*m) is fine. */
-function wordDiff(a: string, b: string): DiffOp[] {
-  const x = a.split(/\s+/).filter(Boolean);
-  const y = b.split(/\s+/).filter(Boolean);
-  const lcs = Array.from({ length: x.length + 1 }, () => new Array<number>(y.length + 1).fill(0));
-  for (let i = x.length - 1; i >= 0; i--) {
-    for (let j = y.length - 1; j >= 0; j--) {
-      lcs[i][j] = x[i] === y[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
-    }
-  }
-  const ops: DiffOp[] = [];
-  let i = 0;
-  let j = 0;
-  while (i < x.length || j < y.length) {
-    if (i < x.length && j < y.length && x[i] === y[j]) {
-      ops.push({ kind: 'same', word: x[i++] });
-      j++;
-    } else if (i < x.length && (j === y.length || lcs[i + 1][j] >= lcs[i][j + 1])) ops.push({ kind: 'del', word: x[i++] });
-    else ops.push({ kind: 'ins', word: y[j++] });  // deletions first, so a replaced word reads old-then-new
-  }
-  return ops;
-}
-
 const APPROVABLE = ['awaiting_review', 'below_threshold'];
 const FINAL = ['applied', 'skipped', 'filtered_out'];
 
 @Component({
   selector: 'app-job-detail',
-  imports: [DtPipe, NgTemplateOutlet, MsgPipe, RouterLink, SourcePipe, Toast, TPipe],
+  imports: [DtPipe, MsgPipe, PatchDiff, RouterLink, SourcePipe, Toast, TPipe],
   template: `
     @if (error()) {
       <div class="alert alert-error" dir="auto">{{ error() }}</div>
@@ -186,7 +161,7 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
             @if (t.status === 'unchanged') { <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">{{ 'detail.tailor.unchanged' | t }}</p> }
             <ul class="mt-2 space-y-3">
               @for (p of t.patches; track $index) {
-                <li><ng-container [ngTemplateOutlet]="patch" [ngTemplateOutletContext]="{ $implicit: p }" /></li>
+                <li><app-patch-diff [patch]="p" /></li>
               }
             </ul>
             @if (t.rejected.length) {
@@ -194,7 +169,7 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
                 <summary class="cursor-pointer text-sm font-medium">{{ 'detail.tailor.rejected' | t: { n: num(t.rejected.length) } }}</summary>
                 <ul class="mt-2 space-y-3">
                   @for (p of t.rejected; track $index) {
-                    <li><ng-container [ngTemplateOutlet]="patch" [ngTemplateOutletContext]="{ $implicit: p }" /></li>
+                    <li><app-patch-diff [patch]="p" /></li>
                   }
                 </ul>
               </details>
@@ -253,21 +228,6 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
     }
 
     @if (fixNote(); as note) { <app-toast [text]="note" [action]="'review.undo' | t" (act)="undoFix()" /> }
-
-    <ng-template #patch let-p>
-      <div class="rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-700">
-        <p class="leading-relaxed" dir="auto">
-          @for (op of diff(p); track $index) {
-            @switch (op.kind) {
-              @case ('del') { <del class="rounded line-through bg-rose-50 px-0.5 text-rose-700 dark:bg-rose-950 dark:text-rose-300">{{ op.word }}</del>{{ ' ' }} }
-              @case ('ins') { <ins class="rounded underline bg-emerald-50 px-0.5 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">{{ op.word }}</ins>{{ ' ' }} }
-              @default { {{ op.word + ' ' }} }
-            }
-          }
-        </p>
-        @if (p.reason) { <p class="mt-1 text-xs text-slate-500" dir="auto">{{ p.reason }}</p> }
-      </div>
-    </ng-template>
   `,
 })
 export class JobDetailPanel implements OnDestroy {
@@ -296,12 +256,6 @@ export class JobDetailPanel implements OnDestroy {
     });
   }
 
-  private readonly diffs = new WeakMap<TailorPatch, DiffOp[]>();
-  protected diff(p: TailorPatch): DiffOp[] {
-    let ops = this.diffs.get(p);
-    if (!ops) this.diffs.set(p, (ops = wordDiff(p.old_text ?? '', p.new_text ?? '')));
-    return ops;
-  }
   protected tailorClass = (s: string): string => ({ tailored: 'tier-high', rolled_back: 'tier-mid' })[s] ?? 'tier-low';
 
   protected verdict = (tr: NonNullable<Detail['trust']>, kind: 'scam' | 'ghost'): TrustVerdict => tr[kind] ?? { score: 0, band: 'low', signals: [] };

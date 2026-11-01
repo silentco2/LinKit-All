@@ -1,5 +1,6 @@
-import { Injectable, signal } from '@angular/core';
-import { LiveEvent, LiveShot, RunState } from './types';
+import { inject, Injectable, signal } from '@angular/core';
+import { Api } from './api';
+import { JobDetail, LiveEvent, LiveShot, RunState } from './types';
 
 /** WebSocket /api/events with auto-reconnect; keeps recent events and the run state. */
 @Injectable({ providedIn: 'root' })
@@ -11,6 +12,10 @@ export class Live {
   readonly connected = signal(false);
   /** Bumped whenever a stage or run ends, so pages can reload their data. */
   readonly changed = signal(0);
+  /** Titles of the jobs an apply run works on, so its log can say "Stripe — Backend Engineer" and not a job number. */
+  readonly jobs = signal<Record<number, { title: string; company: string }>>({});
+  private readonly api = inject(Api);
+  private frameJob: number | null = null;
 
   constructor() {
     this.connect();
@@ -22,6 +27,7 @@ export class Live {
     socket.onopen = () => {
       this.connected.set(true);
       this.events.set([]); // the server replays its recent history
+      this.frameJob = null;
       this.run.set(null); // a restarted server replays nothing: take the run state from the replay or /status
       this.changed.update((n) => n + 1);
     };
@@ -34,14 +40,22 @@ export class Live {
 
   private handle(event: LiveEvent & Partial<RunState>): void {
     if (event.type === 'live_shot') { // every ~3 s: shown in the browser view, not in the activity log
-      this.shot.set(event as LiveShot);
+      const shot = event as LiveShot;
+      this.shot.set(shot);
+      this.jobs.update((m) => ({ ...m, [shot.job_id]: { title: shot.title, company: shot.company } }));
+      if (shot.job_id !== this.frameJob) { // the browser moved on to another job: say so once ("Filling ...")
+        this.frameJob = shot.job_id;
+        this.add({ at: event.at, type: 'log', level: 'INFO', code: 'apply_filling', params: { job: shot.job_id } });
+      }
       return;
     }
-    this.events.update((list) => [...list.slice(-499), event]);
+    if (event.type === 'log' && event.code === 'apply_job') void this.nameJob(Number(event.params?.['job']));
+    this.add(event);
     if (event.type === 'run') {
       const { running = false, stopping = false, run_id = null, stages = [], stage = null, started_at = null, error = null, results = {}, reason_code = null, reason_params = {}, status } = event;
       this.run.set({ running, stopping: running && stopping, run_id, stages, stage, started_at, error, reason_code, reason_params, status, results });
       if (!running) this.shot.set(null);
+      if (event.status === 'started' || !running) this.frameJob = null;
     } else if (event.type === 'stage') {
       this.run.update((r) =>
         r && {
@@ -52,5 +66,20 @@ export class Live {
       );
     }
     if (event.type !== 'log' && event.status !== 'started') this.changed.update((n) => n + 1);
+  }
+
+  private add(event: LiveEvent): void {
+    this.events.update((list) => [...list.slice(-499), event]);
+  }
+
+  /** A job that finished without a browser frame (closed, skipped) has no title yet: ask once. */
+  private async nameJob(id: number): Promise<void> {
+    if (!id || this.jobs()[id]) return;
+    try {
+      const j = await this.api.get<JobDetail>(`/jobs/${id}`);
+      this.jobs.update((m) => ({ ...m, [id]: { title: j.title, company: j.company } }));
+    } catch {
+      // the line then says "a job"
+    }
   }
 }
