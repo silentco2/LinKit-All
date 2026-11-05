@@ -3,11 +3,13 @@ import { Component, computed, effect, inject, signal, viewChildren } from '@angu
 import { Api } from '../api';
 import { AllClear } from '../components/all-clear';
 import { GmailConnect, GmailConnected } from '../components/gmail-connect';
+import { MenuItem, MoreMenu } from '../components/more-menu';
 import { Toast } from '../components/toast';
 import { VaultGate, VaultReady } from '../components/vault-gate';
 import { I18n, MsgPipe, TPipe } from '../i18n';
 import { Live } from '../live';
 import { fmtNum, labelOr, localeOf } from '../locale';
+import { Shell } from '../shell';
 import { ActionDecision, ActionGroup, ActionItem, ActionKind, ActionQuestion, AnswerValue, Remember, Status } from '../types';
 
 /** Kinds where signing in / solving it by hand in a real Chrome window can unblock the job. */
@@ -17,6 +19,18 @@ const BROWSER_KINDS: ActionKind[] = ['captcha', 'login_issue', 'two_factor', 'va
 const VAULT_CODES = ['needs_vault', 'vault_locked'];
 const EMAIL_CODES = ['needs_email', 'email_not_connected'];
 const EEO_KEYS = ['eeo_gender', 'eeo_race', 'eeo_hispanic', 'eeo_veteran', 'eeo_disability'];
+const FACT_KEYS = ['military_status', 'nationality', 'marital_status', 'date_of_birth'];
+// what a form option says -> the value the profile stores; null = not recognised, so it is not saved
+const FACT_VALUES: Record<string, [string, RegExp][]> = {
+  military_status: [
+    ['not_applicable', /not applicable|n\/a|لا ينطبق/i], ['completed', /(?<!not )(?<!un)complet|served|fulfil|أديت|أنهيت/i], ['postponed', /(?<!not )postpon|defer|مؤجل/i],
+    ['exempted', /(?<!not )(?<!non-)exempt|معفى|معفي/i], ['decline', /prefer not|decline|rather not|أفضل عدم/i],
+  ],
+  marital_status: [
+    ['single', /single|unmarried|أعزب|عزباء/i], ['married', /(?<!not )(?<!un)married|متزوج/i], ['divorced', /(?<!not )divorc|مطلق/i], ['widowed', /(?<!not )widow|أرمل/i],
+    ['decline', /prefer not|decline|rather not|أفضل عدم/i],
+  ],
+};
 const EEO_DECLINE: Remember = Object.fromEntries(EEO_KEYS.map((k) => [k, 'decline']));
 const ACK_CATEGORIES = ['acknowledge_privacy', 'acknowledge_legal'];
 const DECLINE = /decline|prefer not|do(?:n'?t| not) wish|not to (?:say|answer|disclose|identify|specify)|choose not|rather not/i;
@@ -40,7 +54,7 @@ const SOURCES: Record<string, string> = {
 
 @Component({
   selector: 'app-actions',
-  imports: [AllClear, GmailConnect, MsgPipe, NgTemplateOutlet, Toast, TPipe, VaultGate],
+  imports: [AllClear, GmailConnect, MoreMenu, MsgPipe, NgTemplateOutlet, Toast, TPipe, VaultGate],
   template: `
     <p class="text-sm text-slate-500">{{ 'actions.intro' | t }}</p>
 
@@ -92,9 +106,11 @@ const SOURCES: Record<string, string> = {
                  (input)="set(k, q.label, val($event))">
         }
       }
-      @if (q.reason) { <p class="hint" dir="auto">{{ q.reason }}</p> }
+      @if (q.reason) { <p class="hint" dir="auto">{{ why(q) }}</p> }
       @if (q.sensitive || q.category) {
         <p class="hint !text-amber-700 dark:!text-amber-400">{{ 'actions.sensitive' | t }}</p>
+      } @else {
+        <p class="hint">{{ 'fin.remembers' | t }}</p>
       }
     </ng-template>
 
@@ -108,6 +124,11 @@ const SOURCES: Record<string, string> = {
       @if (isRelocate(q)) {
         <label class="mt-2 flex items-center gap-2 text-sm">
           <input type="checkbox" [checked]="kept(k, q)" (change)="keep(k, q, checked($event))"> {{ 'fin.keepRelocate' | t }}
+        </label>
+      }
+      @if (isProfileFact(q)) {
+        <label class="mt-2 flex items-center gap-2 text-sm">
+          <input type="checkbox" [checked]="kept(k, q)" (change)="keep(k, q, checked($event))"> {{ 'fin.keepFact' | t }}
         </label>
       }
       @if (isEeo(q) && declineOf(q); as d) {
@@ -145,14 +166,14 @@ const SOURCES: Record<string, string> = {
 
       @for (c of groupCards(); track c.key) {
         <section class="card" [attr.aria-label]="c.g.label">
-          <h2><span>{{ 'fin.group.asks' | t: { n: num(c.g.count) } }}</span>&ngsp;<bdi dir="auto" class="font-semibold">{{ c.g.label }}</bdi></h2>
+          <h2><span>{{ plural('fin.group.asks', c.g.count) }}</span>&ngsp;<bdi dir="auto" class="font-semibold">{{ c.g.label }}</bdi></h2>
           @if (companies(c.g); as co) { <p class="mt-1 text-sm text-slate-500" dir="auto">{{ co }}</p> }
           <div class="mt-4">
             <ng-container *ngTemplateOutlet="ctl; context: { k: c.key, q: c.q, i: 0 }" />
             <ng-container *ngTemplateOutlet="extras; context: { k: c.key, q: c.q, a: null, c: c }" />
           </div>
           @if (errors()[c.key]; as err) { <div class="alert alert-error mt-4" role="alert" dir="auto">{{ err }}</div> }
-          <div class="mt-4">
+          <footer class="mt-5 border-t border-slate-100 pt-4 dark:border-slate-800">
             @if (ackOf(c.q); as ack) {
               <p class="mb-2 text-sm font-medium">{{ 'fin.ack.' + ack | t }}</p>
               <div class="flex flex-wrap gap-3">
@@ -165,7 +186,7 @@ const SOURCES: Record<string, string> = {
             } @else {
               <button type="button" class="btn btn-primary" [disabled]="busy() || !hasValue(c.key, c.g.label)" (click)="answerGroup(c)">{{ 'fin.group.answerAll' | t: { n: num(c.g.count) } }}</button>
             }
-          </div>
+          </footer>
         </section>
       }
 
@@ -177,7 +198,7 @@ const SOURCES: Record<string, string> = {
               <div class="truncate text-sm text-slate-500" dir="auto"><bdi>{{ a.job.company }}</bdi> · <bdi>{{ a.job.location }}</bdi></div>
             </div>
             <div class="flex shrink-0 flex-col items-end gap-1">
-              @if (a.job.score) { <span class="text-xs text-slate-500">{{ 'actions.score' | t: { n: num(a.job.score) } }}</span> }
+              @if (a.job.score) { <span class="text-xs text-slate-500"><bdi>{{ 'actions.score' | t: { n: a.job.score, out: 10 } }}</bdi></span> }
               <span class="text-xs text-slate-400">{{ when(a.created_at) }}</span>
             </div>
           </header>
@@ -187,17 +208,6 @@ const SOURCES: Record<string, string> = {
           @if (a.message) { <p class="mt-1 text-sm text-slate-700 dark:text-slate-300" dir="auto">{{ a | msg }}</p> }
           @if (hasHelp(a.kind)) { <div class="alert alert-info mt-3">{{ 'actions.help.' + a.kind | t }}</div> }
 
-          @if (a.screenshots) {
-            <div class="mt-4 flex flex-wrap gap-3">
-              @for (n of range(a.screenshots); track n) {
-                <a [href]="shot(a.id, n)" target="_blank" rel="noopener">
-                  <img [src]="shot(a.id, n)" [alt]="'actions.screenshot' | t: { n: n + 1 }"
-                       class="max-h-64 rounded-lg border border-slate-200 dark:border-slate-700">
-                </a>
-              }
-            </div>
-          }
-
           @if (a.kind === 'unknown_question') {
             <div class="alert alert-info mt-4">{{ 'actions.unknown.info' | t }}</div>
             <div class="mt-4 space-y-5">
@@ -206,20 +216,6 @@ const SOURCES: Record<string, string> = {
                   <ng-container *ngTemplateOutlet="ctl; context: { k: a.id, q: q, i: i }" />
                   <ng-container *ngTemplateOutlet="extras; context: { k: a.id, q: q, a: a, c: null }" />
                 </div>
-              }
-            </div>
-            <div class="mt-4">
-              @if (ackQuestion(a); as ack) {
-                <p class="mb-2 text-sm font-medium">{{ 'fin.ack.' + ack.category | t }}</p>
-                <div class="flex flex-wrap gap-3">
-                  <button type="button" class="btn btn-primary" [disabled]="busy()" (click)="send(a, 'answer')">{{ 'fin.ack.once' | t }}</button>
-                  @if (acceptValue(ack) !== null) {
-                    <button type="button" class="btn" [disabled]="busy()" (click)="acceptAlways(ack, ack.category!, a, null)">{{ 'fin.ack.always' | t }}</button>
-                  }
-                  <button type="button" class="btn" [disabled]="busy()" (click)="send(a, 'answer')">{{ 'fin.ack.ask' | t }}</button>
-                </div>
-              } @else {
-                <button type="button" class="btn btn-primary" [disabled]="busy()" (click)="send(a, 'answer')">{{ 'actions.saveRetry' | t }}</button>
               }
             </div>
           }
@@ -241,10 +237,6 @@ const SOURCES: Record<string, string> = {
                 </tbody>
               </table>
             </div>
-            <div class="mt-4">
-              <button type="button" class="btn !border-emerald-700 !bg-emerald-600 !font-semibold !text-white hover:!bg-emerald-700"
-                      [disabled]="busy()" (click)="send(a, 'confirm')">{{ 'actions.submit' | t }}</button>
-            </div>
           }
 
           @if (a.kind === 'confirm_email' && a.email_draft; as d) {
@@ -265,39 +257,31 @@ const SOURCES: Record<string, string> = {
               </div>
             </div>
             @if (emailSaved()[a.id]) { <div class="alert alert-ok mt-3" role="status">{{ 'actions.email.saved' | t }}</div> }
-            <div class="mt-4 flex flex-wrap gap-3">
-              <button type="button" class="btn !border-emerald-700 !bg-emerald-600 !font-semibold !text-white hover:!bg-emerald-700"
-                      [disabled]="busy() || !emailValid(a)" (click)="confirmEmail(a)">{{ 'actions.email.send' | t }}</button>
-              <button type="button" class="btn" [disabled]="busy() || !emailDirty(a) || !emailValid(a)" (click)="saveDraft(a)">{{ 'actions.email.save' | t }}</button>
-            </div>
-          }
-
-          @if (browserKind(a.kind)) {
-            <div class="mt-4">
-              @if (browser().open && browser().item_id === a.id) {
-                <div class="flex flex-wrap items-center gap-3">
-                  <span class="badge tier-high">{{ 'actions.browser.open' | t }}</span>
-                  <button type="button" class="btn" [disabled]="browserBusy()" (click)="closeBrowser(a)">{{ 'actions.browser.close' | t }}</button>
-                </div>
-              } @else {
-                <button type="button" class="btn" [class.btn-primary]="a.kind !== 'unknown_question' && !isSetup(a)"
-                        [disabled]="browserBusy() || browser().open" (click)="openBrowser(a)">{{ 'actions.browser.openBtn' | t }}</button>
-                @if (browser().open) { <p class="hint mt-1">{{ 'actions.browser.other' | t }}</p> }
-              }
-              <p class="hint mt-1">{{ 'actions.browser.hint' | t }}</p>
-            </div>
           }
 
           @if (errors()[a.id]; as err) { <div class="alert alert-error mt-4" role="alert" dir="auto">{{ err }}</div> }
 
+          <!-- one main button for the kind of card; everything quiet is under "More" -->
           <footer class="mt-5 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
-            <button type="button" class="btn" [class.btn-primary]="retryIsMain(a)" [disabled]="busy()" (click)="send(a, 'retry')">{{ 'actions.retry' | t }}</button>
-            @if (hasPage(a)) {
-              <a class="btn no-underline hover:no-underline" [href]="a.job.apply_url" target="_blank" rel="noopener">{{ 'actions.openPage' | t }}</a>
+            @if (a.kind === 'unknown_question' && ackQuestion(a); as ack) {
+              <p class="w-full text-sm font-medium">{{ 'fin.ack.' + ack.category | t }}</p>
+              <button type="button" class="btn btn-primary" [disabled]="busy()" (click)="send(a, 'answer')">{{ 'fin.ack.once' | t }}</button>
+              @if (acceptValue(ack) !== null) {
+                <button type="button" class="btn" [disabled]="busy()" (click)="acceptAlways(ack, ack.category!, a, null)">{{ 'fin.ack.always' | t }}</button>
+              }
+              <button type="button" class="btn" [disabled]="busy()" (click)="send(a, 'answer')">{{ 'fin.ack.ask' | t }}</button>
             }
-            <button type="button" class="btn" [disabled]="busy()" (click)="send(a, 'applied_by_hand')">{{ 'actions.byHand' | t }}</button>
-            <button type="button" class="btn btn-danger" [disabled]="busy()" (click)="send(a, 'skip')">{{ 'actions.skip' | t }}</button>
+            @if (primary(a); as p) {
+              <button type="button" [class]="p.go ? 'btn !border-emerald-700 !bg-emerald-600 !font-semibold !text-white hover:!bg-emerald-700' : 'btn btn-primary'"
+                      [disabled]="busy() || browserBusy() || !p.ok" (click)="p.run()">{{ p.label }}</button>
+            }
+            @if (browser().open && browser().item_id === a.id) { <span class="badge tier-high">{{ 'actions.browser.open' | t }}</span> }
+            <app-more-menu class="ms-auto" [items]="moreItems()[a.id]" [context]="a.job.title" (picked)="more(a, $event)" />
           </footer>
+          @if (browserKind(a.kind) && primaryOpensBrowser(a)) {
+            <p class="hint mt-2">{{ 'actions.browser.hint' | t }}</p>
+            @if (browser().open && browser().item_id !== a.id) { <p class="hint mt-1">{{ 'actions.browser.other' | t }}</p> }
+          }
         </section>
       }
 
@@ -314,6 +298,7 @@ const SOURCES: Record<string, string> = {
 export class ActionsPage {
   private readonly api = inject(Api);
   private readonly live = inject(Live);
+  private readonly shell = inject(Shell);
   private readonly i18n = inject(I18n);
   private readonly loc = computed(() => localeOf(this.i18n.lang()));
   protected readonly VAULT_CODES = VAULT_CODES;
@@ -389,7 +374,9 @@ export class ActionsPage {
 
   // ---- setup cards ---------------------------------------------------------------------------------------
 
-  protected plural = (base: string, n: number): string => this.i18n.t(`${base}.${n === 1 ? 'one' : 'other'}`, { n: this.num(n) });
+  protected plural = (base: string, n: number): string => this.i18n.plural(base, n);
+  /** Why a question was parked, in the UI language (the server sends a code like `not_in_profile` and its params). */
+  protected why = (q: ActionQuestion): string => this.i18n.msg({ message: q.reason, code: q.reason_code, params: q.reason_params });
   protected isSetup = (a: ActionItem): boolean => VAULT_CODES.includes(a.code ?? '') || EMAIL_CODES.includes(a.code ?? '');
   /** The first three sites the waiting applications are for, then "+N". */
   protected sites(list: ActionItem[]): string {
@@ -408,7 +395,8 @@ export class ActionsPage {
 
   private continued(n: number): void {
     if (n > 0) this.showToast(this.plural('fin.continue', n));
-    this.live.changed.update((c) => c + 1); // reloads this list and the badge in the shell
+    this.live.changed.update((c) => c + 1); // reloads this list
+    void this.shell.refresh(); // and the nav badge, the tab counts and Home
   }
 
   protected onVault(r: VaultReady): void {
@@ -438,6 +426,8 @@ export class ActionsPage {
 
   protected isNotice = (q: ActionQuestion): boolean => !q.sensitive && !q.category && /notice/i.test(q.label);
   protected isRelocate = (q: ActionQuestion): boolean => !q.sensitive && !q.category && /relocat/i.test(q.label);
+  /** Personal details the profile can hold (never guessed): military, nationality, marital status, date of birth. */
+  protected isProfileFact = (q: ActionQuestion): boolean => FACT_KEYS.includes(q.category ?? '');
   protected isEeo = (q: ActionQuestion): boolean => !!q.category && EEO_KEYS.includes(q.category);
   /** The "I'd rather not say" option of an option list, if the form has one. */
   protected declineOf = (q: ActionQuestion): string | null => q.options.find((o) => DECLINE.test(o)) ?? null;
@@ -467,6 +457,12 @@ export class ActionsPage {
       if (!this.kept(k, q)) continue;
       const v = this.draft()[k]?.[q.label];
       if (this.isNotice(q) && typeof v === 'string' && v.trim()) r['notice_period'] = v.trim();
+      if (this.isProfileFact(q) && typeof v === 'string' && v.trim()) {
+        const cat = q.category!;
+        const t = v.trim();
+        const val = FACT_VALUES[cat]?.find(([, re]) => re.test(t))?.[0] ?? (cat === 'date_of_birth' ? (/^\d{4}-\d{2}-\d{2}$/.test(t) ? t : null) : cat === 'nationality' ? t : null);
+        if (val) r[cat] = val;
+      }
       if (this.isRelocate(q)) {
         const b = typeof v === 'boolean' ? v : typeof v === 'string' ? (/^(yes|true)/i.test(v) ? true : /^(no|false)/i.test(v) ? false : null) : null;
         if (b !== null) r['willing_to_relocate'] = b;
@@ -506,13 +502,20 @@ export class ActionsPage {
         ...(Object.keys(remember).length ? { remember } : {}),
       });
       this.draft.update(({ [c.key]: _drop, ...rest }) => rest);
-      this.showToast(this.i18n.t('fin.group.done', { resolved: this.num(r.resolved), still: this.num(r.still_open) }));
+      this.showToast(this.groupDone(r.resolved, r.still_open));
       this.live.changed.update((n) => n + 1);
+      void this.shell.refresh();
     } catch (e) {
       this.errors.update((m) => ({ ...m, [c.key]: e instanceof Error ? e.message : String(e) }));
     } finally {
       this.busy.set(false);
     }
+  }
+
+  /** "4 continue, 1 still needs you": each half is a plural of its own noun, and an empty half is left out. */
+  private groupDone(resolved: number, still: number): string {
+    const parts = [resolved > 0 ? this.plural('fin.group.resolved', resolved) : '', still > 0 ? this.plural('fin.group.still', still) : ''].filter(Boolean);
+    return parts.join(this.i18n.t('fin.group.sep')) || this.plural('fin.group.resolved', 0);
   }
 
   protected companies(g: ActionGroup): string {
@@ -561,8 +564,68 @@ export class ActionsPage {
   hasPage = (a: ActionItem): boolean => a.kind !== 'confirm_email' && !a.job.apply_url.toLowerCase().startsWith('mailto:');
   browserKind = (k: ActionKind): boolean => BROWSER_KINDS.includes(k);
   hasHelp = (k: ActionKind): boolean => k !== 'unknown_question' && k !== 'confirm_submit';
-  /** Retry is the main button when nothing else on the card is: setup cards, and kinds Chrome cannot fix. */
-  retryIsMain = (a: ActionItem): boolean => a.kind !== 'confirm_submit' && a.kind !== 'confirm_email' && (this.isSetup(a) || !this.browserKind(a.kind));
+  /** This card's Chrome window is open now. */
+  windowOpenFor = (a: ActionItem): boolean => this.browser().open && this.browser().item_id === a.id;
+  /** Cards whose main button opens the page in the app browser (CAPTCHA, sign-in, code, rejected form). */
+  primaryOpensBrowser = (a: ActionItem): boolean => !this.isSetup(a) && this.browserKind(a.kind) && a.kind !== 'unknown_question';
+
+  /** Enough is typed to save: every required question, or at least one answer when none is required. */
+  private canSave(a: ActionItem): boolean {
+    const has = (q: ActionQuestion) => this.hasValue(a.id, q.label);
+    const need = a.questions.filter((q) => q.required);
+    return !a.questions.length || (need.length ? need.every(has) : a.questions.some(has));
+  }
+
+  /** The one main button of a card, by kind; null when the card has its own answer buttons (agreements). */
+  protected primary(a: ActionItem): { label: string; run: () => void; ok: boolean; go?: boolean } | null {
+    const t = (key: string) => this.i18n.t(key);
+    if (this.isSetup(a)) return { label: t('actions.retry'), run: () => void this.send(a, 'retry'), ok: true };
+    switch (a.kind) {
+      case 'unknown_question':
+        return this.ackQuestion(a) ? null : { label: t('actions.saveRetry'), run: () => void this.send(a, 'answer'), ok: this.canSave(a) };
+      case 'confirm_submit':
+        return { label: t('actions.submit'), run: () => void this.send(a, 'confirm'), ok: true, go: true };
+      case 'confirm_email':
+        return { label: t('actions.email.send'), run: () => void this.confirmEmail(a), ok: this.emailValid(a), go: true };
+      default:
+        if (this.windowOpenFor(a)) return { label: t('actions.doneRetry'), run: () => void this.doneRetry(a), ok: true };
+        return { label: t(a.kind === 'validation_error' ? 'actions.fixInPage' : 'actions.openPage'), run: () => void this.openBrowser(a), ok: !this.browser().open };
+    }
+  }
+
+  /** The quiet actions of each card, under "More". A computed: a new array on every check would make Angular think the input keeps changing. */
+  protected readonly moreItems = computed<Record<number, MenuItem[]>>(() => {
+    const t = (key: string, p?: Record<string, number>) => this.i18n.t(key, p);
+    const out: Record<number, MenuItem[]> = {};
+    for (const a of this.items()) {
+      const list: MenuItem[] = [];
+      if (a.kind === 'confirm_email' && a.email_draft) list.push({ id: 'saveDraft', label: t('actions.email.save'), disabled: !this.emailDirty(a) || !this.emailValid(a) });
+      if (!this.isSetup(a)) list.push({ id: 'retry', label: t('actions.retry') });
+      if (this.hasPage(a) && !this.primaryOpensBrowser(a)) list.push({ id: 'page', label: t('actions.openPage'), href: a.job.apply_url });
+      if (this.windowOpenFor(a)) list.push({ id: 'closeBrowser', label: t('actions.browser.close') });
+      else if (this.browserKind(a.kind) && !this.primaryOpensBrowser(a) && !this.isSetup(a)) list.push({ id: 'browser', label: t('actions.browser.openBtn'), disabled: this.browser().open });
+      for (const n of this.range(a.screenshots)) list.push({ id: `shot${n}`, label: t('actions.viewShot', { n: n + 1 }), href: this.shot(a.id, n) });
+      list.push({ id: 'byHand', label: t('actions.byHand') }, { id: 'skip', label: t('actions.skip'), danger: true });
+      out[a.id] = list;
+    }
+    return out;
+  });
+
+  protected more(a: ActionItem, id: string): void {
+    if (id === 'saveDraft') void this.saveDraft(a);
+    else if (id === 'retry') void this.send(a, 'retry');
+    else if (id === 'browser') void this.openBrowser(a);
+    else if (id === 'closeBrowser') void this.closeBrowser(a);
+    else if (id === 'byHand') void this.send(a, 'applied_by_hand');
+    else if (id === 'skip') void this.send(a, 'skip');
+  }
+
+  /** Done in the page: close the window (the profile is busy while it is open), then try the application again. */
+  private async doneRetry(a: ActionItem): Promise<void> {
+    await this.closeBrowser(a);
+    if (!this.errors()[a.id]) await this.send(a, 'retry');
+  }
+
   num = (n: number | null): string => fmtNum(this.loc(), n);
   sourceLabel = (s: string): string => labelOr(this.i18n, 'common.answerSource.', s || 'unknown');
   range = (n: number): number[] => Array.from({ length: n }, (_, i) => i);
@@ -643,8 +706,9 @@ export class ActionsPage {
       const remember = decision === 'answer' ? { ...this.keepRemember(a.id, a.questions), ...extra } : {};
       await this.api.post(`/actions/${a.id}`, { decision, answers, ...(Object.keys(remember).length ? { remember } : {}) });
       this.draft.update(({ [a.id]: _drop, ...rest }) => rest);
-      // bumping `changed` reloads this list and the nav badge in the shell
+      // bumping `changed` reloads this list; the shell refresh keeps the nav badge, the tab counts and Home in step
       this.live.changed.update((n) => n + 1);
+      void this.shell.refresh();
     } catch (e) {
       this.errors.update((m) => ({ ...m, [a.id]: e instanceof Error ? e.message : String(e) }));
     } finally {

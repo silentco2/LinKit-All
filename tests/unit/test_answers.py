@@ -117,7 +117,8 @@ def test_authorized_locally_means_no_sponsorship() -> None:
 
 
 def test_abroad_uses_saved_sponsorship_need() -> None:
-    c = ctx(authorized_countries=["Egypt"], needs_sponsorship=True)
+    # Ireland must be a visa country now: an unknown country is asked, not answered "No".
+    c = ctx(authorized_countries=["Egypt"], visa_countries=["IE"], needs_sponsorship=True)
     c.job_location = "Dublin"
     r = resolve_static([AUTH, SPONSOR], c)
     assert r.answers["q1"].startswith("No, I am not")
@@ -127,7 +128,7 @@ def test_abroad_uses_saved_sponsorship_need() -> None:
 @pytest.mark.parametrize(
     ("job_location", "needs", "authorized", "expected"),
     [("Cairo, Egypt", None, ["Egypt"], "No, I do not"),
-     ("Dubai", None, ["Egypt"], "Yes, I will require immigration sponsorship now"),
+     ("Dubai", None, ["Egypt"], None),  # not a visa country either: ask
      ("Dubai", True, ["Egypt"], "Yes, I will require immigration sponsorship now"),
      ("Dubai", False, ["Egypt"], "No, I do not"),
      ("Cairo, Egypt", True, ["Egypt"], "No, I do not"),  # authorized there: explicit True does not override

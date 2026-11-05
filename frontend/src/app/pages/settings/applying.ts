@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { GoLiveCard } from '../../components/golive';
+import { LibreOffice, LibreOfficeCard } from '../../components/libreoffice-card';
 import { I18n, TPipe } from '../../i18n';
 import { Field } from './saved';
 import { SettingsStore } from './store';
@@ -11,7 +12,7 @@ const MODE = 'rounded-lg border p-3 text-start text-sm focus-visible:outline-2 f
 /** Settings > Applying: practice or real, the pace, and how the browser behaves. Everything saves as you edit. */
 @Component({
   selector: 'app-settings-applying',
-  imports: [Field, GoLiveCard, RouterLink, TPipe],
+  imports: [Field, GoLiveCard, LibreOfficeCard, RouterLink, TPipe],
   template: `
     <div class="space-y-6">
       <section class="card space-y-4">
@@ -48,6 +49,14 @@ const MODE = 'rounded-lg border p-3 text-start text-sm focus-visible:outline-2 f
       </section>
 
       <section class="card space-y-4">
+        <h2>{{ 'settings.apply.cv' | t }}</h2>
+        <app-field key="apply.tailor_cv" for="tailor-cv" [check]="true" [label]="'settings.apply.tailor' | t" [hint]="(lo.tailor() === null ? 'settings.apply.tailorUndecided' : 'settings.apply.tailorHint') | t">
+          <input id="tailor-cv" type="checkbox" role="switch" class="mt-1" [checked]="lo.tailor() === true" (change)="lo.setTailor(checked($event))">
+        </app-field>
+        <app-libreoffice-card />
+      </section>
+
+      <section class="card space-y-4">
         <h2>{{ 'settings.apply.pace' | t }}</h2>
         @if (tuning.data(); as p) {
           <app-field key="apply.parallel_sites" [label]="'settings.apply.paceLabel' | t" [hint]="'settings.apply.paceHint' | t">
@@ -77,10 +86,33 @@ const MODE = 'rounded-lg border p-3 text-start text-sm focus-visible:outline-2 f
         }
       </section>
 
+
+      <section class="card space-y-4">
+        <h2>{{ 'settings.apply.limits' | t }}</h2>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <app-field key="apply.max_per_run" for="lim-run" [label]="'setup.apply.maxRun' | t">
+            <input id="lim-run" type="number" min="1" max="100" class="input" [value]="store.cfg.apply.max_per_run" (change)="store.update('apply.max_per_run', num($event))">
+          </app-field>
+          <app-field key="apply.daily_cap_per_site" for="lim-day" [label]="'setup.apply.daily' | t" [hint]="'setup.apply.dailyHint' | t">
+            <input id="lim-day" type="number" min="1" max="200" class="input" [value]="store.cfg.apply.daily_cap_per_site" (change)="store.update('apply.daily_cap_per_site', num($event))">
+          </app-field>
+          <app-field key="apply.email_daily_cap" for="lim-mail" [label]="'setup.email.cap' | t" [hint]="'setup.email.capHint' | t">
+            <input id="lim-mail" type="number" min="1" max="100" class="input" [value]="store.cfg.apply.email_daily_cap" (change)="store.update('apply.email_daily_cap', num($event))">
+          </app-field>
+        </div>
+      </section>
+
       <section class="card space-y-4">
         <h2>{{ 'settings.apply.how' | t }}</h2>
-        <app-field key="apply.headless" for="show-window" [check]="true" [label]="'settings.apply.showWindow' | t" [hint]="'settings.apply.showWindowHint' | t">
-          <input id="show-window" type="checkbox" class="mt-1" [checked]="!store.cfg.apply.headless" (change)="store.update('apply.headless', !checked($event))">
+        <app-field key="apply.headless" [label]="'settings.apply.browser' | t" [hint]="'settings.apply.showWindowHint' | t">
+          <div class="grid gap-3 sm:grid-cols-2" role="radiogroup" [attr.aria-label]="'settings.apply.browser' | t">
+            @for (hide of [false, true]; track hide) {
+              <label [class]="card(store.cfg.apply.headless === hide)">
+                <input type="radio" name="browser" class="sr-only" [checked]="store.cfg.apply.headless === hide" (change)="store.update('apply.headless', hide)">
+                <span class="block font-medium">{{ (hide ? 'settings.apply.hideWindow' : 'settings.apply.showWindow') | t }}</span>
+              </label>
+            }
+          </div>
         </app-field>
         <app-field key="apply.generic_agent" for="agent" [check]="true" [label]="'settings.apply.agent' | t" [hint]="'settings.apply.agentHint' | t">
           <input id="agent" type="checkbox" class="mt-1" [checked]="store.cfg.apply.generic_agent" (change)="store.update('apply.generic_agent', checked($event))">
@@ -92,6 +124,7 @@ const MODE = 'rounded-lg border p-3 text-start text-sm focus-visible:outline-2 f
 export class ApplyingSection implements OnInit {
   protected readonly store = inject(SettingsStore);
   protected readonly tuning = inject(Tuning);
+  protected readonly lo = inject(LibreOffice);
   private readonly i18n = inject(I18n);
   protected readonly card = cardClass;
   /** Switching to "Applying for real" opens the guided card instead of flipping the switch. */
@@ -99,6 +132,7 @@ export class ApplyingSection implements OnInit {
 
   ngOnInit(): void {
     void this.tuning.load();
+    void this.lo.load();
   }
 
   protected live(): boolean {
@@ -117,14 +151,20 @@ export class ApplyingSection implements OnInit {
     return (e.target as HTMLInputElement).checked;
   }
 
+  /** The number in the box; an empty box is NaN, which the server rejects with a message for this field. */
+  protected num(e: Event): number {
+    const box = e.target as HTMLInputElement;
+    return box.value.trim() === '' ? NaN : box.valueAsNumber;
+  }
+
   protected modeClass(on: boolean): string {
     return `${MODE} ${on ? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-slate-800 dark:text-white' : 'border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800'}`;
   }
 
   /** "1 site at a time · 60–120 s between applications · up to 10 a day per site · 5 per search" */
   protected line(v: Record<string, number>): string {
-    const t = (k: string) => this.i18n.t(k, { n: v['parallel_sites'], min: v['min_pause_s'], max: v['max_pause_s'], cap: v['daily_cap_per_site'], run: v['max_per_run'] });
-    return [t(v['parallel_sites'] === 1 ? 'settings.apply.sitesOne' : 'settings.apply.sitesMany'), t('settings.apply.paceRest')].join(' · ');
+    const t = (k: string) => this.i18n.t(k, { min: v['min_pause_s'], max: v['max_pause_s'], cap: v['daily_cap_per_site'], run: v['max_per_run'] });
+    return [this.i18n.plural('settings.apply.sites', v['parallel_sites']), t('settings.apply.paceRest')].join(' · ');
   }
 
   /**

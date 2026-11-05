@@ -109,7 +109,10 @@ async def discover(
                     )
                     stats.new += new
                     stats.duplicates += len(stubs) - new
-                    logger.info("{} page {}: {} new of {}", task.key, page, new, len(stubs))
+                    logger.bind(
+                        code="discover_page",
+                        params={"key": task.key, "page": page, "new": new, "total": len(stubs)},
+                    ).info("{} page {}: {} new of {}", task.key, page, new, len(stubs))
                     page += 1
             except Unsupported as e:  # not an error: tell the user why nothing came of it
                 stats.unsupported.append(f"{task.board} ({e})")

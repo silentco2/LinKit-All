@@ -117,7 +117,9 @@ def send(cfg: EmailSection, vault: Vault, profile_email: str, msg: EmailMessage)
             f"{host} rejected the login: check the app password and email address"
         ) from None
     except (OSError, smtplib.SMTPException) as e:
-        logger.warning("SMTP send failed ({})", type(e).__name__)
+        logger.bind(code="smtp_failed", params={"error": type(e).__name__}).warning(
+            "SMTP send failed ({})", type(e).__name__
+        )
         raise SmtpError(f"Could not send through {host} ({type(e).__name__})") from None
     logger.info("Email sent to *@{} ({})", domain, message_id)
     return message_id

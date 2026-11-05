@@ -1,18 +1,27 @@
-import { Component, computed, ElementRef, inject, OnInit, signal, viewChild, WritableSignal } from '@angular/core';
+import { Component, computed, effect, ElementRef, inject, OnInit, signal, untracked, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Api } from '../api';
 import { AiConnect, AiState } from '../components/ai-connect';
+import { ChipOption, ChipSelect } from '../components/chip-select';
+import { Countries } from '../components/countries';
+import { LibreOfficeCard } from '../components/libreoffice-card';
+import { Privacy } from '../components/privacy';
+import { PhoneInput } from '../components/phone-input';
+import { PlacePick, PlacePicker } from '../components/place-picker';
+import { PlacesList } from '../components/places-list';
+import { TagInput } from '../components/tag-input';
 import { I18n, Lang, SourcePipe, TPipe } from '../i18n';
-import { expandQueries, InferPayload, lines, Profile, SearchConfig, Segment, Status, unlines } from '../types';
+import { currencyLabel, cvLabel, levelTip } from '../locale';
+import { expandQueries, InferPayload, Place, Profile, SearchConfig, Segment, Status, WorkMode } from '../types';
 
 type StepNo = 1 | 2 | 3 | 4;
 type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_disability';
-type Chip = { text: string; on: boolean };
 type Field = { key: string; label: string; kind: 'text' | 'ltr' | 'num' };
 type Upload = { cv_name: string; segments: Segment[]; cv_source_format: Profile['cv_source_format']; cv_approved: boolean; cv_renderer_ok: boolean };
 
 // answers the user must say yes to on screen 3: their saved state is shown there and only sent when changed
+// (work rights come from the places on screen 4, so the suggested authorized_countries is never sent)
 const SENSITIVE = new Set(['answers.authorized_countries', 'answers.salary_expectation', 'answers.salary_currency', 'answers.eeo_gender', 'answers.eeo_race', 'answers.eeo_hispanic', 'answers.eeo_veteran', 'answers.eeo_disability']);
 const STEPS: StepNo[] = [1, 2, 3, 4];
 const FIELD_GROUPS: { id: string; title: string; fields: Field[] }[] = [
@@ -22,8 +31,6 @@ const FIELD_GROUPS: { id: string; title: string; fields: Field[] }[] = [
     fields: [
       { key: 'profile.full_name', label: 'welcome.f.name', kind: 'text' },
       { key: 'profile.email', label: 'welcome.f.email', kind: 'ltr' },
-      { key: 'profile.phone', label: 'welcome.f.phone', kind: 'ltr' },
-      { key: 'profile.location', label: 'welcome.f.location', kind: 'text' },
     ],
   },
   {
@@ -56,11 +63,16 @@ const SRC_TEXT: Record<string, string> = {
 // The first-run flow: four screens that replace the ten-tab Setup. Labels in the arrays are i18n keys.
 @Component({
   selector: 'app-welcome',
-  imports: [FormsModule, RouterLink, AiConnect, SourcePipe, TPipe],
+  imports: [FormsModule, RouterLink, AiConnect, ChipSelect, LibreOfficeCard, PhoneInput, PlacePicker, PlacesList, Privacy, SourcePipe, TagInput, TPipe],
   template: `
     <div class="mx-auto max-w-3xl">
       <div class="flex flex-wrap items-center justify-between gap-3">
-        <div class="text-lg font-bold text-slate-900 dark:text-white">LinKit <span class="text-brand-600">All</span></div>
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <div class="text-lg font-bold text-slate-900 dark:text-white">LinKit <span class="text-brand-600">All</span></div>
+          @if (status(); as st) {
+            <span class="badge" [class]="st.apply_live ? 'tier-mid' : 'tier-low'" [title]="(st.apply_live ? 'shell.liveTitle' : 'shell.dryTitle') | t">{{ (st.apply_live ? 'shell.live' : 'welcome.practicePill') | t }}</span>
+          }
+        </div>
         <div class="flex items-center gap-2">
           <div class="flex items-center gap-1" role="group" [attr.aria-label]="'shell.language' | t">
             <button type="button" class="btn !px-2 !py-1 text-xs" lang="en" dir="ltr" [class.btn-primary]="i18n.lang() === 'en'" [attr.aria-pressed]="i18n.lang() === 'en'" (click)="setLang('en')">English</button>
@@ -69,6 +81,7 @@ const SRC_TEXT: Record<string, string> = {
         </div>
       </div>
       <p class="mt-4 text-sm text-slate-600 dark:text-slate-400">{{ 'welcome.promise' | t }}</p>
+      <app-privacy class="mt-1 block" />
 
       @if (!status()) {
         <p class="mt-8 text-sm text-slate-500">{{ 'common.loading' | t }}</p>
@@ -112,8 +125,8 @@ const SRC_TEXT: Record<string, string> = {
 
               @if (cv(); as c) {
                 <div class="flex flex-wrap items-center gap-3 text-sm">
-                  <bdi class="font-medium">{{ c.name }}</bdi>
-                  @if (c.parts) { <span class="text-slate-500">{{ 'welcome.cv.parts' | t: { n: c.parts } }}</span> }
+                  <bdi class="font-medium">{{ cvName(c) }}</bdi>
+                  @if (c.parts) { <span class="text-slate-500">{{ i18n.plural('welcome.cv.parts', c.parts) }}</span> }
                   @if (c.rendererOk ?? status()!.libreoffice) {
                     <a class="btn" href="/api/profile/cv/pdf" target="_blank" rel="noopener">{{ 'setup.cv.preview' | t }}</a>
                   }
@@ -126,10 +139,10 @@ const SRC_TEXT: Record<string, string> = {
                 }
                 @if (c.format === 'tex') {
                   @if (c.rendererOk === false) {
-                    <div class="alert alert-error">{{ 'setup.cv.tectonicA' | t }}<a href="https://tectonic-typesetting.github.io" target="_blank" rel="noopener">Tectonic</a>{{ 'setup.cv.tectonicB' | t }}<code dir="ltr">linkit doctor</code>{{ 'setup.cv.tectonicC' | t }}</div>
+                    <div class="alert alert-warn">{{ 'setup.cv.tectonicA' | t }}<a href="https://tectonic-typesetting.github.io" target="_blank" rel="noopener">Tectonic</a>{{ 'setup.cv.tectonicB' | t }}</div>
                   }
                 } @else if (!status()!.libreoffice) {
-                  <div class="alert alert-error">{{ 'setup.cv.noLibreA' | t }}<code dir="ltr">linkit doctor</code>{{ 'setup.cv.noLibreB' | t }}</div>
+                  <app-libreoffice-card />
                 }
               }
             }
@@ -160,26 +173,27 @@ const SRC_TEXT: Record<string, string> = {
                           @if (badge(f.key); as b) { <span class="badge mt-1" [class]="b.warn ? 'tier-mid' : 'tier-low'">{{ b.text | t }}</span> }
                         </div>
                       }
+                      @if (g.id === 'you') {
+                        <div>
+                          <label class="label" for="f-phone">{{ 'welcome.f.phone' | t }}</label>
+                          <app-phone-input inputId="f-phone" [value]="text('profile.phone')" [defaultIso]="text('profile.home_country')" (changed)="set('profile.phone', $event)" />
+                          @if (badge('profile.phone'); as b) { <span class="badge mt-1" [class]="b.warn ? 'tier-mid' : 'tier-low'">{{ b.text | t }}</span> }
+                        </div>
+                        <div>
+                          <label class="label" for="f-home">{{ 'welcome.f.location' | t }}</label>
+                          <app-place-picker inputId="f-home" [value]="homeText()" [placeholder]="'settings.profile.cityPh' | t" (picked)="setHome($event)" />
+                          @if (badge('profile.home_city'); as b) { <span class="badge mt-1" [class]="b.warn ? 'tier-mid' : 'tier-low'">{{ b.text | t }}</span> }
+                        </div>
+                      }
                     </div>
                   </div>
                 }
 
                 <div class="space-y-2 border-t border-slate-100 pt-4 dark:border-slate-800">
-                  <h2 class="!text-sm">{{ 'welcome.g.skills' | t: { n: list('profile.skills').length } }}</h2>
-                  <label class="sr-only" for="f-skills">{{ 'welcome.g.skills' | t: { n: list('profile.skills').length } }}</label>
-                  <textarea id="f-skills" class="input h-24" dir="auto" [value]="unlines(list('profile.skills'))" (change)="onLines('profile.skills', $event)" [placeholder]="'welcome.found.missing' | t"></textarea>
-                  <div class="flex items-center gap-2">
-                    <span class="hint !mt-0">{{ 'welcome.found.linesHint' | t }}</span>
-                    @if (badge('profile.skills'); as b) { <span class="badge" [class]="b.warn ? 'tier-mid' : 'tier-low'">{{ b.text | t }}</span> }
-                  </div>
-                </div>
-
-                <div class="space-y-2 border-t border-slate-100 pt-4 dark:border-slate-800">
-                  <h2 class="!text-sm">{{ 'welcome.g.locked' | t }}</h2>
-                  <p class="hint !mt-0">{{ 'welcome.g.lockedHint' | t }}</p>
-                  <label class="sr-only" for="f-locked">{{ 'welcome.g.locked' | t }}</label>
-                  <textarea id="f-locked" class="input h-24" dir="auto" [value]="unlines(list('profile.locked_facts'))" (change)="onLines('profile.locked_facts', $event)" [placeholder]="'welcome.found.missing' | t"></textarea>
-                  @if (badge('profile.locked_facts'); as b) { <span class="badge" [class]="b.warn ? 'tier-mid' : 'tier-low'">{{ b.text | t }}</span> }
+                  <h2 class="!text-sm"><label for="f-skills">{{ 'welcome.g.skills' | t: { n: list('profile.skills').length } }}</label></h2>
+                  <app-tag-input inputId="f-skills" [values]="list('profile.skills')" [placeholder]="'settings.profile.skillsPh' | t" [recommended]="recSkills()" [caption]="'settings.profile.skillsRec' | t"
+                                 (changed)="set('profile.skills', $event)" />
+                  @if (badge('profile.skills'); as b) { <span class="badge" [class]="b.warn ? 'tier-mid' : 'tier-low'">{{ b.text | t }}</span> }
                 </div>
 
                 <div class="space-y-4 border-t border-slate-100 pt-4 dark:border-slate-800">
@@ -187,17 +201,6 @@ const SRC_TEXT: Record<string, string> = {
                     <h2 class="!text-sm">{{ 'welcome.forms.title' | t }}</h2>
                     <p class="hint">{{ 'welcome.forms.note' | t }}</p>
                   </div>
-
-                  @if (countryName()) {
-                    <div role="group" aria-labelledby="q-auth">
-                      <p id="q-auth" class="label"><bdi>{{ 'welcome.forms.auth' | t: { country: countryName() } }}</bdi></p>
-                      <div class="flex flex-wrap gap-2">
-                        <button type="button" class="btn" [class.btn-primary]="authorized() === 'yes'" [attr.aria-pressed]="authorized() === 'yes'" (click)="authorized.set('yes')">{{ 'common.yes' | t }}</button>
-                        <button type="button" class="btn" [class.btn-primary]="authorized() === 'no'" [attr.aria-pressed]="authorized() === 'no'" (click)="authorized.set('no')">{{ 'common.no' | t }}</button>
-                        <button type="button" class="btn" [class.btn-primary]="authorized() === 'ask'" [attr.aria-pressed]="authorized() === 'ask'" (click)="authorized.set('ask')">{{ 'welcome.forms.ask' | t }}</button>
-                      </div>
-                    </div>
-                  }
 
                   <div role="group" aria-labelledby="q-demo">
                     <p id="q-demo" class="label">{{ 'welcome.forms.demo' | t }}</p>
@@ -224,8 +227,8 @@ const SRC_TEXT: Record<string, string> = {
                   </div>
 
                   <div class="max-w-xs">
-                    <label class="label" for="salary">{{ (infer()!.country.currency ? 'welcome.forms.salary' : 'welcome.forms.salaryPlain') | t: { cur: infer()!.country.currency } }}</label>
-                    <input id="salary" dir="ltr" inputmode="numeric" class="input" [(ngModel)]="salary" placeholder="30000">
+                    <label class="label" for="salary">{{ (currency() ? 'welcome.forms.salary' : 'welcome.forms.salaryPlain') | t: { cur: curName() } }}</label>
+                    <input id="salary" dir="ltr" inputmode="numeric" class="input placeholder:italic" [(ngModel)]="salary" [placeholder]="'welcome.forms.salaryPh' | t">
                     <p class="hint">{{ 'welcome.forms.salaryHint' | t }}</p>
                   </div>
                 </div>
@@ -236,49 +239,34 @@ const SRC_TEXT: Record<string, string> = {
               <p class="text-sm text-slate-600 dark:text-slate-400">{{ 'welcome.jobs.intro' | t }}</p>
 
               <div>
-                <p class="label" id="l-roles">{{ 'welcome.jobs.roles' | t }}</p>
-                <div class="flex flex-wrap gap-2" role="group" aria-labelledby="l-roles">
-                  @for (c of roles(); track c.text) {
-                    <button type="button" [class]="chipClass(c.on)" [attr.aria-pressed]="c.on" (click)="toggleChip(roles, c.text, 'roles')"><bdi>{{ c.text }}</bdi></button>
-                  }
-                </div>
-                <div class="mt-2 flex max-w-md gap-2">
-                  <input class="input" dir="auto" [(ngModel)]="newRole" (keydown.enter)="addRole()" [attr.aria-label]="'welcome.jobs.addRole' | t" [placeholder]="'welcome.jobs.addRole' | t">
-                  <button type="button" class="btn" (click)="addRole()" [disabled]="!newRole.trim()">{{ 'welcome.jobs.add' | t }}</button>
-                </div>
+                <label class="label" for="w-roles">{{ 'welcome.jobs.roles' | t }}</label>
+                <app-tag-input inputId="w-roles" [values]="roles()" [suggest]="titles" [split]="expand" [placeholder]="'welcome.jobs.addRole' | t" (changed)="setRoles($event)" />
               </div>
 
               <div>
-                <p class="label" id="l-level">{{ 'welcome.jobs.level' | t }}</p>
-                <div class="flex flex-wrap items-center gap-2" role="group" aria-labelledby="l-level">
-                  @for (s of seniorities; track s) {
-                    <button type="button" [class]="chipClass(level().includes(s))" [attr.aria-pressed]="level().includes(s)" (click)="toggleLevel(s)">{{ 'setup.seniority.' + s | t }}</button>
-                  }
-                </div>
-                @if (years() !== null && !touched.has('filters.seniority')) { <p class="hint">{{ 'welcome.jobs.levelYears' | t: { n: years()! } }}</p> }
+                <label class="label" for="w-place">{{ 'welcome.jobs.where' | t }}</label>
+                <app-places-list inputId="w-place" [places]="placesShown()" (changed)="placesEdited.set($event)" />
               </div>
 
               <div>
-                <p class="label" id="l-where">{{ 'welcome.jobs.where' | t }}</p>
-                <div class="flex flex-wrap items-center gap-2" role="group" aria-labelledby="l-where">
-                  @for (c of where(); track c.text) {
-                    <button type="button" [class]="chipClass(c.on)" [attr.aria-pressed]="c.on" (click)="toggleChip(where, c.text, 'where')"><bdi>{{ c.text }}</bdi></button>
-                  }
-                </div>
-                <div class="mt-2 flex max-w-md gap-2">
-                  <input class="input" dir="auto" [(ngModel)]="newPlace" (keydown.enter)="addPlace()" [attr.aria-label]="'welcome.jobs.addPlace' | t" [placeholder]="'welcome.jobs.addPlace' | t">
-                  <button type="button" class="btn" (click)="addPlace()" [disabled]="!newPlace.trim()">{{ 'welcome.jobs.add' | t }}</button>
-                </div>
-                <label class="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" [checked]="remote()" (change)="remote.set(!remote())"> {{ 'welcome.jobs.remote' | t }}</label>
+                <p class="label">{{ 'welcome.jobs.modes' | t }}</p>
+                <app-chip-select [options]="modeOptions()" [selected]="modes()" [label]="'welcome.jobs.modes' | t" (changed)="setModes($event)" />
               </div>
 
               <div>
-                <p class="label" id="l-kind">{{ 'welcome.jobs.kind' | t }}</p>
-                <div class="flex flex-wrap gap-2" role="group" aria-labelledby="l-kind">
-                  <button type="button" [class]="chipClass(track() === 'tech')" [attr.aria-pressed]="track() === 'tech'" (click)="setTrack('tech')">{{ 'welcome.jobs.tech' | t }}</button>
-                  <button type="button" [class]="chipClass(track() === 'general')" [attr.aria-pressed]="track() === 'general'" (click)="setTrack('general')">{{ 'welcome.jobs.general' | t }}</button>
-                </div>
+                <p class="label">{{ 'welcome.jobs.level' | t }}</p>
+                <app-chip-select [options]="levelOptions()" [selected]="level()" [label]="'welcome.jobs.level' | t" (changed)="set('filters.seniority', $event)" />
+                @if (years() !== null && !touched.has('filters.seniority')) { <p class="hint">{{ (underYear() ? 'welcome.jobs.levelUnderYear' : 'welcome.jobs.levelYears') | t: { n: years()! } }}</p> }
+              </div>
+
+              <div>
+                <p class="label">{{ 'welcome.jobs.kind' | t }}</p>
+                <app-chip-select [options]="trackOptions()" [selected]="trackSel()" [single]="true" [label]="'welcome.jobs.kind' | t" (changed)="setTrack($event[0])" />
                 <p class="hint">{{ 'welcome.jobs.kindHint' | t }}</p>
+                <ul class="hint list-disc ps-5">
+                  <li>{{ 'welcome.jobs.techHint' | t }}</li>
+                  <li>{{ 'welcome.jobs.generalHint' | t }}</li>
+                </ul>
               </div>
 
               @if (infer(); as inf) {
@@ -286,7 +274,7 @@ const SRC_TEXT: Record<string, string> = {
                   <p class="label">{{ 'welcome.jobs.sources' | t }}</p>
                   <p class="text-sm">
                     @for (s of sourceNames(); track s; let last = $last) { <bdi>{{ s | src }}</bdi>@if (!last) {<span>, </span>} }
-                    @if (inf.sources.enabled.length) { <span class="text-slate-500"> {{ 'welcome.jobs.sourcesMore' | t: { n: inf.sources.enabled.length } }}</span> }
+                    @if (inf.sources.enabled.length) { <span class="text-slate-500"> {{ more(inf.sources.enabled.length) }}</span> }
                   </p>
                 </div>
               }
@@ -302,6 +290,7 @@ const SRC_TEXT: Record<string, string> = {
           }
 
           <app-ai-connect [hidden]="step() !== 2" [active]="step() === 2" intro="welcome.ai.intro" (stateChange)="ai.set($event)" (connected)="aiConnected()" />
+          @if (step() === 2) { <app-privacy [lead]="false" /> }
 
           <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
             @if (step() > 1) {
@@ -326,13 +315,17 @@ const SRC_TEXT: Record<string, string> = {
 export class WelcomePage implements OnInit {
   private readonly api = inject(Api);
   private readonly router = inject(Router);
+  private readonly countries = inject(Countries);
   protected readonly i18n = inject(I18n);
+  protected cvName = (c: { name: string; format?: string }): string => cvLabel(this.i18n, c.name, c.format);
   private readonly heading = viewChild<ElementRef<HTMLElement>>('heading');
 
   protected readonly steps = STEPS;
   protected readonly groups = FIELD_GROUPS;
   protected readonly headings = ['welcome.cv.title', 'welcome.ai.title', 'welcome.found.title', 'welcome.jobs.title'];
-  protected readonly unlines = unlines;
+  protected readonly expand = expandQueries;
+  protected readonly titles = (q: string) => this.api.get<string[]>(`/suggest/titles?q=${encodeURIComponent(q)}`);
+  protected readonly recSkills = signal<string[]>([]);
   protected readonly status = signal<Status | null>(null);
   protected readonly step = signal<StepNo>(1);
 
@@ -361,7 +354,7 @@ export class WelcomePage implements OnInit {
     {
       key: 'eeo_race',
       label: 'setup.eeo.race',
-      options: [['asian', 'setup.eeo.asian'], ['black', 'setup.eeo.black'], ['hispanic', 'setup.eeo.hispanic'], ['white', 'setup.eeo.white'],
+      options: [['asian', 'setup.eeo.asian'], ['black', 'setup.eeo.black'], ['white', 'setup.eeo.white'],
         ['middle_eastern', 'setup.eeo.middleEastern'], ['native', 'setup.eeo.native'],
         ['pacific', 'setup.eeo.pacific'], ['two_or_more', 'setup.eeo.twoOrMore']],
     },
@@ -369,12 +362,21 @@ export class WelcomePage implements OnInit {
     { key: 'eeo_veteran', label: 'setup.eeo.veteran', options: [['not_veteran', 'setup.eeo.notVeteran'], ['veteran', 'setup.eeo.isVeteran']] },
     { key: 'eeo_disability', label: 'setup.eeo.disability', options: [['no', 'setup.eeo.noDisability'], ['yes', 'setup.eeo.yesDisability']] },
   ];
-  protected readonly countryName = computed(() => String(this.vals()['answers.country'] ?? this.infer()?.country.name ?? ''));
+  /** The salary currency: the home country's, else the one the CV's country implies. */
+  protected currency(): string {
+    return this.countries.byIso(this.text('profile.home_country'))?.currency || this.infer()?.country.currency || '';
+  }
+  /** The currency as the label shows it: the code, plus its name ("EGP · الجنيه المصري") so a code alone is never the whole story. */
+  protected curName(): string {
+    return currencyLabel(this.i18n.lang(), this.currency());
+  }
 
   // screen 4
-  protected readonly roles = signal<Chip[]>([]);
-  protected readonly where = signal<Chip[]>([]);
-  protected readonly remote = signal(true);
+  protected readonly roles = signal<string[]>([]);
+  /** Places the user edited; null = still the saved ones, else the home country. */
+  protected readonly placesEdited = signal<Place[] | null>(null);
+  private readonly savedPlaces = signal<Place[]>([]);
+  protected readonly modes = signal<WorkMode[]>(['remote', 'hybrid', 'onsite']);
   protected readonly track = signal<'tech' | 'general'>('general');
   protected readonly seniorities = ['intern', 'junior', 'mid', 'senior', 'lead', 'manager', 'executive'];
   protected readonly level = computed(() => this.list('filters.seniority'));
@@ -382,19 +384,28 @@ export class WelcomePage implements OnInit {
     const y = this.vals()['answers.years_experience'];
     return typeof y === 'number' ? y : null;
   });
+  /** The CV shows less than a year of experience (an internship, say): the level hint says so instead of "0 years". */
+  protected readonly underYear = computed(() => this.infer()?.values['answers.years_experience']?.note === 'under_one_year');
+  private readonly homePlace = computed<Place[]>(() => {
+    const c = this.countries.byIso(String(this.vals()['profile.home_country'] ?? ''));
+    return c ? [{ label: c.name, city: '', country: c.iso2, work: 'ask' }] : [];
+  });
+  protected readonly placesShown = computed(() => this.placesEdited() ?? (this.savedPlaces().length ? this.savedPlaces() : this.homePlace()));
+  // computed: a new array on every check would make Angular think an input keeps changing
+  protected readonly modeOptions = computed<ChipOption[]>(() => (['remote', 'hybrid', 'onsite'] as const).map((m) => ({ value: m, label: this.i18n.t(`mode.${m}`) })));
+  protected readonly levelOptions = computed<ChipOption[]>(() => this.seniorities.map((s) => ({ value: s, label: this.i18n.t(`setup.seniority.${s}`), tip: levelTip(this.i18n, s) })));
+  protected readonly trackOptions = computed<ChipOption[]>(() => [{ value: 'tech', label: this.i18n.t('welcome.jobs.tech') }, { value: 'general', label: this.i18n.t('welcome.jobs.general') }]);
+  protected readonly trackSel = computed(() => [this.track()]);
   protected readonly sourceNames = computed(() => {
     const s = this.infer()?.sources;
     return s ? [...s.regional, ...s.jobspy] : [];
   });
-  protected newRole = '';
-  protected newPlace = '';
   protected readonly starting = signal(false);
   protected readonly startError = signal('');
   // once the user (or a saved config) has set a list, a later CV re-read must not overwrite it
   /** What is already stored (non-empty only), when setup was done before; wins over CV guesses and is only re-sent when changed. */
   private saved: Record<string, unknown> = {};
   private rolesSet = false;
-  private whereSet = false;
   private trackSet = false;
 
   protected readonly canNext = computed(() => {
@@ -408,7 +419,7 @@ export class WelcomePage implements OnInit {
       case 3:
         return !!(this.text('profile.full_name').trim() && this.text('profile.email').trim()) && !!this.infer();
       default:
-        return this.roles().some((c) => c.on) && this.where().some((c) => c.on);
+        return this.roles().length > 0 && this.placesShown().length > 0 && this.modes().length > 0;
     }
   });
 
@@ -426,15 +437,13 @@ export class WelcomePage implements OnInit {
       }
       // coming back to edit: the saved roles and places are the starting point, not the CV guess
       if (status.setup.roles && cfg.search.queries.length) {
-        this.roles.set(cfg.search.queries.map((text) => ({ text, on: true })));
+        this.roles.set(cfg.search.queries);
         this.rolesSet = true;
       }
-      if (status.setup.where) {
-        const places = cfg.search.locations.filter((p) => p.toLowerCase() !== 'remote');
-        this.where.set(places.map((text) => ({ text, on: true })));
-        this.remote.set(cfg.search.locations.length > places.length);
-        this.whereSet = true;
-      }
+      if (status.setup.where) this.savedPlaces.set(cfg.search.places);
+      this.modes.set(cfg.filters.work_modes);
+      void this.countries.load();
+      this.api.get<string[]>('/suggest/skills').then((l) => this.recSkills.set(l)).catch(() => {});
       this.status.set(status);
       const next = status.setup.next_step;
       this.go(next === 'cv' ? 1 : next === 'ai' ? 2 : next === 'profile' ? 3 : 4);
@@ -449,7 +458,7 @@ export class WelcomePage implements OnInit {
   private async loadSaved(profile: Profile): Promise<void> {
     const ans = await this.api.get<Record<string, unknown>>('/profile/answers');
     const all: Record<string, unknown> = {};
-    for (const k of ['full_name', 'email', 'phone', 'location', 'skills', 'locked_facts'] as const) all[`profile.${k}`] = profile[k];
+    for (const k of ['full_name', 'email', 'phone', 'home_city', 'home_country', 'skills'] as const) all[`profile.${k}`] = profile[k];
     for (const [k, v] of Object.entries(ans)) all[`answers.${k}`] = v;
     all['filters.seniority'] = this.cfg?.filters.seniority;
     all['filters.title_exclude'] = this.cfg?.filters.title_exclude;
@@ -576,15 +585,11 @@ export class WelcomePage implements OnInit {
     for (const [k, v] of Object.entries(p.values)) if (!this.touched.has(k) && !(k in this.saved)) next[k] = v.value;
     this.derive(next);
     this.vals.set(next);
-    if (!this.rolesSet) this.roles.set(asList(next['search.queries']).map((text) => ({ text, on: true })));
-    if (!this.whereSet) {
-      const place = String(next['answers.country'] || next['profile.location'] || '').trim();
-      this.where.set(place ? [{ text: place, on: true }] : []);
-    }
+    if (!this.rolesSet) this.roles.set(asList(next['search.queries']));
     if (!this.trackSet) this.track.set(next['track'] === 'tech' ? 'tech' : 'general');
   }
 
-  /** First/last name and city follow the full name and location unless the CV gave them. */
+  /** First/last name and city follow the full name and home city unless the CV gave them. */
   private derive(v: Record<string, unknown>, force = false): void {
     const name = String(v['profile.full_name'] ?? '').trim();
     if (name && (force || !v['answers.first_name'])) {
@@ -592,16 +597,16 @@ export class WelcomePage implements OnInit {
       v['answers.first_name'] = first;
       v['answers.last_name'] = rest.join(' ');
     }
-    const city = String(v['profile.location'] ?? '').split(/[,،]/)[0].trim();
+    const city = String(v['profile.home_city'] ?? '').trim();
     if (city && (force || !v['answers.city'])) v['answers.city'] = city;
   }
 
   private resetEdits(): void {
     this.vals.set({});
     this.touched.clear();
-    this.rolesSet = this.whereSet = this.trackSet = false;
+    this.rolesSet = this.trackSet = false;
     this.roles.set([]);
-    this.where.set([]);
+    this.placesEdited.set(null);
   }
 
   protected text(key: string): string {
@@ -613,10 +618,10 @@ export class WelcomePage implements OnInit {
     return asList(this.vals()[key]);
   }
 
-  private set(key: string, value: unknown): void {
+  protected set(key: string, value: unknown): void {
     this.touched.add(key);
     const next = { ...this.vals(), [key]: value };
-    if (key === 'profile.full_name' || key === 'profile.location') this.derive(next, true);
+    if (key === 'profile.full_name' || key === 'profile.home_city') this.derive(next, true);
     this.vals.set(next);
   }
 
@@ -625,8 +630,43 @@ export class WelcomePage implements OnInit {
     this.set(f.key, f.kind === 'num' ? (raw.trim() === '' ? null : Math.max(0, Math.round(Number(raw)))) : raw);
   }
 
-  protected onLines(key: string, e: Event): void {
-    this.set(key, lines((e.target as HTMLTextAreaElement).value));
+  /** A picked city sets city and country; a country sets country only; typed text keeps the country; cleared clears both. */
+  protected setHome(p: PlacePick): void {
+    const iso = p.label ? p.country || this.text('profile.home_country') : '';
+    this.set('profile.home_country', iso);
+    this.set('profile.home_city', p.city);
+    const c = this.countries.byIso(iso);
+    if (c) this.set('answers.country', c.name);
+  }
+
+  /** "City, Country" in the UI language: the country by its Arabic name and an Arabic comma when the UI is Arabic. */
+  protected more = (n: number): string => this.i18n.plural('welcome.jobs.sourcesMore', n);
+
+  protected homeText(): string {
+    const iso = this.text('profile.home_country');
+    const c = this.countries.byIso(iso);
+    const city = this.text('profile.home_city');
+    const ar = this.i18n.lang() === 'ar';
+    return [(ar && this.arCity()[`${city}|${iso}`]) || city, c ? this.countries.name(c) : iso].filter(Boolean).join(ar ? '، ' : ', ');
+  }
+
+  /** The Arabic name of an English city ("Alexandria" -> "الإسكندرية"), looked up once; a city already written in Arabic needs none. */
+  private readonly arCity = signal<Record<string, string>>({});
+  private async loadArCity(city: string, iso: string): Promise<void> {
+    const key = `${city}|${iso}`;
+    if (key in this.arCity() || /[؀-ۿ]/.test(city)) return;
+    this.arCity.update((m) => ({ ...m, [key]: '' }));
+    const rows = await this.api.get<{ city: string; iso2: string; label_ar: string }[]>(`/suggest/places?q=${encodeURIComponent(city)}&lang=ar`).catch(() => []);
+    const name = rows.find((r) => r.city === city && r.iso2 === iso)?.label_ar ?? '';
+    this.arCity.update((m) => ({ ...m, [key]: name.split('،')[0].split(',')[0].trim() }));
+  }
+
+  constructor() {
+    effect(() => {
+      const city = this.text('profile.home_city');
+      const iso = this.text('profile.home_country');
+      if (this.i18n.lang() === 'ar' && city && iso) untracked(() => void this.loadArCity(city, iso));
+    });
   }
 
   /** The small source label under a value; null when the CV said nothing about it. */
@@ -642,50 +682,17 @@ export class WelcomePage implements OnInit {
 
   // ---- screen 4: what jobs -----------------------------------------------------------
 
-  protected chipClass(on: boolean): string {
-    return `rounded-full border px-3 py-1 text-sm ${on ? 'border-brand-500 bg-brand-50 font-medium text-brand-700 dark:bg-slate-800 dark:text-white' : 'border-slate-300 text-slate-500 dark:border-slate-700 dark:text-slate-400'}`;
-  }
-
-  protected toggleChip(list: WritableSignal<Chip[]>, text: string, which: 'roles' | 'where'): void {
-    list.update((cs) => cs.map((c) => (c.text === text ? { ...c, on: !c.on } : c)));
-    this.markSet(which);
-  }
-
-  private markSet(which: 'roles' | 'where'): void {
-    if (which === 'roles') this.rolesSet = true;
-    else this.whereSet = true;
-  }
-
-  private add(list: WritableSignal<Chip[]>, texts: string[]): void {
-    list.update((cs) => {
-      const have = new Set(cs.map((c) => c.text.toLowerCase()));
-      return [...cs.map((c) => (texts.some((t) => t.toLowerCase() === c.text.toLowerCase()) ? { ...c, on: true } : c)), ...texts.filter((t) => !have.has(t.toLowerCase())).map((text) => ({ text, on: true }))];
-    });
-  }
-
-  protected addRole(): void {
-    const t = this.newRole.trim();
-    if (!t) return;
-    this.add(this.roles, expandQueries([t])); // "React/Next.JS Developer" becomes two searches
-    this.newRole = '';
+  protected setRoles(list: string[]): void {
+    this.roles.set(list);
     this.rolesSet = true;
   }
 
-  protected addPlace(): void {
-    const t = this.newPlace.trim();
-    if (!t) return;
-    this.add(this.where, [t]);
-    this.newPlace = '';
-    this.whereSet = true;
+  protected setModes(list: string[]): void {
+    this.modes.set(list as WorkMode[]);
   }
 
-  protected toggleLevel(s: string): void {
-    const cur = this.level();
-    this.set('filters.seniority', cur.includes(s) ? cur.filter((x) => x !== s) : this.seniorities.filter((x) => x === s || cur.includes(x)));
-  }
-
-  protected setTrack(t: 'tech' | 'general'): void {
-    this.track.set(t);
+  protected setTrack(t: string): void {
+    this.track.set(t === 'tech' ? 'tech' : 'general');
     this.trackSet = true;
   }
 
@@ -697,24 +704,30 @@ export class WelcomePage implements OnInit {
       const values: Record<string, unknown> = {};
       const changed = (k: string, v: unknown) => JSON.stringify(v) !== JSON.stringify(this.saved[k] ?? (Array.isArray(v) ? [] : typeof v === 'string' ? '' : null));
       for (const [k, v] of Object.entries(this.vals())) {
-        // track is sent on its own; sensitive answers are only sent when the user answers them below
-        if (k === 'track' || k === 'search.queries' || SENSITIVE.has(k) || v === undefined) continue;
+        // profile and answers only: track, the search lists and the places are saved below; sensitive answers only when answered here;
+        // location is derived from the home city and country, locked facts are protected by the server
+        if (k === 'track' || k.startsWith('search.') || k.startsWith('filters.') || k === 'profile.location' || k === 'profile.locked_facts' || SENSITIVE.has(k) || v === undefined) continue;
         if (v === null && !(k in this.saved)) continue;
         if (changed(k, v)) values[k] = v;
       }
-      const queries = this.roles().filter((c) => c.on).map((c) => c.text);
-      if (JSON.stringify(queries) !== JSON.stringify(this.cfg?.search.queries ?? [])) values['search.queries'] = queries;
-      const country = this.countryName();
-      const savedAuth = asList(this.saved['answers.authorized_countries']);
-      if (this.authorized() === 'yes' && country && !savedAuth.includes(country)) values['answers.authorized_countries'] = [country];
-      else if ((this.authorized() === 'no' || this.authorized() === 'ask') && savedAuth.length) values['answers.authorized_countries'] = [];
       for (const f of this.eeoFields) {
         const mode = this.eeoMode();
         const target = mode === 'decline' ? 'decline' : mode === 'now' ? this.eeo[f.key] || null : null;
         if (target !== ((this.saved[`answers.${f.key}`] as string | undefined) ?? null)) values[`answers.${f.key}`] = target;
       }
-      if (this.salary.trim() !== String(this.saved['answers.salary_expectation'] ?? '')) values['answers.salary_expectation'] = this.salary.trim();
-      await this.api.post('/infer/apply', { values, where: this.where().filter((c) => c.on).map((c) => c.text), remote: this.remote(), track: this.track() });
+      const salary = this.salary.trim();
+      if (salary !== String(this.saved['answers.salary_expectation'] ?? '')) values['answers.salary_expectation'] = salary;
+      if (salary && !this.saved['answers.salary_currency'] && this.currency()) values['answers.salary_currency'] = this.currency();
+      // the profile (home country) first: the places derive the work-permit answers from it
+      await this.api.post('/infer/apply', { values, track: this.track() });
+      const cfg = await this.api.get<SearchConfig>('/search');
+      cfg.search.queries = this.roles();
+      cfg.search.places = this.placesShown();
+      cfg.filters.work_modes = this.modes();
+      cfg.filters.seniority = this.level();
+      const exclude = this.vals()['filters.title_exclude'];
+      if (Array.isArray(exclude)) cfg.filters.title_exclude = asList(exclude);
+      await this.api.put('/search', cfg);
       await this.api.post('/runs', { stages: ['discover', 'enrich', 'rank', 'score'] });
       await this.router.navigate(['/home']);
     } catch (e) {
@@ -726,5 +739,5 @@ export class WelcomePage implements OnInit {
 }
 
 function asList(v: unknown): string[] {
-  return Array.isArray(v) ? v.map(String) : [];
+  return Array.isArray(v) ? (v.every((x) => typeof x === 'string') ? (v as string[]) : v.map(String)) : [];
 }

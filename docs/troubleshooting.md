@@ -14,6 +14,7 @@ It shows which tools are found. Logs are in `logs/linkit.log` inside your
 
 Tailoring and applying need LibreOffice to make the PDF. `linkit doctor` shows `MISSING`.
 
+- On Windows, press **Install it for me** on the LibreOffice card in the app.
 - Install it from [libreoffice.org](https://www.libreoffice.org/download/), or install the
   minimal bundle with `linkit install-libreoffice <zip>`. See [Install](install.md#libreoffice).
 - On Windows it is also found in `Program Files` and `LocalAppData`. On macOS, in

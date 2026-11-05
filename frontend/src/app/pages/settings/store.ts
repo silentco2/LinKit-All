@@ -8,12 +8,16 @@ import { ApplicationAnswers, Profile, SearchConfig } from '../../types';
 export type FieldState = { state: 'saving' | 'saved' | 'error'; error?: string };
 type Obj = 'search' | 'profile' | 'answers';
 type Detail = { loc: (string | number)[]; msg: string; type: string; ctx?: Record<string, unknown> };
-type Sent = { ok: true } | { ok: false; status: number; detail: unknown };
+type Sent = { ok: true; body: unknown } | { ok: false; status: number; detail: unknown };
 
 const DEBOUNCE_MS = 400;
 const TICK_MS = 2000;
 const URLS: Record<Obj, string> = { search: '/search', profile: '/profile', answers: '/profile/answers' };
-const PROFILE_FIELDS = ['full_name', 'email', 'phone', 'location', 'skills', 'locked_facts'] as const;
+// locked_facts is left out on purpose: protection is automatic and the server keeps the stored facts when a save omits them
+// what the server works out from the places (and work modes) when the search config is saved
+const DERIVED = ['search.locations', 'search.remote', 'filters.locations', 'sources.jobspy_country'];
+const DERIVED_ANSWERS = ['authorized_countries', 'visa_countries', 'willing_to_relocate'] as const;
+const PROFILE_FIELDS = ['full_name', 'email', 'phone', 'location', 'address', 'postal_code', 'home_city', 'home_country', 'skills'] as const;
 
 /**
  * One in-memory copy each of the search config, the profile and the answers, saved as the user edits.
@@ -122,6 +126,7 @@ export class SettingsStore {
       const sent = new Map(this.dirty[obj]);
       const r = await this.put(obj);
       if (!r.ok) return this.failed(obj, sent, r);
+      if (obj === 'search') await this.adopt(r.body as SearchConfig, sent.has('search.places'));
       for (const [k, rev] of sent) {
         if (this.dirty[obj].get(k) === rev) this.dirty[obj].delete(k); // edited again meanwhile: stays for the next round
         if (this.dirty[obj].has(k)) continue;
@@ -141,11 +146,28 @@ export class SettingsStore {
         await this.put('profile'); // the answers live on the profile row, which a fresh install has not created yet
         res = await send();
       }
-      if (res.ok) return { ok: true };
+      if (res.ok) return { ok: true, body: obj === 'search' ? await res.json().catch(() => null) : null };
       const data = await res.json().catch(() => null);
       return { ok: false, status: res.status, detail: data?.detail ?? `${res.status} ${res.statusText}` };
     } catch {
       return { ok: false, status: 0, detail: this.i18n.t('settings.err.network') };
+    }
+  }
+
+  /** Take what the server derived from the places, except where the user has edited it again since. */
+  private async adopt(saved: SearchConfig | null, places: boolean): Promise<void> {
+    if (saved) {
+      for (const key of DERIVED) {
+        if (this.dirty.search.has(key)) continue;
+        const { root, path } = this.resolve(key);
+        path.slice(0, -1).reduce((o, p) => o[p], root)[path[path.length - 1]] = path.reduce((o: any, p) => o?.[p], saved); // eslint-disable-line @typescript-eslint/no-explicit-any
+      }
+    }
+    if (!places) return;
+    // new places change the work-permit answers; a later save of the answers must not send the old ones back
+    const now = await this.api.get<ApplicationAnswers>('/profile/answers').catch(() => null);
+    if (now) {
+      for (const k of DERIVED_ANSWERS) if (!this.dirty.answers.has(`answers.${k}`)) (this.answers as any)[k] = now[k]; // eslint-disable-line @typescript-eslint/no-explicit-any
     }
   }
 

@@ -18,7 +18,30 @@ export interface RunState {
   stage: Stage | null;
   started_at: string | null;
   error: string | null;
+  /** Why the run stopped or paused, as a stable code the UI words itself (`run.reason.<code>`). */
+  reason_code?: string | null;
+  reason_params?: Record<string, unknown>;
+  /** The socket's last `run` event: started | stopping | finished | failed | paused | cancelled. */
+  status?: string;
   results: Record<string, Record<string, unknown>>;
+}
+
+/** What a run did, from its stages: titles say "Search 3", "Applying 4" or "Search and apply 5". */
+export const runKind = (stages: readonly string[]): 'search' | 'apply' | 'mixed' => {
+  const apply = stages.includes('apply');
+  const search = stages.some((s) => s !== 'apply');
+  return apply && search ? 'mixed' : apply ? 'apply' : 'search';
+};
+
+/** GET /tools/libreoffice. */
+export interface LibreOfficeStatus {
+  installed: boolean;
+  path: string | null;
+  installing: boolean;
+  progress: number;
+  error: string | null;
+  /** False when no download fits this computer (hosted bundle is Windows x64 only): then only "Get LibreOffice" and "No thanks" make sense. */
+  available: boolean;
 }
 
 /** What first-run setup still needs; the server computes it once (`/status`). */
@@ -63,15 +86,31 @@ export interface GoLive {
   eligible: boolean;
   live: boolean;
   samples: { job_id: number; title: string; company: string; screenshots: string[]; tailored: boolean }[];
-  checklist: { cv_approved: boolean; answers_reviewed: boolean; caps_set: boolean; confirm_each: boolean };
+  /** A job whose CV was really tailored, for "See how your CV was tailored". */
+  tailored_example: { job_id: number; title: string; company: string } | null;
+  checklist: {
+    cv_ready: { ok: boolean; detail: 'ready' | 'needs_approval' | 'no_cv' };
+    tailoring: { ok: boolean; mode: 'tailor' | 'original' | 'undecided'; libreoffice: boolean };
+    answers_reviewed: { ok: boolean };
+    open_items: { ok: boolean; count: number };
+    confirm_each: { ok: boolean };
+    caps_set: { ok: boolean; daily_cap_per_site: number };
+  };
 }
 
 export interface Profile {
   full_name: string;
   email: string;
   phone: string;
+  /** Derived on the server from the home city and country. */
   location: string;
+  address: string;
+  postal_code: string;
+  home_city: string;
+  /** ISO2 */
+  home_country: string;
   skills: string[];
+  /** Not edited in the UI: the server keeps them when a save leaves them out. */
   locked_facts: string[];
   cv_name?: string | null;
   cv_source_format?: 'docx' | 'odt' | 'pdf' | 'tex';
@@ -102,9 +141,12 @@ export function expandQueries(queries: string[]): string[] {
   return [...seen.values()];
 }
 
+/** A place you would work: `allowed` = you may work there, `visa` = you would need a visa, `ask` = not answered (never assumed). `country` is ISO2. */
+export interface Place { label: string; city: string; country: string; work: 'allowed' | 'visa' | 'ask' }
+
 export interface SearchConfig {
-  search: { queries: string[]; locations: string[]; posted_within_days: number; max_results_per_query: number };
-  sources: { companies: string[]; jobspy: string[]; jobspy_country: string; regional: string[]; enabled: string[]; telegram_channels: string[]; use_discovered_boards: boolean; boards_per_run: number; linkedin_keywords: string[]; linkedin_window: 'day' | 'week'; linkedin_max_posts: number; linkedin_headless: boolean };
+  search: { queries: string[]; locations: string[]; places: Place[]; remote: boolean; posted_within_hours: number | null; max_results_per_query: number };
+  sources: { companies: string[]; /** Added page -> "Stripe · Greenhouse" (display only; absent on older servers) */ company_labels?: Record<string, string>; jobspy: string[]; jobspy_country: string; regional: string[]; enabled: string[]; telegram_channels: string[]; use_discovered_boards: boolean; boards_per_run: number; linkedin_keywords: string[]; linkedin_window: 'day' | 'week'; linkedin_max_posts: number };
   filters: {
     title_include: string[];
     title_exclude: string[];
@@ -113,6 +155,7 @@ export interface SearchConfig {
     seniority: string[];
     salary_floor_monthly: number;
     salary_currency: string;
+    skip_below_expectation: boolean;
     company_blacklist: string[];
     one_per_company: boolean;
   };
@@ -175,6 +218,8 @@ export interface ApplySection {
   parallel_sites: number;
   generic_agent: boolean;
   email_daily_cap: number;
+  /** null = not decided yet, true = tailor the CV per job, false = send the CV as uploaded. */
+  tailor_cv: boolean | null;
 }
 
 /** Null / empty means "ask me in the Action Center" for the sensitive fields. */
@@ -193,7 +238,15 @@ export interface ApplicationAnswers {
   heard_about: string;
   willing_to_relocate: boolean | null;
   authorized_countries: string[];
+  /** Derived from the places on the Jobs page. */
+  visa_countries: string[];
   needs_sponsorship: boolean | null;
+  military_status: 'completed' | 'postponed' | 'exempted' | 'not_applicable' | 'decline' | null;
+  /** ISO2 */
+  nationality: string;
+  /** ISO date, empty = ask */
+  date_of_birth: string;
+  marital_status: 'single' | 'married' | 'divorced' | 'widowed' | 'decline' | null;
   salary_expectation: string;
   salary_currency: string;
   eeo_gender: string | null;
@@ -270,6 +323,11 @@ export interface LiveEvent {
   type: 'log' | 'stage' | 'run' | 'live_shot';
   level?: string;
   message?: string;
+  /** Log lines and stopped stages: a stable code and its params (`log.<code>` / `run.reason.<code>`). */
+  code?: string;
+  params?: Record<string, unknown>;
+  reason_code?: string | null;
+  reason_params?: Record<string, unknown>;
   stage?: Stage;
   status?: string;
   error?: string;
@@ -292,6 +350,19 @@ export interface LiveShot {
 }
 
 /** "a\nb" <-> ["a", "b"] for one-per-line list fields. */
+/** First and last name for forms; a particle (Abdel, El, Bin, عبد ...) joins the token after it. Mirrors `split_name` on the server. */
+const PARTICLES = new Set(['abd', 'abdel', 'abdul', 'abdal', 'abu', 'el', 'al', 'bin', 'ibn', 'عبد', 'أبو', 'ابو', 'بن', 'ابن', 'ال']);
+export function splitName(full: string): { first: string; last: string } {
+  const units: string[] = [];
+  let pending: string[] = [];
+  for (const tok of full.split(/\s+/).filter(Boolean)) {
+    pending.push(tok);
+    if (!PARTICLES.has(tok.toLowerCase().replace(/^\.+|\.+$/g, ''))) { units.push(pending.join(' ')); pending = []; }
+  }
+  units.push(...pending);
+  return units.length < 2 ? { first: units[0] ?? '', last: '' } : { first: units[0], last: units[units.length - 1] };
+}
+
 export const lines = (text: string): string[] => text.split('\n').map((l) => l.trim()).filter(Boolean);
 export const unlines = (list: string[]): string => list.join('\n');
 
@@ -315,6 +386,9 @@ export interface ActionQuestion {
   options: string[];
   required: boolean;
   reason: string;
+  /** Stable code of the reason (`park.<code>`): not_in_profile, own_answer, no_option, file_missing, ... */
+  reason_code?: string | null;
+  reason_params?: Record<string, unknown>;
   sensitive: boolean;
   /** Server's sensitive category (acknowledge_privacy, acknowledge_legal, eeo_gender, ...), null for ordinary questions. */
   category?: string | null;
@@ -431,6 +505,8 @@ export interface InferredValue {
   source: 'cv' | 'country' | 'roles' | 'years' | 'default' | 'ai';
   level: 'auto' | 'suggest' | 'ask';
   check: boolean;
+  /** A caveat the UI words itself, e.g. `under_one_year`. */
+  note?: string;
 }
 
 /** `GET /infer`, `POST /infer/ai-fill`. A key is missing when the CV says nothing about it. */
@@ -440,6 +516,30 @@ export interface InferPayload {
   sources: { jobspy: string[]; regional: string[]; enabled: string[]; telegram_channels: string[] };
   has_cv: boolean;
 }
+
+/** Where the setting behind a filter reason lives: the Settings section and the field (an element id) to scroll to. */
+const REASON_SETTING: Record<string, { section: string; focus: string }> = {
+  title_not_included: { section: 'jobs', focus: 'role-add' },
+  title_excluded: { section: 'jobs', focus: 'exc' },
+  work_mode: { section: 'jobs', focus: 'fld-modes' },
+  location: { section: 'jobs', focus: 'place-add' },
+  seniority: { section: 'jobs', focus: 'fld-level' },
+  too_old: { section: 'jobs', focus: 'fld-posted' },
+  salary: { section: 'jobs', focus: 'salary' },
+  blacklist: { section: 'jobs', focus: 'black' },
+  one_per_company: { section: 'advanced', focus: 'adv-one' },
+  one_per_company_better: { section: 'advanced', focus: 'adv-one' },
+  scam: { section: 'advanced', focus: 'adv-scam' },
+  ghost: { section: 'advanced', focus: 'adv-ghost' },
+  low_score: { section: 'advanced', focus: 'adv-high' },
+  low_rank: { section: 'advanced', focus: 'adv-high' },
+};
+
+/** The Settings field that decides a job's reason (`reason_code`), or null when none does (a job you reported, an unknown code). */
+export const reasonSetting = (code: string | null | undefined): { section: string; focus: string } | null => (code ? REASON_SETTING[code] ?? null : null);
+
+/** A job that is out of the running (filtered out or a weak match): its reason reads "why was this left out". */
+export const isLeftOut = (j: { state: string; tier: Tier | null }): boolean => j.state === 'filtered_out' || j.state === 'below_threshold' || j.tier === 'low';
 
 /** Why a job sits where it is, in the UI language: `reason.<code>` with the server's params, else its English `reason`. */
 export function reasonText(i18n: I18n, j: { reason?: string | null; reason_code?: string | null; reason_params?: Record<string, unknown> }): string {

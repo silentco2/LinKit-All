@@ -14,7 +14,7 @@ from apscheduler.triggers.cron import CronTrigger
 from loguru import logger
 from sqlalchemy import Engine
 
-from linkit_all.api.runner import PipelineRunner, RunBusy
+from linkit_all.api.runner import PipelineRunner, RunBlocked, RunBusy
 from linkit_all.apply.browser import UserBrowser
 from linkit_all.core.search import SearchConfig
 from linkit_all.pipeline import STAGES
@@ -43,6 +43,9 @@ async def scheduled_run(new: bool) -> bool:
         _runner.start(list(STAGES), new=new)
     except RunBusy:
         logger.warning("Scheduled run skipped: a run is already in progress")
+        return False
+    except RunBlocked as e:
+        logger.warning("Scheduled run skipped: {}", e)
         return False
     logger.info("Scheduled run started")
     return True

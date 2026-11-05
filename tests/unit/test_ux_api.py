@@ -8,7 +8,17 @@ import pytest
 from fastapi.testclient import TestClient
 from test_api import SAME_ORIGIN, client, mem_keyring  # noqa: F401  (fixtures)
 
-from linkit_all.core.models import Job, JobEvent, JobState, TailoredCV, Tier, utcnow
+from linkit_all.api import routes
+from linkit_all.core.models import (
+    ActionItem,
+    ActionKind,
+    Job,
+    JobEvent,
+    JobState,
+    TailoredCV,
+    Tier,
+    utcnow,
+)
 from linkit_all.core.presets import PACE, PICKINESS
 from linkit_all.core.search import SearchConfig
 from linkit_all.core.state import transition
@@ -70,7 +80,7 @@ def reason_of(job: Job, event: tuple[str, str | None, dict[str, Any]] | None = N
         ({"seniority": ["junior"]}, {}, {"title": "Senior Developer"}, "seniority",
          "Seniority senior is not one you want", {"level": "senior"}),
         ({}, {"posted_within_days": 14}, {"posted_at": NOW - timedelta(days=40)}, "too_old",
-         "Posted 40 days ago", {"limit": 14, "days": 40}),
+         "Posted 40 days ago", {"limit": 14, "hours": 336, "days": 40}),
         ({"salary_floor_monthly": 50000, "salary_currency": "EGP"}, {},
          {"data": {"salary_max": 20000, "salary_currency": "EGP", "salary_interval": "month"}},
          "salary", "Salary below your floor", {"amount": 20000, "currency": "EGP"}),
@@ -93,7 +103,11 @@ def test_reason_for_each_hard_rule(
 def test_reason_for_posting_without_a_date_uses_the_limit() -> None:
     row = Job(**JOB)
     event = ("posted more than 14 days ago", None, {})
-    assert reason_of(row, event) == ("Posted more than 14 days ago", "too_old", {"limit": 14})
+    assert reason_of(row, event) == (
+        "Posted more than 14 days ago",
+        "too_old",
+        {"limit": 14, "hours": 336},
+    )
 
 
 def test_reason_for_company_rule_and_trust_drops() -> None:
@@ -189,11 +203,19 @@ def dry_run(client: TestClient, title: str, shots: int = 1, code: str = "dry_run
         return event.id
 
 
-def test_golive_without_samples(client: TestClient) -> None:
+def test_golive_without_samples(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(routes, "soffice_path", lambda: None)
     got = client.get("/api/golive").json()
     assert got["eligible"] is False and got["live"] is False and got["samples"] == []
-    assert got["checklist"] == {"cv_approved": False, "answers_reviewed": False,
-                                "caps_set": True, "confirm_each": True}  # fmt: skip
+    assert got["tailored_example"] is None
+    assert got["checklist"] == {
+        "cv_ready": {"ok": False, "detail": "no_cv"},
+        "tailoring": {"ok": False, "mode": "undecided", "libreoffice": False},
+        "answers_reviewed": {"ok": False},
+        "open_items": {"ok": True, "count": 0},
+        "confirm_each": {"ok": True},
+        "caps_set": {"ok": True, "daily_cap_per_site": 20},
+    }
 
 
 def test_golive_samples_are_recent_dry_runs_with_screenshots(client: TestClient) -> None:
@@ -235,27 +257,66 @@ def test_golive_screenshot_url_is_servable(client: TestClient) -> None:
     assert client.get(url).status_code == 200
 
 
-def test_golive_checklist_flags(client: TestClient) -> None:
+def test_golive_checklist_flags(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(routes, "soffice_path", lambda: None)
     client.put("/api/profile", json={"full_name": "J", "email": "j@x.io"}, headers=SAME_ORIGIN)
-    checklist = client.get("/api/golive").json()["checklist"]
-    assert checklist["cv_approved"] is False  # no CV uploaded yet
+
+    def checklist() -> dict[str, Any]:
+        got: dict[str, Any] = client.get("/api/golive").json()["checklist"]
+        return got
+
+    assert checklist()["cv_ready"] == {"ok": False, "detail": "no_cv"}
 
     from test_tailor import make_cv
 
     cv = make_cv(client.app.state.settings.data_dir.parent / "cv.docx").read_bytes()  # type: ignore[attr-defined]
     client.post("/api/profile/cv", params={"filename": "cv.docx"}, content=cv, headers=SAME_ORIGIN)
-    assert client.get("/api/golive").json()["checklist"]["cv_approved"] is True
+    assert checklist()["cv_ready"] == {"ok": True, "detail": "ready"}
 
     # saving the untouched defaults is not "reviewed"; a changed answer is
     client.put("/api/profile/answers", json={}, headers=SAME_ORIGIN)
-    assert client.get("/api/golive").json()["checklist"]["answers_reviewed"] is False
+    assert checklist()["answers_reviewed"]["ok"] is False
     body = {"authorized_countries": ["Egypt"]}
     client.put("/api/profile/answers", json=body, headers=SAME_ORIGIN)
-    assert client.get("/api/golive").json()["checklist"]["answers_reviewed"] is True
+    assert checklist()["answers_reviewed"]["ok"] is True
 
     put_cfg(client, apply={"daily_cap_per_site": 41, "submit_without_asking": True, "live": True})
     got = client.get("/api/golive").json()
     assert got["live"] is True
-    assert got["checklist"]["caps_set"] is False and got["checklist"]["confirm_each"] is False
+    assert checklist()["caps_set"] == {"ok": False, "daily_cap_per_site": 41}
+    assert checklist()["confirm_each"]["ok"] is False
     put_cfg(client, apply={"daily_cap_per_site": 40})
-    assert client.get("/api/golive").json()["checklist"]["caps_set"] is True
+    assert checklist()["caps_set"]["ok"] is True
+
+
+def test_golive_tailoring_mode_follows_the_choice_and_libreoffice(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    tools = {"lo": None}
+    monkeypatch.setattr(routes, "soffice_path", lambda: tools["lo"])
+
+    def tailoring() -> dict[str, Any]:
+        got: dict[str, Any] = client.get("/api/golive").json()["checklist"]["tailoring"]
+        return got
+
+    assert tailoring() == {"ok": False, "mode": "undecided", "libreoffice": False}
+    put_cfg(client, apply={"tailor_cv": True})
+    assert tailoring() == {"ok": False, "mode": "tailor", "libreoffice": False}  # needs the tool
+    tools["lo"] = "soffice"  # type: ignore[assignment]
+    assert tailoring() == {"ok": True, "mode": "tailor", "libreoffice": True}
+    tools["lo"] = None
+    put_cfg(client, apply={"tailor_cv": False})
+    assert tailoring() == {"ok": True, "mode": "original", "libreoffice": False}
+
+
+def test_golive_open_items_and_a_tailored_example(client: TestClient) -> None:
+    job_id = seed(client, "Tailored", JobState.needs_user)
+    with client.app.state.db.begin() as s:  # type: ignore[attr-defined]
+        s.add(ActionItem(job_id=job_id, kind=ActionKind.captcha, message="x"))
+        s.add(TailoredCV(job_id=job_id, docx_path="a.docx", pdf_path="a.pdf", applied=[]))
+        newer = TailoredCV(job_id=job_id, docx_path="b.docx", pdf_path="b.pdf",
+                           applied=[{"segment_id": 1, "old_text": "a", "new_text": "b"}])  # fmt: skip
+        s.add(newer)
+    got = client.get("/api/golive").json()
+    assert got["checklist"]["open_items"] == {"ok": False, "count": 1}
+    assert got["tailored_example"] == {"job_id": job_id, "title": "Tailored", "company": "Tailored"}

@@ -4,9 +4,8 @@ import { GmailConnect, GmailConnected } from '../../components/gmail-connect';
 import { KeyForm } from '../../components/key-form';
 import { VaultGate, VaultReady } from '../../components/vault-gate';
 import { I18n, TPipe } from '../../i18n';
-import { fmtNum, labelOr, localeOf } from '../../locale';
+import { labelOr, localeOf } from '../../locale';
 import { ApiKeyProvider, VaultEntry, VaultState } from '../../types';
-import { Field } from './saved';
 import { SettingsStore } from './store';
 
 type Note = { ok: boolean; text: string };
@@ -14,7 +13,7 @@ type Note = { ok: boolean; text: string };
 /** Settings > Accounts & email: saved passwords (the vault), Gmail for sign-up codes and email applications, API keys. */
 @Component({
   selector: 'app-settings-accounts',
-  imports: [Field, GmailConnect, KeyForm, VaultGate, TPipe],
+  imports: [GmailConnect, KeyForm, VaultGate, TPipe],
   template: `
     <div class="space-y-6">
       @if (note(); as n) {
@@ -28,7 +27,7 @@ type Note = { ok: boolean; text: string };
           <div class="space-y-4">
             <div class="flex flex-wrap items-center gap-3">
               <span class="badge tier-high">{{ 'vault.unlocked' | t }}</span>
-              <span class="text-sm text-slate-500">{{ (entries().length === 1 ? 'vault.entries.one' : 'vault.entries.other') | t: { n: num(entries().length) } }}</span>
+              <span class="text-sm text-slate-500">{{ plural('vault.entries', entries().length) }}</span>
               <span class="ms-auto flex gap-2">
                 <button type="button" class="btn" [disabled]="busy()" (click)="toggleExport()" [attr.aria-expanded]="exporting()">{{ 'vault.export' | t }}</button>
                 <button type="button" class="btn" [disabled]="busy()" (click)="lock()">{{ 'vault.lock' | t }}</button>
@@ -87,20 +86,13 @@ type Note = { ok: boolean; text: string };
       </section>
 
       <section class="card space-y-4">
-        <h2>{{ 'settings.acc.gmail' | t }} <span class="text-sm font-normal text-slate-500">({{ 'common.optional' | t }})</span></h2>
+        <h2>{{ 'settings.acc.gmail' | t }}</h2>
         <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'setup.email.intro' | t }}</p>
         <app-gmail-connect [unlocked]="unlocked()" (connected)="onGmail($event)" />
-        @if (unlocked()) {
-          <div class="max-w-xs border-t border-slate-100 pt-4 dark:border-slate-800">
-            <app-field key="apply.email_daily_cap" for="e-cap" [label]="'setup.email.cap' | t" [hint]="'setup.email.capHint' | t">
-              <input id="e-cap" type="number" min="1" max="100" class="input" [value]="store.cfg.apply.email_daily_cap" (change)="store.update('apply.email_daily_cap', num2($event))">
-            </app-field>
-          </div>
-        }
       </section>
 
       <section class="card space-y-4">
-        <h2>{{ 'setup.keys.title' | t }} <span class="text-sm font-normal text-slate-500">({{ 'common.optional' | t }})</span></h2>
+        <h2>{{ 'setup.keys.title' | t }}</h2>
         <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'setup.keys.intro' | t }}</p>
         @if (!unlocked()) {
           <div class="alert alert-info" role="status">{{ 'settings.acc.needVaultKeys' | t }}</div>
@@ -145,18 +137,12 @@ export class AccountsSection implements OnInit {
     void this.loadAll();
   }
 
-  protected num = (n: number): string => fmtNum(this.loc(), n);
+  protected plural = (base: string, n: number): string => this.i18n.plural(base, n);
   protected kindLabel = (kind: string): string => labelOr(this.i18n, 'vault.kind.', kind);
   protected when = (iso: string): string => new Date(iso).toLocaleString(this.loc());
 
   protected val(e: Event): string {
     return (e.target as HTMLInputElement).value;
-  }
-
-  /** An empty box is NaN, which the server rejects with a message for this field. */
-  protected num2(e: Event): number {
-    const box = e.target as HTMLInputElement;
-    return box.value.trim() === '' ? NaN : box.valueAsNumber;
   }
 
   private async loadAll(): Promise<void> {
@@ -174,7 +160,7 @@ export class AccountsSection implements OnInit {
   }
 
   private waiting(n: number): string {
-    return this.i18n.t(n === 1 ? 'settings.acc.waiting.one' : 'settings.acc.waiting.other', { n: this.num(n) });
+    return this.i18n.plural('settings.acc.waiting', n);
   }
 
   /** Run an action; it returns the (already translated) text to show. */

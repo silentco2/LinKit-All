@@ -1,138 +1,178 @@
-# UX plan and audit: LinKit All before V1
+# UX plan and audit: LinKit All V1
 
-Written 2026-10-29. Status: plan only. None of it is built yet.
+Written 2026-10-29, brought up to date 2026-11-05. Status: **UX1–UX6, round 2, the UX7 fixes and U15–U18 are built.**
+What is left: the study with real people, merging the Outlook branch (section 12).
 Goal: make the app **simple, usable, learnable and memorable**, and get a new user from install to the first
-job search with as few inputs as possible, with no invented answers (CLAUDE.md §2 still applies to everything).
+job search with as few inputs as possible, with no invented answers (CLAUDE.md §2 applies to everything).
 
-Read with `CLAUDE.md` (binding rules), `plan.md` and `handoff.md`. Section 13 lists the CLAUDE.md edits this plan needs.
+Read with `CLAUDE.md` (binding rules), `plan.md` and `handoff.md`.
 
 ---
 
 ## 0. TL;DR
 
-| | Today | After this plan |
+| | Before | Now |
 |---|---|---|
-| Setup screens | 10 tabs, 2 rows, no Next/Back | 4 short first-run screens; the rest is Settings or asked just in time |
-| Controls shown before the first search | ~90, plus ~100 source checkboxes | **5 decisions** (upload CV, pick AI, confirm profile, confirm roles + place, start) |
-| Fields asked twice | name, location, country, currency ×3, email, company, title, links | each asked once, or derived |
-| Save buttons | ~12 (most of them save *everything*) | 0: autosave with a "Saved" tick |
+| Setup screens | 10 tabs, 2 rows, no Next/Back | 4 first-run screens at `/welcome`; the rest is Settings or asked just in time |
+| Controls shown before the first search | ~90, plus ~100 source checkboxes | **5 decisions** (CV, AI, confirm profile, roles + places, start). The simulated round measured a median of 6 |
+| Suggestions | free text everywhere | offline lists (GeoNames cities, O*NET titles and skills) behind tag/chip inputs; tap-to-add recommendations |
+| Where to work | 4 location fields, Indeed country as text | **one places list**; each place is "I can work here", "I'd need a visa" or unanswered |
+| Fields asked twice | name, location, country, currency ×3, email, company, title, links | each asked once, or derived; name typed once; home address and international phone in the profile |
+| CV upload | filled nothing | fills empty non-sensitive fields; employers, titles and degrees are protected automatically |
+| Save buttons | ~12 | 0: autosave with a "Saved" tick |
 | Nav items | 8 | 5: Home, Jobs, Needs you, Activity, Settings |
-| Starting a run | 5 stage checkboxes + "new vs resume" | 1 smart button whose label follows the state |
-| Going live | a checkbox anytime | guided unlock after a reviewed practice run |
+| Starting a run | 5 stage checkboxes + "new vs resume" | 1 smart button that follows the state, plus an "Apply to N jobs" button; a line per job while applying |
+| Going live | a checkbox anytime | "Ready to apply for real?" in Home's main card, with real checks, screenshots, the CV red-line and a named confirm |
+| AI limits | raw vendor error, run "failed" | one plain message, run paused, "use another AI" |
+| LibreOffice | red box, `linkit doctor` | optional; one-click install from the hosted bundle (Windows x64) or use the CV as it is |
+| Privacy | "everything stays on this computer" | the exact list of what leaves it ("What leaves this computer") |
+| Arabic | partly English at run time | one numeral system, six plural forms, translated reasons, errors and log lines |
 
-The core change is a **rule-based inference layer** (section 4): the CV plus the country plus the target roles
-derive nearly every other setting. Each derived value shows where it came from and stays editable.
+The core is a **rule-based inference layer** (section 4): the CV, the places and the target roles derive nearly
+every other setting. Each derived value shows its source and stays editable.
 
 ---
 
-## 1. Decisions taken (maintainer, 2026-10-29)
+## 1. Decisions (maintainer)
 
-| # | Topic | Decision |
-|---|---|---|
-| D1 | Persona | **Both**: tech and non-tech. The track is chosen at the start. The plan *pre-selects* it from the CV, so it costs one tap, not a question |
-| D2 | CV parsing | **Rules first, AI fills the gaps.** Each AI-filled value is marked "check this" |
-| D3 | Work authorization | **Suggested from the country of residence, one-tap confirm, nothing pre-ticked.** Sponsorship is then worked out per job from the confirmed list |
-| D4 | Vault | **Asked only when first needed** (first account sign-up or adding Gmail). There's no vault step in setup |
-| D5 | Navigation | **Merge Review + Action Center into "Needs you".** Nav: Home, Jobs, Needs you, Activity, Settings |
-| D6 | Terms | **Plain words** (glossary in section 9) |
-| D7 | Saving | **Autosave** on blur with a "Saved" tick. Risky switches still confirm |
-| D8 | Salary | **One expectation** (used only to answer forms). The filter floor is a separate opt-in, off by default. **One currency**, from the country |
-| D9 | Run control | **One smart button** on Home. Resume is automatic; stages move under Advanced |
-| D10 | Live mode | **Guided unlock** after the first practice run |
-| D11 | Tuning knobs | **Presets** (Pace, Pickiness) **+ a collapsed Advanced section**; changed values are marked |
+| # | Date | Topic | Decision |
+|---|---|---|---|
+| D1 | 2026-10-29 | Persona | **Both** tech and non-tech. The track is pre-selected from the CV: one tap, not a question |
+| D2 | 2026-10-29 | CV parsing | **Rules first, AI fills the gaps.** AI-filled values are marked "check this" and must be verbatim from the CV |
+| D3 | 2026-10-29 | Work authorization | Never assumed. Now set per place (D17). Sponsorship is worked out per job |
+| D4 | 2026-10-29 | Vault | **Asked only when first needed** (first account sign-up or adding Gmail) |
+| D5 | 2026-10-29 | Navigation | **Review + Action Center = "Needs you".** Nav: Home, Jobs, Needs you, Activity, Settings |
+| D6 | 2026-10-29 | Terms | **Plain words** (section 9) |
+| D7 | 2026-10-29 | Saving | **Autosave** with a "Saved" tick. Risky switches still confirm |
+| D8 | 2026-10-29 | Salary | One expectation used only to answer forms; the filter floor is a separate opt-in. Refined by D21 |
+| D9 | 2026-10-29 | Run control | **One smart button** on Home. Resume is automatic; stages are under Advanced |
+| D10 | 2026-10-29 | Live mode | **Guided unlock** after the first practice run |
+| D11 | 2026-10-29 | Tuning knobs | **Presets** (Pace, Pickiness) **+ a collapsed Advanced section**; changed values are marked |
+| D12 | 2026-10-29 | Q1 | Egyptian and Gulf Telegram lists: the first curated MENA tech channels shipped (947d891). Other lists still to curate |
+| D13 | 2026-10-31 | Q2 | **Internships DO count** toward years of experience (first "excluded", changed 2026-10-31) |
+| D14 | 2026-10-31 | Q3 | Outlook: built in its own session on branch `claude/outlook-oauth-898770` (f0214e3). **Not merged.** Needs an Azure client id |
+| D15 | 2026-10-29 | Q4 | No wizard for power users. Settings has everything; "Redo first-time setup" sits in Settings |
+| D16 | 2026-10-29 | AI language | AI writes **English only**. Job details are never translated (copied verbatim). English variants of multi-language sources are kept |
+| D17 | 2026-11-01 | Places | One list: **allowed / visa / unanswered**. Work rights are never assumed. Home country and old-config places start unanswered |
+| D18 | 2026-10-29 | Arabic plurals | `Intl.PluralRules`: zero/one/two/few/many/other in the UI (39a7e3f) |
+| D19 | 2026-10-31 | Offline data | GeoNames (countries, cities) and O*NET (titles, skills) ship with the app; `/api/suggest` reads them |
+| D20 | 2026-10-31 | Exchange rates | A shipped table, refreshed from open.er-api.com at each search (only a currency code is sent) |
+| D21 | 2026-10-31 | Salary | **One monthly expectation** plus an opt-in "skip lower". Postings in other currencies are converted |
+| D22 | 2026-10-31 | LinkedIn posts | One quiet note, no checkbox. Google search, no LinkedIn login (9d033de) |
+| D23 | 2026-10-31 | Sensitive answers | Nationality, date of birth, marital status and military status are sensitive: "Ask me", never sent to the AI |
+| D24 | 2026-10-31 | CV upload | Fills empty non-sensitive fields. Locked facts are automatic (no "never changed" input) |
+| D25 | 2026-11-01 | Browser | **One Show/Hide setting** for every browser LinKit runs |
+| D26 | 2026-11-01 | LibreOffice | **Optional one-click install.** Declining means the original CV is used, no tailoring. **Practice works without LibreOffice** |
+| D27 | 2026-11-01 | Testing | **No more simulated users.** Further findings come from the maintainer |
+| D28 | 2026-11-05 | Level tips | Level chips explain themselves in **hover/focus tooltips** (maintainer's choice), not inline text |
+| D29 | 2026-11-05 | Source names | Added sources are named **"Company · platform"** (60b9c97) |
+| D30 | 2026-11-05 | Work rights | A work right **belongs to the country**: a new place in a listed country inherits it, a change applies to all its rows (52b068e) |
+| D31 | 2026-11-05 | LibreOffice bundle | **Hosted on the GitHub release** `libreoffice-26.2.6-win-x64` of silentco2/LinKit-All, with a pinned SHA-256 (dfb7c26). Verified with a real install |
 
 ---
 
 ## 2. How this audit was done
 
-- **Code read**: `frontend/src/app/pages/setup.ts` (all 1068 lines), `app.ts`, `app.routes.ts`, the copy in
-  `i18n/en.ts`, plus the models in `core/search.py`, `core/profile.py` and `apply/answers.py`.
-- **App run** on a fresh data dir (`build/ux-audit/data`), first-run screens: Setup, Jobs, Live run, Action Center.
-- **Frameworks used**: design critique (first impression, usability, hierarchy, consistency), UX copy
-  (clear, concise, consistent, useful, human), the UI/UX Pro Max rule base (onboarding, forms & feedback,
-  navigation: `progressive-disclosure`, `multi-step-progress`, `form-autosave`, `error-recovery`,
-  `empty-states`, `nav-hierarchy`, `undo-support`), Nielsen's 10 heuristics, and a user-research
-  validation plan (section 14).
-- **Out of scope on purpose**: visual polish, colour and contrast, and an accessibility pass. You asked for UX
-  first. Those come after V1's flow is settled.
+- **Code read**: the old `pages/setup.ts` (1068 lines, now deleted), `app.ts`, routes, `i18n/en.ts`, and the models in
+  `core/search.py`, `core/profile.py` and `apply/answers.py`.
+- **App run** on a fresh data dir, then a browser E2E pass after UX6 (10 of 10 flows), then a simulated usability round (section 14).
+- **Frameworks**: design critique, UX copy, the UI/UX Pro Max rule base, Nielsen's 10 heuristics.
+- **Out of scope on purpose**: visual polish, colour contrast, a full accessibility pass.
 
 ---
 
-## 3. Audit findings
+## 3. Findings and status
 
 Severity: 🔴 blocks or tires new users · 🟡 slows or confuses · 🟢 polish.
+Status: **Fixed** (built as planned) · **Changed** (solved a different way) · **Open**.
 
 ### 3.1 Onboarding
 
-| # | Finding | Sev | Heuristic | Fix (section) |
-|---|---|---|---|---|
-| O1 | 10 setup tabs in 2 rows, with no Next/Back and no "step x of y". Users can't tell what's required and what's optional | 🔴 | Visibility of status, minimalist design | 4-screen first run (5) |
-| O2 | Profile asks for name, email, phone and location **before** the CV upload, then Answers asks first/last name, city, country, company, title, links and years again. All of it is in the CV | 🔴 | Recognition over recall, error prevention | Inference layer (4) |
-| O3 | The location is typed 4 times: profile location, search locations, filter locations, Indeed country (`"egypt"` as free text) | 🔴 | Consistency | One "Where" field (4.3) |
-| O4 | Currency is typed 3 times: filter currency select, answers currency text, implicit country | 🟡 | Consistency | One currency from the country (D8) |
-| O5 | Sources: ~100 checkboxes, **all off**, plus 8 site boxes and Telegram. That's choice overload, and a new user gets nothing they didn't tick | 🔴 | Flexibility vs. minimalism | Presets per track + country (4.4) |
-| O6 | Telegram defaults are Russian-language channels (from freehire). They're wrong for MENA users and add noise | 🔴 | Match with the real world | Country/track channel lists (4.4) |
-| O7 | Vault, Email and API keys are three main-flow steps, all optional, and two need the vault first. The order makes users solve problems they don't have yet | 🔴 | Minimalism | Just-in-time setup (6) |
-| O8 | Step ticks: "Application answers" and "Applying" **never** show ✓ (hard-coded `false`), and "Filters" ticks whenever "Search" does. Setup never feels finished | 🟡 | Visibility of status | Real completion rules (5.5) |
-| O9 | The "Setup isn't finished, open the setup wizard" banner shows **on the setup page itself**, and on every page | 🟢 | Aesthetic, minimalist | Replace with a progress chip (5.5) |
-| O10 | The finish checklist shows LibreOffice ✗ while the Start button is enabled (`allReady` ignores it) | 🟢 | Consistency | One readiness rule (5.5) |
-| O11 | The first visit lands on **Jobs** (empty), not setup (`'' → jobs`) | 🟡 | Help users start | `''` → Home, which routes a new user to the first run (7) |
-| O12 | AI step: "Test" and "Save" are separate, and the model field is free text. The app already detects installed CLIs (`available`) but doesn't pre-select or auto-test | 🟡 | Error prevention | Auto-detect + test on pick (5.2) |
-| O13 | 24 answer fields in one form (13 basics, 4 sensitive, 5 EEO, 2 agreements) | 🔴 | Minimalism | 4 derived, 3 one-tap, the rest just in time (4, 6) |
+| # | Finding | Sev | Status |
+|---|---|---|---|
+| O1 | 10 setup tabs, no Next/Back, no "step x of y" | 🔴 | **Fixed** 4-screen first run with "Step n of 4" (4d96adc) |
+| O2 | Name, email, phone and location asked before the CV, then again in Answers | 🔴 | **Fixed** inference + CV autofill + name typed once (2777e78, ea22b5e, ec1d220) |
+| O3 | Location typed 4 times (profile, search, filter, Indeed country as free text) | 🔴 | **Fixed** one places list; Indeed's country comes from it (dd5e4d2, bc15cd3) |
+| O4 | Currency typed 3 times | 🟡 | **Fixed** one currency from the home country, listed first (ec1d220, 92709c3) |
+| O5 | ~100 source checkboxes, all off | 🔴 | **Changed** presets pick the sources; one grouped "Job sources" list with a recommended filter and an Add-a-source box (da96a87, bc15cd3) |
+| O6 | Telegram defaults were Russian-language channels | 🔴 | **Fixed** per country/track lists; first MENA tech channels curated (2777e78, 947d891). Other lists: see Q1 |
+| O7 | Vault, Email and API keys as three main-flow steps | 🔴 | **Fixed** just-in-time cards (3c9ae0c, 60eb327) |
+| O8 | Step ticks never ticked or ticked too early | 🟡 | **Fixed** one server rule `setup_state` (4d96adc) |
+| O9 | "Setup isn't finished" banner on the setup page itself | 🟢 | **Fixed** replaced by a "Setup n/4" chip on Settings (986969a) |
+| O10 | Checklist shows LibreOffice ✗ while Start is enabled | 🟢 | **Changed** LibreOffice is optional; practice works without it (ba46591, 717f827) |
+| O11 | First visit lands on empty Jobs | 🟡 | **Fixed** `''` → Home; a new user goes to `/welcome` (4d96adc) |
+| O12 | AI step: separate Test and Save, free-text model | 🟡 | **Fixed** auto-detect, auto-test on pick (4d96adc) |
+| O13 | 24 answer fields in one form | 🔴 | **Fixed** 4 derived, a few one-tap, the rest just in time (2777e78, 60eb327) |
 
 ### 3.2 Saving and feedback
 
-| # | Finding | Sev | Fix |
+| # | Finding | Sev | Status |
 |---|---|---|---|
-| F1 | Search, Filters, Scoring, Trust, LinkedIn, Apply and Email cap each have a Save button, but all of them `PUT` the **whole** config. "Filters saved" also silently saves Apply edits made on another tab. The mental model is wrong | 🔴 | Autosave per field (D7) |
-| F2 | Unsaved edits are lost when you leave the page, with no warning (`form-autosave`) | 🟡 | Autosave |
-| F3 | Server errors are shown raw (`(e as Error).message`) in a banner at the top, far from the field (`error-placement`, `error-clarity`) | 🟡 | Inline error under the field: cause + fix |
-| F4 | One shared message banner per page: a success on one card shows above an unrelated card | 🟢 | Per-field "Saved" tick |
+| F1 | Seven Save buttons all `PUT` the whole config | 🔴 | **Fixed** autosave per field (da96a87) |
+| F2 | Unsaved edits lost on leaving | 🟡 | **Fixed** autosave |
+| F3 | Raw server errors in a banner far from the field | 🟡 | **Fixed** inline errors under the field (da96a87) |
+| F4 | One shared banner per page | 🟢 | **Fixed** per-field "Saved" tick |
 
 ### 3.3 Information architecture
 
-| # | Finding | Sev | Fix |
+| # | Finding | Sev | Status |
 |---|---|---|---|
-| I1 | 8 flat nav items. Answer bank and Vault are settings, not daily places; Review and Action Center are both "things waiting for me" | 🟡 | 5 items (7) |
-| I2 | Two places for answers (Setup → Answers, Answer bank) and two for the vault (Setup → Vault, Vault page) | 🟡 | One home each, under Settings |
-| I3 | Live run mixes run control, Schedule, Activity and the screenshot view; Report is a separate page about the same runs | 🟡 | "Activity" = live now + history + report |
-| I4 | No "home": nothing answers "what should I do now?" | 🔴 | Home with the next best action (7.1) |
-| I5 | Schedule is hidden inside Live run | 🟡 | A one-line toggle on Home: "Search every day at 09:00" |
+| I1 | 8 flat nav items | 🟡 | **Fixed** 5 items (986969a) |
+| I2 | Two places for answers, two for the vault | 🟡 | **Fixed** one home each under Settings (da96a87) |
+| I3 | Live run mixes control, schedule, activity and screenshots; Report is separate | 🟡 | **Fixed** Activity = Now + History (986969a) |
+| I4 | No home; nothing answers "what now?" | 🔴 | **Fixed** Home with the smart button (986969a) |
+| I5 | Schedule hidden inside Live run | 🟡 | **Fixed** one-line daily toggle on Home |
 
 ### 3.4 Running and applying
 
-| # | Finding | Sev | Fix |
+| # | Finding | Sev | Status |
 |---|---|---|---|
-| R1 | 5 stage checkboxes (Find jobs, Read descriptions, Filter & rank, AI scoring, Apply) expose the pipeline instead of the user's goal | 🟡 | Smart button (8.1) |
-| R2 | "Start a new run (otherwise an unfinished run resumes)" asks users to reason about run internals | 🟡 | Auto-resume; "Start fresh" sits in Advanced |
-| R3 | Live mode is one checkbox, with nothing proving that practice mode worked | 🔴 | Guided unlock (8.2) |
-| R4 | Live run's Start is enabled while setup is unfinished | 🟢 | The button explains what's missing |
+| R1 | 5 stage checkboxes expose the pipeline | 🟡 | **Fixed** smart button (986969a) |
+| R2 | "New run vs resume" asks users to reason about internals | 🟡 | **Fixed** auto-resume; "Start fresh" in Advanced |
+| R3 | Live mode is one checkbox with no proof practice worked | 🔴 | **Fixed** guided unlock (6ee5dc3); checks made real and the confirm made safer (ba46591, 717f827) |
+| R4 | Start enabled while setup is unfinished | 🟢 | **Fixed** the button says what is missing |
 
 ### 3.5 Review and Action Center
 
-| # | Finding | Sev | Fix |
+| # | Finding | Sev | Status |
 |---|---|---|---|
-| A1 | Parked applications are one card each. If 9 jobs ask "notice period", the user answers 9 times (the answer bank helps only *after* the first one) | 🔴 | Batch-resolve by question (10) |
-| A2 | Review has bulk approve but no undo (`undo-support`) | 🟡 | 10 s "Undo" toast |
-| A3 | No keyboard flow for reviewing many jobs | 🟢 | J/K move, A approve, S skip, O open |
-| A4 | A filtered or low job doesn't say *why* in plain words at list level | 🟡 | One-line reason chip ("Title has 'intern'", "Scam score 72") |
+| A1 | 9 jobs ask "notice period", the user answers 9 times | 🔴 | **Fixed** grouped by question (3c9ae0c, 60eb327) |
+| A2 | No undo on bulk approve | 🟡 | **Fixed** 10 s Undo (60eb327) |
+| A3 | No keyboard flow | 🟢 | **Fixed** J/K/A/S/O/X and a `?` cheat sheet (60eb327) |
+| A4 | A filtered or low job doesn't say why | 🟡 | **Fixed** reason chips (6ee5dc3); the reason links to its setting (92709c3) |
 
 ### 3.6 Copy and terms
 
-| # | Finding | Sev | Fix |
+| # | Finding | Sev | Status |
 |---|---|---|---|
-| C1 | Mixed vocabulary: dry run, tiers high/mid/low, run, stage, Action Center, vault | 🟡 | Glossary (9) |
-| C2 | Implementation details in hints: "Wuzzuf … 1 page per 10 s", "`LINKIT_API_KEY`", "One AI call per form page", "Indeed only (Glassdoor gets none)" | 🟡 | Move them to Advanced or the docs |
-| C3 | The "/" split syntax for searches is only explained in a hint | 🟢 | Show the split as chips while typing |
-| C4 | CV intro is 4 sentences about formats before the button | 🟢 | "Upload your CV (Word, PDF, ODT or LaTeX)" + a "Which format is best?" link |
+| C1 | Mixed vocabulary | 🟡 | **Fixed** section 9 (986969a) |
+| C2 | Implementation details in hints | 🟡 | **Changed** moved to Advanced or removed (da96a87, a11af9f); not re-audited line by line |
+| C3 | "/" split syntax only in a hint | 🟢 | **Fixed** tag inputs split into chips (ea22b5e) |
+| C4 | CV intro is 4 sentences about formats | 🟢 | **Fixed** short drop zone text (4d96adc) |
 
-### 3.7 What already works well (keep)
+### 3.7 Found by the simulated round (details: `docs/usability/simulated-round-1.md`)
 
-- Privacy promise up front ("Everything stays on this computer…"). It's the right first message.
-- "Ask me" as the explicit default for sensitive answers is clear and honest. Keep the term.
-- The PDF → DOCX approval gate and the CV segment preview build trust.
+U1–U14 are in the round file. U15–U18 and the smaller items are now fixed:
+
+| # | Finding | Sev | Status |
+|---|---|---|---|
+| U15 | Go-live entry is a small link; no CV red-line diff | 🟡 | **Fixed** go-live in Home's main card with the red-line (d821983; lightbox in 717f827) |
+| U16 | Internal words: "Practised", "Find new jobs" label, raw state names | 🟡 | **Fixed** plain words, "Connected to Claude", states mapped to user words (d821983, 60b9c97; buttons in 717f827) |
+| U17 | Silent apply runs, raw log lines, no "stopped" notice | 🟡 | **Fixed** a line per job, a Stopped state, plain errors with Details (d821983, 93637ec) |
+| U18 | Needs-you cards carry 5–8 controls and no clear main button | 🟡 | **Fixed** one main button per card kind, the rest in a More menu; choice answers save explicitly (52b068e) |
+| – | Smaller items: practice badge on welcome (d821983) · level tips (52b068e) · work rights per country, so no second Riyadh question (52b068e) · select-all focus and undo key (92709c3) · two-step Backspace on tags (52b068e) · added source named "Company · platform" (60b9c97, 52b068e) · job history dates (52b068e) · shareable job URL (92709c3) · flags hidden where Windows can't draw them (52b068e) · PDF name shown after upload (52b068e) · Home "Next" counts the approve queue (52b068e) | 🟢 | **Fixed** |
+
+Remaining limits:
+- No `daily_cap` per-job event. Jobs over the daily cap are skipped before a run starts, so Activity has no line for them.
+- Level tips show on hover and focus only. Touch screens get no tip.
+- Place picker: Enter now picks the first suggestion; unmatched text in the places list shows a hint (fixed in 46d5521).
+
+### 3.8 What already works well (keep)
+
+- The "Ask me" default for sensitive answers; "never sent to the AI" was praised.
+- The PDF → DOCX approval gate and the CV segment preview.
 - Live badges for review and actions counts, desktop notifications, EN/AR with RTL.
-- Plain, friendly copy in most hints. The tone is already good; it's the *amount* of copy that's the problem.
+- Practice mode, the grouped answer, funnel numbers as links, source badges, blunt confirm text.
 
 ---
 
@@ -140,152 +180,118 @@ Severity: 🔴 blocks or tires new users · 🟡 slows or confuses · 🟢 polis
 
 ### 4.1 Confirmation levels
 
-Every setting falls into one of three levels. The UI shows a small source badge on each value: **From your CV ·
-From your country · From your roles · You set this**.
+Each value shows a source badge: **From your CV · From your country · From your roles · You set this**.
 
 | Level | Meaning | UI |
 |---|---|---|
 | **Auto** | Derived by a rule, low risk, shown and editable | Filled in, with a source badge |
-| **Suggest** | Derived, but the user must tap to accept (sensitive, or a guess with real consequences) | Shown as a question with the suggestion as a button; nothing is used until tapped |
+| **Suggest** | Derived, but the user taps to accept | A question with the suggestion as a button; unused until tapped |
 | **Ask** | Never derived (§2) | Left on "Ask me"; asked just in time (section 6) |
 
-AI-filled CV values (D2) are always **Auto + "check this"** until the user has looked at the confirm screen once.
+AI-filled CV values are **Suggest + "check this"**, and must be verbatim from the CV (checked). Nothing is written until the user confirms (`GET /api/infer` computes, `POST /api/infer/apply` writes). A CV upload then fills only **empty, non-sensitive** fields.
 
-### 4.2 Field map: what derives what
+### 4.2 Field map
 
-Inputs the user actually gives: **CV file, AI choice, target roles (confirm), where (confirm), track (confirm)**.
+Inputs the user gives: **CV file, AI choice, roles (confirm), places (confirm), track (confirm)**.
 
-| Setting today | Derived from | Rule | Level |
+| Setting | Derived from | Rule | Level |
 |---|---|---|---|
-| `full_name` | CV | First non-empty paragraph above the contact line, or the largest font run on page 1 | Auto |
-| `email`, `phone` | CV | Regex; DOCX hyperlinks (`mailto:`/`tel:`) are read from the rels too; phone normalized with the country code | Auto |
-| `location` | CV | Header line next to the contacts matching "City, Country" against a city/country list (EN + AR names) | Auto |
-| `first_name`, `last_name` | full name | First token / last token. Arabic particles join the next token: *Abd, Abdel, Abdul, Abu, El, Al, Bin, Ibn* ("Abdel Rahman") | Auto |
-| `city`, `country` | location | Split on the comma, checked against the country list | Auto |
-| `linkedin`, `github`, `portfolio` | CV | URL regex + DOCX hyperlink targets, by domain | Auto |
-| `current_company`, `current_title` | CV | The experience entry whose date range ends in *Present / Current / Now / حتى الآن / الآن* | Auto |
-| `years_experience` | CV | Union of non-overlapping experience date ranges (internships count half or are excluded; see Q2 in section 15) | Auto |
-| `locked_facts` | CV | Every employer, title, degree and institution found → pre-listed as "Never changed" (numbers, dates and contacts are already auto-locked) | Auto |
-| `skills` | CV | The "Skills" section split on `, • | ;` + a known-skills lexicon matched anywhere in the CV | Auto |
-| **track** (new) | skills + titles | ≥ 3 lexicon tech skills **or** a tech title word (engineer, developer, data, devops, QA…) → *Tech*, else *General* | Suggest (one tap: "Looks like tech jobs · Change") |
-| `search.queries` | CV titles | Current + past titles, normalized, seniority words removed, deduped, max 5 → chips the user taps on/off | Suggest |
-| `search.locations` + `filters.locations` | location + remote | **One field: "Where".** Defaults to the city's country + "Remote" if remote is on. Both config lists are written from it | Auto |
-| `filters.work_modes` | — | Default all three; "Include remote jobs" toggle on the roles screen | Auto |
-| `filters.seniority` | years + title words | Band ±1: 0–1 y intern/junior · 1–3 junior/mid · 3–6 mid/senior · 6–10 senior/lead · 10+ lead/manager/executive. *Senior/Lead/Head/Manager* in the current title raises the band | Auto |
-| `filters.title_exclude` | seniority band | Words two or more bands away (mid → *intern, director, VP, head of*) | Auto (Advanced) |
-| `filters.title_include` | — | Empty (ranking already handles relevance); Advanced only | — |
-| `sources.jobspy_country` | country | Country name → the jobspy key (`Egypt → egypt`) | Auto |
-| `sources.regional`, `sources.enabled`, `sources.jobspy` | country + track | Preset table (4.4) | Auto |
-| `sources.telegram_channels` | country + language + track | Curated list per region (4.4); empty when there's no list | Auto |
-| `sources.linkedin_keywords` | queries + language | `"<query> hiring"` + Arabic `"مطلوب <query>"` when the CV or UI is Arabic | Auto (the feature itself stays opt-in) |
-| `filters.salary_currency`, `answers.salary_currency` | country | One currency per country (EGP, SAR, AED…) | Auto |
-| `email.imap_user` | profile email | Same address; no field | Auto |
-| `email.imap_host`, `smtp_host`, `smtp_port` | email domain | gmail/googlemail → Google; yahoo.* → Yahoo; outlook/hotmail/live → "not supported yet" message *before* the user hunts for an app password | Auto |
-| `answers.heard_about` | the job's source | Per job: "LinkedIn", "Wuzzuf", "Company website"… (`Context.job_source` already exists) | Auto (field removed from setup) |
-| `answers.willing_to_relocate` | "Where" vs residence | "Where" includes a place outside the home country → suggest **Yes**; only home + remote → don't ask | Suggest |
-| `answers.authorized_countries` | country of residence | "Are you authorized to work in **Egypt**?" Yes / No, nothing pre-ticked (D3) | Suggest |
-| `answers.needs_sponsorship` | authorized list + **job country** | Per job: job country in the list → "No"; not in the list → "Yes"; country unknown → park (Ask) | Rule from profile data, per job |
-| `answers.salary_expectation` | — | Asked once, optional; "Ask me" by default (§2) | Ask |
-| EEO ×5 | — | One row: **Prefer not to say for all / Ask me each time / Answer now** (expands the 5 selects) | Ask (one control) |
-| `acknowledge_privacy`, `acknowledge_legal` | — | Just in time, with "Always accept privacy notices" on the first card (section 6) | Ask |
-| `notice_period` | — | Just in time, a select (Immediately / 2 weeks / 1 month / 2 months / 3 months), saved to the profile | Ask |
-| AI provider | PATH scan | One CLI found and signed in → pre-selected and auto-tested; several → the CLI first, then API key, then local | Auto |
-| Tiers, AI max, batch | Pickiness preset | Strict 9/6 · Balanced 8/5 · Wide 7/4 (`tier_high`/`tier_mid`) | Auto |
-| Apply pace/caps/parallel | Pace preset | Careful (1 site, 60–120 s, 10/day) · Balanced (current defaults) · Fast (3 sites, 20–60 s, 20/day) | Auto |
+| `full_name` | CV | Top of page 1. Typed once; first/last name derived | Auto |
+| `email`, `phone` | CV | Regex + DOCX hyperlinks. Phone is international, picked with a country-code picker | Auto |
+| home address (address, city, country, postal code) | CV header | City matched against the offline GeoNames list (EN + AR). Address and postal code also fill forms | Auto |
+| `linkedin`, `github`, `portfolio` | CV | URL regex + hyperlink targets. Shown as "read from your CV" with **Use it** | Auto |
+| `current_company`, `current_title` | CV | The entry whose date range ends in *Present / Current / Now / حتى الآن* | Auto |
+| `years_experience` | CV | Union of experience date ranges. **Internships count** (D13) | Auto |
+| level (seniority) | years + **title words** | Band from years; a title that names a level (*Senior, Lead, Manager*) sets it. Years alone never infer manager or executive. Internship-only CVs get an intern/junior level | Auto |
+| `locked_facts` | CV | Every employer, title, degree and institution is protected **automatically**. There is no input for it (D24) | Auto |
+| `skills` | CV | The skills section only, plus a known-skills lexicon; links like "github" are not skills. Shown as tags with O*NET suggestions | Auto |
+| track | skills + titles | Tech vs General | Suggest |
+| `search.queries` | CV titles | Current and past titles, seniority words removed, max 5, as tap-to-add recommendations | Suggest |
+| places | CV country + remote | **One list.** Each place: allowed / visa / unanswered (D17). Search places, filter places, Indeed's country, `authorized_countries` and the visa list are all written from it | Auto / Ask |
+| work rights | — | **Never assumed.** Only an explicit choice adds a country to the authorized or visa list | Ask |
+| `needs_sponsorship` | places + **job country** | Left on "Ask me" → per job: job country allowed → No; visa → Yes; unknown country → Needs you | Rule, per job |
+| `sources.*` | country + track | Preset tables (4.4); LinkedIn keywords default to your job titles | Auto |
+| currency | home country | One currency, listed first in the selector | Auto |
+| salary | — | One **monthly** expectation, optional, "Ask me" by default. Opt-in "skip lower" filter; postings are converted with the FX table (D20, D21) | Ask |
+| `email.imap_*`, `smtp_*` | email domain | Gmail → Google; Yahoo → Yahoo; Outlook → needs the OAuth branch (D14) | Auto |
+| `answers.heard_about` | the job's source | Per job: "LinkedIn", "Wuzzuf", "Company website"… | Auto |
+| notice period | — | Just-in-time select (Immediately … 3 months), saved to the profile | Ask |
+| nationality, date of birth, marital status, military status | — | **Sensitive.** "Ask me", never sent to the AI (D23). Military status answers Egyptian service questions; it is not US veteran status | Ask |
+| EEO | — | One row: Prefer not to say for all / Ask me each time / Answer now. "Hispanic" removed from the race list | Ask |
+| `acknowledge_privacy`, `acknowledge_legal` | — | Just in time: This job only / Always / Ask me each time | Ask |
+| AI provider | PATH scan | One CLI found and signed in → pre-selected and auto-tested | Auto |
+| Tiers, AI max, batch | Pickiness preset | Strict 9/6 · Balanced 8/5 · Wide 7/4 | Auto |
+| Apply pace/caps/parallel | Pace preset | Careful · Balanced · Fast (values in `core/presets.py`) | Auto |
 
-Implementation home: a new `core/infer.py` (pure functions: `infer(cv_segments, profile, country) -> Inferred`,
-each value carries `source` and `level`) plus `core/presets.py` (country/track tables as data). It's unit-tested
-with CV fixtures in EN and AR. The UI never invents; it only renders `Inferred`.
+Home: `core/infer.py` (pure functions) and `core/presets.py` (tables as data), unit-tested with EN and AR CV fixtures.
+The UI never invents; it only renders `Inferred`.
 
 ### 4.3 One "Where" concept
 
-Users think "where do I want to work", not "search locations vs. filter locations vs. Indeed country". The roles
-screen has one chip input, **Where**, prefilled from the CV country, plus an **Include remote jobs** toggle. The
-backend writes `search.locations`, `filters.locations`, `jobspy_country` and the region presets from it. The raw
-lists stay in Advanced for power users.
+Users think "where do I want to work", not "search vs filter vs Indeed country". The roles screen has one **places**
+picker over the offline city list (EN + AR) plus the three work-mode chips and a posted-within chip. Each place gets a
+work-rights choice. The backend writes every derived list from it. The raw lists stay in Advanced.
 
 ### 4.4 Preset tables (data, not code)
 
 | Region | Regional boards | jobspy | Currency | Telegram |
 |---|---|---|---|---|
-| Egypt | Wuzzuf, Forasna, Bayt | LinkedIn, Indeed, Google | EGP | Egyptian job channels (**to curate**, see section 15) |
-| Gulf (SA, AE, QA, KW, BH, OM) | Bayt (Naukrigulf when unblocked) | LinkedIn, Indeed, Google, Glassdoor | local | Gulf channels (to curate) |
+| Egypt | Wuzzuf, Forasna, Bayt | LinkedIn, Indeed, Google | EGP | first curated MENA tech channels (947d891) |
+| Gulf (SA, AE, QA, KW, BH, OM) | Bayt (Naukrigulf when unblocked) | LinkedIn, Indeed, Google, Glassdoor | local | to curate |
 | Other | — | LinkedIn, Indeed, Google, Glassdoor | local | none |
 
 | Track | Extra sources on |
 |---|---|
-| Tech | ATS feeds (Greenhouse/Lever/Ashby…), remote-job aggregators, tech boards |
-| General | Regional boards only + aggregators that aren't tech-only |
+| Tech | ATS feeds, remote-job aggregators, tech boards |
+| General | Regional boards + aggregators that aren't tech-only |
 
-Everything stays editable in **Settings → Sources**. The 100-row list stays, but with the preset ticked, a
-"Recommended for you" filter, and the region/track shown on each row.
+Everything stays editable in **Settings → Sources**: one grouped list (job sites, regional, aggregators, boards,
+companies, Telegram), a "Recommended for you" filter, and an **Add a source** box for Telegram links or careers pages (`POST /sources/add`).
 
 ---
 
-## 5. New first run: 4 screens
+## 5. First run: 4 screens
 
-Progress: "Step 2 of 4" with Back on every screen; Skip where optional (`multi-step-progress`, user freedom).
+"Step n of 4", Back on every screen. All inputs are autosaved; nothing derived is written until confirmed.
 
-### 5.1 Screen 1: Welcome + CV
+| # | Screen | What it shows |
+|---|---|---|
+| 1 | **Add your CV** | Drop zone (Word, PDF, ODT, LaTeX), language switch, short privacy line with the "What leaves this computer" panel. The PDF conversion approval stays here. LibreOffice is **optional** and not asked here (section 5.3) |
+| 2 | **Connect your AI** | Detected CLIs get a "Found on this computer" badge; one is pre-selected and auto-tested. Picking a card tests it. A usage-limit error is one translated sentence with a "use another AI" button. The AI then fills CV gaps in the background |
+| 3 | **Check what we found** | One card, every value with a source badge: name, phone (country-code picker), home address, current work, links, skills as tags. Sensitive answers: demographics row, monthly salary (muted example placeholder). **No** "never changed" row and **no** authorized-to-work question |
+| 4 | **What jobs?** | Job titles as tags with O*NET suggestions and tap-to-add recommendations · level chips · **places with work rights** · work modes · track (Tech / General) · sources summary · "Find jobs (practice mode, nothing is submitted)" |
 
-```
-LinKit All finds jobs, tailors your CV and applies for you. Everything stays on this computer.
-[ English | العربية ]
-
-   ┌───────────────────────────────────────────┐
-   │   Drop your CV here, or Choose a file     │
-   │   Word, PDF, ODT or LaTeX                 │
-   └───────────────────────────────────────────┘
-   Which format works best?  (link → docs)
-```
-- Rules extraction runs on upload (instant). The PDF conversion approval stays as it is, shown here.
-- LibreOffice missing → inline "Install LibreOffice (439 MB)" with the existing `linkit install-libreoffice`
-  path, not just "run linkit doctor".
-
-### 5.2 Screen 2: Connect your AI
-
-- Detected CLIs show a "Found on this computer" badge. One is pre-selected and **auto-tested** on screen open.
-- Picking a card tests it right away; success saves it. There's no separate Test/Save.
-- Model is an optional dropdown of known models, not free text (free text stays in Advanced).
-- After success, the AI fills the CV fields the rules missed (D2), in the background.
-
-### 5.3 Screen 3: Check what we found
-
-One card, grouped, every value with a source badge, edit in place:
+### 5.1 Screen 3 sketch
 
 ```
-You                      Sara Ahmed · sara@… · +20 …      From your CV
-                         Cairo, Egypt                           From your CV
-Now                      Backend Engineer at Acme · 5 years     From your CV  ⚠ check this
-Links                    linkedin.com/in/… · github.com/…       From your CV
-Skills (14)              Python, FastAPI, …            [edit]   From your CV
-Never changed in your CV Acme · Backend Engineer · B.Sc. …      From your CV
+You          Sara Ahmed · sara@… · +20 …                    From your CV
+Home         12 Nile St, Cairo, Egypt · 11511               From your CV
+Now          Backend Engineer at Acme · 5 years             From your CV  ⚠ check this
+Links        linkedin.com/in/… · github.com/…               From your CV   [Use it]
+Skills       [Python] [FastAPI] [+ add]                     From your CV
 
 A few answers forms often need           (nothing is sent until you answer)
-  Authorized to work in Egypt?            [Yes] [No] [Ask me]
-  Demographic questions (gender, race…)   [Prefer not to say for all] [Ask me each time] [Answer now]
-  Salary expectation (EGP)                [        ]  optional · Ask me
+  Demographic questions   [Prefer not to say for all] [Ask me each time] [Answer now]
+  Monthly salary (EGP)    [ e.g. 30,000 ]   Ask me by default
 ```
 
-### 5.4 Screen 4: What jobs?
+### 5.2 Screen 4 sketch
 
 ```
-Jobs like                [Backend Engineer ✓] [Python Developer ✓] [Software Engineer] [+ add]
-Level                    Mid · Senior                                 From 5 years in your CV
-Where                    [Egypt ✓] [+ add]     [✓] Include remote jobs
-Kind of jobs             Tech ✓  ·  Change                              From your skills
-Sources                  Wuzzuf, Forasna, Bayt, LinkedIn, Indeed + 120 company boards   Change
-
-                 [ Find jobs (practice mode, nothing is submitted) ]
+Jobs like   [Backend Engineer ✓] [Python Developer ✓] [+ add]
+Level       [Mid ✓] [Senior ✓]                          From 5 years in your CV
+Places      [Egypt · I can work here] [Dubai · I'd need a visa] [Riyadh ?] [+ add]
+Work mode   [Onsite] [Hybrid] [Remote]       Posted within [7 days]
+Kind        Tech ✓ · Change                              From your skills
+              [ Find jobs (practice mode, nothing is submitted) ]
 ```
-The button starts discover → score and opens Home with live progress.
 
-### 5.5 Readiness rules (one source of truth)
+### 5.3 Readiness (one source of truth)
 
-The server computes `setup_state = {required_done, next_step}` once. The UI uses it for the Home card, the step
-ticks and the Start buttons. Required = CV approved + AI tested + at least one role + Where. LibreOffice is
-required *before tailoring*, not before searching, so it shows as a Home task ("Needed before applying"), not a
-blocker. The global banner is replaced by a nav chip: "Setup 3/4".
+The server computes `setup_state = {required_done, next_step}`. Required = CV approved + AI tested + at least one role + a place.
+LibreOffice is **never required**: practice works without it, a real run that needs it is refused up front with a code,
+and declining means the original CV is used for every job (D26). It shows as one card (install for me, a one-click 145 MB download on Windows x64 /
+get it / check again / use my CV as it is). No terminal commands.
 
 ---
 
@@ -293,44 +299,43 @@ blocker. The global banner is replaced by a nav chip: "Setup 3/4".
 
 | Trigger | Card in "Needs you" | Asks for | Remembers |
 |---|---|---|---|
-| The first job that needs an account | "Acme's site needs an account. LinKit can create it and save the password safely." | Vault passphrase (once, with a show toggle; the repeat field is dropped, a strength meter is added) + "Connect Gmail" (app password, with a 3-step how-to and a link) | Vault unlocked + IMAP/SMTP |
-| The first email application | "This job asks you to apply by email." | Gmail is already connected → just confirm; not connected → the same Gmail card | — |
-| The user enables a source that needs a key | Inline on the source row | The key, with a "Get a free key" link | Vault (asks for the passphrase if it isn't made yet) |
-| The first unknown question | The existing answer card | The answer + **"Use this for similar questions"** (on by default) | Answer bank |
-| The first privacy-notice checkbox | "Accept privacy notices like this one?" | **This job only / Always / Ask me each time** | `acknowledge_privacy` |
-| The first legal declaration | The same pattern, default "Ask me each time" | — | `acknowledge_legal` |
-| The first notice-period question | A select | — | profile |
-| The user turns on LinkedIn posts | The existing risk warning + sign-in button | — | — |
+| The first job that needs an account | "Create your saved passwords so the app can make an account on {site}" | Vault passphrase (show toggle, strength meter) + Gmail app password | Vault unlocked + IMAP/SMTP |
+| The first email application | "This job asks you to apply by email" | Gmail already connected → confirm; else the Gmail card | — |
+| A source that needs a key | Inline on the source row | The key | Vault |
+| An unknown question | The answer card, grouped by question | The answer. LinKit remembers it for the same question; "Also save to my profile" for profile fields | Answer bank / profile |
+| A privacy notice or legal declaration | "Accept privacy notices like this one?" | **This job only / Always / Ask me each time** | `acknowledge_*` |
+| Notice period, relocation, demographics, personal details | A select or form | One-time "always" choice | Profile |
+| LinkedIn posts | One quiet note in Settings, no checkbox | — | — |
+| Google check on LinkedIn posts | Flag in Settings + "Solve Google check" (opens the app browser) | The user solves it | — |
 
-Rule: a just-in-time card never blocks other jobs. Only that job waits.
+Rule: a just-in-time card never blocks other jobs. Only that job waits. Park codes: `needs_vault`, `vault_locked`, `needs_email`; `retry-code` requeues all jobs waiting on one.
 
 ---
 
 ## 7. Information architecture
 
 ```
-Home        next best action · progress · today's numbers · "Search every day at 09:00" toggle
-Jobs        all jobs, filters, job detail (unchanged, plus a reason chip)
+Home        next best action · funnel (numbers are links) · today's numbers · daily-search toggle · tasks
+Jobs        all jobs, filters, job detail ("Why was this left out?") · reason chips · open jobs live in the URL
 Needs you   [Approve jobs] [Finish applications]   ← Review + Action Center (one badge)
 Activity    [Now] live events + screenshot view · [History] runs + report + export
-Settings    Profile & CV · Jobs & places · Sources · Answers (answer bank) · Applying (Pace, Live) ·
-            Accounts & email (vault, Gmail, keys) · AI · Advanced · Language & notifications
+Settings    Profile & CV · Jobs & places · Sources · Answers · Applying · Accounts & email · AI · Advanced
 ```
-- `''` → Home. Home sends a new user to the first run.
-- The old routes (`/review`, `/actions`, `/live`, `/report`, `/vault`, `/answers`, `/setup`) redirect to the new
-  tabs so the notification links and docs keep working (`deep-linking`, `back-stack-integrity`).
+- `''` → Home. Home sends a new user to `/welcome`. A "Setup n/4" chip sits on Settings until done.
+- Old routes (`/review`, `/actions`, `/live`, `/report`, `/vault`, `/answers`, `/setup`) redirect to the new tabs.
+- Phone width: the status pill and the Needs-you count stay in the top bar; tap targets are 40 px; toasts sit at the bottom and never cover buttons.
 
 ### 7.1 Home: one place answers "what now?"
 
 ```
 ┌ Next ──────────────────────────────────────────────────────────┐
-│ 14 possible matches are waiting for you.   [ Review them ]      │
+│ 14 possible matches are waiting for you.   [ Review 14 ]        │
 └────────────────────────────────────────────────────────────────┘
 Found 1,240 → passed filters 310 → strong 22 · possible 14 → applied 9 (practice)
 Last search: today 09:00 · next: tomorrow 09:00   [✓] Search every day at [09:00]
-Tasks: ☐ Install LibreOffice (needed before applying)  ☐ Ready to apply for real? (8.2)
+Tasks: ☐ Ready to apply for real?   ☐ LibreOffice (optional)
 ```
-The funnel numbers are links into Jobs with a matching filter, so the numbers teach the pipeline (learnability).
+Counts come from `/status` (`ready_to_apply`, `practiced`) and update right after approve, skip and answers.
 
 ---
 
@@ -340,191 +345,172 @@ The funnel numbers are links into Jobs with a matching filter, so the numbers te
 
 | State | Label |
 |---|---|
-| Setup not done | Finish setup (step 3 of 4) |
+| Setup not done | Finish setup (step n of 4) |
 | No jobs yet | Find jobs |
-| A run is going | Searching… 640 found · Stop |
-| Possible matches waiting | Review 14 possible matches |
-| Approved or strong jobs queued | Apply to 9 jobs (practice) / Apply to 9 jobs |
+| A run is going | Searching… n found · Stop (a cancelled run ends as "cancelled", resumable; the UI shows Stopping…) |
+| Applications parked | Finish n applications |
+| Possible matches waiting | Review n possible matches |
+| Jobs ready (approved or strong) | **Apply to n jobs** (practice mode: "Apply to n jobs (practice)"), also offered as "Apply now" in the approve toast |
 | Nothing queued | Find new jobs |
 
-Unfinished runs resume automatically. "Start fresh" and the stage checkboxes move to Activity → Advanced.
+Activity buttons and run titles follow the chosen steps. "Start fresh" and the stage checkboxes are under Activity → Advanced.
 
-### 8.2 Guided unlock for Live mode (D10)
+### 8.2 Guided unlock for real applications (D10)
 
-After the first practice run with at least one filled form:
-1. A Home task appears: "Ready to apply for real?"
-2. The card shows the screenshots of 3 filled forms + the tailored CV diff for one job.
-3. Checklist: CV approved · sensitive answers set or on "Ask me" · daily caps (Pace) · "Confirm each submission" **on**.
-4. The button "Turn on real applications" confirms with the action named ("Submit real applications from now on?").
-5. "Submit without asking" stays a separate Advanced switch with its current warning.
+After the first practice run with a filled form, a Home task "Ready to apply for real?" opens a card (also in Settings → Applying):
+1. Screenshots of practice forms (open in an in-app viewer) and a link to the tailored CV.
+2. A checklist computed from **real state**, each item with its value and a fix link: CV ready, tailoring mode, open items, "confirm each" on.
+3. "Turn on real applications" opens a named confirm: "Submit real applications from now on?" with "Each one is sent in your name and can't be taken back." and "You'll still confirm each application before it's sent" (or the opposite when "Submit without asking" is on). **Cancel is first.**
+4. "Submit without asking" stays a separate Advanced switch.
 
-The header badge changes from **Practice mode** to **Applying for real**, the same words everywhere.
+The header badge changes from **Practice mode** to **Applying for real**.
+
+### 8.3 AI usage limits
+
+A usage limit pauses the run with one translated message and a reset date (`ai_usage_limit`), never a doubled vendor error or "failed". The UI offers "use another AI".
 
 ---
 
-## 9. Vocabulary (one name everywhere; EN and AR need a native check)
+## 9. Vocabulary (EN and AR; the new Arabic terms still need a native check)
 
-| Concept | Old | New EN | New AR |
+| Concept | Old | EN | AR |
 |---|---|---|---|
 | Dry run | Dry run | Practice mode | وضع التجربة |
 | Live | Live | Applying for real | تقديم فعلي |
-| Tier high / mid / low | high / mid / low | Strong / Possible / Weak match | تطابق قوي / محتمل / ضعيف |
-| Action Center + Review | Action Center, Review queue | Needs you | بانتظارك |
+| Tier | high / mid / low | Strong / Possible / Weak match | تطابق قوي / محتمل / ضعيف |
+| Action Center + Review | — | Needs you | بانتظارك |
 | Run | Run | Search | بحث |
-| Stage | Stage | (hidden; Advanced only) | — |
-| Vault | Vault | Saved passwords (vault) | كلمات المرور المحفوظة |
-| Locked facts | Locked facts | Never changed in your CV | لا يتغير في سيرتك |
+| Stage | Stage | hidden (Advanced only) | — |
+| Vault | Vault | Saved passwords | كلمات المرور المحفوظة |
 | Answer bank | Answer bank | Saved answers | الإجابات المحفوظة |
 | Ghost job | Ghost job | Stale posting | إعلان قديم |
+| Why a job is out | — | "Why was this left out?" / "Why is this here?" | — |
+| Privacy | "Everything stays here" | "What leaves this computer" | — |
 
-Code names (`dry run`, `tier`, `needs_user`…) stay. This is UI copy only; `i18n/en.ts` + `ar.ts`.
-
----
-
-## 10. "Needs you": batch resolve
-
-- **Approve jobs** tab (old Review): card list, J/K/A/S/O keys, bulk approve with a 10 s Undo, and the reason
-  and missing skills on each card.
-- **Finish applications** tab (old Action Center): **group parked items by question** (fuzzy match on the label,
-  the same rapidfuzz/embedding match the answer bank uses). "9 applications ask: *What is your notice period?*"
-  → answer once → all 9 retry. CAPTCHA, login and 2FA stay one per item, sorted by site.
-- Each card follows one pattern: **what happened · why · one primary fix button** (`error-recovery`).
-- Empty state: "Nothing needs you. LinKit will tell you when something does." + the notification toggle inline.
+~~Locked facts / "Never changed in your CV"~~ is gone from the UI: protection is automatic (D24).
+Code names (`dry run`, `tier`, `needs_user`…) stay. UI copy only: `i18n/en.ts` + `ar.ts`.
 
 ---
 
-## 11. Learnability and memorability features
+## 10. "Needs you"
 
-1. **Source badges** on every derived value. Users learn *why* a setting is what it is.
-2. **Reason chips** on filtered and low jobs ("Filtered: title has 'intern'"), plus "Show me why" in the job detail.
-3. **Funnel numbers as links** on Home: clicking teaches the pipeline without a tutorial.
-4. **"Changed" marks** in Advanced + a "Reset to preset" link. It's safe to explore.
-5. **First-time hints**: one dismissible line per page on the first visit only (e.g. "Possible matches wait here
-   for your yes or no"). They're kept in `localStorage`, a per-viewer convenience.
-6. **Keyboard shortcuts** in Needs you, with a `?` cheat sheet.
-7. **The same button names on every screen** (*Approve*, *Skip*, *Retry*, *Open the page*), with verbs first (UX copy).
-8. **The weekly return path**: notifications say exactly one thing to do ("3 applications need you"), and the click
-   lands on that tab.
+- **Approve jobs**: card list, J/K/A/S/O/X keys with a `?` cheat sheet, bulk approve with a 10 s Undo, reason and missing skills on each card.
+- **Finish applications**: setup cards (saved passwords, Gmail) above the jobs waiting on them; parked items **grouped by question** ("9 applications ask: …" → "Answer all 9"). Sensitive questions group only on exact wording. CAPTCHA, login and 2FA stay one per item.
+- Each card: what happened · why · one primary fix button; everything else sits in a More menu (52b068e).
+- Empty state: "Nothing needs you." with the notification toggle inline.
 
 ---
 
-## 12. Roadmap (build order; sizes are agent working time, with tests)
+## 11. Learnability and memorability
 
-| Phase | What | Main files | Size |
-|---|---|---|---|
-| **UX1** | Inference layer + presets + CV contact/section/date rules + AI gap fill | new `core/infer.py`, `core/presets.py`; `core/profile.py`; tests with EN/AR CV fixtures | 2 days |
-| **UX2** | 4-screen first run + "Check what we found" + readiness state | new `pages/welcome.ts`; `api/routes.py` (`/setup/state`, `/infer`) | 2 days |
-| **UX3** | Settings reorg + autosave + Pace/Pickiness presets + Advanced + one "Where" | split `pages/setup.ts` (1068 lines) into `pages/settings/*.ts` | 2 days |
-| **UX4** | IA: Home + smart button + 5-item nav + redirects + vocabulary rename EN/AR | `app.ts`, `app.routes.ts`, new `pages/home.ts`, `i18n/*` | 2 days |
-| **UX5** | Just-in-time cards (vault, Gmail, keys, privacy/legal/notice) + batch resolve in Needs you + per-job sponsorship rule | `pages/actions.ts`, `apply/answers.py`, `api/routes.py` | 2–3 days |
-| **UX6** | Guided Live unlock + review shortcuts/undo + reason chips + first-time hints | `pages/review.ts`, `pages/home.ts`, `pages/jobs.ts` | 1.5 days |
-| **UX7** | Usability round (section 14) + fixes | — | 1 week calendar |
-
-UX1 goes first: every later screen only renders what it produces. UX3 and UX4 can run in parallel after UX2
-(they touch different files).
+1. **Source badges** on every derived value.
+2. **Reason chips** on filtered and low jobs, "Why was this left out?" in the job detail. The reason links to its setting, with one-click "Allow this word" and "Remove from blocked companies" (Undo).
+3. **Funnel numbers as links** on Home.
+4. **"Changed" marks** in Advanced + a reset link.
+5. **First-time hints**: one dismissible line per page (`localStorage`); "Show tips again" in Settings.
+6. **Keyboard shortcuts** in Needs you.
+7. **Same button names everywhere**, verbs first.
+8. **The return path**: notifications say one thing to do and land on that tab.
+9. **What leaves this computer**: one panel, linked from the welcome screens and the go-live card.
 
 ---
 
-## 13. CLAUDE.md edits this plan needs (on approval)
+## 12. Roadmap
 
-- §5.5 Screening questions: sponsorship is answered per job from `authorized_countries` + the job country; unknown country → Action Center.
-- §5.7 Action Center: shown as "Needs you" (with Review); parked items grouped by question.
-- §6 Vault: created just in time (the first account or Gmail), not in setup. The crypto is unchanged.
-- §7 UI screens: replace the list with section 7 of this file.
-- §10 Build order: add Phase 12 (UX1–UX7).
+### Built
+
+| Phase | What | Commit |
+|---|---|---|
+| UX1 | Inference layer, presets, per-job sponsorship | 2777e78 |
+| UX2 | 4-screen first run | 4d96adc |
+| UX3 | Autosaving Settings | da96a87 |
+| UX4 | Home, Needs you, Activity, plain-word vocabulary | 986969a |
+| UX5a / UX5 | Just-in-time park codes + batch answers / Needs you that clears fast | 3c9ae0c / 60eb327 |
+| UX6a / UX6 | Presets, job reasons, go-live data / guided go-live, reason chips, hints | da5a346 / 6ee5dc3 |
+| Docs | CLAUDE.md and handoff for phase 12 | b32a249 |
+| Also | AI English-only; Arabic plurals; test fakes; cancelled-run fix; study kit; LinkedIn via Google | 947d891, 39a7e3f, 23f0b3a, 743a70b, c8b23aa, 9d033de |
+| Round 2 | Backend: places, offline suggestions, FX, new answers | ec1d220 |
+| Round 2 | Shared inputs (tags, places, phone), Profile & CV | ea22b5e |
+| Round 2 | Jobs & places; first-run places with work rights | dd5e4d2 |
+| Round 2 | Job sources and Answers | bc15cd3 |
+| Round 2 | Applying limits, one browser setting, Advanced clean-up | a11af9f |
+| UX7 fixes | Frontend: reasons that lead somewhere, phone width, Arabic | 92709c3 |
+| UX7 fixes | Backend: AI limits pause, optional LibreOffice, real go-live checks | ba46591 |
+| UX7 fixes | Frontend: apply path, LibreOffice choice, honest go-live and privacy | 717f827 |
+| After UX7 | Headless Chrome client-hints fix | e576eb0 |
+| After UX7 | LibreOffice one-click install points at the hosted bundle | dfb7c26 |
+| U16 | "Company · platform" source names; structured AI check | 60b9c97 |
+| U15–U17 | Go-live in Home's main card with CV red-line; plain words; visible apply runs; practice badge on welcome | d821983 |
+| U17 | Per-job apply events (start, reason code, question count) | 93637ec |
+| U18 | Needs-you cards with one main action; work rights per country; level tips; flags; PDF name; small items | 52b068e |
+
+### Left
+
+| Item | Notes |
+|---|---|
+| Study with real people | Use the kit in `docs/usability/` (5 people, Task 5 seven days later). Install LibreOffice (one click) and sign in to an AI with quota first |
+| Merge the Outlook branch | `claude/outlook-oauth-898770`; needs an Azure client id |
+| Native review of the Arabic SUS | and of the new Arabic terms (section 9) |
+| Place picker Enter key | Built (46d5521) |
+| Unverified | Real Gmail connect; local-model pick on a real server; Indeed country (U11) on a real Egypt place. The LibreOffice install is verified (real install from the release) |
+
+---
+
+## 13. CLAUDE.md edits
+
+Done (b32a249 and later commits): §5.5 sponsorship per job, §5.7 Needs you, §6 vault just in time, §7 screens, §10 phase 12. Nothing pending.
 
 ---
 
 ## 14. Validation plan (no telemetry: moderated sessions only)
 
 - **Who**: 5 people. 3 non-tech MENA job seekers (one Arabic-UI user), 2 developers. A fresh Windows machine, the app installed.
-- **Tasks**: (1) get from install to the first search; (2) find out why a job was filtered; (3) answer a question
-  that 4 parked applications share; (4) turn on real applications; (5) **7 days later**, come back and approve +
-  apply without help (memorability).
-- **Targets**:
+- **Tasks**: (1) install to first search; (2) why was a job left out; (3) answer a question 4 parked applications share; (4) turn on real applications; (5) **7 days later**, approve and apply without help.
+- **Method**: think-aloud, 45 min, affinity map, impact/effort sort. Kit: `docs/usability/` (script, consent, SUS EN/AR, notes and results templates, sample CV, `scripts/seed_usability.py`).
 
-| Metric | Today (estimate) | V1 target |
+| Metric | Target | Simulated round 1 (2026-11-01) |
 |---|---|---|
-| Time from CV upload to the first search started | 15–30 min | **≤ 3 min** |
-| Required decisions before the first search | ~25+ | **≤ 5** |
-| Task success (tasks 1–4), no help | — | ≥ 80 % |
-| Task 5 success after 7 days | — | ≥ 4 of 5 |
-| SUS score | — | ≥ 75 |
-| Derived CV fields correct before edits | — | ≥ 90 % on the fixture set (EN + AR) |
+| CV chosen to first search | ≤ 3 min | median 4:15 (not met) |
+| Decisions before first search | ≤ 5 | median 6 (not met) |
+| Task success, tasks 1–4 | ≥ 80 % | 19 of 20 = 95 % |
+| Task 5 after 7 days | ≥ 4 of 5 | **0 of 5** before the fixes (not run after 7 days) |
+| SUS | ≥ 75 | **mean 60** (non-tech 55, developers 67.5) |
+| Derived CV fields correct | ≥ 90 % | 86.7 % on the sample |
 
-- **Method**: think-aloud, 45 min (5 warm-up, 30 tasks, 10 debrief), an affinity map of the notes, then an
-  impact/effort sort into UX7 fixes.
+**The round was simulated** (AI agents played five personas). It found 18 issues (U1–U18); the fixes in 92709c3, ba46591 and 717f827
+cover U1–U14; d821983, 93637ec, 60b9c97 and 52b068e cover U15–U18 and the smaller items. It does **not** replace the study with real people. Full results and caveats: `docs/usability/simulated-round-1.md`.
+Per D27 there are no more simulated rounds.
 
 ---
 
-## 15. Still open (small; defaults chosen, change any)
+## 15. Still open
 
-| # | Question | Default in this plan |
+| # | Question | State |
 |---|---|---|
-| Q1 | Egyptian and Gulf Telegram channel lists: who curates them? | Ship empty for MENA until you give a list; the Russian defaults only apply to region "Other" + track Tech |
-| Q2 | Do internships count toward years of experience? | Excluded (the title contains *intern/trainee*) |
-| Q3 | Outlook users: Gmail-only message now, or hide email apply? | Show "Outlook isn't supported yet" at the Gmail card |
-| Q4 | Keep the setup wizard reachable for power users? | No. Settings has everything; "Run first-time setup again" sits in Settings |
+| Q1 | Telegram channel lists for Gulf and non-tech MENA: who curates them? | The first MENA tech channels are in; the rest ship empty until you give a list |
+| Q6 | Azure client id for Outlook | Needed before the Outlook branch can be merged and tested |
+| Q7 | Native Arabic reviewer for the UI terms and the SUS | Not arranged |
+| Q8 | Is the Indeed country bug (U11) real? | Fixed in ba46591 by mapping each jobspy key to one country; not re-checked on a real Egypt place |
+
+Answered: Q2 internships count (D13); Q3 Outlook branch (D14); Q4 no power-user wizard (D15); Q5 LibreOffice bundle hosted (D31).
 
 ---
 
-## 16. Execution (orchestrator log)
+## 16. Execution status
 
-Started 2026-10-29. Orchestrator plans and reviews; Sonnet executors build; Haiku assistants search and browser-test.
+Started 2026-10-29. An orchestrator planned and reviewed; Sonnet executors built; Haiku assistants searched and browser-tested.
+Rules: one commit per phase on `main`; Arabic written for every new key; no new dependencies; ruff, mypy, pytest and `ng build` clean.
 
-### 16.1 Extra decisions (maintainer, 2026-10-29)
-
-- §13 CLAUDE.md edits and Q1–Q4 defaults: **approved**.
-- Git: **one commit per phase on main** (UX1 … UX6), message style `UX1: <summary>`.
-- Arabic: **executors write AR for every new/renamed key** (terms from section 9); list new terms at the end for a native check.
-- Old wizard: **delete `pages/setup.ts`**; `/setup` redirects (first run if not ready, else Settings).
-
-### 16.2 Decisions made by orchestrator (override any)
-
-- An explicit `needs_sponsorship` (Yes/No) still wins; only when it is "Ask me" (None) is sponsorship derived per job
-  from `authorized_countries` + `country_of(job_location)`; unknown country → Action Center.
-- Country data: reuse `apply/answers.py` `_COUNTRIES` / `country_of` / `canonical_country`; no new country/city tables
-  beyond what `core/presets.py` needs (currency, jobspy key, region, boards).
-- No new dependencies (no `phonenumbers`); regex + small lexicons in code.
-- Inference values are stored nowhere until the user confirms: `GET /api/infer` computes, `POST /api/infer/apply` writes.
-- AI gap fill: one LLM call through the configured `LLMProvider`, non-sensitive fields only, values flagged `check=true`.
-- Frontend tasks run **sequentially** (they all touch `i18n/en.ts` + `ar.ts`); backend UX1 tasks run in parallel.
-- Fix found during mapping: `resolve_action` writes to the answer bank before checking the item is open (routes.py:880-887) → fixed in UX5.
-
-### 16.3 Global constraints (every brief)
-
-1. CLAUDE.md §2 hard rules: no fabricated CV content; sensitive categories never sent to the AI and never auto-answered; no telemetry; never log CV text, passwords or tokens.
-2. No new Python or npm dependencies. Type hints everywhere; `uv run ruff check src tests`, `uv run mypy src` clean.
-3. Tests for every new logic path (`uv run pytest tests/unit -q`); no live-site calls; synthetic CV fixtures built in tests with python-docx.
-4. Frontend: Angular 21 standalone components + signals, existing classes in `frontend/src/styles.css`, all text via the `t` pipe with keys in **both** `i18n/en.ts` and `i18n/ar.ts`; RTL-safe (`dir="auto"`, `<bdi>`). `cd frontend && npx ng build` clean.
-5. Match surrounding code: comment density, naming, helpers (`lines`, `unlines`, `Api`, `I18n`).
-6. Code names stay (`dry run`, `tier`, `needs_user`); only UI copy changes (section 9).
-
-### 16.4 Tasks
-
-| Id | Phase | Task | Depends | Status |
-|---|---|---|---|---|
-| T1.1 | UX1 | `core/presets.py`: country, track, Pace, Pickiness presets + tests | — | done (2777e78) |
-| T1.2 | UX1 | `core/infer.py`: CV rules (contacts, links, name split, location, experience/years, current role, skills, locked facts, track, queries, seniority, title_exclude) + EN/AR tests | T1.1 interface | done (2777e78) |
-| T1.3 | UX1 | Per-job sponsorship rule in `apply/answers.py` + tests | — | done (2777e78) |
-| T1.4 | UX1 | API: `GET /infer`, `POST /infer/ai-fill`, `POST /infer/apply`, `GET /setup/state`, "where" writer + tests; commit UX1 | T1.1, T1.2 | done (2777e78) |
-| T2.1 | UX2 | `pages/welcome.ts` 4-screen first run; `''`/`/setup` routing; commit UX2 | T1.4 | done |
-| T3.1 | UX3 | Settings shell + autosave helper + Profile & CV, Jobs & places (one Where), AI sections | T2.1 | done |
-| T3.2 | UX3 | Settings: Sources (recommended filter), Answers (bank merged), Applying (Pace, Live), Accounts & email (vault, Gmail, keys), Advanced (Pickiness, raw knobs, changed marks); delete `setup.ts`, `answers.ts`, `vault.ts` pages; commit UX3 | T3.1 | done |
-| T4.1 | UX4 | Home + smart button + 5-item nav + Activity (Live + Report tabs) + Needs you (Review + Actions tabs) + redirects + store owner fix | T3.2 | done |
-| T4.2 | UX4 | Vocabulary sweep EN/AR (section 9) across all strings + AR term consistency; commit UX4 | T4.1 | done |
-| T5.1 | UX5 | Backend: JIT park kinds (vault/email needed), batch answer API, privacy/legal "always" option, resolve_action fix + tests | T1.4 | done |
-| T5.2 | UX5 | Frontend: grouped Needs you, JIT cards, undo toast, J/K/A/S/O shortcuts; commit UX5 | T4.1, T5.1 | done |
-| T6.1 | UX6 | Guided Live unlock, reason chips on Jobs, first-time hints; commit UX6 | T5.2 | done |
-| T7.1 | — | CLAUDE.md §13 edits (≤ 200 lines), handoff.md note | T6.1 | done |
-| T7.2 | — | Browser E2E pass (Haiku) on a fresh data dir + full test suite | T7.1 | done |
-
-### 16.5 Log
-
-- T1.1: `enabled` source presets are hard-coded curated name lists (registry has no region/tech metadata) + a registry-sync test. Pace "fast" = 3 sites, 10–30 s, 40/day, 25/run; "careful" = 1 site, 60–120 s, 10/day, 5/run.
-- T1.3: sponsorship compares the country the question names, else the job's country.
-- T1.4: AI-filled values come back as level "suggest", check true; stored in `<cv dir>/infer_ai.json` keyed by CV hash.
-- UX1 committed 2777e78. T2.1 and T5.1 running in parallel (frontend vs backend, no shared files).
-
-- UX3 committed da96a87; UX5a backend 3c9ae0c; UX6a backend da5a346 (presets, job reasons, go-live data). T3.2 split into T3.2a/T3.2b; T4.1 split off the vocabulary sweep (T4.2).
-- T7.2 E2E on a fresh install: 10/10 flows pass; 1813 tests, ruff, mypy, ng build clean. Found + fixed: cancelled runs never finalized (now status 'cancelled', resumable, UI shows Stopping…). 'Saved' tick report was a screenshot-timing artifact (tick renders ~2 s).
+| Tasks | Phase | Status | Commit |
+|---|---|---|---|
+| T1.1–T1.4 | UX1 | done | 2777e78 |
+| T2.1 | UX2 | done | 4d96adc |
+| T3.1–T3.2 | UX3 | done | da96a87 |
+| T4.1–T4.2 | UX4 | done | 986969a |
+| T5.1 / T5.2 | UX5 | done | 3c9ae0c / 60eb327 |
+| T6.1 | UX6 | done | da5a346 / 6ee5dc3 |
+| T7.1 | CLAUDE.md, handoff | done | b32a249 |
+| T7.2 | Browser E2E on a fresh install: 10 of 10 flows, 1813 tests, ruff, mypy, ng build clean | done | 743a70b (fix found) |
+| Round 2 | Places, suggestions, FX, inputs, Settings rework | done | ec1d220 … a11af9f |
+| UX7 | Study kit; simulated round; fixes | kit and fixes done, real study pending | c8b23aa, 92709c3, ba46591, 717f827 |
+| UX7 follow-up | U15–U18 and the smaller items; LibreOffice hosted; headless fix | done | e576eb0, dfb7c26, 60b9c97, d821983, 93637ec, 52b068e, 46d5521 |

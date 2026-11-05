@@ -55,9 +55,12 @@ def test_source_presets() -> None:
     egypt = country_preset("Egypt")
     assert "wuzzuf" in source_preset(egypt, "general")["regional"]
     assert source_preset(country_preset("UAE"), "tech")["regional"] == ["bayt"]
+    mena_tech = ["IT_jobs_coop", "Freejobs5", "findmyremote_frontend", "SDEjobsandinternships",
+                 "ELIT_IT", "technomajed"]  # fmt: skip
     for name in ("Egypt", "Riyadh", "Jordan"):
-        for track in TRACKS:
-            assert source_preset(country_preset(name), track)["telegram_channels"] == []
+        assert source_preset(country_preset(name), "tech")["telegram_channels"] == mena_tech
+        assert source_preset(country_preset(name), "general")["telegram_channels"] == []
+        assert SourcesSection(telegram_channels=mena_tech).telegram_channels == mena_tech
     other = country_preset("Berlin")
     assert source_preset(other, "tech")["telegram_channels"] == list(DEFAULT_TELEGRAM_CHANNELS)
     assert source_preset(other, "general")["telegram_channels"] == []

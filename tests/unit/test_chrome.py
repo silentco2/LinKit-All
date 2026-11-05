@@ -107,7 +107,7 @@ def test_launch_reads_identity_once_and_masks_headless(
         ua = "Mozilla/5.0 HeadlessChrome/150.0.0.0 Safari/537.36"
         return {"User-Agent": ua, "webSocketDebuggerUrl": f"ws://127.0.0.1:{port}/devtools/b"}
 
-    async def fake_hints(port: int, ws_url: str) -> dict[str, Any]:
+    async def fake_hints(ws_url: str) -> dict[str, Any]:
         return {"brands": [{"brand": "Google Chrome", "version": "150"}], "mobile": False}
 
     masks: list[tuple[str, chrome.Identity]] = []
@@ -144,6 +144,49 @@ def test_launch_reads_identity_once_and_masks_headless(
     assert masks[0][0] == f"ws://127.0.0.1:{first.port}/devtools/b"
     assert first.cdp_url == f"http://127.0.0.1:{first.port}" and first.port != 0
     assert len(ended) == 1  # only the probe was stopped
+
+
+def test_read_hints_navigates_a_blank_tab_to_chrome_version(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, dict[str, Any] | None, str | None]] = []
+
+    class FakeCdp:
+        @classmethod
+        async def open(cls, ws_url: str) -> "FakeCdp":
+            return cls()
+
+        async def send(
+            self, method: str, params: dict[str, Any] | None = None, session: str | None = None
+        ) -> dict[str, Any]:
+            calls.append((method, params, session))
+            if method == "Target.createTarget":
+                return {"targetId": "T"}
+            if method == "Target.attachToTarget":
+                return {"sessionId": "S"}
+            if method == "Runtime.evaluate":
+                return {"result": {"value": {"mobile": False} if params == ask else True}}
+            return {}
+
+        async def close(self) -> None:
+            calls.append(("close", None, None))
+
+    ask = {"expression": chrome.UA_CH, "awaitPromise": True, "returnByValue": True}
+    monkeypatch.setattr(chrome, "Cdp", FakeCdp)
+    assert asyncio.run(chrome._read_hints("ws://x")) == {"mobile": False}
+    assert [(m, p and p.get("url"), s) for m, p, s in calls if m != "Runtime.evaluate"] == [
+        ("Target.createTarget", "about:blank", None),
+        ("Target.attachToTarget", None, None),
+        ("Page.navigate", "chrome://version", "S"),
+        ("Target.closeTarget", None, None),
+        ("close", None, None),
+    ]
+    order = [m for m, _, _ in calls]
+    assert (
+        order.index("Page.navigate")
+        < order.index("Runtime.evaluate")
+        < order.index("Target.closeTarget")
+    )
 
 
 def test_launch_without_chrome_says_so(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -3,6 +3,7 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } fro
 import { Api } from './api';
 import { I18n, Lang, TPipe } from './i18n';
 import { Live } from './live';
+import { fmtNum, localeOf, runReason } from './locale';
 import { Shell } from './shell';
 import { LiveEvent, setupDone } from './types';
 
@@ -14,11 +15,21 @@ const FRESH_MS = 60_000; // a run that ended longer ago than this is replayed hi
   template: `
     <div class="flex min-h-screen flex-col md:flex-row">
       @if (!welcome()) {
-      <header class="sticky top-0 z-20 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 md:hidden dark:border-slate-800 dark:bg-slate-900">
-        <div class="text-lg font-bold text-slate-900 dark:text-white">LinKit <span class="text-brand-600">All</span></div>
-        <button type="button" class="btn" (click)="menuOpen.set(!menuOpen())" [attr.aria-expanded]="menuOpen()" aria-controls="main-nav">
-          {{ 'shell.menu' | t }}
-        </button>
+      <header class="sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-2 md:hidden dark:border-slate-800 dark:bg-slate-900">
+        <div class="text-lg font-bold whitespace-nowrap text-slate-900 dark:text-white">LinKit <span class="text-brand-600">All</span></div>
+        <div class="flex min-w-0 items-center gap-2">
+          @if (shell.status(); as s) {
+            <span class="badge whitespace-nowrap" [class]="s.apply_live ? 'tier-mid' : 'tier-low'" [title]="(s.apply_live ? 'shell.liveTitle' : 'shell.dryTitle') | t">
+              {{ (s.apply_live ? 'shell.live' : 'shell.dry') | t }}
+            </span>
+          }
+          @if (shell.needsCount() > 0) {
+            <a routerLink="/needs-you" class="badge tier-mid min-h-10 min-w-10 justify-center no-underline hover:no-underline" [attr.aria-label]="('shell.nav.needsYou' | t) + ': ' + num(shell.needsCount())">{{ num(shell.needsCount()) }}</a>
+          }
+          <button type="button" class="btn min-h-10" (click)="menuOpen.set(!menuOpen())" [attr.aria-expanded]="menuOpen()" aria-controls="main-nav">
+            {{ 'shell.menu' | t }}
+          </button>
+        </div>
       </header>
       }
       @if (!welcome()) {
@@ -38,8 +49,8 @@ const FRESH_MS = 60_000; // a run that ended longer ago than this is replayed hi
           <a [routerLink]="item.path" (click)="menuOpen.set(false)" routerLinkActive="!bg-brand-50 !text-brand-700 dark:!bg-slate-800 dark:!text-white" ariaCurrentWhenActive="page"
              class="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-slate-600 no-underline hover:bg-slate-100 hover:no-underline dark:text-slate-300 dark:hover:bg-slate-800">
             {{ item.label | t }}
-            @if (item.path === 'needs-you' && needsCount() > 0) {
-              <span class="badge tier-mid">{{ needsCount() }}</span>
+            @if (item.path === 'needs-you' && shell.needsCount() > 0) {
+              <span class="badge tier-mid">{{ num(shell.needsCount()) }}</span>
             }
             @if (item.path === 'activity' && live.run()?.running) {
               <span class="size-2 animate-pulse rounded-full bg-emerald-500" role="img" [attr.aria-label]="'shell.running' | t"></span>
@@ -51,8 +62,8 @@ const FRESH_MS = 60_000; // a run that ended longer ago than this is replayed hi
         }
         <div class="mt-4 space-y-2 px-2 text-xs text-slate-400 md:mt-auto">
           <div class="flex items-center gap-1" role="group" [attr.aria-label]="'shell.language' | t">
-            <button type="button" class="btn !px-2 !py-1 text-xs" lang="en" dir="ltr" [class.btn-primary]="i18n.lang() === 'en'" [attr.aria-pressed]="i18n.lang() === 'en'" (click)="setLang('en')">English</button>
-            <button type="button" class="btn !px-2 !py-1 text-xs" lang="ar" dir="rtl" [class.btn-primary]="i18n.lang() === 'ar'" [attr.aria-pressed]="i18n.lang() === 'ar'" (click)="setLang('ar')">العربية</button>
+            <button type="button" class="btn !px-2 !py-1 text-xs max-sm:!min-h-10 max-sm:!px-4" lang="en" dir="ltr" [class.btn-primary]="i18n.lang() === 'en'" [attr.aria-pressed]="i18n.lang() === 'en'" (click)="setLang('en')">English</button>
+            <button type="button" class="btn !px-2 !py-1 text-xs max-sm:!min-h-10 max-sm:!px-4" lang="ar" dir="rtl" [class.btn-primary]="i18n.lang() === 'ar'" [attr.aria-pressed]="i18n.lang() === 'ar'" (click)="setLang('ar')">العربية</button>
           </div>
           @if (shell.notifySupported) {
             <label class="flex items-center gap-2" [title]="'shell.notifyTitle' | t">
@@ -83,11 +94,7 @@ export class App {
   /** First-run flow: no side nav, the page is its own guide. */
   protected readonly welcome = computed(() => this.path().startsWith('/welcome'));
   protected readonly menuOpen = signal(false);
-  /** One badge for everything waiting on the user: jobs to approve plus applications to finish. */
-  protected readonly needsCount = computed(() => {
-    const s = this.shell.status();
-    return s ? (s.states['awaiting_review'] ?? 0) + s.actions_open : 0;
-  });
+  protected readonly num = (n: number): string => fmtNum(localeOf(this.i18n.lang()), n);
   /** The "Setup N/4" chip on Settings, until the required steps are done. */
   protected readonly setupLeft = computed(() => {
     const s = this.shell.status();
@@ -132,11 +139,19 @@ export class App {
   private async runEnded(end: LiveEvent): Promise<void> {
     if (!this.shell.notify()) return;
     const alert = (title: string, body: string) => this.shell.alert(title, body, 'run', '/activity');
-    if (end.error) return alert(this.i18n.t('shell.runFailed'), end.error);
+    if (end.error) {
+      // a run that stopped for a known reason is said in words; anything else is "Something went wrong." (never the raw text)
+      const known = end.reason_code && end.reason_code !== 'pipeline_error' && this.i18n.has('run.reason.' + end.reason_code);
+      return alert(this.i18n.t('shell.runFailed'), known ? runReason(this.i18n, end.reason_code, end.reason_params, end.error) : this.i18n.t('live.err.generic'));
+    }
     let pause: string | null = null;
     try {
-      const { recent } = await this.api.get<{ recent: { status: string; pause_reason: string | null }[] }>('/runs');
-      if (recent[0]?.status === 'paused') pause = recent[0].pause_reason ?? this.i18n.t('shell.resumeHint');
+      const { recent } = await this.api.get<{ recent: { status: string; pause_reason: string | null; reason_code: string | null; reason_params: Record<string, unknown> }[] }>('/runs');
+      if (recent[0]?.status === 'paused') {
+        const r = recent[0];
+        const known = r.reason_code && r.reason_code !== 'pipeline_error' && this.i18n.has('run.reason.' + r.reason_code);
+        pause = known ? runReason(this.i18n, r.reason_code, r.reason_params, r.pause_reason ?? '') : this.i18n.t('shell.resumeHint');
+      }
     } catch {
       // fall back to the plain message
     }

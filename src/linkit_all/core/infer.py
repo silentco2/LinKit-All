@@ -18,6 +18,8 @@ from docx.opc.constants import RELATIONSHIP_TYPE as RT
 from pydantic import BaseModel
 
 from linkit_all.apply.answers import country_of
+from linkit_all.core import geo
+from linkit_all.matching.rules import seniority
 
 Source = Literal["cv", "country", "roles", "years", "default", "ai"]
 Level = Literal["auto", "suggest", "ask"]
@@ -28,6 +30,7 @@ class InferredValue(BaseModel):
     source: Source
     level: Level
     check: bool = False  # True = the rule is unsure; the UI asks the user to look
+    note: str = ""  # stable code for a caveat the UI words itself, e.g. "under_one_year"
 
 
 class Experience(BaseModel):
@@ -77,6 +80,12 @@ def _country(text: str) -> str | None:
     if m := _AR_COUNTRY_RX.search(text):
         return _AR_COUNTRIES[m.group(1)]
     return country_of(text)
+
+
+_COUNTRY_NAMES = {
+    *_AR_COUNTRIES.values(),
+    *("مصر", "السعودية", "الإمارات", "قطر", "الكويت", "البحرين", "سلطنة عمان", "الأردن", "المغرب"),
+}
 
 
 def _dedupe(items: Sequence[str]) -> list[str]:
@@ -150,7 +159,7 @@ _PRESENT = (
     r"(?:حتى\s*الآن|حتي\s*الان|حتى\s*الان|الآن|الان|حاليا|حاليًا|حالياً|present|current(?:ly)?"
     r"|now|today|ongoing|till\s+date|to\s+date)"
 )
-_SEP = r"(?:[-–—]|(?<!\w)(?:to|until|till|إلى|الى|حتى|حتي)(?!\w))"
+_SEP = r"(?:[-–—‒·•]|(?<!\w)(?:to|until|till|إلى|الى|حتى|حتي)(?!\w))"
 _RANGE = re.compile(
     rf"(?<!\w)(?P<a>{_DATE})\s*{_SEP}\s*(?P<b>{_DATE}|(?<!\w){_PRESENT}(?!\w))(?!\w)", re.I
 )
@@ -210,6 +219,31 @@ def cv_links(docx_path: Path) -> list[str]:
 def _phone_digits(raw: str) -> str:
     plus = "+" if raw.strip().startswith("+") else ""
     return plus + re.sub(r"\D", "", raw)
+
+
+def _dial_country(phone: str) -> str:
+    """ISO2 of the country an international number belongs to; "" when it is unknown or the
+    code is shared ("+1" is the US, Canada and others)."""
+    if not phone.startswith("+"):
+        return ""
+    digits = phone[1:]
+    hits = [c for c in geo.countries() if c.phone and digits.startswith(c.phone)]
+    best = max((len(c.phone) for c in hits), default=0)
+    top = [c for c in hits if len(c.phone) == best]
+    return top[0].iso2 if len(top) == 1 else ""
+
+
+def international_phone(raw: str, home_country: str = "") -> str:
+    """ "+<code><digits>". A local number gets the home country's code and loses its trunk "0";
+    without a known country it stays as it was (digits only)."""
+    raw = raw.strip()
+    if raw.startswith("00"):
+        raw = "+" + raw[2:]
+    digits = re.sub(r"\D", "", raw)
+    if raw.startswith("+") or not digits:
+        return "+" + digits if digits else ""
+    home = geo.country(home_country) if home_country else None
+    return f"+{home.phone}{digits.lstrip('0')}" if home and home.phone else digits
 
 
 def _contacts(lines: list[str], links: Sequence[str]) -> dict[str, str]:
@@ -456,7 +490,20 @@ _LEX_CI = _lexicon_rx([w for w in _LEX if w not in _CASE_SENSITIVE], re.I)
 _LEX_CS = _lexicon_rx([w for w in _LEX if w in _CASE_SENSITIVE], 0)
 
 
-def _skills(lines: list[str]) -> list[str]:
+# A link in the text ("https://github.com/x", "github.com/x") or the word of a linked site.
+_LINKISH = re.compile(
+    r"(?:https?://|www\.)[^\s<>\"')\],;|]+"
+    r"|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|net|org|io|dev|me|app|co)/\S*",
+    re.I,
+)
+
+
+def _site_word(url: str) -> str:
+    labels = _host(url).split(".")
+    return labels[-2] if len(labels) > 1 else ""
+
+
+def _skills(lines: list[str], links: Sequence[str] = ()) -> list[str]:
     out: list[str] = []
     section: str | None = None
     for ln in lines:
@@ -474,8 +521,14 @@ def _skills(lines: list[str]) -> list[str]:
             item = item.strip(" -–—*")
             if 1 < len(item) <= 40 and len(item.split()) <= 4:
                 out.append(item)
+    # The lexicon is scanned outside links: "github" in a profile URL, or as the label of a link
+    # to github.com, is a contact and not a skill (a Skills list that names it still counts).
     blob = "\n".join(lines)
-    out += [m[0] for rx in (_LEX_CI, _LEX_CS) for m in rx.finditer(blob)]
+    linked = {_site_word(u) for u in [*links, *_LINKISH.findall(blob)]} - {""}
+    blob = _LINKISH.sub(" ", blob)
+    out += [
+        m[0] for rx in (_LEX_CI, _LEX_CS) for m in rx.finditer(blob) if m[0].lower() not in linked
+    ]
     return _dedupe(out)
 
 
@@ -492,7 +545,7 @@ def read_cv(texts: list[str], links: Sequence[str] = ()) -> CvFacts:
         location=_find_location(lines),
         experiences=_experiences(lines),
         education=_education(lines),
-        skills=_skills(lines),
+        skills=_skills(lines, links),
         **_contacts(lines, links),
     )
 
@@ -502,9 +555,9 @@ def _month_index(d: date) -> int:
 
 
 def years_experience(facts: CvFacts, today: date) -> int | None:
-    """Whole years over the union of dated, non-intern ranges (overlaps counted once).
+    """Whole years over the union of dated ranges, internships included (overlaps counted once).
 
-    None when no experience has dates. Internships do not count (decision Q2).
+    None when no experience has dates. Internships count (maintainer decision, T8.1).
     """
     dated = [e for e in facts.experiences if e.start and (e.end or e.current)]
     if not dated:
@@ -513,7 +566,7 @@ def years_experience(facts: CvFacts, today: date) -> int | None:
     spans = sorted(
         (_month_index(e.start), min(_month_index(e.end) if e.end else now, now))
         for e in dated
-        if e.start and not e.intern
+        if e.start
     )
     total, reach = 0, -1
     for a, b in spans:
@@ -526,7 +579,7 @@ def years_experience(facts: CvFacts, today: date) -> int | None:
 
 # --- suggestions -----------------------------------------------------------------------------
 
-# Seniority bands (ux-plan 4.2): years pick a band, a senior-sounding current title raises it.
+# Seniority bands (ux-plan 4.2): years pick a band when the current title names no level.
 _BANDS: list[list[str]] = [
     ["intern", "junior"],
     ["junior", "mid"],
@@ -534,11 +587,23 @@ _BANDS: list[list[str]] = [
     ["senior", "lead"],
     ["lead", "manager", "executive"],
 ]
+# A level the current title names (matching.rules.seniority, plus Arabic): that level and the
+# one above it, and the band whose far-away title words are excluded.
+_TITLE_LEVELS: dict[str, tuple[list[str], int]] = {
+    "intern": (["intern", "junior"], 0),
+    "junior": (["junior", "mid"], 1),
+    "senior": (["senior", "lead"], 3),
+    "lead": (["lead", "manager"], 4),
+    "manager": (["manager", "executive"], 4),
+    "executive": (["manager", "executive"], 4),
+}
+_AR_LEVEL_RX = [
+    (re.compile("متدرب"), "intern"),
+    (re.compile("مدير|رئيس"), "manager"),
+    (re.compile("كبير|أول"), "senior"),
+]
 # Title words that rule a job out when it is two or more bands away from the chosen band.
 _BAND_WORDS = [["intern"], ["junior"], [], ["senior"], ["director", "vp", "head of"]]
-_RAISE_RX = re.compile(
-    r"\b(senior|sr\.?|lead|head|manager|director|principal|vp)\b|كبير|رئيس|مدير|أول", re.I
-)
 _SENIORITY_WORDS = {
     "senior",
     "junior",
@@ -559,11 +624,22 @@ _TECH_TITLE_RX = re.compile(
 _NON_TECH_ENG_RX = re.compile(r"civil|mechanical|chemical|petroleum|structural|مدني|ميكانيك", re.I)
 
 
-def _band(years: int | None, title: str) -> int | None:
+def _title_level(title: str) -> str | None:
+    """The level a title states ("Senior Accountant" -> senior), else None."""
+    if level := seniority(title):
+        return level
+    return next((lv for rx, lv in _AR_LEVEL_RX if rx.search(title)), None)
+
+
+def _levels(years: int | None, title: str) -> tuple[list[str], int] | None:
+    """(seniority levels to look for, band index). A level named in the current title wins, with
+    the level above it; otherwise the years band. None when there is nothing to go on."""
+    if (named := _title_level(title)) in _TITLE_LEVELS:
+        return _TITLE_LEVELS[named]
     if years is None:
         return None
     band = 0 if years < 1 else 1 if years < 3 else 2 if years < 6 else 3 if years < 10 else 4
-    return min(band + 1, 4) if _RAISE_RX.search(title) else band
+    return _BANDS[band], band
 
 
 def _query_of(title: str) -> str:
@@ -582,31 +658,48 @@ def infer(facts: CvFacts, today: date) -> dict[str, InferredValue]:
     out: dict[str, InferredValue] = {}
     roles = _newest_first(facts)
     current = roles[0] if roles and roles[0].current else None
+    newest = current or (roles[0] if roles else None)  # no current job: the newest one, to check
 
     def put(
-        key: str, value: Any, source: Source = "cv", level: Level = "auto", check: bool = False
+        key: str,
+        value: Any,
+        source: Source = "cv",
+        level: Level = "auto",
+        check: bool = False,
+        note: str = "",
     ) -> None:
         if value not in ("", None, []):
-            out[key] = InferredValue(value=value, source=source, level=level, check=check)
+            out[key] = InferredValue(
+                value=value, source=source, level=level, check=check, note=note
+            )
 
     put("profile.full_name", facts.full_name, check=facts.name_check)
     put("profile.email", facts.email)
-    put("profile.phone", facts.phone)
     put("profile.location", facts.location)
     put("profile.skills", facts.skills)
+    parts = [x.strip() for x in re.split(r"[,،]", facts.location) if x.strip()]
+    country = _country(parts[-1]) if parts else None
+    iso = c.iso2 if country and (c := geo.country(country)) else ""
+    from_phone = False
+    if not iso and facts.phone.startswith("+"):  # no place in the CV: the number's country code
+        iso = _dial_country(facts.phone)
+        from_phone = bool(iso)
+    put("profile.phone", international_phone(facts.phone, iso))
+    put("profile.home_country", iso, check=from_phone)
+    if parts and (len(parts) > 1 or parts[0].lower() not in _COUNTRY_NAMES):
+        put("profile.home_city", parts[0])
     first, last = split_name(facts.full_name)
     put("answers.first_name", first)
     put("answers.last_name", last)
-    if facts.location:
-        parts = [p.strip() for p in re.split(r"[,،]", facts.location) if p.strip()]
+    if parts:
         put("answers.city", parts[0])
-        if code := _country(parts[-1]):
-            country = code.title()
-            put("answers.country", country)
-            put("answers.authorized_countries", [country], "country", "suggest")
-    if current:
-        put("answers.current_company", current.company, check=True)
-        put("answers.current_title", current.title, check=True)
+        if country:
+            put("answers.country", country.title())
+            put("answers.authorized_countries", [country.title()], "country", "suggest")
+    if newest:  # only a job the CV calls current is filled in without asking
+        lv: Level = "auto" if current else "suggest"
+        put("answers.current_company", newest.company, level=lv, check=True)
+        put("answers.current_title", newest.title, level=lv, check=True)
     put("answers.linkedin", facts.linkedin)
     put("answers.github", facts.github)
     put("answers.portfolio", facts.portfolio)
@@ -619,16 +712,18 @@ def infer(facts: CvFacts, today: date) -> dict[str, InferredValue]:
         tech_skills = sum(s.lower() in _TECH_SET for s in facts.skills)
         tech_title = bool(_TECH_TITLE_RX.search(recent)) and not _NON_TECH_ENG_RX.search(recent)
         put("track", "tech" if tech_skills >= 3 or tech_title else "general", level="suggest")
-    # Internship titles only become queries when there is nothing else to search for.
-    query_titles = [e.title for e in roles if e.title and not e.intern] or titles
-    queries = _dedupe([q for t in query_titles if (q := _query_of(t))])[:5]
+    # Internship titles only become queries when there is nothing else to search for, and then
+    # they stay as written ("Marketing Intern" is the search; "Marketing" alone is not).
+    query_titles = [e.title for e in roles if e.title and not e.intern]
+    queries = _dedupe([q for t in query_titles if (q := _query_of(t))] or titles)[:5]
     put("search.queries", queries, level="suggest")
 
     years = years_experience(facts, today)
-    put("answers.years_experience", years, "years")
-    band = _band(years, current.title if current else (titles[0] if titles else ""))
-    if band is not None:
-        put("filters.seniority", _BANDS[band], "years")
+    put("answers.years_experience", years, "years", note="under_one_year" if years == 0 else "")
+    picked = _levels(years, newest.title if newest else (titles[0] if titles else ""))
+    if picked is not None:
+        levels, band = picked
+        put("filters.seniority", levels, "years")
         far = [w for i, ws in enumerate(_BAND_WORDS) if abs(i - band) >= 2 for w in ws]
         put("filters.title_exclude", far, "years")
     return out

@@ -43,7 +43,7 @@ class LiteLLMProvider(LLMProvider):
                 timeout=self.timeout_s,
             )
         except RateLimitError as e:
-            raise UsageLimitError(str(e)) from e
+            raise UsageLimitError(str(e), self.name) from e
         except Exception as e:
-            raise classify(f"{type(e).__name__}: {e}") from e
+            raise classify(f"{type(e).__name__}: {e}", self.name) from e
         return str(resp.choices[0].message.content or "")

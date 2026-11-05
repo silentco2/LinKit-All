@@ -18,6 +18,7 @@ def current_run(db: sessionmaker[Session], new: bool = False) -> int:
             ).first()
             if run is not None:  # a cancelled run resumes too: its page checkpoints are kept
                 run.status, run.finished_at = RunStatus.running, None
+                run.pause_reason, run.reason_code, run.reason_params = None, None, {}
                 return run.id
         run = Run()
         s.add(run)
@@ -37,3 +38,47 @@ def record_stats(db: sessionmaker[Session], run_id: int, stage: str, stats: Any)
     with db.begin() as s:
         run = s.get_one(Run, run_id)
         run.stats = {**run.stats, stage: stats}  # new dict so the JSON change is saved
+
+
+def add_stage(db: sessionmaker[Session], run_id: int, stage: str) -> None:
+    with db.begin() as s:
+        run = s.get_one(Run, run_id)
+        if stage not in run.stages:
+            run.stages = [*run.stages, stage]
+
+
+def pause_run(
+    db: sessionmaker[Session], run_id: int, message: str, code: str, params: dict[str, Any]
+) -> None:
+    """Stop the run cleanly (AI usage limit, LibreOffice missing): resuming continues it."""
+    with db.begin() as s:
+        run = s.get_one(Run, run_id)
+        run.status, run.pause_reason = RunStatus.paused, message
+        run.reason_code, run.reason_params = code, params
+
+
+def note_failure(
+    db: sessionmaker[Session], run_id: int, message: str, code: str, params: dict[str, Any]
+) -> None:
+    """Remember why a stage failed. The status stays: the run is resumable, as before."""
+    with db.begin() as s:
+        run = s.get_one(Run, run_id)
+        run.pause_reason, run.reason_code, run.reason_params = message, code, params
+
+
+def pause_of(db: sessionmaker[Session], run_id: int) -> tuple[str, str, dict[str, Any]] | None:
+    """(message, code, params) when a stage paused this run, else None."""
+    with db() as s:
+        run = s.get_one(Run, run_id)
+        if run.status != RunStatus.paused:
+            return None
+        return run.pause_reason or "", run.reason_code or "", dict(run.reason_params)
+
+
+def run_kind(run: Run) -> str:
+    """ "apply" (only the apply stage), "mixed" (apply plus any search stage) or "search"
+    (everything else: discover, enrich, rank, score). Old runs without `stages` use their stats."""
+    stages = set(run.stages or run.stats)
+    if "apply" not in stages:
+        return "search"
+    return "apply" if stages == {"apply"} else "mixed"

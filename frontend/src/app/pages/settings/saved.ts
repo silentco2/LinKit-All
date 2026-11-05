@@ -37,8 +37,8 @@ export class Saved {
     <ng-template #control><ng-content /></ng-template>
     @if (check()) {
       <div class="flex items-start gap-2">
-        <ng-container [ngTemplateOutlet]="control" />
-        <label class="text-sm" [for]="forId()">{{ label() }}</label>
+        <label [for]="forId()" class="flex shrink-0 items-center justify-center max-sm:-m-2 max-sm:size-10"><ng-container [ngTemplateOutlet]="control" /></label>
+        <label class="text-sm max-sm:flex max-sm:min-h-6 max-sm:items-center" [for]="forId()">{{ label() }}</label>
         <app-saved class="ms-auto" [field]="key()" />
       </div>
     } @else {

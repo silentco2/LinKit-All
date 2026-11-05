@@ -1,10 +1,11 @@
 """What to search and how to filter/rank it, imported from search.toml until the UI exists."""
 
+import math
 import re
 import tomllib
 from itertools import product
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Self
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy.orm import Session, sessionmaker
@@ -136,11 +137,62 @@ def normalize_channel(raw: str) -> str:
     return name
 
 
+class Place(BaseModel):
+    """A place you would work: `allowed` = you may work there, `visa` = you would need a visa,
+    `ask` (the default) = not answered yet: work rights are never assumed, forms ask you."""
+
+    label: str
+    city: str = ""
+    country: str = ""  # ISO2; empty only for a place migrated from an old free-text location
+    work: Literal["allowed", "visa", "ask"] = "ask"
+
+    @field_validator("label", "city")
+    @classmethod
+    def _strip(cls, v: str) -> str:
+        return v.strip()
+
+    @field_validator("country")
+    @classmethod
+    def _iso2(cls, v: str) -> str:
+        v = v.strip().upper()
+        if v and not re.fullmatch(r"[A-Z]{2}", v):
+            raise ValueError("country must be a 2-letter code such as EG")
+        return v
+
+    @model_validator(mode="after")
+    def _named(self) -> Self:
+        if not self.label:
+            raise ValueError("a place needs a label")
+        return self
+
+
+ANY_AGE_DAYS = 3650  # what day-based sources get for "posted any time"
+
+
 class SearchSection(BaseModel):
     queries: list[str] = []
-    locations: list[str] = [""]  # "" = anywhere
-    posted_within_days: int = Field(14, ge=1)
+    locations: list[str] = [""]  # "" = anywhere; derived from `places` when those are saved
+    places: list[Place] = []
+    remote: bool = True  # also accept remote jobs
+    posted_within_hours: int | None = Field(336, ge=1)  # None = any time
     max_results_per_query: int = Field(200, ge=1, le=1000)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _days_to_hours(cls, data: Any) -> Any:
+        """Old configs: posted_within_days becomes hours unless hours is given."""
+        if isinstance(data, dict) and "posted_within_days" in data:
+            data = dict(data)
+            days = data.pop("posted_within_days")
+            if "posted_within_hours" not in data and isinstance(days, int) and days >= 1:
+                data["posted_within_hours"] = days * 24
+        return data
+
+    @property
+    def posted_within_days(self) -> int:
+        """Whole days for sources that only take days: hours rounded up; "any" is ten years."""
+        h = self.posted_within_hours
+        return ANY_AGE_DAYS if h is None else math.ceil(h / 24)
 
     @field_validator("queries")
     @classmethod
@@ -153,6 +205,7 @@ class SearchSection(BaseModel):
 
 class SourcesSection(BaseModel):
     companies: list[str] = []  # career-page URLs or "greenhouse:stripe" style shorthands
+    company_labels: dict[str, str] = {}  # companies entry -> "Stripe · Greenhouse" (display only)
     jobspy: list[Literal["linkedin", "indeed", "glassdoor", "google", "zip_recruiter"]] = []
     jobspy_country: str = "usa"  # Indeed only (Glassdoor gets none); e.g. "egypt", "qatar"
     regional: list[Literal["wuzzuf", "bayt", "forasna"]] = []
@@ -173,8 +226,9 @@ class SourcesSection(BaseModel):
     # LinkedIn hiring posts; read when "linkedin_posts" is in `enabled`.
     linkedin_keywords: list[str] = []
     linkedin_window: Literal["day", "week"] = "week"
-    linkedin_max_posts: int = Field(60, ge=1, le=200)  # posts read per keyword
-    linkedin_headless: bool = True
+    # posts read per keyword; Google gives at most 50 (linkedin_posts.google.MAX_PAGES)
+    linkedin_max_posts: int = Field(30, ge=1, le=200)
+    linkedin_headless: bool = True  # deprecated and ignored: `apply.headless` is the one setting
 
 
 class FiltersSection(BaseModel):
@@ -184,7 +238,10 @@ class FiltersSection(BaseModel):
     work_modes: list[WorkMode] = Field(default_factory=lambda: list(WORK_MODES))
     seniority: list[Seniority] = []  # empty = any
     salary_floor_monthly: int = Field(0, ge=0)  # only checked when the posting states a salary
-    salary_currency: str = "EGP"  # only postings in this currency are compared
+    salary_currency: str = (
+        "EGP"  # the floor is in this currency; other currencies are converted (fx)
+    )
+    skip_below_expectation: bool = False  # no floor set: use the salary you expect (Answers)
     company_blacklist: list[str] = []
     one_per_company: bool = True
 
@@ -239,6 +296,9 @@ class ApplySection(BaseModel):
     parallel_sites: int = Field(3, ge=1, le=3)  # sites worked on at the same time
     generic_agent: bool = True  # use the AI form agent for sites without a dedicated handler
     email_daily_cap: int = Field(15, ge=1, le=100)  # live application emails per day
+    # None = not decided yet, True = tailor the CV per job (needs LibreOffice), False = send
+    # the CV as uploaded. Without LibreOffice, practice mode sends it as uploaded either way.
+    tailor_cv: bool | None = None
 
 
 class AISection(BaseModel):

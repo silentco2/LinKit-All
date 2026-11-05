@@ -10,6 +10,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ProviderName = Literal["codex_cli", "claude_cli", "litellm"]
 
+# The trimmed LibreOffice bundle (scripts/bundle_libreoffice.py), Windows x64 only, hosted as a
+# release asset (152,201,685 bytes, unpacks to about 439 MB). The hash is checked before unpacking.
+LO_BUNDLE_URL = "https://github.com/silentco2/LinKit-All/releases/download/libreoffice-26.2.6-win-x64/libreoffice-minimal-26.2.6-win-x64.zip"
+LO_BUNDLE_SHA256 = "9f5e05e456393c91108f3c48cca4f74c095867a5ef806714102c86a7706cfb28"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="LINKIT_")
@@ -33,6 +38,9 @@ class Settings(BaseSettings):
 
     # Multilingual (Arabic + English), 220 MB, downloaded once into data_dir/models.
     embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+
+    lo_bundle_url: str = LO_BUNDLE_URL  # LINKIT_LO_BUNDLE_URL
+    lo_bundle_sha256: str = LO_BUNDLE_SHA256  # LINKIT_LO_BUNDLE_SHA256: hex digest of the zip
 
     @property
     def db_path(self) -> Path:

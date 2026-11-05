@@ -1,13 +1,15 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { Api } from '../../api';
+import { Countries } from '../../components/countries';
+import { PlacePicker } from '../../components/place-picker';
 import { I18n, TPipe } from '../../i18n';
 import { fmtNum, localeOf } from '../../locale';
 import { AnswerEntry, AnswerValue, ApplicationAnswers, lines, unlines } from '../../types';
 import { Field } from './saved';
 import { SettingsStore } from './store';
 
-const CHIP = 'inline-flex items-center gap-1 rounded-full border border-brand-500 bg-brand-50 py-0.5 ps-3 pe-1 text-sm font-medium text-brand-700 dark:bg-slate-800 dark:text-white';
 type EeoKey = 'eeo_gender' | 'eeo_race' | 'eeo_hispanic' | 'eeo_veteran' | 'eeo_disability';
 type EeoMode = 'ask' | 'decline' | 'now';
 type Filter = 'all' | 'ai' | 'user';
@@ -16,7 +18,7 @@ type Choice = { v: boolean | null; label: string };
 /** Settings > Answers: the sensitive and form answers, then the saved answers list. Everything saves as you edit. */
 @Component({
   selector: 'app-settings-answers',
-  imports: [Field, NgTemplateOutlet, TPipe],
+  imports: [Field, NgTemplateOutlet, PlacePicker, RouterLink, TPipe],
   template: `
     <ng-template #choice let-k="k" let-opts="opts">
       <div class="flex flex-wrap gap-2" role="group">
@@ -28,50 +30,48 @@ type Choice = { v: boolean | null; label: string };
 
     <div class="space-y-6">
       <section class="card space-y-5">
-        <h2>{{ 'setup.answers.sensitive' | t }}</h2>
-        <p class="hint">{{ 'setup.answers.sensitiveHint' | t }}</p>
-
-        <app-field key="answers.authorized_countries" for="auth-add" [label]="'setup.answers.auth' | t" [hint]="'setup.answers.authHint' | t">
-          <div class="flex flex-wrap items-center gap-2" role="list">
-            @for (c of store.answers.authorized_countries; track c) {
-              <span role="listitem" [class]="chip">
-                <bdi>{{ c }}</bdi>
-                <button type="button" class="rounded-full px-1.5 hover:bg-brand-100 dark:hover:bg-slate-700" [attr.aria-label]="'settings.jobs.remove' | t: { name: c }" (click)="removeCountry(c)"><span aria-hidden="true">×</span></button>
-              </span>
-            }
-          </div>
-          <div class="mt-2 flex max-w-md gap-2">
-            <input #countryIn id="auth-add" class="input" dir="auto" placeholder="Egypt" (keydown.enter)="addCountry(countryIn)" (change)="addCountry(countryIn)">
-            <button type="button" class="btn" (click)="addCountry(countryIn)">{{ 'welcome.jobs.add' | t }}</button>
-          </div>
-        </app-field>
-
-        <app-field key="answers.needs_sponsorship" [label]="'setup.answers.sponsor' | t" [hint]="'settings.ans.sponsorHint' | t">
-          <ng-container [ngTemplateOutlet]="choice" [ngTemplateOutletContext]="{ k: 'answers.needs_sponsorship', opts: yesNo }" />
-        </app-field>
-
-        <div class="grid gap-4 sm:grid-cols-2">
-          <app-field key="answers.salary_expectation" for="a-sal" [label]="'setup.answers.salary' | t" [hint]="'setup.answers.salaryHint' | t">
-            <input id="a-sal" dir="ltr" class="input" placeholder="30000" [value]="store.answers.salary_expectation" (change)="store.update('answers.salary_expectation', val($event).trim())">
-          </app-field>
-          <app-field key="answers.salary_currency" for="a-cur" [label]="'setup.answers.currency' | t">
-            <select id="a-cur" class="input" dir="ltr" (change)="store.update('answers.salary_currency', val($event))">
-              <option value="" [selected]="!store.answers.salary_currency">—</option>
-              @for (c of currencies(); track c) { <option [value]="c" [selected]="c === store.answers.salary_currency">{{ c }}</option> }
-            </select>
-          </app-field>
+        <h2>{{ 'ans.work' | t }}</h2>
+        <div class="text-sm text-slate-600 dark:text-slate-300">
+          <p>{{ 'ans.permits' | t }} <a routerLink="/settings/jobs">{{ 'settings.s.jobs' | t }}</a></p>
+          @if (store.answers.authorized_countries.length) { <p class="hint"><bdi>{{ 'ans.permits.allowed' | t: { list: names(store.answers.authorized_countries) } }}</bdi></p> }
+          @if (store.answers.visa_countries.length) { <p class="hint"><bdi>{{ 'ans.permits.visa' | t: { list: names(store.answers.visa_countries) } }}</bdi></p> }
         </div>
 
         <div class="grid gap-4 sm:grid-cols-2">
           <app-field key="answers.notice_period" for="a-notice" [label]="'setup.answers.notice' | t">
-            <select id="a-notice" class="input" (change)="store.update('answers.notice_period', val($event))">
-              <option value="" [selected]="!store.answers.notice_period">{{ 'welcome.forms.ask' | t }}</option>
-              @for (n of notices(); track n[0]) { <option [value]="n[0]" [selected]="n[0] === store.answers.notice_period">{{ n[1] | t }}</option> }
+            <select id="a-notice" class="input" (change)="setNotice(val($event))">
+              <option value="" [selected]="!otherNotice() && !store.answers.notice_period">{{ 'welcome.forms.ask' | t }}</option>
+              @for (n of noticeOptions; track n[0]) { <option [value]="n[0]" [selected]="!otherNotice() && n[0] === store.answers.notice_period">{{ n[1] | t }}</option> }
+              <option value="other" [selected]="otherNotice()">{{ 'settings.ans.n.other' | t }}</option>
             </select>
+            @if (otherNotice()) {
+              <input class="input mt-2" dir="auto" [attr.aria-label]="'settings.ans.n.other' | t" [value]="store.answers.notice_period" (change)="store.update('answers.notice_period', val($event).trim())">
+            }
           </app-field>
           <app-field key="answers.willing_to_relocate" [label]="'setup.answers.reloc' | t">
             <ng-container [ngTemplateOutlet]="choice" [ngTemplateOutletContext]="{ k: 'answers.willing_to_relocate', opts: yesNo }" />
           </app-field>
+        </div>
+      </section>
+
+      <section class="card space-y-5">
+        <h2>{{ 'ans.personal' | t }}</h2>
+        <p class="hint !mt-0">{{ 'ans.personal.hint' | t }}</p>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <app-field key="answers.nationality" for="a-nat" [label]="'ans.nationality' | t">
+            <app-place-picker inputId="a-nat" [countriesOnly]="true" [value]="nationalityName()" [placeholder]="'welcome.forms.ask' | t" [ariaLabel]="'ans.nationality' | t" (picked)="store.update('answers.nationality', $event.country)" />
+          </app-field>
+          <app-field key="answers.date_of_birth" for="a-dob" [label]="'ans.dob' | t">
+            <input id="a-dob" type="date" dir="ltr" class="input" [value]="store.answers.date_of_birth" (change)="store.update('answers.date_of_birth', val($event))">
+          </app-field>
+          @for (f of factFields; track f.key) {
+            <app-field [key]="'answers.' + f.key" [for]="'a-' + f.key" [label]="f.label | t">
+              <select [id]="'a-' + f.key" class="input" (change)="store.update('answers.' + f.key, val($event) || null)">
+                <option value="" [selected]="!store.answers[f.key]">{{ 'welcome.forms.ask' | t }}</option>
+                @for (o of f.options; track o[0]) { <option [value]="o[0]" [selected]="store.answers[f.key] === o[0]">{{ o[1] | t }}</option> }
+              </select>
+            </app-field>
+          }
         </div>
       </section>
 
@@ -150,7 +150,7 @@ type Choice = { v: boolean | null; label: string };
                 </header>
                 <p class="mt-2 whitespace-pre-line break-words text-sm text-slate-700 dark:text-slate-300" dir="auto">{{ show(e.answer) }}</p>
                 <footer class="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                  <span>{{ (e.uses === 1 ? 'answers.used.one' : 'answers.used.other') | t: { n: num(e.uses) } }}</span>
+                  <span>{{ plural('answers.used', e.uses) }}</span>
                   <span>{{ 'answers.updated' | t: { date: when(e.updated_at) } }}</span>
                   <span class="ms-auto flex gap-2">
                     <button type="button" class="btn" [disabled]="busy()" (click)="edit(e)">{{ 'answers.edit' | t }}</button>
@@ -173,14 +173,21 @@ export class AnswersSection implements OnInit {
   protected readonly store = inject(SettingsStore);
   private readonly api = inject(Api);
   private readonly i18n = inject(I18n);
-  protected readonly chip = CHIP;
+  private readonly countries = inject(Countries);
   protected readonly yesNo: Choice[] = [{ v: null, label: 'welcome.forms.ask' }, { v: true, label: 'common.yes' }, { v: false, label: 'common.no' }];
   protected readonly agree: Choice[] = [{ v: null, label: 'welcome.forms.askEach' }, { v: true, label: 'settings.ans.always' }];
   // the stored value is this English text (it is typed into English forms); the label is translated
-  private readonly noticeOptions: [string, string][] = [
-    ['Immediately', 'settings.ans.n.now'], ['2 weeks', 'settings.ans.n.2w'], ['1 month', 'settings.ans.n.1m'], ['2 months', 'settings.ans.n.2m'], ['3 months', 'settings.ans.n.3m'],
+  protected readonly noticeOptions: [string, string][] = [
+    ['Immediately', 'settings.ans.n.now'], ['1 week', 'settings.ans.n.1w'], ['2 weeks', 'settings.ans.n.2w'], ['1 month', 'settings.ans.n.1m'], ['2 months', 'settings.ans.n.2m'],
+    ['3 months', 'settings.ans.n.3m'], ['6 months', 'settings.ans.n.6m'], ['Currently serving notice', 'settings.ans.n.serving'],
   ];
-  private readonly allCurrencies = ['EGP', 'SAR', 'AED', 'QAR', 'KWD', 'BHD', 'OMR', 'JOD', 'USD', 'EUR', 'GBP'];
+  /** "Other..." is picked (or the saved value is none of the options): a text box shows. */
+  protected readonly otherNotice = signal(false);
+  // select values are the codes the server stores
+  protected readonly factFields: { key: 'marital_status' | 'military_status'; label: string; options: [string, string][] }[] = [
+    { key: 'marital_status', label: 'ans.marital', options: [['single', 'ans.marital.single'], ['married', 'ans.marital.married'], ['divorced', 'ans.marital.divorced'], ['widowed', 'ans.marital.widowed'], ['decline', 'setup.eeo.decline']] },
+    { key: 'military_status', label: 'ans.military', options: [['completed', 'ans.military.completed'], ['postponed', 'ans.military.postponed'], ['exempted', 'ans.military.exempted'], ['not_applicable', 'ans.military.na'], ['decline', 'setup.eeo.decline']] },
+  ];
   protected readonly eeoModes: { id: EeoMode; label: string }[] = [
     { id: 'decline', label: 'welcome.forms.declineAll' },
     { id: 'ask', label: 'welcome.forms.askEach' },
@@ -191,7 +198,7 @@ export class AnswersSection implements OnInit {
     {
       key: 'eeo_race',
       label: 'setup.eeo.race',
-      options: [['asian', 'setup.eeo.asian'], ['black', 'setup.eeo.black'], ['hispanic', 'setup.eeo.hispanic'], ['white', 'setup.eeo.white'],
+      options: [['asian', 'setup.eeo.asian'], ['black', 'setup.eeo.black'], ['white', 'setup.eeo.white'],
         ['middle_eastern', 'setup.eeo.middleEastern'], ['native', 'setup.eeo.native'], ['pacific', 'setup.eeo.pacific'], ['two_or_more', 'setup.eeo.twoOrMore']],
     },
     { key: 'eeo_hispanic', label: 'setup.eeo.hispanicQ', options: [['yes', 'common.yes'], ['no', 'common.no']] },
@@ -220,6 +227,9 @@ export class AnswersSection implements OnInit {
 
   ngOnInit(): void {
     const v = this.eeoFields.map((f) => this.store.answers[f.key]);
+    const n = this.store.answers.notice_period;
+    this.otherNotice.set(!!n && !this.noticeOptions.some((o) => o[0] === n));
+    void this.countries.load();
     this.eeoMode.set(v.every((x) => x === 'decline') ? 'decline' : v.some((x) => x) ? 'now' : 'ask');
     void this.load();
   }
@@ -233,28 +243,25 @@ export class AnswersSection implements OnInit {
     return this.store.get(key) ?? null;
   }
 
-  /** The labels for the notice-period select: the fixed options, plus an older free-text value if there is one. */
-  protected notices(): [string, string][] {
-    const cur = this.store.answers.notice_period;
-    return !cur || this.noticeOptions.some((n) => n[0] === cur) ? this.noticeOptions : [[cur, cur], ...this.noticeOptions];
+  /** "Other..." opens the text box and clears the old canned value; any other choice is stored as its English text. */
+  protected setNotice(v: string): void {
+    this.otherNotice.set(v === 'other');
+    this.store.update('answers.notice_period', v === 'other' ? '' : v);
   }
 
-  protected currencies(): string[] {
-    const cur = this.store.answers.salary_currency;
-    return !cur || this.allCurrencies.includes(cur) ? this.allCurrencies : [cur, ...this.allCurrencies];
+  /** Country names in the UI language (the stored ones are English names). */
+  protected names(list: string[]): string {
+    return list.map((n) => {
+      const c = this.countries.list().find((x) => x.name.toLowerCase() === n.toLowerCase());
+      return c ? this.countries.name(c) : n;
+    }).join(', ');
   }
 
-  // ---- authorized countries -----------------------------------------------------------------
-
-  protected addCountry(box: HTMLInputElement): void {
-    const v = box.value.trim();
-    box.value = '';
-    const cur = this.store.answers.authorized_countries;
-    if (v && !cur.some((c) => c.toLowerCase() === v.toLowerCase())) this.store.update('answers.authorized_countries', [...cur, v]);
-  }
-
-  protected removeCountry(c: string): void {
-    this.store.update('answers.authorized_countries', this.store.answers.authorized_countries.filter((x) => x !== c));
+  /** The saved nationality (ISO2, or an older typed name) as the text for the box. */
+  protected nationalityName(): string {
+    const n = this.store.answers.nationality;
+    const c = n.length === 2 ? this.countries.byIso(n) : undefined;
+    return c ? this.countries.name(c) : n;
   }
 
   // ---- demographic questions: one row for all five -----------------------------------------------
@@ -283,6 +290,7 @@ export class AnswersSection implements OnInit {
 
   protected count = (f: Filter): number => this.entries().filter((e) => f === 'all' || e.source === f).length;
   protected num = (n: number): string => fmtNum(this.loc(), n);
+  protected plural = (base: string, n: number): string => this.i18n.plural(base, n);
   protected when = (iso: string): string => new Date(iso).toLocaleString(this.loc());
   protected isBool = (v: AnswerValue): boolean => typeof v === 'boolean';
   protected isList = (v: AnswerValue): boolean => Array.isArray(v);

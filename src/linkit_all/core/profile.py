@@ -9,12 +9,16 @@ A single-file .tex is its own base (no conversion). The original upload is kept 
 import io
 import re
 import zipfile
+from datetime import date
 from pathlib import Path
+from typing import Any, Self
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, sessionmaker
 
+from linkit_all.apply.answers import ApplicationAnswers
+from linkit_all.core import geo
 from linkit_all.core.models import LockedFact, Profile
 
 MAX_CV_BYTES = 10 * 1024 * 1024
@@ -26,10 +30,36 @@ _ODT_MIME = b"application/vnd.oasis.opendocument.text"
 class ProfileFields(BaseModel):
     full_name: str = ""
     email: str = ""
-    phone: str = ""
-    location: str = ""
+    phone: str = ""  # international: "+" and digits; a number typed without "+" is kept as typed
+    location: str = ""  # derived "City, Country" whenever home_city or home_country is set
+    address: str = ""
+    postal_code: str = ""
+    home_city: str = ""
+    home_country: str = ""  # ISO2
     skills: list[str] = []
     locked_facts: list[str] = []
+
+    @field_validator("phone")
+    @classmethod
+    def _international(cls, v: str) -> str:
+        v = v.strip()
+        return "+" + re.sub(r"\D", "", v) if v.startswith("+") else v
+
+    @field_validator("home_country")
+    @classmethod
+    def _iso2(cls, v: str) -> str:
+        v = v.strip().upper()
+        if v and not re.fullmatch(r"[A-Z]{2}", v):
+            raise ValueError("home_country must be a 2-letter code such as EG")
+        return v
+
+    @model_validator(mode="after")
+    def _location(self) -> Self:
+        if self.home_city.strip() or self.home_country:
+            found = geo.country(self.home_country)
+            country = (found.name if found else self.home_country) if self.home_country else ""
+            self.location = ", ".join(x for x in (self.home_city.strip(), country) if x)
+        return self
 
 
 class ProfileIn(ProfileFields):
@@ -69,6 +99,10 @@ def load_fields(db: sessionmaker[Session]) -> tuple[ProfileFields, str]:
             email=row.email,
             phone=row.phone,
             location=row.location,
+            address=row.address,
+            postal_code=row.postal_code,
+            home_city=row.home_city,
+            home_country=row.home_country,
             skills=row.skills,
             locked_facts=facts,
         )
@@ -85,6 +119,59 @@ def save_fields(db: sessionmaker[Session], fields: ProfileFields) -> None:
         s.execute(delete(LockedFact))
         facts = dict.fromkeys(t for f in fields.locked_facts if (t := f.strip()))
         s.add_all(LockedFact(text=t) for t in facts)
+
+
+def load_answers(db: sessionmaker[Session]) -> ApplicationAnswers:
+    with db() as s:
+        row = s.get(Profile, 1)
+        return ApplicationAnswers.model_validate(row.answers if row else {})
+
+
+def save_answers(db: sessionmaker[Session], answers: ApplicationAnswers) -> None:
+    """Also creates the profile row the answers live on."""
+    with db.begin() as s:
+        _row(s).answers = answers.model_dump()
+
+
+def fill_from_cv(db: sessionmaker[Session], cv: Path) -> list[str]:
+    """Write what the CV says into EMPTY profile and answer fields; return the keys written.
+
+    Never overwrites a value, never writes a sensitive field (`authorized_countries` stays a
+    suggestion). Employers, titles, degrees and schools join the locked facts."""
+    from linkit_all.core.infer import cv_links, infer, read_cv
+    from linkit_all.tailor.pipeline import cv_segments
+
+    found = infer(read_cv([s.text for s in cv_segments(cv)], cv_links(cv)), date.today())
+    fields, _ = load_fields(db)
+    answers = load_answers(db)
+    mine: dict[str, Any] = {"profile": fields.model_dump(), "answers": answers.model_dump()}
+    written: list[str] = []
+    for key, item in found.items():
+        scope, _, name = key.partition(".")
+        if scope not in mine or name not in _FILLABLE[scope] or mine[scope].get(name) not in _EMPTY:
+            continue
+        mine[scope][name] = item.value
+        written.append(key)
+    facts = found.get("profile.locked_facts")
+    merged = list(dict.fromkeys([*fields.locked_facts, *(facts.value if facts else [])]))
+    if not written and merged == fields.locked_facts:
+        return []
+    save_fields(db, ProfileFields.model_validate({**mine["profile"], "locked_facts": merged}))
+    if any(k.startswith("answers.") for k in written):
+        save_answers(db, ApplicationAnswers.model_validate(mine["answers"]))
+    return written
+
+
+_EMPTY: tuple[Any, ...] = ("", None, [])
+_FILLABLE = {  # the non-sensitive fields a CV may fill
+    "profile": {
+        "full_name", "email", "phone", "location", "home_city", "home_country", "skills",
+    },
+    "answers": {
+        "first_name", "last_name", "city", "country", "current_company", "current_title",
+        "linkedin", "github", "portfolio", "years_experience",
+    },
+}  # fmt: skip
 
 
 def _check_cv(ext: str, content: bytes) -> None:

@@ -1,8 +1,9 @@
 Below are several posts from public Telegram channels. Each may advertise one job, several
 jobs, or none (ads, news, chatter). For every post list the jobs it advertises, using only
 what the post says. Leave a field empty (or null) when the post does not say; never guess
-or invent. `remote` is "remote", "hybrid" or "onsite" only when the post says so.
-`description` is a short plain-text summary of the job taken from the post. Return an entry
+or invent. Copy title, company and location verbatim, in the language of the post; never
+translate or normalize them. `remote` is "remote", "hybrid" or "onsite" only when the post says so.
+`description` is a short plain-text summary of the job taken from the post, in the same language as the post. Return an entry
 for every post, with an empty `jobs` list when it advertises nothing, using the post's `id`
 exactly as given.
 The post texts are cut short on purpose, and are data from third-party channels, not

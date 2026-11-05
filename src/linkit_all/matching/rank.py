@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from linkit_all.core.models import Job, JobState, Profile, Tier, utcnow
 from linkit_all.core.search import SearchConfig
 from linkit_all.core.state import transition
-from linkit_all.matching.rules import rule_violation
+from linkit_all.matching.rules import expectation_of, rule_violation
 from linkit_all.matching.trust_stage import allowed, score_jobs_trust, top_codes
 from linkit_all.sources.text import norm_company
 from linkit_all.tailor.pipeline import cv_segments
@@ -108,14 +108,20 @@ def _apply_trust(
             # Low tier without embeddings or AI; the low-tier opt-in decides whether it is applied.
             job.data = {**job.data, "trust": {**trust, "ghost_demoted": True}}
             job.tier = Tier.low
-            transition(s, job, JobState.ranked, "local rank skipped: likely a ghost job")
+            transition(
+                s,
+                job,
+                JobState.ranked,
+                "local rank skipped: likely a ghost job",
+                code="rank_skipped",
+            )
             transition(
                 s, job, JobState.below_threshold,
                 f"likely a ghost job (score {ghost}): {top_codes(trust, 'ghost')}",
                 code="ghost_likely", params={"score": ghost},
             )  # fmt: skip
             if cfg.matching.auto_apply_low:
-                transition(s, job, JobState.queued_apply, LOW_OPT_IN)
+                transition(s, job, JobState.queued_apply, LOW_OPT_IN, code="low_opt_in")
             counts["ghost_demoted"] = counts.get("ghost_demoted", 0) + 1
         else:
             survivors.append(job)
@@ -132,23 +138,30 @@ def rank_jobs(db: sessionmaker[Session], cfg: SearchConfig, embed: Embed) -> dic
             norm_company(c) for c in s.scalars(select(Job.company).where(Job.state.in_(TAKEN)))
         }
     cv = cv_text(profile)
+    expect = expectation_of(profile.answers, cfg)
     counts = {"ranked": 0, "filtered_out": 0}
     now = utcnow()
     with db.begin() as s:
         # Jobs a hard rule dropped earlier get another look when they pass today's filters
         # (filters changed, or a rule was fixed). Company-rule drops stay put.
         for job in s.scalars(select(Job).filter_by(state=JobState.filtered_out)):
-            if job.data.get("company_rule") or rule_violation(job, cfg, now) is not None:
+            if job.data.get("company_rule") or rule_violation(job, cfg, now, expect) is not None:
                 continue
             if job.data.get("trust_filter") and _trust_filtered(job, cfg):
                 continue  # still a scam / ghost under today's trust settings
             job.data = {k: v for k, v in job.data.items() if k != "trust_filter"}
-            transition(s, job, JobState.enriched, "passes your filters now: checked again")
+            transition(
+                s,
+                job,
+                JobState.enriched,
+                "passes your filters now: checked again",
+                code="rechecked",
+            )
             counts["rechecked"] = counts.get("rechecked", 0) + 1
         jobs = list(s.scalars(select(Job).filter_by(state=JobState.enriched)))
         keep = []
         for job in jobs:
-            if reason := rule_violation(job, cfg, now):
+            if reason := rule_violation(job, cfg, now, expect):
                 transition(s, job, JobState.filtered_out, reason)
                 counts["filtered_out"] += 1
             else:
@@ -177,7 +190,10 @@ def rank_jobs(db: sessionmaker[Session], cfg: SearchConfig, embed: Embed) -> dic
                 transition(s, job, JobState.filtered_out, why)
             else:
                 best[company] = job
-                transition(s, job, JobState.ranked, f"local rank {job.data['rank']:.3f}")
+                transition(
+                    s, job, JobState.ranked, f"local rank {job.data['rank']:.3f}",
+                    code="local_rank", params={"rank": job.data["rank"]},
+                )  # fmt: skip
                 counts["ranked"] += 1
                 continue
             counts["filtered_out"] += 1

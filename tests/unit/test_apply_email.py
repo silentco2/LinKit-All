@@ -45,12 +45,15 @@ class FakeProvider(LLMProvider):
     def __init__(self) -> None:
         super().__init__("fake")
         self.prompts: list[str] = []
+        self.queue: list[str] = []  # answers served first, then `answer`
         self.answer: str | Exception = json.dumps(
             {"subject_suffix": None, "body": "I would be a good fit for this role. CV attached."}
         )
 
     async def _call(self, prompt: str) -> str:
         self.prompts.append(prompt)
+        if self.queue:
+            return self.queue.pop(0)
         if isinstance(self.answer, Exception):
             raise self.answer
         return self.answer
@@ -391,3 +394,41 @@ def test_pick_jobs_takes_mailto_and_respects_the_daily_cap(make: Any) -> None:
 
 def test_old_config_loads_with_default_cap() -> None:
     assert SearchConfig.model_validate({"apply": {"live": True}}).apply.email_daily_cap == 15
+
+
+ARABIC_MAIL = json.dumps({"subject_suffix": None, "body": "السلام عليكم، أنا مطور برمجيات."})
+
+
+def test_arabic_email_is_retried_once_then_accepted(make: Any, smtp: type[FakeSMTP]) -> None:
+    env: Env = make(live=True, submit_without_asking=True)
+    env.provider.queue = [ARABIC_MAIL]  # then the default English answer
+    out = env.apply(env.job())
+    assert out.status == "applied" and len(env.provider.prompts) == 2
+    assert "Write in English only" in env.provider.prompts[1]
+
+
+def test_arabic_email_twice_is_never_sent_even_without_asking(
+    client: TestClient, make: Any, smtp: type[FakeSMTP]
+) -> None:
+    env: Env = make(live=True, submit_without_asking=True)
+    env.provider.answer = ARABIC_MAIL
+    job_id = env.job()
+    out = env.apply(job_id)
+    assert out.status == "needs_user" and smtp.instances == []
+    assert len(env.provider.prompts) == 2  # first try plus one retry
+    item = env.item()
+    assert item is not None and item.kind == ActionKind.confirm_email
+    assert item.params["problem"] == "arabic" and "Arabic" in item.message
+    draft = env.row(job_id).data["email_draft"]
+    assert draft["problem"] == "arabic" and "السلام" not in draft["body"]  # AI text not kept
+
+    # confirming without writing anything parks again; the user's edit clears the problem
+    client.app.state.db = env.db  # type: ignore[attr-defined]
+    url = f"/api/actions/{item.id}/email-draft"
+    edit = {"subject": draft["subject"], "body": "Hello,\n\nMy own words."}
+    assert client.put(url, json=edit, headers=SAME_ORIGIN).status_code == 200
+    assert "problem" not in env.row(job_id).data["email_draft"]
+    client.post(f"/api/actions/{item.id}", json={"decision": "confirm"}, headers=SAME_ORIGIN)
+    assert env.apply(job_id).status == "applied"
+    (sent,) = smtp.instances[0].sent
+    assert "My own words." in sent.get_body(("plain",)).get_content()  # type: ignore[union-attr]

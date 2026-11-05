@@ -14,6 +14,7 @@ from pydantic import BaseModel, field_validator
 
 from linkit_all.apply.email_send import valid_address
 from linkit_all.providers.base import LLMProvider, render
+from linkit_all.tailor.patches import has_arabic
 
 MAX_BODY_WORDS = 180
 MAX_SUFFIX = 60
@@ -58,6 +59,7 @@ class Draft:
     to: str
     subject: str
     body: str
+    problem: str | None = None  # "arabic": body left blank; a live send waits for the user
 
 
 def mailto_address(url: str | None) -> str | None:
@@ -113,8 +115,15 @@ async def compose(
     brief = {**job, "description": job.get("description", "")[:4000]}
     prompt = render("application_email.j2", cv=cv[:6000], profile=profile_facts, job=brief)
     mail = await provider.complete(prompt, ApplicationEmail)
+    problem = None
+    if has_arabic(mail.body) or has_arabic(mail.subject_suffix or ""):  # retry once, uncached
+        retry = prompt + "\n\nYour previous answer contained Arabic script. Write in English only."
+        mail = await provider.complete(retry, ApplicationEmail, use_cache=False)
+        if has_arabic(mail.body) or has_arabic(mail.subject_suffix or ""):
+            mail, problem = ApplicationEmail.model_construct(body="", subject_suffix=None), "arabic"
     body = f"{greeting(author)}\n\n{mail.body}\n\n{signature(full_name, phone, linkedin)}"
-    return Draft(to, subject_for(job.get("title", ""), full_name, mail.subject_suffix), body)
+    subject = subject_for(job.get("title", ""), full_name, mail.subject_suffix)
+    return Draft(to, subject, body, problem)
 
 
 def attachment_copy(src: str | Path, out_dir: Path, full_name: str) -> Path:

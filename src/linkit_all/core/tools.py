@@ -19,13 +19,14 @@ def _program_dirs() -> list[Path]:
     return [Path(v) for k in keys if (v := os.environ.get(k))]
 
 
-def bundled_libreoffice() -> Path:
-    """Where `linkit install-libreoffice` puts the minimal portable LibreOffice."""
-    return get_settings().data_dir / "tools" / "libreoffice"
+def bundled_libreoffice(data_dir: Path | None = None) -> Path:
+    """Where `linkit install-libreoffice` (or the in-app install) puts the minimal portable
+    LibreOffice."""
+    return (data_dir or get_settings().data_dir) / "tools" / "libreoffice"
 
 
-def soffice_path() -> str | None:
-    bundled = bundled_libreoffice() / "program" / "soffice.exe"
+def soffice_path(data_dir: Path | None = None) -> str | None:
+    bundled = bundled_libreoffice(data_dir) / "program" / "soffice.exe"
     if bundled.is_file():
         return str(bundled)
     fallbacks = [d / "LibreOffice/program/soffice.exe" for d in _program_dirs()]

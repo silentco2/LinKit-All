@@ -115,3 +115,17 @@ Logic ported from MIT-licensed projects (re-implemented in Python, no files copi
     LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
     SOFTWARE.
+
+Bundled data (src/linkit_all/data/, built by scripts/build_datasets.py):
+  - Countries and cities (countries.json, cities.json): derived from GeoNames
+    (https://www.geonames.org), licensed under Creative Commons Attribution 4.0
+    (https://creativecommons.org/licenses/by/4.0/). Data was filtered, renamed and compacted;
+    Arabic names were picked from GeoNames alternate names or written by hand.
+  - Job titles (titles.json): This product includes information from the O*NET(R) Database by
+    the U.S. Department of Labor, Employment and Training Administration (USDOL/ETA). Used
+    under the CC BY 4.0 license. O*NET(R) is a trademark of USDOL/ETA. LinKit All has modified
+    all or some of this information (titles were merged, deduplicated and trimmed). USDOL/ETA
+    has not approved, endorsed, or tested these modifications.
+  - Exchange rates (fx.json, refreshed at the start of each search from
+    https://open.er-api.com/v6/latest/USD): Rates By Exchange Rate API
+    (https://www.exchangerate-api.com).

@@ -1,4 +1,4 @@
-import { DatePipe, KeyValuePipe, NgTemplateOutlet } from '@angular/common';
+import { KeyValuePipe, NgTemplateOutlet } from '@angular/common';
 import { Component, computed, effect, ElementRef, inject, OnDestroy, signal, viewChild } from '@angular/core';
 import {
   ArcElement, BarController, BarElement, CategoryScale, Chart, DoughnutController, Legend, LinearScale, LineController,
@@ -7,7 +7,7 @@ import {
 import { Api } from '../api';
 import { I18n, SourcePipe, TPipe } from '../i18n';
 import { Live } from '../live';
-import { fmtNum, labelOr, localeOf } from '../locale';
+import { DtPipe, fmtNum, labelOr, localeOf } from '../locale';
 import { Report } from '../types';
 
 Chart.register(
@@ -20,6 +20,7 @@ interface RunRow {
   status: string;
   started_at: string;
   finished_at: string | null;
+  kind?: 'search' | 'apply' | 'mixed';
   stats: Record<string, Record<string, unknown>>;
 }
 
@@ -41,7 +42,7 @@ const FUNNEL: Record<string, string> = {
 
 @Component({
   selector: 'app-report',
-  imports: [DatePipe, KeyValuePipe, NgTemplateOutlet, SourcePipe, TPipe],
+  imports: [DtPipe, KeyValuePipe, NgTemplateOutlet, SourcePipe, TPipe],
   template: `
     <div class="flex flex-wrap items-center justify-end gap-3">
       <div class="flex flex-wrap items-center gap-3 text-sm">
@@ -49,7 +50,7 @@ const FUNNEL: Record<string, string> = {
           <select class="rounded border border-slate-300 bg-transparent px-2 py-1 dark:border-slate-700" (change)="pick($event)">
             <option value="" [selected]="runId() === null">{{ 'report.allRuns' | t }}</option>
             @for (run of runs(); track run.id) {
-              <option [value]="run.id" [selected]="runId() === run.id">#{{ num(run.id) }}</option>
+              <option [value]="run.id" [selected]="runId() === run.id">{{ title(run.id) }}</option>
             }
           </select>
         </label>
@@ -118,8 +119,8 @@ const FUNNEL: Record<string, string> = {
           <tbody>
             @for (run of runs(); track run.id) {
               <tr class="border-t border-slate-100 dark:border-slate-800">
-                <td class="py-2">#{{ num(run.id) }}</td>
-                <td>{{ run.started_at + 'Z' | date: 'medium' : undefined : loc() }}</td>
+                <td class="py-2">{{ title(run.id) }}</td>
+                <td>{{ run.started_at + 'Z' | dt: 'medium' }}</td>
                 <td>{{ runStatus(run.status) }}</td>
                 <td class="text-end">{{ stat(run, 'discover', 'new') }}</td>
                 <td class="text-end">{{ stat(run, 'rank', 'ranked') }}</td>
@@ -140,7 +141,7 @@ const FUNNEL: Record<string, string> = {
           <tbody>
             @for (run of r.per_run; track run.run_id) {
               <tr class="border-t border-slate-100 dark:border-slate-800">
-                <td class="py-2">#{{ num(run.run_id) }}</td>
+                <td class="py-2">{{ title(run.run_id) }}</td>
                 <td class="text-end">{{ num(run.found) }}</td>
                 <td class="text-end">{{ num(run.applied) }}</td>
                 <td class="text-end">{{ num(run.failed) }}</td>
@@ -232,6 +233,11 @@ export class ReportPage implements OnDestroy {
   }
 
   protected num = (n: number | null | undefined): string => fmtNum(this.loc(), n);
+
+  /** "Search 3" / "Applying 4" / "Search and apply 5". */
+  protected title(id: number): string {
+    return this.i18n.t('live.runTitle.' + (this.runs().find((r) => r.id === id)?.kind ?? 'search'), { id: this.num(id) });
+  }
   protected runStatus = (s: string): string => labelOr(this.i18n, 'report.runStatus.', s);
 
   stat(run: RunRow, stage: string, key: string): string {

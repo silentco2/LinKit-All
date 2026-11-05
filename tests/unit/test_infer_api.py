@@ -142,7 +142,7 @@ def test_apply_writes_only_given_keys(client: TestClient, tmp_path: Path) -> Non
     assert profile["phone"] == "+201001234567"
     assert {k: profile[k] for k in keep} == keep  # untouched
     answers = client.get("/api/profile/answers").json()
-    assert answers["city"] == "Cairo" and answers["first_name"] == ""
+    assert answers["city"] == "Cairo" and answers["first_name"] == "Sara"  # first_name: the upload
     assert answers["authorized_countries"] == []  # never written unless given
     cfg = client.get("/api/search").json()
     assert cfg["search"]["queries"] == ["Backend Engineer"]
@@ -179,7 +179,7 @@ def test_where_remote_and_track_presets(client: TestClient) -> None:
     assert "wuzzuf" in cfg["sources"]["regional"]
     assert cfg["sources"]["enabled"][0] == "my_board"  # union: nothing of the user's is removed
     assert "remoteok" in cfg["sources"]["enabled"]
-    assert cfg["sources"]["telegram_channels"] == []  # still the default list: replaced
+    assert "ELIT_IT" in cfg["sources"]["telegram_channels"]  # MENA tech list replaces the default
     assert client.get("/api/profile/answers").json()["salary_currency"] == "EGP"
     assert r.json()["setup"]["where"] is True
     # not remote -> hybrid/onsite only; an edited channel list and a set currency stay
@@ -247,6 +247,7 @@ def test_ai_fill_keeps_only_values_found_in_the_cv(
     values = r.json()["values"]
     assert values["answers.portfolio"] == {
         "value": "behance.net/sara", "source": "ai", "level": "suggest", "check": True,
+        "note": "",
     }  # fmt: skip
     assert "answers.github" not in values
     assert values["answers.current_title"]["source"] == "cv"  # found by the rules, not asked
@@ -313,10 +314,9 @@ def test_status_setup_and_next_step(client: TestClient, tmp_path: Path) -> None:
     }  # fmt: skip
     upload(client, tmp_path)
     assert setup()["cv"] and setup()["next_step"] == "ai"
+    assert setup()["profile"]  # the upload filled name and email from the CV
     connect_ai(client)
-    assert setup()["ai"] and setup()["next_step"] == "profile"
-    apply(client, values={"profile.full_name": "Sara Ahmed", "profile.email": "s@x.io"})
-    assert setup()["profile"] and setup()["next_step"] == "roles"
+    assert setup()["ai"] and setup()["next_step"] == "roles"
     apply(client, values={"search.queries": ["Backend Engineer"]})
     assert setup()["roles"] and setup()["next_step"] == "where"
     status = apply(client, where=["Cairo, Egypt"]).json()

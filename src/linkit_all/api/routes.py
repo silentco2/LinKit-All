@@ -11,17 +11,19 @@ from datetime import date
 from functools import partial
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import urlparse
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse, Response
+from loguru import logger
 from pydantic import BaseModel, Field, ValidationError, field_validator
 from rapidfuzz import fuzz
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from linkit_all.api.events import EventBus
-from linkit_all.api.runner import PipelineRunner, RunBusy
+from linkit_all.api.runner import PipelineRunner, RunBlocked, RunBusy
 from linkit_all.apply.answers import ApplicationAnswers, Question, sensitive_category
 from linkit_all.apply.assist import AnswerBank
 from linkit_all.apply.browser import UserBrowser, fresh_live_shot, profile_dir
@@ -38,6 +40,7 @@ from linkit_all.apply.vault import Vault, VaultError, VaultLocked, WrongPassphra
 from linkit_all.core.api_keys import KNOWN, delete_keys, get_keys, set_keys
 from linkit_all.core.config import Settings
 from linkit_all.core.infer import InferredValue, infer, read_cv
+from linkit_all.core.lo_install import LibreOfficeInstaller
 from linkit_all.core.models import (
     ActionItem,
     ActionKind,
@@ -53,6 +56,7 @@ from linkit_all.core.models import (
     Tier,
     utcnow,
 )  # fmt: skip
+from linkit_all.core.places import apply_places, places_answers, synthesize_places
 from linkit_all.core.presets import (
     PACE,
     PICKINESS,
@@ -66,10 +70,14 @@ from linkit_all.core.profile import (
     ProfileFields,
     approve_cv,
     cv_state,
+    fill_from_cv,
+    load_answers,
     load_fields,
+    save_answers,
     save_cv,
     save_fields,
 )
+from linkit_all.core.runs import run_kind
 from linkit_all.core.scheduler import apply_schedule, next_runs
 from linkit_all.core.search import (
     DEFAULT_TELEGRAM_CHANNELS,
@@ -77,6 +85,7 @@ from linkit_all.core.search import (
     SearchConfig,
     SourcesSection,
     load_search,
+    normalize_channel,
     save_search,
 )
 from linkit_all.core.state import InvalidTransition, can_transition, transition
@@ -85,7 +94,9 @@ from linkit_all.matching.reasons import FilterEvent, job_reason
 from linkit_all.pipeline import STAGES, PipelineError, ai_settings
 from linkit_all.reports import build_report, export_csv, export_pdf
 from linkit_all.sources import registry
+from linkit_all.sources.ats_detector import detect
 from linkit_all.sources.base import OPT_IN_KINDS, Source
+from linkit_all.sources.labels import label_for, offline_label
 from linkit_all.sources.text import norm_company
 
 router = APIRouter(prefix="/api")
@@ -224,8 +235,19 @@ def get_profile(request: Request) -> dict[str, Any]:
 
 @router.put("/profile")
 def put_profile(request: Request, fields: ProfileFields) -> dict[str, Any]:
+    if "locked_facts" not in fields.model_fields_set:  # the UI no longer edits them: keep them
+        fields.locked_facts = load_fields(_db(request))[0].locked_facts
     save_fields(_db(request), fields)
     return get_profile(request)
+
+
+async def _fill_from_cv(request: Request, cv: Path) -> list[str]:
+    """What the CV filled into empty profile fields. A CV that cannot be read fills nothing."""
+    try:
+        return await asyncio.to_thread(fill_from_cv, _db(request), cv)
+    except Exception as e:  # reading is best effort; the upload itself already worked
+        logger.warning("Could not read values from the CV ({})", type(e).__name__)
+        return []
 
 
 @router.post("/profile/cv")
@@ -240,8 +262,10 @@ async def upload_cv(request: Request, filename: str) -> dict[str, Any]:
     except ValueError as e:
         raise HTTPException(422, str(e)) from e
     fmt, approved = cv_state(_db(request))
+    filled = await _fill_from_cv(request, cv) if approved else []  # a converted PDF waits
     return {
         "cv_name": cv.name,
+        "filled": filled,
         "segments": segments,
         "cv_source_format": fmt,
         "cv_approved": approved,
@@ -250,11 +274,13 @@ async def upload_cv(request: Request, filename: str) -> dict[str, Any]:
 
 
 @router.post("/profile/cv/approve")
-def approve_cv_route(request: Request) -> dict[str, Any]:
+async def approve_cv_route(request: Request) -> dict[str, Any]:
     """The user checked the converted PDF base; tailoring may now use it."""
     if not approve_cv(_db(request)):
         raise HTTPException(404, "No CV uploaded yet")
-    return get_profile(request)
+    cv = _cv_file(request)
+    filled = await _fill_from_cv(request, cv) if cv is not None else []
+    return {**get_profile(request), "filled": filled}
 
 
 @router.get("/profile/cv/segments")
@@ -281,17 +307,62 @@ async def cv_pdf(request: Request) -> FileResponse:
     return FileResponse(pdf, media_type="application/pdf")
 
 
+# --- optional LibreOffice install -----------------------------------------------------
+
+
+def _installer(request: Request) -> LibreOfficeInstaller:
+    installer: LibreOfficeInstaller = request.app.state.lo_installer
+    return installer
+
+
+@router.get("/tools/libreoffice")
+def libreoffice_status(request: Request) -> dict[str, Any]:
+    """{installed, path, installing, progress 0..1, error, available (URL and hash set)}."""
+    return _installer(request).status()
+
+
+@router.post("/tools/libreoffice/install", status_code=202)
+async def install_libreoffice_route(request: Request) -> dict[str, Any]:
+    """Download LinKit's trimmed LibreOffice into its own folder, in the background. Optional:
+    the user may decline and send the CV as it is."""
+    installer = _installer(request)
+    if not installer.available():
+        raise HTTPException(409, {"code": "lo_not_available", "message":
+                            "LinKit's LibreOffice download is only for Windows (64-bit). Install "
+                            "LibreOffice yourself, or send your CV as it is."})  # fmt: skip
+    installer.start()  # already running: the status below simply says so
+    return installer.status()
+
+
 # --- search config and AI ----------------------------------------------------------
 
 
 @router.get("/search")
 def get_search(request: Request) -> SearchConfig:
-    return load_search(_db(request)) or SearchConfig()
+    """The saved config. An old one with only `search.locations` shows them as places (unsaved)."""
+    cfg = load_search(_db(request)) or SearchConfig()
+    src = cfg.sources  # names for entries added before labels existed: computed, not saved
+    src.company_labels = {c: offline_label(c) for c in src.companies} | src.company_labels
+    return synthesize_places(cfg, load_fields(_db(request))[0].home_country)
 
 
 @router.put("/search")
 def put_search(request: Request, cfg: SearchConfig) -> SearchConfig:
-    save_search(_db(request), cfg)
+    """Save. The places derive the location filters, work modes, Indeed country and the saved
+    answers (authorized/visa countries, relocation), so those never drift from the places."""
+    db = _db(request)
+    before = load_search(db)
+    prev = before.search.places if before else []
+    cfg = apply_places(cfg, prev)
+    src = cfg.sources
+    src.company_labels = {c: v for c, v in src.company_labels.items() if c in src.companies}
+    save_search(db, cfg)
+    if cfg.search.places or prev:
+        home = load_fields(db)[0].home_country
+        answers = load_answers(db)
+        derived = places_answers(answers, cfg.search.places, prev, home)
+        if derived != answers:
+            save_answers(db, derived)
     apply_schedule(request.app.state.scheduler, cfg)
     return cfg
 
@@ -345,15 +416,42 @@ def go_live(request: Request) -> dict[str, Any]:
         ]
         profile = s.get(Profile, 1)
         answers = ApplicationAnswers.model_validate(profile.answers if profile else {})
+        example = s.execute(
+            select(TailoredCV, Job).join(Job, Job.id == TailoredCV.job_id)
+            .where(func.json_array_length(TailoredCV.applied) > 0)
+            .order_by(TailoredCV.id.desc()).limit(1)
+        ).first()  # fmt: skip
+    fmt, approved = cv_state(db)
+    mode = {True: "tailor", False: "original", None: "undecided"}[cfg.apply.tailor_cv]
+    count = _open_actions(db)
+    cv_ok = bool(cv) and (approved or mode == "original")  # a CV sent as uploaded needs no approval
+    ex_job = example[1] if example else None
     return {
         "eligible": bool(samples),
         "live": cfg.apply.live,
         "samples": samples,
+        "tailored_example": (
+            {"job_id": ex_job.id, "title": ex_job.title, "company": ex_job.company}
+            if ex_job
+            else None
+        ),
         "checklist": {
-            "cv_approved": bool(cv) and cv_state(db)[1],
-            "answers_reviewed": answers != ApplicationAnswers(),
-            "caps_set": cfg.apply.daily_cap_per_site <= 40,
-            "confirm_each": not cfg.apply.submit_without_asking,
+            "cv_ready": {
+                "ok": cv_ok,
+                "detail": "ready" if cv_ok else "needs_approval" if cv else "no_cv",
+            },
+            "tailoring": {
+                "ok": mode == "original" or (mode == "tailor" and _renderer_ok(fmt)),
+                "mode": mode,
+                "libreoffice": soffice_path() is not None,
+            },
+            "answers_reviewed": {"ok": answers != ApplicationAnswers()},
+            "open_items": {"ok": count == 0, "count": count},
+            "confirm_each": {"ok": not cfg.apply.submit_without_asking},
+            "caps_set": {
+                "ok": cfg.apply.daily_cap_per_site <= 40,
+                "daily_cap_per_site": cfg.apply.daily_cap_per_site,
+            },
         },
     }
 
@@ -412,9 +510,13 @@ class AICheck(BaseModel):
     api_base: str | None = None
 
 
+_AI_LABELS = {"codex_cli": "ChatGPT (Codex)", "claude_cli": "Claude", "litellm": "API key"}
+
+
 @router.post("/ai/check")
 async def check_ai(request: Request, body: AICheck) -> dict[str, Any]:
-    from linkit_all.providers import ProviderError, get_provider
+    from linkit_all.providers import ProviderError, UsageLimitError, get_provider
+    from linkit_all.providers.base import tidy
 
     cfg = SearchConfig.model_validate(
         {
@@ -425,11 +527,18 @@ async def check_ai(request: Request, body: AICheck) -> dict[str, Any]:
             }
         }
     )
+    label = _AI_LABELS[body.provider]
+    if body.provider == "litellm" and body.api_base:
+        label = "Local model"
+    who = {"provider": body.provider, "provider_label": label, "model": body.model or None}
     try:
-        message = await get_provider(ai_settings(_settings(request), cfg)).check()
+        provider = get_provider(ai_settings(_settings(request), cfg))
+        message = await provider.check()
+    except UsageLimitError as e:  # a plan limit is not a broken setup: one calm sentence
+        return {"ok": False, "kind": e.kind, **who, "until": e.until, "message": e.message}
     except (ProviderError, PipelineError) as e:
-        return {"ok": False, "message": str(e)}
-    return {"ok": True, "message": message}
+        return {"ok": False, "kind": "error", **who, "message": tidy(str(e))}
+    return {"ok": True, **who, "version": provider.version, "message": message}
 
 
 # --- first-run setup: what the CV says, and writing what the user confirmed ---------------
@@ -888,7 +997,9 @@ def list_runs(request: Request) -> dict[str, Any]:
         runs = s.scalars(select(Run).order_by(Run.id.desc()).limit(20))
         recent = [{"id": r.id, "status": r.status, "started_at": r.started_at.isoformat(),
                    "finished_at": r.finished_at.isoformat() if r.finished_at else None,
-                   "pause_reason": r.pause_reason, "stats": r.stats} for r in runs]  # fmt: skip
+                   "kind": run_kind(r), "stages": r.stages or list(r.stats),
+                   "pause_reason": r.pause_reason, "reason_code": r.reason_code,
+                   "reason_params": r.reason_params, "stats": r.stats} for r in runs]  # fmt: skip
     return {"current": _runner(request).state.as_dict(), "recent": recent, "stages": STAGES}
 
 
@@ -905,6 +1016,8 @@ async def start_run(request: Request, body: RunRequest) -> dict[str, Any]:
         return _runner(request).start(body.stages, body.new).as_dict()
     except RunBusy as e:
         raise HTTPException(409, str(e)) from e
+    except RunBlocked as e:  # e.g. needs_libreoffice: the UI offers the install or the choice
+        raise HTTPException(409, {"code": e.code, "message": str(e)}) from e
     except ValueError as e:
         raise HTTPException(422, str(e)) from e
 
@@ -1055,40 +1168,33 @@ async def close_app_browser(request: Request, item_id: int) -> None:
     await _user_browser(request).close()
 
 
-@router.post("/linkedin/signin", status_code=201)
-async def linkedin_signin(request: Request) -> dict[str, Any]:
-    """Open the LinkedIn login page in the app browser (its own `linkedin` profile) so the user
-    signs in themselves. Nothing is typed or clicked by the app."""
+@router.get("/linkedin/google-check")
+def linkedin_google_check(request: Request) -> dict[str, bool]:
+    """Did the last LinkedIn-posts search stop on a Google check the user has to solve?"""
+    from linkit_all.sources.linkedin_posts.source import check_flag
+
+    return {"needed": check_flag(_settings(request).data_dir).exists()}
+
+
+@router.post("/linkedin/google-check", status_code=201)
+async def open_google_check(request: Request) -> dict[str, Any]:
+    """Open Google in the app browser, on the profile the searches use, so the user solves the
+    check (or picks cookie settings) themselves. Nothing is typed or clicked by the app."""
+    from linkit_all.sources.linkedin_posts.google import search_url
+    from linkit_all.sources.linkedin_posts.source import profile_path
+
     browser = _user_browser(request)
     if _runner(request).state.running:  # a run may be using the profile
         raise HTTPException(409, "A run is in progress: wait for it, or cancel it")
     if browser.is_open:
         raise HTTPException(409, "The app browser is already open: close its window first")
+    cfg = load_search(_db(request)) or SearchConfig()
+    words = next(iter(cfg.sources.linkedin_keywords or cfg.search.queries), "hiring")
     try:
-        await browser.open(
-            profile_dir(_settings(request), "linkedin"), "https://www.linkedin.com/login", 0
-        )
+        await browser.open(profile_path(_settings(request).data_dir), search_url(words, "week"), 0)
     except Exception as e:
         raise HTTPException(503, f"Could not open Chrome: {str(e).splitlines()[0][:200]}") from e
     return {"open": True, "item_id": 0}
-
-
-@router.get("/linkedin/session")
-async def linkedin_session(request: Request) -> dict[str, str]:
-    """Is the saved LinkedIn sign-in still good? Looks at the feed (headless unless the setting says
-    otherwise)."""
-    from linkit_all.sources.linkedin_posts.session import SessionError, check_session
-
-    if _runner(request).state.running:
-        raise HTTPException(409, "A run is in progress: wait for it, or cancel it")
-    headless = (load_search(_db(request)) or SearchConfig()).sources.linkedin_headless
-    try:
-        state = await check_session(_settings(request), headless, _user_browser(request))
-    except SessionError as e:
-        raise HTTPException(409, str(e)) from e
-    except Exception as e:
-        raise HTTPException(503, f"Could not open Chrome: {str(e).splitlines()[0][:200]}") from e
-    return {"state": state}
 
 
 def _entry(e: AnswerEntry) -> dict[str, Any]:
@@ -1180,6 +1286,7 @@ class ActionDecision(BaseModel):
 REMEMBER_KEYS = frozenset({
     "acknowledge_privacy", "acknowledge_legal", "notice_period", "willing_to_relocate",
     "eeo_gender", "eeo_race", "eeo_hispanic", "eeo_veteran", "eeo_disability",
+    "military_status", "nationality", "marital_status", "date_of_birth",
 })  # fmt: skip
 # Park codes that were renamed: open items with the old code count as the new one.
 CODE_ALIASES = {"needs_email": ("needs_email", "email_not_connected")}
@@ -1404,6 +1511,8 @@ def edit_email_draft(request: Request, item_id: int, body: EmailDraftEdit) -> di
         draft = job.data.get("email_draft")
         if not isinstance(draft, dict):
             raise HTTPException(409, "This job has no email draft")
+        if body.body != draft.get("body"):
+            draft = {k: v for k, v in draft.items() if k != "problem"}  # the user wrote it
         draft = {**draft, "subject": body.subject, "body": body.body}
         job.data = {**job.data, "email_draft": draft}
         item.params = {**item.params, "subject": body.subject}
@@ -1759,6 +1868,62 @@ def list_sources(request: Request) -> dict[str, Any]:
         )
     out.sort(key=lambda o: (o["kind"], str(o["label"]).lower()))
     return {"ats_count": sum(s.kind == "ats" for s in found.values()), "sources": out}
+
+
+class AddSource(BaseModel):
+    value: str
+
+
+_TELEGRAM_LINK = re.compile(r"^(@|(https?://)?(www\.)?(t|telegram)\.me/)", re.I)
+
+
+def _careers_url(raw: str) -> str:
+    """`raw` as an https URL, or ValueError."""
+    url = raw if "://" in raw else f"https://{raw}"
+    u = urlparse(url)
+    if u.scheme not in ("http", "https") or "." not in u.netloc or "@" in u.netloc or " " in raw:
+        raise ValueError(f"{raw!r} is not a web address or a Telegram channel")
+    return url
+
+
+@router.post("/sources/add")
+def add_source(request: Request, body: AddSource) -> dict[str, Any]:
+    """Add a Telegram channel (`@name` or t.me link) or a careers / ATS page to the config.
+
+    Returns {kind: telegram | ats | careers, label, config}; `config` holds the `sources`
+    fields that changed. 422 for a duplicate or something that is neither."""
+    db = _db(request)
+    raw = body.value.strip()
+    cfg = load_search(db) or SearchConfig()
+    src = cfg.sources
+    try:
+        if _TELEGRAM_LINK.match(raw):
+            name = normalize_channel(raw)
+            if name.lower() in {c.lower() for c in src.telegram_channels}:
+                raise ValueError(f"@{name} is already in your list")
+            src.telegram_channels = [*src.telegram_channels, name]
+            if "telegram" not in src.enabled:
+                src.enabled = [*src.enabled, "telegram"]
+            kind, label = "telegram", f"@{name}"
+            config: dict[str, Any] = {
+                "telegram_channels": src.telegram_channels,
+                "enabled": src.enabled,
+            }
+        else:
+            found = detect(raw) if re.fullmatch(r"[a-z_]+:[^/\s]+", raw) else None
+            url = raw if found else _careers_url(raw)
+            found = found or detect(url)
+            if url.rstrip("/").lower() in {c.rstrip("/").lower() for c in src.companies}:
+                raise ValueError("this page is already in your list")
+            src.companies = [*src.companies, url]
+            kind = "ats" if found else "careers"
+            label = label_for(url)  # a careers page costs one fetch (5 s at most)
+            src.company_labels = {**src.company_labels, url: label}
+            config = {"companies": src.companies, "company_labels": src.company_labels}
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
+    save_search(db, cfg)
+    return {"kind": kind, "label": label, "config": config}
 
 
 @router.put("/keys/{name}")

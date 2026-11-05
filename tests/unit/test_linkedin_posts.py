@@ -1,4 +1,4 @@
-"""LinkedIn posts -> stubs: age labels, email/link finders, filters, ATS routing, batched AI."""
+"""LinkedIn posts -> stubs: email/link finders, filters, ATS routing, batched AI."""
 
 import asyncio
 from datetime import datetime, timedelta
@@ -15,13 +15,7 @@ from linkit_all.sources.linkedin_posts.extract import (
     ExtractedPosts,
     posts_to_stubs,
 )
-from linkit_all.sources.linkedin_posts.post import (
-    RawPost,
-    find_emails,
-    find_links,
-    keep_recent,
-    posted_at,
-)
+from linkit_all.sources.linkedin_posts.post import RawPost, find_emails, find_links
 
 NOW = datetime(2026, 10, 25, 12, 0)
 HIRING = "We're hiring a Data Engineer. Send your CV to hr@acme.com"
@@ -34,7 +28,7 @@ def mk(n: int = 1, text: str = HIRING, **kw: Any) -> RawPost:
         "author": "Sara",
         "author_url": "https://www.linkedin.com/in/sara",
         "headline": "HR at Acme",
-        "posted_text": "3d",
+        "posted_at": NOW - timedelta(days=3),
         "text": text,
         "links": (),
         "emails": find_emails(text),
@@ -58,59 +52,6 @@ class FakeProvider:
 
 def run(posts: list[RawPost], provider: FakeProvider | None) -> list[JobStub]:
     return asyncio.run(posts_to_stubs(posts, cast(LLMProvider | None, provider)))
-
-
-@pytest.mark.parametrize(
-    ("label", "delta"),
-    [
-        ("3h", timedelta(hours=3)),
-        ("2d", timedelta(days=2)),
-        ("1w", timedelta(weeks=1)),
-        ("1mo", timedelta(days=30)),
-        ("3 days ago", timedelta(days=3)),
-        ("5m", timedelta(minutes=5)),
-        ("2d • Edited", timedelta(days=2)),
-        ("منذ 3 أيام", timedelta(days=3)),
-        ("٣ي", timedelta(days=3)),
-        ("منذ ٢ أسبوع", timedelta(weeks=2)),
-        ("٥س", timedelta(hours=5)),
-        ("منذ 1 شهر", timedelta(days=30)),
-    ],
-)
-def test_posted_at(label: str, delta: timedelta) -> None:
-    assert posted_at(mk(posted_text=label)) == NOW - delta
-
-
-def test_posted_at_unreadable() -> None:
-    assert posted_at(mk(posted_text="")) is None
-    assert posted_at(mk(posted_text="soon")) is None
-    assert posted_at(mk(posted_text="Feb 30")) is None
-
-
-@pytest.mark.parametrize(
-    ("label", "at"),
-    [
-        ("Oct 22", datetime(2026, 10, 22)),
-        ("Oct 22 • Edited", datetime(2026, 10, 22)),
-        ("22 Oct", datetime(2026, 10, 22)),
-        ("22 Dec", datetime(2025, 12, 22)),  # not "22 days"; a future date is last year's
-        ("Dec 3, 2024", datetime(2024, 12, 3)),
-        ("٢٢ أكتوبر", datetime(2026, 10, 22)),
-        ("Yesterday", NOW - timedelta(days=1)),
-        ("أمس", NOW - timedelta(days=1)),
-    ],
-)
-def test_posted_at_absolute_labels(label: str, at: datetime) -> None:
-    assert posted_at(mk(posted_text=label)) == at
-
-
-def test_keep_recent_only_filters_past_the_threshold() -> None:
-    labels = ["2d", "Oct 18", "Oct 10", "soon"]  # 3 / 7 / 15 days old, unreadable
-    posts = [mk(i, posted_text=labels[i % 4]) for i in range(8)]
-    assert keep_recent(posts, "week", after=8) == posts  # not more than `after`: untouched
-    kept = keep_recent(posts, "week", after=7)
-    assert [p.posted_text for p in kept] == ["2d", "Oct 18", "soon"] * 2
-    assert [p.posted_text for p in keep_recent(posts, "day", after=7)] == ["soon"] * 2
 
 
 def test_find_emails() -> None:

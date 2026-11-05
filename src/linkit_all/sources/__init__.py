@@ -44,6 +44,7 @@ PACKAGES = (
     "linkit_all.sources.aggregators",
     "linkit_all.sources.boards",
     "linkit_all.sources.companies",
+    "linkit_all.sources.linkedin_posts",
 )
 
 

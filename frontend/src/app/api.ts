@@ -1,5 +1,12 @@
 import { Injectable } from '@angular/core';
 
+/** An API failure: the server's message, its HTTP status and (409 refusals) a stable `code` the UI words itself. */
+export class ApiError extends Error {
+  constructor(message: string, readonly status = 0, readonly code = '') {
+    super(message);
+  }
+}
+
 /** Thin fetch wrapper for the local API. Errors carry the server's message. */
 @Injectable({ providedIn: 'root' })
 export class Api {
@@ -12,7 +19,7 @@ export class Api {
       headers,
       body: file ?? (body !== undefined ? JSON.stringify(body) : undefined),
     });
-    if (!res.ok) throw new Error(await errorText(res));
+    if (!res.ok) throw await apiError(res);
     if (res.status === 204) return undefined as T;
     return res.json() as Promise<T>;
   }
@@ -44,7 +51,7 @@ export class Api {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(await errorText(res));
+    if (!res.ok) throw await apiError(res);
     return res.blob();
   }
   upload<T>(path: string, file: File): Promise<T> {
@@ -52,16 +59,18 @@ export class Api {
   }
 }
 
-async function errorText(res: Response): Promise<string> {
+async function apiError(res: Response): Promise<ApiError> {
   try {
     const data = await res.json();
-    if (typeof data.detail === 'string') return data.detail;
-    if (Array.isArray(data.detail)) {
+    const d = data.detail;
+    if (typeof d === 'string') return new ApiError(d, res.status);
+    if (d && typeof d === 'object' && !Array.isArray(d)) return new ApiError(String(d.message ?? ''), res.status, String(d.code ?? ''));
+    if (Array.isArray(d)) {
       // FastAPI validation errors: "filters.salary_floor: Input should be a valid integer"
-      return data.detail.map((d: { loc: string[]; msg: string }) => `${d.loc.slice(1).join('.')}: ${d.msg}`).join('; ');
+      return new ApiError(d.map((x: { loc: string[]; msg: string }) => `${x.loc.slice(1).join('.')}: ${x.msg}`).join('; '), res.status);
     }
   } catch {
     // not JSON
   }
-  return `${res.status} ${res.statusText}`;
+  return new ApiError(`${res.status} ${res.statusText}`, res.status);
 }

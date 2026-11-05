@@ -1,4 +1,4 @@
-"""LinkedIn hiring posts -> job stubs. No scraping here.
+"""LinkedIn hiring posts -> job stubs. No fetching here.
 
 Job-seeker posts and posts that do not read as hiring are dropped. A post linking to a known ATS
 becomes a stub for that ATS (no AI). The others go to the AI in batches of AI_BATCH posts per
@@ -19,7 +19,7 @@ from pydantic import BaseModel
 from linkit_all.providers.base import LLMProvider, ProviderError, UsageLimitError, render
 from linkit_all.sources.ats_detector import detect
 from linkit_all.sources.base import JobStub, remote_from_text
-from linkit_all.sources.linkedin_posts.post import RawPost, find_emails, find_links, posted_at
+from linkit_all.sources.linkedin_posts.post import RawPost, find_emails, find_links
 from linkit_all.sources.telegram import EXCERPT, fold, looks_like_vacancy
 
 SOURCE = "linkedin_posts"
@@ -117,7 +117,7 @@ def _linked(post: RawPost, ats: str, board: str, link: str) -> JobStub:
         title=first[:120],
         company=board.split("/")[0].replace("-", " ").replace("_", " ").title(),
         description=post.text[:DESCRIPTION],
-        posted_at=posted_at(post),
+        posted_at=post.posted_at,
         ats=ats,
         apply_url=link,
         remote=remote_from_text(first),
@@ -159,7 +159,7 @@ def _stubs_of(post: RawPost, found: ExtractedPost) -> list[JobStub]:
                 company=job.company.strip() or "Unknown",
                 location=job.location.strip(),
                 description=post.text[:DESCRIPTION],
-                posted_at=posted_at(post),
+                posted_at=post.posted_at,
                 ats=ats[0] if ats else None,
                 apply_url=f"mailto:{email}" if method == "email" else link,
                 remote=job.remote or remote_from_text(job.title, job.location),

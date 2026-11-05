@@ -6,9 +6,10 @@ Order per question: standard profile fields -> sensitive rules (profile only, ne
 
 import re
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from rapidfuzz import fuzz
 
 Kind = Literal[
@@ -57,8 +58,24 @@ class ApplicationAnswers(BaseModel):
     eeo_hispanic: str | None = None  # yes | no | decline
     eeo_veteran: str | None = None  # not_veteran | veteran | decline
     eeo_disability: str | None = None  # no | yes | decline
+    # More sensitive profile facts: empty/None = "Ask me" (Action Center); the AI never answers them.
+    military_status: str | None = (
+        None  # completed | postponed | exempted | not_applicable | decline
+    )
+    nationality: str = ""  # ISO2 or a name
+    date_of_birth: str = ""  # ISO date, YYYY-MM-DD
+    marital_status: str | None = None  # single | married | divorced | widowed | decline
+    visa_countries: list[str] = []  # countries where you would need a visa to work
     acknowledge_privacy: bool | None = None  # privacy notices, data-processing consent
     acknowledge_legal: bool | None = None  # arbitration agreements, "I certify this is true"
+
+    @field_validator("date_of_birth")
+    @classmethod
+    def _dob(cls, v: str) -> str:
+        v = v.strip()
+        if v:
+            date.fromisoformat(v)
+        return v
 
 
 @dataclass
@@ -68,6 +85,10 @@ class Context:
     phone: str
     location: str
     answers: ApplicationAnswers
+    address: str = ""  # home address, from the profile
+    postal_code: str = ""
+    home_city: str = ""
+    home_country: str = ""  # ISO2
     job_location: str = ""
     job_source: str = ""  # where we found the job, for "how did you hear about us"
     resume_path: str = ""
@@ -79,6 +100,27 @@ class Missing:
     question: Question
     reason: str
     sensitive: bool = False
+
+
+_REASON_CODES: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"^(?P<what>[^:]+?):? (?:country unknown or )?not set in your profile$"), "not_in_profile"),
+    (re.compile(r"^(?P<what>salary expectation) needed$"), "not_in_profile"),
+    (re.compile(r"^(?P<what>.+?) question: only you can answer$"), "own_answer"),
+    (re.compile(r"^no option matches"), "no_option"),
+    (re.compile(r"^file the app cannot provide$"), "file_missing"),
+    (re.compile(r"^The AI wrote the cover letter in Arabic"), "arabic_letter"),
+    (re.compile(r"^not answerable from your CV or profile$"), "not_answerable"),
+    (re.compile(r"^no saved answer$"), "no_saved_answer"),
+]  # fmt: skip
+
+
+def reason_code(reason: str) -> tuple[str, dict[str, str]]:
+    """Stable (code, params) for a `Missing.reason`, so the UI can word the hint itself.
+    "other" when a new reason has no code yet (the English text still shows)."""
+    for rx, code in _REASON_CODES:
+        if m := rx.match(reason):
+            return code, m.groupdict()
+    return "other", {}
 
 
 # --- sensitive questions -----------------------------------------------------------
@@ -95,9 +137,16 @@ _SENSITIVE: list[tuple[str, re.Pattern[str]]] = [
         ("eeo_race", r"\brace\b|ethnicit"),
         ("eeo_hispanic", r"hispanic|latin[oax]"),
         ("eeo_gender", r"\bgender\b|\bsex\b"),
-        ("eeo_veteran", r"veteran|military service|armed forces"),
+        # Before veteran: an Egyptian "Military service status" is not a US veteran question.
+        ("military_status", r"military (service )?status|military service (status|situation)|"
+                            r"الموقف من التجنيد|التجنيد|الخدمة العسكرية|الموقف من الخدمة"),
+        ("eeo_veteran", r"veteran|armed forces|served in the military|protected veteran"),
+        ("military_status", r"military service"),  # a bare label is still never the AI's to answer
+        ("nationality", r"nationality|\bcitizen(ship)?\b|الجنسية"),
+        ("date_of_birth", r"date of birth|birth ?date|\bdob\b|تاريخ الميلاد|\bage\b|how old|عمرك"),
+        ("marital_status", r"marital|تعيش|الحالة الاجتماعية"),
         ("eeo_disability", r"disabilit"),
-        ("eeo_other", r"sexual orientation|transgender|\bpronouns?\b|lgbt|religio|marital|date of birth|\bage\b|how old"),
+        ("eeo_other", r"sexual orientation|transgender|\bpronouns?\b|lgbt|religio"),
         # Being recorded or transcribed (AI notetakers) is its own decision, never a default.
         ("recording_consent", r"notetaker|\brecord(ing|ed)?\b.*\b(interview|call|conversation)|transcri"),
         ("acknowledge_legal", r"arbitration|\bcertify\b|attest|true and (complete|correct|accurate)|"
@@ -137,7 +186,9 @@ _COUNTRIES = {
 }  # fmt: skip
 _ISO = {"us": "united states", "gb": "united kingdom", "uk": "united kingdom", "eg": "egypt",
         "ae": "united arab emirates", "sa": "saudi arabia", "ca": "canada", "ie": "ireland",
-        "de": "germany", "in": "india", "qa": "qatar", "kw": "kuwait"}  # fmt: skip
+        "de": "germany", "in": "india", "qa": "qatar", "kw": "kuwait", "bh": "bahrain",
+        "om": "oman", "jo": "jordan", "ma": "morocco", "nl": "netherlands", "fr": "france",
+        "es": "spain", "sg": "singapore", "au": "australia", "jp": "japan"}  # fmt: skip
 _THIS_COUNTRY = re.compile(r"country where (the|this) (job|role|position)|this (country|location)|"
                            r"where the (job|role|position) is|country (for|to) which you (are )?apply", re.I)  # fmt: skip
 
@@ -153,8 +204,18 @@ def country_of(text: str) -> str | None:
     return _ISO.get(tail)
 
 
+_ISO_OF = {name: iso for iso, name in _ISO.items() if iso != "uk"}
+
+
+def iso2_of(text: str) -> str:
+    """ "Egypt", "Cairo, Egypt" or "eg" -> "EG"; "" when the country is not one we know."""
+    return _ISO_OF.get(canonical_country(text), "").upper()
+
+
 def canonical_country(name: str) -> str:
-    return country_of(name) or name.strip().lower()
+    """ "EG", "Cairo, Egypt" and "egypt" all give "egypt"; unknown names come back lower-cased."""
+    low = name.strip().lower()
+    return _ISO.get(low) or country_of(name) or low
 
 
 # --- picking options -------------------------------------------------------------
@@ -178,6 +239,14 @@ _CANON: dict[str, re.Pattern[str]] = {
     "native": re.compile(r"american indian|alaska|indigenous|first nations", re.I),
     "pacific": re.compile(r"pacific islander|hawaiian", re.I),
     "two_or_more": re.compile(r"two or more|multiracial|mixed", re.I),
+    "completed": re.compile(r"^(complet|done|served|fulfil)|أدى|أديت|مؤدي|أنهى|منتهي", re.I),
+    "postponed": re.compile(r"postpon|defer|مؤجل|تأجيل", re.I),
+    "exempted": re.compile(r"exempt|معفى|معفي|إعفاء", re.I),
+    "not_applicable": re.compile(r"not applicable|^n/?a$|does not apply|لا ينطبق|غير منطبق", re.I),
+    "single": re.compile(r"^single|^unmarried|^أعزب|^عزباء|^اعزب", re.I),
+    "married": re.compile(r"^married|^متزوج", re.I),
+    "divorced": re.compile(r"divorc|مطلق", re.I),
+    "widowed": re.compile(r"widow|أرمل|ارمل", re.I),
 }
 
 
@@ -224,6 +293,9 @@ _STANDARD: list[tuple[str, re.Pattern[str]]] = [
         ("last_name", r"last[ _-]?name|surname|family name"),
         ("email", r"e-?mail"),
         ("phone", r"phone|mobile"),
+        ("address", r"^address(?![ _-]?(line[ _-]?)?(2|two|3))|street[ _-]?address|"
+                    r"(home|mailing|residential)[ _-]address|address line ?(1|one)|العنوان"),
+        ("postal_code", r"\bzip\b|zip[ _-]?code|postal|post[ _-]?code|الرمز البريدي|الكود البريدي"),
         ("linkedin", r"linkedin"),
         ("github", r"github"),
         ("portfolio", r"portfolio|personal (web)?site|^website$|urls\[other\]"),
@@ -243,6 +315,14 @@ _SOURCE_NAMES = {"linkedin": "LinkedIn", "indeed": "Indeed", "glassdoor": "Glass
                  "forasna": "Forasna"}  # fmt: skip
 
 
+def _country_name(iso2: str) -> str:
+    """ "EG" -> "Egypt" (English, never the code); "" when there is none."""
+    from linkit_all.core.geo import country  # late: geo imports this module
+
+    found = country(iso2) if iso2 else None
+    return found.name if found else ""
+
+
 def _standard_value(key: str, ctx: Context) -> Any:
     a = ctx.answers
     first, _, last = ctx.full_name.strip().partition(" ")
@@ -257,8 +337,12 @@ def _standard_value(key: str, ctx: Context) -> Any:
         "portfolio": a.portfolio,
         "current_company": a.current_company,
         "current_title": a.current_title,
-        "country": a.country or (country_of(ctx.location) or "").title(),
-        "city": a.city or ctx.location,
+        "address": ctx.address,
+        "postal_code": ctx.postal_code,
+        "country": _country_name(ctx.home_country)
+        or a.country
+        or (country_of(ctx.location) or "").title(),
+        "city": ctx.home_city or a.city or ctx.location,
         "heard_about": a.heard_about or _SOURCE_NAMES.get(ctx.job_source, "Company website"),
         "notice_period": a.notice_period,
         "years_experience": "" if a.years_experience is None else str(a.years_experience),
@@ -304,10 +388,10 @@ def _pick_range(options: list[str], years: int) -> str | None:
 def sensitive_answer(q: Question, category: str, ctx: Context) -> tuple[Any, str]:
     """(value, "") or (None, why the user must answer)."""
     a = ctx.answers
-    if category.startswith("eeo_"):
+    if category.startswith("eeo_") or category in ("military_status", "marital_status"):
         value = getattr(a, category, None)
         if not value:
-            return None, "demographic question you have not answered in setup"
+            return None, f"{category.replace('_', ' ')} not set in your profile"
         if q.kind in CHOICE_KINDS or q.kind == "multi":
             picked = pick_canonical(q.options, value)
             if picked is None:
@@ -320,19 +404,40 @@ def sensitive_answer(q: Question, category: str, ctx: Context) -> tuple[Any, str
             country_of(ctx.job_location) if _THIS_COUNTRY.search(text) else None
         ) or country_of(text)
         authorized = {canonical_country(c) for c in a.authorized_countries}
+        visa = {canonical_country(c) for c in a.visa_countries}
         if category == "work_authorization":
-            if country is None or not authorized:
-                return None, "work authorization: country unknown or not set in your profile"
-            return yes_no(q, country in authorized), ""
-        if country is not None and country in authorized:
+            if country in authorized:
+                return yes_no(q, True), ""
+            if country in visa:
+                return yes_no(q, False), ""
+            return None, "work authorization: country unknown or not set in your profile"
+        if country in authorized:
             return yes_no(q, False), ""  # authorized there already: no sponsorship needed
-        if a.needs_sponsorship is None:
-            # "Ask me": derive per job from authorized countries + the job's country (profile data only).
-            where = country or country_of(ctx.job_location)
-            if where is not None and authorized:
-                return yes_no(q, where not in authorized), ""
-            return None, "visa sponsorship: not set in your profile"
-        return yes_no(q, a.needs_sponsorship), ""
+        if a.needs_sponsorship is not None:
+            return yes_no(q, a.needs_sponsorship), ""  # set explicitly: it wins
+        # "Ask me": derive per job from the places you listed and the job's country (profile data only).
+        where = country or country_of(ctx.job_location)
+        if where in authorized:
+            return yes_no(q, False), ""
+        if where in visa:
+            return yes_no(q, True), ""
+        return None, "visa sponsorship: not set in your profile"
+    if category == "nationality":
+        if not a.nationality:
+            return None, "nationality not set in your profile"
+        name = canonical_country(a.nationality).title()
+        if q.kind in CHOICE_KINDS or q.kind == "multi":
+            picked = pick_option(q.options, name) or pick_option(q.options, a.nationality)
+            if picked is None:
+                return None, f"no option matches your nationality ({name})"
+            return ([picked] if q.kind == "multi" else picked), ""
+        return name, ""
+    if category == "date_of_birth":
+        if re.search(r"\bage\b|how old|عمرك", q.label, re.I):
+            return None, "age question: only you can answer"
+        if not a.date_of_birth:
+            return None, "date of birth not set in your profile"
+        return a.date_of_birth, ""  # a date input takes ISO; a text field gets it as stored
     if category == "salary":
         if not a.salary_expectation or q.kind in CHOICE_KINDS:
             return None, "salary expectation needed"

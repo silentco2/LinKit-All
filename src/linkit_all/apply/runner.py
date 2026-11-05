@@ -45,7 +45,13 @@ from linkit_all.apply.agent import (
     step,
     wait_for_confirmation,
 )
-from linkit_all.apply.answers import ApplicationAnswers, Context, Missing, Question
+from linkit_all.apply.answers import (
+    ApplicationAnswers,
+    Context,
+    Missing,
+    Question,
+    reason_code,
+)
 from linkit_all.apply.assist import AnswerBank, answer_questions, profile_summary
 from linkit_all.apply.browser import live_frames, live_shot_path, profile_dir
 from linkit_all.apply.email_apply import (
@@ -87,7 +93,7 @@ from linkit_all.sources import registry
 from linkit_all.sources.ats_detector import detect
 from linkit_all.sources.base import JobStub, Source
 from linkit_all.sources.http import Http, make_client
-from linkit_all.tailor.pipeline import TailorError, tailor_job
+from linkit_all.tailor.pipeline import TailorError, cv_plan, original_cv, tailor_job
 from linkit_all.tailor.render.libreoffice import RenderError
 
 
@@ -97,7 +103,26 @@ class DryRunViolation(RuntimeError):
 
 class ApplyBlocked(RuntimeError):
     """Nothing can be applied right now (AI usage limit, LibreOffice missing, no profile).
-    Jobs keep their state; the next run continues."""
+    Jobs keep their state; the next run continues. With a `code` (and `params`) the run is
+    *paused* with that reason, without one it fails."""
+
+    def __init__(
+        self, message: str, code: str | None = None, params: dict[str, Any] | None = None
+    ) -> None:
+        super().__init__(message)
+        self.code, self.params = code, params or {}
+
+
+def usage_blocked(e: UsageLimitError) -> ApplyBlocked:
+    return ApplyBlocked(e.message, "ai_usage_limit", {"provider": e.provider, "until": e.until})
+
+
+NEEDS_TOOL = {
+    "needs_libreoffice": "Tailoring needs LibreOffice. Install it (one click), or choose to send "
+    "your CV as it is",
+    "needs_tectonic": "Your CV is a LaTeX file and needs Tectonic to make the PDF: run "
+    "`linkit doctor` to see how to install it",
+}
 
 
 MAX_AGENT_PAGES = 8
@@ -162,6 +187,7 @@ class Outcome:
     status: str  # dry_run | applied | needs_user | failed | skipped
     message: str
     artifacts: list[str] = field(default_factory=list)
+    reason: str = ""  # stable code for an outcome that leaves no job event (else the last event's)
 
 
 def job_info(job: Job) -> JobInfo | None:
@@ -256,6 +282,8 @@ def _missing_dict(m: Missing) -> dict[str, Any]:
         "options": q.options,
         "required": q.required,
         "reason": m.reason,
+        "reason_code": reason_code(m.reason)[0],  # not_in_profile | own_answer | ...
+        "reason_params": reason_code(m.reason)[1],
         "sensitive": m.sensitive,
     }
 
@@ -419,7 +447,9 @@ class Applier:
                 async with make_client() as client:
                     live = await source.is_live(Http(client), stub)
         except Exception as e:  # our own failure never blocks an application
-            logger.warning("job {}: liveness check failed: {}", job.id, e)
+            logger.bind(
+                code="liveness_check_failed", params={"job": job.id, "error": type(e).__name__}
+            ).warning("job {}: liveness check failed: {}", job.id, e)
             return False
         if live is not False:
             return False
@@ -435,6 +465,34 @@ class Applier:
             )
         return True
 
+    async def _cv_pdf(self, job_id: int) -> str:
+        """The CV file this application sends. A tailored PDF, or (user declined tailoring, or
+        practice mode without LibreOffice) the CV as uploaded, with no AI call at all. Never an
+        untailored CV when tailoring was chosen and the tool is there."""
+        with self.db() as s:
+            profile = s.get(Profile, 1)
+            fmt = profile.cv_source_format if profile else "docx"
+        plan = cv_plan(fmt, self.cfg.apply.tailor_cv, self.cfg.apply.live)
+        if plan.mode == "blocked":
+            raise ApplyBlocked(NEEDS_TOOL[plan.reason], plan.reason)
+        try:
+            if plan.mode == "tailor":
+                return (await tailor_job(self.db, job_id, self.provider, self.settings)).pdf_path
+            if profile is None:
+                raise TailorError("No profile yet: run `linkit profile import profile.json`")
+            path = await asyncio.to_thread(original_cv, profile)
+        except UsageLimitError as e:
+            raise usage_blocked(e) from e
+        except (RenderError, TailorError) as e:
+            raise ApplyBlocked(str(e)) from e
+        with self.db.begin() as s:
+            transition(
+                s, s.get_one(Job, job_id), JobState.tailored,
+                "using your CV as it is (not tailored)",
+                code="tailor_skipped", params={"reason": plan.reason},
+            )  # fmt: skip
+        return str(path)
+
     async def apply(self, job_id: int) -> Outcome:
         with self.db() as s:  # decide first: never tailor a job we won't apply to (CLAUDE.md §4)
             job = s.get_one(Job, job_id)
@@ -442,18 +500,21 @@ class Applier:
         if is_mailto(job.data.get("apply_url")):
             addr = mailto_address(job.data.get("apply_url"))
             if addr is None:
-                return Outcome("skipped", "the apply link is not a single valid email address")
+                return Outcome(
+                    "skipped",
+                    "the apply link is not a single valid email address",
+                    reason="bad_email",
+                )
             return await self._apply_email(job_id, addr)
         handler = HANDLERS.get(job.ats or "")
         generic = self.cfg.apply.generic_agent
         if info is None or (handler is None and not (generic and _web_url(info.apply_url))):
-            return Outcome("skipped", f"no form handler for this posting ({job.ats})")
+            return Outcome(
+                "skipped", f"no form handler for this posting ({job.ats})", reason="no_handler"
+            )
         if await self._posting_closed(job, info):  # a read-only check; costs no AI
             return Outcome("skipped", f"the posting is no longer open on {job.ats}")
-        try:
-            cv = await tailor_job(self.db, job_id, self.provider, self.settings)
-        except (RenderError, UsageLimitError, TailorError) as e:
-            raise ApplyBlocked(str(e)) from e
+        cv_pdf = await self._cv_pdf(job_id)
         with self.db() as s:
             profile = s.get_one(Profile, 1)
         out_dir = self.settings.data_dir / "applications" / f"job_{job_id}"
@@ -464,9 +525,13 @@ class Applier:
             phone=profile.phone,
             location=profile.location,
             answers=ApplicationAnswers.model_validate(profile.answers),
+            address=profile.address,
+            postal_code=profile.postal_code,
+            home_city=profile.home_city,
+            home_country=profile.home_country,
             job_location=job.location,
             job_source=job.source,
-            resume_path=cv.pdf_path,
+            resume_path=cv_pdf,
         )
         key = handler.ats if handler else "generic"
         browser = await self._context(key)
@@ -489,15 +554,21 @@ class Applier:
             keep_trace = outcome.status == "failed"
             return outcome
         except UsageLimitError as e:  # before any state change: the job just waits
-            raise ApplyBlocked(str(e)) from e
+            raise usage_blocked(e) from e
         except Exception as e:
             keep_trace = True
-            logger.exception("job {}: apply crashed", job_id)
+            logger.bind(
+                code="apply_crashed",
+                params={"job": job_id, "error": f"{type(e).__name__}: {str(e)[:120]}"},
+            ).exception("job {}: apply crashed", job_id)
             with self.db.begin() as s:
                 job = s.get_one(Job, job_id)
                 if job.state != JobState.applying:
                     transition(s, job, JobState.applying, "filling the application", code="filling")
-                transition(s, job, JobState.failed, f"{type(e).__name__}: {e}")
+                transition(
+                    s, job, JobState.failed, f"{type(e).__name__}: {e}",
+                    code="apply_crashed", params={"error": type(e).__name__},
+                )  # fmt: skip
             return Outcome("failed", str(e))
         except asyncio.CancelledError:  # another site hit ApplyBlocked and stopped this run
             keep_trace = True
@@ -540,10 +611,7 @@ class Applier:
                     params={"to": addr},
                 )
             return Outcome("skipped", f"already emailed {addr}")
-        try:
-            cv = await tailor_job(self.db, job_id, self.provider, self.settings)
-        except (RenderError, UsageLimitError, TailorError) as e:
-            raise ApplyBlocked(str(e)) from e
+        cv_pdf = await self._cv_pdf(job_id)
         with self.db() as s:
             job = s.get_one(Job, job_id)
             profile = s.get_one(Profile, 1)
@@ -576,7 +644,7 @@ class Applier:
                 answers=answers,
                 job_location=job.location,
                 job_source=job.source,
-                resume_path=cv.pdf_path,
+                resume_path=cv_pdf,
             )
             try:
                 made = await compose(
@@ -594,11 +662,13 @@ class Applier:
                     linkedin=answers.linkedin,
                     author=(job.data.get("extra") or {}).get("author"),
                 )
-                attachment = attachment_copy(cv.pdf_path, out_dir, profile.full_name)
+                attachment = attachment_copy(cv_pdf, out_dir, profile.full_name)
             except UsageLimitError as e:
-                raise ApplyBlocked(str(e)) from e
+                raise usage_blocked(e) from e
             except Exception as e:
-                logger.warning("job {}: could not write the email: {}", job_id, type(e).__name__)
+                logger.bind(
+                    code="email_draft_failed", params={"job": job_id, "error": type(e).__name__}
+                ).warning("job {}: could not write the email: {}", job_id, type(e).__name__)
                 return fail(
                     f"could not write the email ({type(e).__name__})", {"error": type(e).__name__}
                 )
@@ -607,6 +677,7 @@ class Applier:
                 "subject": made.subject,
                 "body": made.body,
                 "attachment": str(attachment),
+                **({"problem": made.problem} if made.problem else {}),
             }
             if apply_cfg.live:  # the UI edits this copy; a retry or confirm reuses it
                 with self.db.begin() as s:
@@ -637,12 +708,23 @@ class Applier:
         if not apply_cfg.live:
             eml = str(save_eml(msg, out_dir / "application.eml"))
             note = f"dry run: email to {addr} prepared, not sent"
+            if draft.get("problem"):
+                note += " (the AI wrote the body in Arabic, so it is blank; a live run asks you)"
             with self.db.begin() as s:
                 row = s.get_one(Job, job_id)
                 _event(s, row, note, [eml], "email_preview", {"to": addr})
                 row.data = {**row.data, "dry_run_at": utcnow().isoformat()}
             return Outcome("dry_run", note, [eml])
 
+        if draft.get(
+            "problem"
+        ):  # only the user's edit clears it; never sent, whatever the settings
+            return park(
+                ActionKind.confirm_email,
+                f"The AI wrote the email to {addr} in Arabic; write the message yourself",
+                "confirm_email",
+                {"to": addr, "subject": draft["subject"], "problem": draft["problem"]},
+            )
         if not apply_cfg.submit_without_asking and not job.data.get("submit_confirmed"):
             return park(
                 ActionKind.confirm_email,
@@ -1113,6 +1195,32 @@ class Applier:
             return Outcome("failed", "no confirmation seen", [shot, done])
 
 
+_END_STATE = {"needs_user": JobState.needs_user, "failed": JobState.failed,
+              "skipped": JobState.skipped}  # fmt: skip
+
+
+def _outcome_params(db: sessionmaker[Session], job_id: int, outcome: Outcome) -> dict[str, Any]:
+    """`apply_job` params: job, status and, for needs_user/failed/skipped, a stable `reason` code
+    (the job's last event if it ended in that state) plus `questions` for a parked job."""
+    params: dict[str, Any] = {"job": job_id, "status": outcome.status}
+    end = _END_STATE.get(outcome.status)
+    if end is None:
+        return params
+    with db() as s:
+        last = s.scalars(
+            select(JobEvent).where(JobEvent.job_id == job_id).order_by(JobEvent.id.desc()).limit(1)
+        ).first()
+        params["reason"] = (
+            outcome.reason or (last.code if last and last.to_state == end else None) or "unknown"
+        )
+        if end == JobState.needs_user:
+            item = s.scalars(
+                select(ActionItem).where(ActionItem.job_id == job_id).order_by(ActionItem.id.desc())
+            ).first()
+            params["questions"] = len(item.questions) if item else 0
+    return params
+
+
 async def apply_jobs(
     db: sessionmaker[Session],
     settings: Settings,
@@ -1132,14 +1240,18 @@ async def apply_jobs(
         for job_id in applier.pick_jobs():
             sites.setdefault(applier.site_of(job_id), []).append(job_id)
         parallel = cfg.apply.parallel_sites
-        logger.info(
+        logger.bind(
+            code="apply_start",
+            params={"jobs": sum(map(len, sites.values())), "sites": len(sites),
+                    "parallel": parallel, "live": live},
+        ).info(
             "apply: {} jobs on {} sites, {} at a time ({}) [{}]",
             sum(map(len, sites.values())),
             len(sites),
             parallel,
             "live" if live else "dry run",
             ", ".join(f"{site}: {len(ids)}" for site, ids in sites.items()),
-        )
+        )  # fmt: skip
         running = asyncio.Semaphore(parallel)
 
         async def work(ids: list[int]) -> None:
@@ -1147,9 +1259,18 @@ async def apply_jobs(
                 for n, job_id in enumerate(ids):
                     if n:  # pace between two applications on the same site
                         await asyncio.sleep(random.uniform(lo, max(lo, hi)))  # noqa: S311
+                    with db() as s:
+                        row = s.get_one(Job, job_id)
+                        title, company = row.title, row.company
+                    logger.bind(
+                        code="apply_job_start",
+                        params={"job": job_id, "title": title, "company": company},
+                    ).info("job {}: starting ({} at {})", job_id, title, company)
                     outcome = await applier.apply(job_id)
                     counts[outcome.status] += 1  # no await in between: no race
-                    logger.info("job {}: {} ({})", job_id, outcome.status, outcome.message)
+                    logger.bind(code="apply_job", params=_outcome_params(db, job_id, outcome)).info(
+                        "job {}: {} ({})", job_id, outcome.status, outcome.message
+                    )
 
         try:
             async with asyncio.TaskGroup() as tg:

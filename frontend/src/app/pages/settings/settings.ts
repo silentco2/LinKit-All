@@ -1,6 +1,7 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { focusFragment } from '../../focus';
 import { Hint, resetHints } from '../../components/hint';
 import { TPipe } from '../../i18n';
 import { AccountsSection } from './accounts';
@@ -43,8 +44,8 @@ type Section = { id: string; label: string };
             }
           </ul>
         </nav>
-        <a routerLink="/welcome" class="mt-4 block px-3 text-sm">{{ 'settings.rerun' | t }}</a>
-        <button type="button" class="mt-2 block px-3 text-start text-sm text-brand-700 hover:underline dark:text-brand-300" (click)="showTips()">{{ 'settings.tips' | t }}</button>
+        <a routerLink="/welcome" class="mt-4 block px-3 text-sm max-sm:py-2.5">{{ 'settings.rerun' | t }}</a>
+        <button type="button" class="mt-2 block px-3 text-start text-sm text-brand-700 hover:underline max-sm:py-2.5 dark:text-brand-300" (click)="showTips()">{{ 'settings.tips' | t }}</button>
         @if (tipsReset()) { <p class="hint px-3" role="status">{{ 'settings.tipsDone' | t }}</p> }
       </aside>
 
@@ -79,7 +80,8 @@ type Section = { id: string; label: string };
 export class SettingsPage implements OnInit {
   protected readonly store = inject(SettingsStore);
   private readonly router = inject(Router);
-  private readonly params = toSignal(inject(ActivatedRoute).paramMap);
+  private readonly route = inject(ActivatedRoute);
+  private readonly params = toSignal(this.route.paramMap);
 
   protected readonly sections: Section[] = [
     { id: 'profile', label: 'settings.s.profile' },
@@ -96,6 +98,7 @@ export class SettingsPage implements OnInit {
 
   ngOnInit(): void {
     void this.store.load();
+    focusFragment(this.route.snapshot.fragment); // /settings/jobs#exc, from a "why was this left out" link
   }
 
   protected readonly tipsReset = signal(false);

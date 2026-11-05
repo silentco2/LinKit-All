@@ -99,7 +99,7 @@ def test_linkedin_search_fields_default_and_round_trip(client: TestClient) -> No
 
     old = SearchConfig.model_validate({"sources": {"enabled": ["telegram"]}}).sources
     assert (old.linkedin_keywords, old.linkedin_window) == ([], "week")
-    assert (old.linkedin_max_posts, old.linkedin_headless) == (60, True)
+    assert (old.linkedin_max_posts, old.linkedin_headless) == (30, True)
     fields = {"linkedin_keywords": ["python dev", "مهندس"], "linkedin_window": "day",
               "linkedin_max_posts": 25, "linkedin_headless": False}  # fmt: skip
     body = {"sources": {"enabled": ["linkedin_posts"], **fields}}
@@ -570,6 +570,12 @@ def test_ai_check_passes_local_server_to_litellm(
     }
     r = client.post("/api/ai/check", json=body, headers=SAME_ORIGIN).json()
     assert r["ok"] and "openai/gemma-3" in r["message"]
+    assert (r["provider"], r["provider_label"], r["model"], r["version"]) == (
+        "litellm",
+        "Local model",
+        "openai/gemma-3",
+        None,
+    )
     assert seen["api_base"] == "http://127.0.0.1:1234/v1" and seen["api_key"] == "local"
 
 

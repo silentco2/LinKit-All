@@ -311,24 +311,32 @@ def ua_metadata(hints: dict[str, Any]) -> dict[str, Any]:
     return {k: hints[k] for k in keys if k in hints}
 
 
-async def _read_hints(port: int, ws_url: str) -> dict[str, Any]:
-    """The browser's own client hints, from a page on its loopback debugging origin (a secure
-    context, so navigator.userAgentData exists)."""
+async def _read_hints(ws_url: str) -> dict[str, Any]:
+    """The browser's own client hints, from its chrome://version page (a secure context, so
+    navigator.userAgentData exists). The tab is made blank and then navigated: a tab created
+    straight onto a URL can stay on about:blank while it is polled."""
     cdp = await Cdp.open(ws_url)
     try:
-        url = f"http://127.0.0.1:{port}/json/version"
-        target = await cdp.send("Target.createTarget", {"url": url})
+        target = await cdp.send("Target.createTarget", {"url": "about:blank"})
         sid = (await cdp.send("Target.attachToTarget", {**target, "flatten": True}))["sessionId"]
-        ready = {"expression": "isSecureContext && !!navigator.userAgentData"}
-        for _ in range(50):
-            if (await cdp.send("Runtime.evaluate", ready, sid)).get("result", {}).get("value"):
-                break
-            await asyncio.sleep(0.1)
-        ask = {"expression": UA_CH, "awaitPromise": True, "returnByValue": True}
-        hints = (await cdp.send("Runtime.evaluate", ask, sid)).get("result", {}).get("value")
-        if not isinstance(hints, dict):
-            raise ChromeError("Chrome did not report its client hints")
-        return hints
+        try:
+            await cdp.send("Page.navigate", {"url": "chrome://version"}, sid)
+            ready = {"expression": "isSecureContext && !!navigator.userAgentData"}
+            for _ in range(50):
+                if (await cdp.send("Runtime.evaluate", ready, sid)).get("result", {}).get("value"):
+                    break
+                await asyncio.sleep(0.1)
+            ask = {"expression": UA_CH, "awaitPromise": True, "returnByValue": True}
+            reply = await cdp.send("Runtime.evaluate", ask, sid)
+            hints = reply.get("result", {}).get("value")
+            if not isinstance(hints, dict):
+                why = reply.get("exceptionDetails", {})
+                detail = why.get("exception", {}).get("description") or why.get("text", "")
+                raise ChromeError(f"Chrome did not report its client hints {detail}".strip())
+            return hints
+        finally:
+            with contextlib.suppress(Exception):
+                await cdp.send("Target.closeTarget", target)
     finally:
         await cdp.close()
 
@@ -338,9 +346,9 @@ async def _headless_identity(exe: str, timeout: float) -> Identity:
     run (its hints already name the real browser; only the UA string says HeadlessChrome)."""
     if exe not in _identity_cache:
         with tempfile.TemporaryDirectory(prefix="linkit-ua-") as tmp:
-            proc, port, info = await _start(exe, Path(tmp) / "p", headless=True, timeout=timeout)
+            proc, _port, info = await _start(exe, Path(tmp) / "p", headless=True, timeout=timeout)
             try:
-                hints = await _read_hints(port, str(info["webSocketDebuggerUrl"]))
+                hints = await _read_hints(str(info["webSocketDebuggerUrl"]))
                 ua = real_user_agent(str(info.get("User-Agent", "")))
                 _identity_cache[exe] = Identity(ua, ua_metadata(hints))
             finally:

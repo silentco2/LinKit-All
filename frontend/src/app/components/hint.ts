@@ -35,8 +35,8 @@ export function resetHints(): void {
   template: `
     @if (shown()) {
       <div class="alert alert-info mt-3 flex items-start justify-between gap-3" role="note">
-        <p dir="auto"><ng-content /></p>
-        <button type="button" class="shrink-0 rounded px-1.5 text-slate-500 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-brand-500 dark:hover:text-white"
+        <p><ng-content /></p>
+        <button type="button" class="shrink-0 rounded px-1.5 text-slate-500 max-sm:min-h-10 max-sm:min-w-10 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-brand-500 dark:hover:text-white"
                 [attr.aria-label]="'hint.dismiss' | t" (click)="dismiss()">✕</button>
       </div>
     }

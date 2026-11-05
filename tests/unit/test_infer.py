@@ -104,25 +104,29 @@ def _exp(start: date, end: date | None, **kw: bool) -> Experience:
     return Experience(start=start, end=end, current=end is None, **kw)
 
 
-def test_years_union_excludes_interns_and_overlaps() -> None:
+def test_years_union_includes_interns_and_overlaps() -> None:
     facts = CvFacts(
         experiences=[
             _exp(date(2020, 1, 1), date(2022, 1, 1)),
             _exp(date(2021, 1, 1), date(2023, 1, 1)),  # overlaps: union is 2020-2023
-            _exp(date(2015, 1, 1), date(2019, 1, 1), intern=True),  # not counted
         ]
     )
     assert years_experience(facts, TODAY) == 3
+    # an internship adds its years (2018-2020 does not overlap 2020-2023)
+    facts.experiences.append(_exp(date(2018, 1, 1), date(2020, 1, 1), intern=True))
+    assert years_experience(facts, TODAY) == 5
     assert years_experience(CvFacts(), TODAY) is None
     only_intern = CvFacts(experiences=[_exp(date(2015, 1, 1), date(2016, 1, 1), intern=True)])
-    assert years_experience(only_intern, TODAY) == 0
+    assert years_experience(only_intern, TODAY) == 1
     # a current job runs to today
     assert years_experience(CvFacts(experiences=[_exp(date(2021, 1, 1), None)]), TODAY) == 5
 
 
 def test_en_infer_values_and_levels() -> None:
     out = infer(read_cv(EN_CV), TODAY)
-    assert out["answers.years_experience"].value == 7  # 2021-2026 + 2018-03..2020-12, no intern
+    assert (
+        out["answers.years_experience"].value == 7
+    )  # 2021-2026 + 2018-03..2020-12 + 2017 internship
     assert out["answers.years_experience"].source == "years"
     assert out["filters.seniority"].value == ["senior", "lead"]
     assert out["filters.title_exclude"].value == ["intern", "junior"]
@@ -152,7 +156,14 @@ def test_intern_title_is_a_query_only_when_nothing_else() -> None:
     only = CvFacts(
         experiences=[Experience(title="Python Intern", start=date(2025, 1, 1), intern=True)]
     )
-    assert infer(only, TODAY)["search.queries"].value == ["Python"]
+    assert infer(only, TODAY)["search.queries"].value == ["Python Intern"]  # kept as written
+    other = CvFacts(
+        experiences=[
+            Experience(title="Python Intern", start=date(2025, 1, 1), intern=True),
+            Experience(title="Senior Developer", start=date(2020, 1, 1), end=date(2024, 1, 1)),
+        ]
+    )
+    assert infer(other, TODAY)["search.queries"].value == ["Developer"]
 
 
 def test_authorized_countries_is_only_a_suggestion() -> None:
@@ -172,7 +183,13 @@ def test_seniority_band_and_title_raise() -> None:
     assert band("Analyst", date(2022, 1, 1)) == ["mid", "senior"]
     assert band("Senior Analyst", date(2022, 1, 1)) == ["senior", "lead"]  # raised one band
     assert band("Analyst", date(2012, 1, 1)) == ["lead", "manager", "executive"]
-    assert band("Head of Sales", date(2012, 1, 1)) == ["lead", "manager", "executive"]  # capped
+    # A level the title names wins over the years: that level and the one above it.
+    assert band("Head of Sales", date(2012, 1, 1)) == ["manager", "executive"]
+    assert band("Senior Accountant", date(2019, 1, 1)) == ["senior", "lead"]  # 7 years
+    assert band("Junior Accountant", date(2012, 1, 1)) == ["junior", "mid"]
+    assert band("Team Lead", date(2024, 1, 1)) == ["lead", "manager"]
+    assert band("Marketing Intern", date(2012, 1, 1)) == ["intern", "junior"]
+    assert band("محاسب كبير", date(2019, 1, 1)) == ["senior", "lead"]
     facts = CvFacts(experiences=[Experience(title="Analyst", start=date(2022, 1, 1), current=True)])
     assert infer(facts, TODAY)["filters.title_exclude"].value == [
         "intern",
@@ -294,3 +311,76 @@ def test_experience_formats() -> None:
     ]
     assert exps[2].current and exps[2].start == date(2022, 1, 1)
     assert exps[3].start == date(2013, 1, 1) and exps[3].end == date(2014, 12, 1)
+
+
+def test_internship_only_pdf_cv(tmp_path: Path) -> None:
+    """P3 of the UX7 round: one internship, a PDF whose font prints the dash as a middle dot."""
+    import pymupdf
+    from docx import Document
+    from pdf2docx import Converter
+
+    from linkit_all.tailor.docx.segments import load_segments
+
+    lines = [
+        "Youssef Kamal",
+        "Marketing Graduate",
+        "Riyadh, Saudi Arabia  |  youssef.k@example.com  |  +966 50 123 4567",
+        "",
+        "Experience",
+        "Marketing Intern at Saudi Retail Co  |  Jun 2025 – Dec 2025",
+        "",
+        "Skills",
+        "Social media, Canva, Google Analytics",
+        "",
+        "Education",
+        "BBA Marketing, King Saud University 2025",
+    ]
+    pdf, docx = tmp_path / "cv.pdf", tmp_path / "cv.docx"
+    doc = pymupdf.open()
+    page = doc.new_page(width=595, height=842)
+    for i, line in enumerate(lines):
+        page.insert_text((50, 60 + 20 * i), line, fontsize=11, fontname="helv")
+    doc.save(str(pdf))
+    conv = Converter(str(pdf))
+    conv.convert(str(docx))
+    conv.close()
+    texts = [s.text for s in load_segments(Document(str(docx))) if s.text.strip()]
+
+    facts = read_cv(texts)
+    assert [(e.title, e.company, e.intern) for e in facts.experiences] == [
+        ("Marketing Intern", "Saudi Retail Co", True)
+    ]
+    got = infer(facts, date(2026, 11, 1))
+    assert got["answers.years_experience"].value == 0
+    assert got["answers.years_experience"].note == "under_one_year"
+    assert got["search.queries"].value == ["Marketing Intern"]
+    assert got["filters.seniority"].value == ["intern", "junior"]
+    assert got["answers.current_title"].value == "Marketing Intern"
+    assert got["answers.current_company"].value == "Saudi Retail Co"
+    assert got["answers.current_company"].level == "suggest"  # it ended: the user confirms
+
+
+def test_senior_title_beats_years_band() -> None:
+    cv = ["Mona Adel", "Experience", "Senior Accountant at Nile Foods | Mar 2019 - Present"]
+    got = infer(read_cv(cv), date(2026, 3, 1))
+    assert got["answers.years_experience"].value == 7
+    assert got["filters.seniority"].value == ["senior", "lead"]
+    assert "note" in got["answers.years_experience"].model_dump() and not got["answers.years_experience"].note  # fmt: skip
+
+
+def test_github_in_links_is_not_a_skill() -> None:
+    lines = [
+        "Layla Hassan",
+        "Cairo, Egypt | layla@example.com",
+        "https://github.com/layla-dev",
+        "GitHub | LinkedIn",
+        "Skills",
+        "Python, Docker",
+        "Version control with Git",
+    ]
+    skills = read_cv(lines, links=["https://github.com/layla-dev"]).skills
+    assert "github" not in [x.lower() for x in skills]
+    assert {"Python", "Docker", "Git"} <= set(skills)
+    # Named in the Skills list itself, it is a skill.
+    listed = read_cv(["Skills", "Python, GitHub"], links=["https://github.com/layla-dev"])
+    assert "GitHub" in listed.skills

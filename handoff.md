@@ -15,19 +15,35 @@ changing a decision in either file.
   - UX4 `986969a`: Home, Needs you, Activity and the plain-word vocabulary (EN + AR).
   - UX5a `3c9ae0c` + UX5 `60eb327`: just-in-time park codes, batch answers, a Needs you that clears fast.
   - UX6a `da5a346` + UX6 `6ee5dc3`: presets, job reasons, the guided switch to real applications, first-visit hints.
-  - Not verified: a real Gmail connect; the PDF approve path without LibreOffice; the local-model pick; a
-    native-speaker review of the new Arabic terms (the executors wrote them from the `ux-plan.md` section 9 list).
-  - Remaining: **UX7**, the usability round with 5 people (`ux-plan.md` section 14), pending with the maintainer.
+  - Round 2 (2026-10-31/11-01): `ec1d220` backend (places with work rights, offline GeoNames/O*NET suggestions, FX,
+    new sensitive answers), `ea22b5e` shared inputs + Profile & CV, `dd5e4d2` Jobs & places + first-run places,
+    `bc15cd3` Job sources + Answers, `a11af9f` Applying limits, one browser setting, Advanced clean-up.
+  - UX7 simulated round (5 AI personas, mean SUS 60; results in `docs/usability/simulated-round-1.md`) and its fixes:
+    `92709c3` (frontend: reasons, phone width, Arabic), `ba46591` (backend: AI limits pause, optional LibreOffice,
+    real go-live checks), `717f827` (frontend: apply path, LibreOffice choice, honest go-live, privacy panel).
+    U1-U14 fixed. No more simulated rounds.
+  - After UX7 (2026-11-01 to 11-05): `e576eb0` headless Chrome client-hints fix; `dfb7c26` one-click LibreOffice
+    install points at release `libreoffice-26.2.6-win-x64` of silentco2/LinKit-All (verified with a real install);
+    `60b9c97` source names "Company · platform" and a structured AI check; `d821983` go-live in Home's main card with
+    the CV red-line, plain words, visible apply runs, practice badge on welcome; `93637ec` per-job apply events;
+    `52b068e` Needs-you cards with one main action, work rights per country, level tips, flags, PDF name. This fixes
+    U15-U18 and the smaller items (`ux-plan.md` section 3.7). Known limits: no `daily_cap` per-job event; level
+    tips are hover/focus only; the place-picker Enter fix landed in 46d5521.
+  - Not verified: a real Gmail connect; real Outlook (branch `claude/outlook-oauth-898770`, not merged, needs an
+    Azure client id); the local-model pick on a real server; the Arabic SUS and new Arabic terms (no native review yet).
+  - Remaining: the usability study with 5 real people (kit in `docs/usability/`); merge the Outlook branch; native
+    Arabic review.
+  - Local `main` has unpushed commits (16 ahead of `origin/main` when checked).
 - Phases 0-8 are built, except the items blocked on the maintainer (see "Needs the
   maintainer"). Every task in `plan.md` is done or marked blocked.
 - Phase 8 (sources ported from freehire) is built too: see "Phase 8 - sources from freehire".
 - Phase 9 (debt D1-D7) is done; what remains of the debt is in "Known issues and debt".
 - Phase 10 (trust filter: scam and ghost scores, offline, EN + AR, in the rank stage; ATS liveness
   check before apply; optional AI legit flags) is done. See `docs/trust.md`.
-- Phase 11 (LinkedIn hiring posts + apply by email) is built except **L2, the Playwright post
-  scraper**: it is blocked until the maintainer captures a LinkedIn search page
-  (`linkit linkedin capture`). Everything else works: sign-in and session check, post filter, ATS
-  routing, batched AI extraction, SMTP sender, email apply (dry-run .eml, confirm, caps), UI.
+- Phase 11 (LinkedIn hiring posts + apply by email) is built. No LinkedIn account: posts are
+  found with Google in Chrome (`google` profile) and read from their public pages; a Google check
+  stops the source and the user solves it from Settings. Post filter, ATS routing, batched AI
+  extraction, SMTP sender, email apply (dry-run .eml, confirm, caps), UI.
   See `docs/linkedin-posts.md` and `plan.md` Phase 11.
 - The unit suite passes (`uv run pytest tests/unit`: 1711 tests collected after Phase 11; 1640 passed, 2 skipped
   before it, the real Tectonic compile),
@@ -146,9 +162,9 @@ src/linkit_all/
   providers/        LLMProvider.complete(prompt, schema); claude_cli, codex_cli, litellm_api;
                     prompts/*.j2 (json_output, json_retry, ping, tailor, score, answer,
                     cover_letter, ...)
-  sources/linkedin_posts/  post (RawPost), extract (hiring/seeker filter, ATS routing, batched AI
-                    extraction -> JobStub), session (linkedin Chrome profile, session check,
-                    page capture); scrape.py (L2) not written yet
+  sources/linkedin_posts/  google (site:linkedin.com/posts search in Chrome, check detection,
+                    /goto resolving), post (RawPost, JSON-LD reader), extract (hiring/seeker
+                    filter, ATS routing, batched AI extraction -> JobStub), source (the plugin)
   sources/          base (JobStub, Task, Source), http (rate limits + retries + Crawl-delay
                     pacing), text (html->text, URL/company normalization, hash),
                     store (Deduper), runner (discover, enrich), ats_detector,
@@ -308,10 +324,7 @@ re-implemented in Python on plain honest HTTP. Plan and not-ported lists: `plan.
 6. **macOS/Linux LibreOffice bundles** (need those OSes or CI).
 7. **GitHub repo + PyPI release** (outward-facing: needs the maintainer's go-ahead).
 
-8. **A captured LinkedIn page** so the post scraper (L2) can be written:
-   `linkit linkedin capture --keywords "hiring python developer"` after signing in from Setup.
-   Review the file first: it is a copy of your own LinkedIn page.
-9. **A first supervised live email application** (Live on, confirm each; send the test email
+8. **A first supervised live email application** (Live on, confirm each; send the test email
    to yourself first).
 
 ## Resolved: robots.txt scope
@@ -357,9 +370,9 @@ anywhere; Crawl-delay pacing and per-host rate limits stay. Recorded in CLAUDE.m
 
 ## Known issues and debt
 
-- LinkedIn markup changes often: the post selectors (once L2 exists) will need upkeep. LinkedIn runs headless by
-  default (real UA + client hints, fitted screen); the Latest + Past week filters gave 1 post, so
-  search is unfiltered and the window is applied to scraped posts past 100. Seeker-tag posts ("open to work")
+- LinkedIn posts depend on Google's result markup (anchors with an <h3> in #search, opaque /goto
+  links since 2026) and on the JSON-LD of public post pages; both can change. No daily cap: a
+  run is ≤5 keywords × ≤5 pages, so several scheduled runs a day multiply the Google load. Seeker-tag posts ("open to work")
   that also contain hiring words are dropped. The email greeting heuristic can misjudge a
   company address versus a person.
 

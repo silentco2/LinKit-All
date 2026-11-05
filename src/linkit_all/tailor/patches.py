@@ -33,6 +33,19 @@ class Plan:
     rejected: list[tuple[Patch, str]] = field(default_factory=list)
 
 
+# Arabic blocks: base, Supplement, Extended-A, Presentation Forms-A and -B (AI never writes these)
+_ARABIC = re.compile(r"[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff\ufb50-\ufdff\ufe70-\ufeff]")
+
+
+def has_arabic(text: str) -> bool:
+    return _ARABIC.search(text) is not None
+
+
+def mostly_arabic(text: str) -> bool:
+    letters = [c for c in text if c.isalpha()]
+    return bool(letters) and sum(1 for c in letters if _ARABIC.match(c)) * 2 > len(letters)
+
+
 _STRIP = ".,;:!?()[]{}\"'“”‘’"  # noqa: RUF001 (Word smart quotes)
 _PLAIN = re.compile("[a-z][a-z'’\\-]*")  # noqa: RUF001
 
@@ -113,6 +126,10 @@ def plan_patches(segments: dict[int, str], patches: list[Patch], rules: Rules) -
             reason = "old_text must appear exactly once in the segment"
         elif p.new_text == p.old_text:
             reason = "no change"
+        elif has_arabic(p.new_text):
+            reason = "new_text contains Arabic script (the AI writes English only)"
+        elif mostly_arabic(seg):
+            reason = "segment is written in Arabic (only English segments may be edited)"
         elif any(c in p.new_text for c in "\t\r\n"):
             reason = "new_text contains a tab or line break"
         else:

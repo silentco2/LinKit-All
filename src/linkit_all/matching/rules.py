@@ -2,7 +2,9 @@
 
 import re
 from datetime import datetime, timedelta
+from typing import Any
 
+from linkit_all.core import fx
 from linkit_all.core.models import Job
 from linkit_all.core.search import SearchConfig, Seniority
 from linkit_all.sources.base import remote_from_text
@@ -17,8 +19,9 @@ _SENIORITY: list[tuple[re.Pattern[str], Seniority]] = [
     (re.compile(r"\b(senior|sr)\b"), "senior"),
     (re.compile(r"\b(junior|jr|entry|graduate|fresh)\b"), "junior"),
 ]
-_PER_YEAR = {"year": 1, "yearly": 1, "month": 12, "monthly": 12, "week": 52, "weekly": 52,
-             "day": 260, "daily": 260, "hour": 2080, "hourly": 2080}  # fmt: skip
+_PERIOD = {"year": "year", "yearly": "year", "month": "month", "monthly": "month",
+           "week": "week", "weekly": "week", "day": "day", "daily": "day",
+           "hour": "hour", "hourly": "hour"}  # fmt: skip
 
 
 def seniority(title: str) -> Seniority | None:
@@ -27,8 +30,23 @@ def seniority(title: str) -> Seniority | None:
     return next((level for pattern, level in _SENIORITY if pattern.search(t)), None)
 
 
-def rule_violation(job: Job, cfg: SearchConfig, now: datetime) -> str | None:
-    """Why the job fails the hard filters, or None if it passes."""
+def expectation_of(answers: dict[str, Any], cfg: SearchConfig) -> tuple[float, str] | None:
+    """The monthly pay you expect and its currency, from the saved answers; None if unset."""
+    raw = str(answers.get("salary_expectation") or "").lower()
+    number = re.sub(r"[^\d.]", "", raw)
+    try:
+        amount = float(number) * (1000 if re.search(r"\dk\b", raw.replace(" ", "")) else 1)
+    except ValueError:
+        return None
+    currency = str(answers.get("salary_currency") or cfg.filters.salary_currency).upper()
+    return (amount, currency) if amount > 0 else None
+
+
+def rule_violation(
+    job: Job, cfg: SearchConfig, now: datetime, expectation: tuple[float, str] | None = None
+) -> str | None:
+    """Why the job fails the hard filters, or None if it passes. `expectation` is
+    `expectation_of(answers)`; it is the salary floor when none is set and the user opted in."""
     f = cfg.filters
     title = job.title.lower()
     if f.title_include and not any(w.lower() in title for w in f.title_include):
@@ -45,14 +63,21 @@ def rule_violation(job: Job, cfg: SearchConfig, now: datetime) -> str | None:
         return f"location {job.location!r} not in your locations"
     if f.seniority and (level := seniority(job.title)) and level not in f.seniority:
         return f"seniority {level} not wanted"
-    if job.posted_at and job.posted_at < now - timedelta(days=cfg.search.posted_within_days):
-        return f"posted more than {cfg.search.posted_within_days} days ago"
-    top, per = job.data.get("salary_max"), _PER_YEAR.get(job.data.get("salary_interval") or "year")
-    # ponytail: no FX conversion; a posting in another currency (or none) is never rejected.
-    # Upgrade path: a rates table, only if mixed-currency boards turn out common.
-    same = str(job.data.get("salary_currency") or "").upper() == f.salary_currency
-    if f.salary_floor_monthly and top and per and same and top * per / 12 < f.salary_floor_monthly:
-        return f"salary up to {top * per / 12:,.0f} {f.salary_currency}/month is below your floor"
+    hours = cfg.search.posted_within_hours
+    if hours and job.posted_at and job.posted_at < now - timedelta(hours=hours):
+        return f"posted more than {hours} hours ago"
+    floor: float = f.salary_floor_monthly
+    currency = f.salary_currency
+    if not floor and f.skip_below_expectation and expectation:
+        floor, currency = expectation
+    top, period = job.data.get("salary_max"), _PERIOD.get(job.data.get("salary_interval") or "year")
+    posted = str(job.data.get("salary_currency") or "").upper()
+    # Unknown to the rates table (or no currency stated): never rejected.
+    if floor and top and period and posted:
+        month = fx.monthly(top, period)
+        pay = month if posted == currency else fx.convert(month, posted, currency)
+        if pay is not None and pay < floor:
+            return f"salary up to {pay:,.0f} {currency}/month is below your floor"
     if norm_company(job.company) in {norm_company(c) for c in f.company_blacklist}:
         return "company is blacklisted"
     return None

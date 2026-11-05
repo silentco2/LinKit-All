@@ -5,6 +5,8 @@ import { en } from './i18n/en';
 export type Lang = 'en' | 'ar';
 export type Params = Record<string, string | number>;
 
+const shown = (v: string | number, loc: string): string => (typeof v === 'number' ? new Intl.NumberFormat(loc).format(v) : String(v));
+
 const LANG_KEY = 'linkit.lang';
 const DICTS: Record<Lang, Record<string, string>> = { en, ar };
 
@@ -44,20 +46,58 @@ export class I18n {
   /** Reads the `lang` signal, so any template or computed that calls it re-renders on a language change. */
   t(key: string, params?: Params): string {
     const text = DICTS[this.lang()][key] ?? en[key] ?? key;
-    return params ? text.replace(/\{(\w+)\}/g, (m, name: string) => (name in params ? String(params[name]) : m)) : text;
+    // a number param is written in the language's own digits (٣ in Arabic), so a sentence never mixes two numeral systems
+    const loc = this.lang() === 'ar' ? 'ar-EG' : 'en';
+    return params ? text.replace(/\{(\w+)\}/g, (m, name: string) => (name in params ? shown(params[name], loc) : m)) : text;
   }
 
   /**
-   * A server message (Action Center item, job event) in the UI language. The server sends an English `message` plus a
-   * stable `code` and `params`; `park.<code>` is used when it exists, else the English message (old rows have no code).
+   * `{base}.{zero|one|two|few|many|other}` picked with the browser's CLDR rules for the UI language (Arabic has all six).
+   * Tries an exact `.zero` for 0 (English can opt in to "No jobs"), then the rule's category, then `.other`; the UI
+   * language first, then English. `{n}` is filled with `n` formatted for the language unless `params` sets it.
    */
-  msg(item: { message: string; code?: string | null; params?: Record<string, unknown> | null }): string {
-    const key = item.code ? `park.${item.code}` : '';
-    if (!key || !(key in en)) return item.message;
-    const loc = this.lang() === 'ar' ? 'ar-EG' : 'en';
+  plural(base: string, n: number, params?: Params): string {
+    const lang = this.lang();
+    const cats = [...(n === 0 ? ['zero'] : []), new Intl.PluralRules(lang).select(n), 'other'];
+    for (const dict of [DICTS[lang], en]) {
+      for (const c of cats) {
+        const text = dict[`${base}.${c}`];
+        if (text !== undefined) return this.t(`${base}.${c}`, { n, ...params });
+      }
+    }
+    return base;
+  }
+
+  /**
+   * A server message (Action Center item, job event, live log line) in the UI language. The server sends an English
+   * `message` plus a stable `code` and `params`; `<prefix><code>` is used when it exists (`park.` by default, `log.` for
+   * the live log), else the English message (old rows have no code). A `reason` param may pick a variant
+   * (`park.tailor_skipped.declined`).
+   */
+  msg(item: { message: string; code?: string | null; params?: Record<string, unknown> | null }, prefix = 'park.'): string {
+    let key = item.code ? `${prefix}${item.code}` : '';
     const params: Params = {};
-    for (const [k, v] of Object.entries(item.params ?? {})) params[k] = typeof v === 'number' ? new Intl.NumberFormat(loc).format(v) : String(v);
-    return this.t(key, params);
+    for (const [k, v] of Object.entries(item.params ?? {})) params[k] = typeof v === 'number' ? v : String(v);
+    if (typeof params['reason'] === 'string' && `${key}.${params['reason']}` in en) key = `${key}.${params['reason']}`;
+    const plural = `${key}.other` in en; // a message about a count ("3 questions need your answer") has its plural forms
+    if (!key || !(key in en || plural)) return item.message;
+    // codes whose params are keys of something else: say them in words
+    if (typeof params['source'] === 'string') params['source'] = this.source(params['source']);
+    if (typeof params['tier'] === 'string' && `common.tier.${params['tier']}` in en) params['tier'] = this.t(`common.tier.${params['tier']}`);
+    if (item.code === 'apply_start') params['mode'] = this.t(item.params?.['live'] ? 'live.mode.real' : 'live.mode.practice');
+    if (item.code === 'apply_job' && typeof params['status'] === 'string') params['status'] = this.t(`live.job.${params['status']}`);
+    return plural && typeof params['n'] === 'number' ? this.plural(key, params['n'], params) : this.t(key, params);
+  }
+
+  /** Is there a translation for `key` (English is the complete dictionary)? */
+  has(key: string): boolean {
+    return key in en;
+  }
+
+  /** The AI behind a provider key, as a person would say it ("ChatGPT (Codex)", "Claude", "your AI"). */
+  provider(key: string | null | undefined): string {
+    const k = `ai.name.${key ?? ''}`;
+    return this.t(k in en ? k : 'ai.name.other');
   }
 
   /** A job source / ATS key as a readable name: `source.<key>` when listed, else the key title-cased (`zip_recruiter` -> "Zip Recruiter"). */

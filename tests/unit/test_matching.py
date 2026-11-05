@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from test_tailor import make_cv
 
 from linkit_all.core.db import init_db
-from linkit_all.core.models import Job, JobEvent, JobState, Run, RunStatus, Tier, utcnow
+from linkit_all.core.models import Job, JobEvent, JobState, Profile, Run, RunStatus, Tier, utcnow
 from linkit_all.core.profile import ProfileIn, import_profile
 from linkit_all.core.runs import current_run
 from linkit_all.core.search import SearchConfig
@@ -516,3 +516,21 @@ def test_auto_apply_low_queues_lows_and_requeues_old_ones(db: sessionmaker[Sessi
     # ordering used by pick_jobs: score first, then rank; unscored lows sort last
     order = sorted(jobs.values(), key=lambda j: (-(j.score or 0), -(j.data.get("rank") or 0)))
     assert next(j.title for j in order if j.state == JobState.queued_apply) == "A"
+
+
+def test_rank_uses_the_saved_salary_expectation_when_opted_in(db: sessionmaker[Session]) -> None:
+    with db.begin() as s:
+        profile = s.get(Profile, 1)
+        assert profile is not None
+        profile.answers = {"salary_expectation": "5000", "salary_currency": "USD"}
+    paying = {"salary_max": 3000, "salary_interval": "month", "salary_currency": "USD"}
+    add(db, job(title="Backend Engineer", company="Acme", data=paying))
+    off = SearchConfig.model_validate({"filters": {"title_include": ["engineer"]}})
+    on = SearchConfig.model_validate(
+        {"filters": {"title_include": ["engineer"], "skip_below_expectation": True}}
+    )
+    assert rank_jobs(db, on, fake_embed)["filtered_out"] == 1  # 3,000 USD/month < 5,000 expected
+    with db() as s:
+        message = s.scalars(select(JobEvent.message).order_by(JobEvent.id.desc())).first()
+    assert message == "salary up to 3,000 USD/month is below your floor"
+    assert rank_jobs(db, off, fake_embed)["rechecked"] == 1  # opting out revives it
