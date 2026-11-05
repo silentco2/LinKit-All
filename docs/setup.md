@@ -164,6 +164,9 @@ up, register one and set it in the `LINKIT_MS_CLIENT_ID` environment variable:
 6. Copy the **Application (client) ID** from **Overview** into `LINKIT_MS_CLIENT_ID` and
    restart LinKit All. It is not a secret. There is no client secret.
 
+   In PowerShell (Windows): `$env:LINKIT_MS_CLIENT_ID = "<id>"; linkit`. In bash or zsh:
+   `LINKIT_MS_CLIENT_ID=<id> linkit`. To keep it, add it to your user environment variables.
+
 ## 9. API keys
 
 Some job sites share their listings through a free API: Adzuna (app ID and app key), Reed
