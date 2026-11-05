@@ -33,7 +33,7 @@ Users bring their own AI: ChatGPT plan via Codex CLI, API keys, and later local 
 - Scraping: httpx (async), python-jobspy, Playwright, selectolax, extruct, trafilatura, rapidfuzz, lingua-py. Embeddings: fastembed.
 - CV: python-docx + lxml, pylatexenc/TexSoup + Tectonic, pdf2docx, LibreOffice headless
   (DOCX->PDF, ODT<->DOCX), PyMuPDF, pdfplumber, Pillow/scikit-image (layout diff).
-- Apply: Playwright (real installed Chrome launched without automation flags, attached over CDP, persistent profile per site), imap-tools, msal (Outlook OAuth), vault via cryptography
+- Apply: Playwright (real installed Chrome launched without automation flags, attached over CDP, persistent profile per site), imap-tools, msal (Outlook sign-in), vault via cryptography
   (AES-GCM) + argon2-cffi + keyring.
 - Frontend: Angular + TypeScript + Tailwind, Chart.js, ngx-fast-diff; built into the wheel.
 - Tooling: ruff, mypy, pre-commit, pytest (+ HTML fixtures), GitHub Actions, MkDocs Material.
@@ -120,7 +120,7 @@ Tailoring happens just before applying, never for jobs that will not be applied 
 - Missing setup parks the job with `needs_vault`, `vault_locked` or `needs_email`; it continues once done (`retry-code`).
 - LinkedIn Easy Apply and Indeed Apply break those sites' ToS: off by default, explicit opt-in with a ban-risk
   warning, low daily caps. No CAPTCHA solving: CAPTCHAs park for the user.
-- Email applications (`mailto:`, `apply/email_apply.py`): Gmail/Yahoo SMTP, vault app password; short cover
+- Email applications (`mailto:`, `apply/email_apply.py`): Gmail/Yahoo SMTP or Outlook Graph; short cover
   email (greeting/signature in code, body from the model, CV/profile only) + tailored CV PDF. Dry run writes an
   .eml only; live follows "submit without asking" (else `confirm_email`). 15/day, never the same address twice.
 - Cover letter only if the form has a field. Screenshot before submit and on confirmation; trace on failure.
@@ -147,7 +147,7 @@ Derived by rules. AI gap-fill must be verbatim from the CV (checked). Nothing is
 - App data under platformdirs user data dir: db, CVs, tailored versions, screenshots, traces.
 - Vault: AES-GCM, key from master passphrase via Argon2id, cached with keyring; export re-asks it.
   Created just in time (first account sign-up or Gmail added), not as a setup step. Crypto unchanged.
-- IMAP/SMTP: app passwords (Gmail, Yahoo). Outlook/Hotmail: Microsoft OAuth (msal loopback, `LINKIT_MS_CLIENT_ID`), token cache in vault, XOAUTH2.
+- IMAP/SMTP: app passwords (Gmail, Yahoo). Outlook/Hotmail: msal loopback sign-in (`LINKIT_MS_CLIENT_ID`), token cache in vault, mail via Microsoft Graph (IMAP XOAUTH2 fails server-side for personal accounts).
 - External tools: LibreOffice required (DOCX->PDF), Chrome for applying, Tectonic for LaTeX.
   `linkit doctor` checks them. End-user install: `uv tool install linkit-all`.
 - LibreOffice: minimal portable bundle (Win 1.6 GB -> 439 MB) from `scripts/bundle_libreoffice.py` (removals kept only if renders stay identical);

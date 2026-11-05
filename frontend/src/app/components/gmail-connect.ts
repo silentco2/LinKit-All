@@ -40,7 +40,6 @@ let nextId = 0;
             <div class="alert alert-info" role="status">{{ 'settings.acc.outlook' | t }}</div>
           } @else if (!email()?.connected) {
             <ol class="list-decimal space-y-1 ps-5 text-sm text-slate-700 dark:text-slate-300">
-              <li>{{ 'settings.acc.ms.step0' | t }} <a href="https://outlook.live.com/mail/" target="_blank" rel="noopener">{{ 'settings.acc.open' | t }}</a></li>
               <li>{{ 'settings.acc.ms.step1' | t }}</li>
               <li>{{ 'settings.acc.ms.step2' | t }}</li>
               <li>{{ 'settings.acc.ms.step3' | t }}</li>

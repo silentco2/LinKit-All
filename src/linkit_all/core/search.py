@@ -260,13 +260,9 @@ class EmailSection(BaseModel):
     poll_s: int = Field(10, ge=3, le=120)
 
     def effective_smtp_host(self) -> str:
-        """The SMTP host; an unchanged Gmail default follows a Yahoo or Outlook IMAP host."""
-        if self.smtp_host == "smtp.gmail.com":
-            imap = self.imap_host.lower()
-            if imap == "imap.mail.yahoo.com":
-                return "smtp.mail.yahoo.com"
-            if imap in ("outlook.office365.com", "imap-mail.outlook.com"):
-                return "smtp-mail.outlook.com"
+        """The SMTP host; an unchanged Gmail default follows a Yahoo IMAP host."""
+        if self.smtp_host == "smtp.gmail.com" and self.imap_host.lower() == "imap.mail.yahoo.com":
+            return "smtp.mail.yahoo.com"
         return self.smtp_host
 
 

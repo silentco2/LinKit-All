@@ -139,14 +139,14 @@ server.
 
 ### Outlook, Hotmail, Live and MSN
 
-Microsoft no longer accepts app passwords, so these addresses sign in with Microsoft:
+Microsoft no longer accepts app passwords, so these addresses sign in with Microsoft. LinKit
+All then reads and sends mail through Microsoft Graph, Microsoft's mail API, so the IMAP
+setting in outlook.com does not matter.
 
-1. On outlook.com open **Settings**, then **Mail**, then **Forwarding and IMAP**. Turn on
-   **Let devices and apps use IMAP** and save. It is often off by default.
-2. Unlock the vault (step 7) and enter your address.
-3. Press **Sign in with Microsoft**. A Microsoft page opens in your browser.
-4. Sign in and allow LinKit All to read and send your email.
-5. Come back to LinKit All. It says you are connected.
+1. Unlock the vault (step 7) and enter your address.
+2. Press **Sign in with Microsoft**. A Microsoft page opens in your browser.
+3. Sign in and allow LinKit All to read and send your email.
+4. Come back to LinKit All. It says you are connected.
 
 LinKit All keeps the sign-in (a refresh token) in the vault and renews it by itself. If
 Microsoft ends it (password change, or a long time without use), the app asks you to sign in
@@ -161,8 +161,8 @@ up, register one and set it in the `LINKIT_MS_CLIENT_ID` environment variable:
 3. Redirect URI: platform **Public client/native (mobile & desktop)**, value
    `http://localhost`.
 4. Under **Authentication**, set **Allow public client flows** to **Yes** and save.
-5. Under **API permissions**, add the delegated permissions `IMAP.AccessAsUser.All`,
-   `SMTP.Send` and `offline_access`.
+5. Under **API permissions**, choose **Add a permission**, **Microsoft Graph**, **Delegated
+   permissions**, and add `Mail.Read`, `Mail.Send` and `offline_access`.
 6. Copy the **Application (client) ID** from **Overview** into `LINKIT_MS_CLIENT_ID` and
    restart LinKit All. It is not a secret. There is no client secret.
 

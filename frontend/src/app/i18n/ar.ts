@@ -826,7 +826,6 @@ export const ar: Record<string, string> = {
   'settings.acc.needVault': 'افتح كلمات المرور المحفوظة أعلاه أولًا. تُحفظ كلمة مرور التطبيق هناك مشفّرة.',
   'settings.acc.needVaultKeys': 'افتح كلمات المرور المحفوظة أعلاه أولًا. تُحفظ مفاتيحك هناك مشفّرة.',
   'settings.acc.outlook': 'تسجيل الدخول بحساب Microsoft غير مُعدّ في هذه النسخة من LinKit All (LINKIT_MS_CLIENT_ID، راجع دليل الإعداد). استخدم عنوان Gmail أو Yahoo حاليًا.',
-  'settings.acc.ms.step0': 'فعّل IMAP في outlook.com: الإعدادات، ثم البريد، ثم إعادة التوجيه وIMAP، ثم «السماح للأجهزة والتطبيقات باستخدام IMAP». احفظ.',
   'settings.acc.ms.step1': 'اضغط «تسجيل الدخول باستخدام Microsoft». ستفتح صفحة تسجيل دخول Microsoft في متصفحك.',
   'settings.acc.ms.step2': 'سجّل الدخول، ثم اسمح لـ LinKit All بقراءة بريدك وإرساله.',
   'settings.acc.ms.step3': 'ارجع إلى هنا. تتحدّث هذه الصفحة بعد تسجيل دخولك. لا حاجة لكلمة مرور تطبيق.',

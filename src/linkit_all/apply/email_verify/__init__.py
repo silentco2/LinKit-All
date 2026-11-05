@@ -1,4 +1,5 @@
-"""Read the user's mailbox (IMAP, read-only) for the code or link a job site sends after sign-up.
+"""Read the user's mailbox (IMAP, or Microsoft Graph for Outlook; read-only) for the code or link
+a job site sends after sign-up.
 
 Regex first, local. Only when it finds nothing is the email text (at most ~4,000 chars) sent to
 the chosen model provider (CLAUDE.md §2, §5.5). Email bodies, codes, links and the password are
@@ -6,7 +7,6 @@ never logged; only counts.
 """
 
 import asyncio
-import imaplib
 import re
 import time
 from collections.abc import Iterator
@@ -50,12 +50,6 @@ _CODE_BEFORE = re.compile(
 
 class EmailLoginError(Exception):
     """Plain-language reason the mailbox could not be opened."""
-
-
-IMAP_OFF = (
-    "Microsoft signed you in, but IMAP is off for this mailbox. On outlook.com open Settings, "
-    "Mail, Forwarding and IMAP, turn on 'Let devices and apps use IMAP', save, then try again"
-)
 
 
 class Verification(BaseModel):
@@ -132,19 +126,6 @@ class _Mail:
     html: str
 
 
-def _login(host: str, user: str, secret: str) -> MailBox:
-    """App password, or (Microsoft) an OAuth access token via XOAUTH2."""
-    mb = MailBox(host)
-    if not microsoft.is_host(host):
-        return mb.login(user, secret)
-    try:
-        return mb.xoauth2(user, secret)
-    except imaplib.IMAP4.error as e:  # a refused AUTHENTICATE raises this, not MailboxLoginError
-        if "not connected" in str(e):  # token accepted, but the mailbox has IMAP switched off
-            raise EmailLoginError(IMAP_OFF) from None
-        raise MailboxLoginError((str(e), []), "OK") from None
-
-
 def _spam_folder(mb: MailBox) -> str | None:
     """The spam folder: the one flagged \\Junk (RFC 6154, any language), else `[Gmail]/Spam`."""
     try:
@@ -156,16 +137,9 @@ def _spam_folder(mb: MailBox) -> str | None:
     return SPAM_FALLBACK if mb.folder.exists(SPAM_FALLBACK) else None
 
 
-def _fetch(
-    host: str, user: str, password: str, site_domains: list[str], since: datetime
-) -> list[_Mail]:
-    """Blocking: relevant recent messages, newest first. Nothing is marked read or deleted."""
-    floor = since - SLACK
-    if floor.tzinfo is None:
-        floor = floor.replace(tzinfo=UTC)
-    domains = [d.lower().lstrip(".") for d in site_domains]
-    found: list[tuple[datetime, _Mail]] = []
-    with _login(host, user, password) as mb:
+def _imap_rows(host: str, user: str, password: str, floor: datetime) -> list[microsoft.Row]:
+    rows: list[microsoft.Row] = []
+    with MailBox(host).login(user, password) as mb:
         spam = _spam_folder(mb)
         for folder in (INBOX, spam) if spam else (INBOX,):
             mb.folder.set(folder)
@@ -173,16 +147,33 @@ def _fetch(
             crit = AND(date_gte=(floor - timedelta(days=1)).date())
             for msg in mb.fetch(crit, mark_seen=False, reverse=True, limit=MAX_PER_POLL):
                 when = msg.date if msg.date.tzinfo else msg.date.replace(tzinfo=UTC)
-                if when < floor:
-                    continue
-                sender = (msg.from_values.email if msg.from_values else "").lower()
-                sender_host = sender.rpartition("@")[2]
-                from_site = any(sender_host == d or sender_host.endswith("." + d) for d in domains)
-                if from_site or _SUBJECT_WORDS.search(msg.subject or ""):
-                    key = f"{folder}:{msg.uid or when.isoformat()}"
-                    found.append(
-                        (when, _Mail(key, msg.subject or "", msg.text or "", msg.html or ""))
-                    )
+                sender = msg.from_values.email if msg.from_values else ""
+                key = f"{folder}:{msg.uid or when.isoformat()}"
+                rows.append((key, when, sender, msg.subject or "", msg.text or "", msg.html or ""))
+    return rows
+
+
+def _fetch(
+    host: str, user: str, password: str, site_domains: list[str], since: datetime
+) -> list[_Mail]:
+    """Blocking: relevant recent messages, newest first. Nothing is marked read or deleted.
+    Microsoft mailboxes are read through Graph (`password` is then an access token)."""
+    floor = since - SLACK
+    if floor.tzinfo is None:
+        floor = floor.replace(tzinfo=UTC)
+    domains = [d.lower().lstrip(".") for d in site_domains]
+    if microsoft.is_host(host):
+        rows = microsoft.messages(password, floor, MAX_PER_POLL)
+    else:
+        rows = _imap_rows(host, user, password, floor)
+    found: list[tuple[datetime, _Mail]] = []
+    for key, when, sender, subject, text, html in rows:
+        if when < floor:
+            continue
+        sender_host = sender.lower().rpartition("@")[2]
+        from_site = any(sender_host == d or sender_host.endswith("." + d) for d in domains)
+        if from_site or _SUBJECT_WORDS.search(subject):
+            found.append((when, _Mail(key, subject, text, html)))
     found.sort(key=lambda t: t[0], reverse=True)
     return [m for _, m in found]
 
@@ -205,6 +196,8 @@ async def wait_for_verification(
             )
         except MailboxLoginError:
             raise EmailLoginError(_login_message(cfg.imap_host)) from None
+        except microsoft.MicrosoftAuthError as e:
+            raise EmailLoginError(str(e)) from None
         except (OSError, ImapToolsError) as e:  # network blip: try again next poll
             logger.warning("IMAP poll failed ({})", type(e).__name__)
             mails = []
@@ -226,16 +219,19 @@ async def wait_for_verification(
 def _login_message(host: str) -> str:
     if "gmail" in host.lower():
         return "Gmail rejected the app password"
-    if microsoft.is_host(host):
-        return "Microsoft rejected the sign-in: sign in with Microsoft again"
     return f"{host} rejected the email address or app password"
 
 
 def check_login(host: str, user: str, password: str) -> None:
     """Connect and log in; raise EmailLoginError with a plain message on failure."""
     try:
-        with _login(host, user, password):
-            pass
+        if microsoft.is_host(host):
+            microsoft.check(password)
+        else:
+            with MailBox(host).login(user, password):
+                pass
+    except microsoft.MicrosoftAuthError as e:
+        raise EmailLoginError(str(e)) from None
     except MailboxLoginError:
         raise EmailLoginError(_login_message(host)) from None
     except (OSError, ImapToolsError) as e:

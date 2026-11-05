@@ -1,22 +1,29 @@
-"""Outlook/Hotmail: Microsoft OAuth sign-in, token refresh into the vault, XOAUTH2 for IMAP and SMTP.
-All with fakes; nothing reaches Microsoft."""
+"""Outlook/Hotmail: Microsoft sign-in, token refresh into the vault, reading and sending mail
+through Microsoft Graph. All with fakes; nothing reaches Microsoft."""
 
+import asyncio
 import base64
-import imaplib
-import smtplib
-from email.message import EmailMessage
+from datetime import UTC, datetime
+from email import message_from_bytes
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, ClassVar
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 from test_api import SAME_ORIGIN, client, mem_keyring  # noqa: F401  (fixtures)
 from test_vault import CHEAP, PASS
 
-import linkit_all.apply.email_verify as ev
-from linkit_all.apply.email_send import OutgoingEmail, SmtpAuthError, build_message, send
-from linkit_all.apply.email_verify import EmailLoginError, check_login, credentials, microsoft
+from linkit_all.apply.email_send import OutgoingEmail, SmtpAuthError, SmtpError, build_message, send
+from linkit_all.apply.email_verify import (
+    EmailLoginError,
+    Verification,
+    check_login,
+    credentials,
+    microsoft,
+    wait_for_verification,
+)
 from linkit_all.apply.vault import Vault
 from linkit_all.core.db import init_db
 from linkit_all.core.search import EmailSection
@@ -118,90 +125,87 @@ def test_credentials_refresh_and_save_rotated_cache(tmp_path: Path) -> None:
         credentials(MS, v, "")
 
 
-class FakeBox:
-    def __init__(self, host: str) -> None:
-        self.host = host
-        self.how: tuple[str, str, str] | None = None
+class FakeGraph:
+    """Stands in for httpx.request against graph.microsoft.com."""
 
-    def login(self, user: str, password: str) -> "FakeBox":
-        self.how = ("login", user, password)
-        return self
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
+        self.status = 200
+        self.inbox: list[dict[str, Any]] = []
+        self.junk: list[dict[str, Any]] = []
 
-    def xoauth2(self, user: str, token: str) -> "FakeBox":
-        self.how = ("xoauth2", user, token)
-        if token == "bad":  # noqa: S105
-            raise imaplib.IMAP4.error("AUTHENTICATE failed")
-        if token == "imap-off":  # noqa: S105
-            raise imaplib.IMAP4.error("User is authenticated but not connected.")
-        return self
-
-    def __enter__(self) -> "FakeBox":
-        return self
-
-    def __exit__(self, *a: object) -> None:
-        return None
+    def __call__(self, method: str, url: str, **kw: Any) -> httpx.Response:
+        self.calls.append({"method": method, "url": url, **kw})
+        if self.status != 200:
+            return httpx.Response(self.status, request=httpx.Request(method, url))
+        if url.endswith("/sendMail"):
+            return httpx.Response(202, request=httpx.Request(method, url))
+        value = self.junk if "/junkemail/" in url else self.inbox
+        return httpx.Response(200, json={"value": value}, request=httpx.Request(method, url))
 
 
-def test_imap_uses_xoauth2_for_microsoft_only(monkeypatch: pytest.MonkeyPatch) -> None:
-    boxes: list[FakeBox] = []
-    monkeypatch.setattr(ev, "MailBox", lambda host: boxes.append(FakeBox(host)) or boxes[-1])
+@pytest.fixture
+def graph(monkeypatch: pytest.MonkeyPatch) -> FakeGraph:
+    fake = FakeGraph()
+    monkeypatch.setattr(microsoft.httpx, "request", fake)
+    return fake
+
+
+NOW = datetime(2026, 11, 5, 12, 0, tzinfo=UTC)
+
+
+def mail(subject: str, html: str, sender: str = "no-reply@acme.example") -> dict[str, Any]:
+    return {
+        "id": subject,
+        "subject": subject,
+        "receivedDateTime": "2026-11-05T12:01:00Z",
+        "from": {"emailAddress": {"address": sender}},
+        "body": {"contentType": "html", "content": html},
+    }
+
+
+def test_check_login_reads_inbox_with_token(graph: FakeGraph) -> None:
     check_login(microsoft.IMAP_HOST, USER, "AT")
-    check_login("imap.gmail.com", "me@gmail.com", "pw")
-    assert [b.how for b in boxes] == [("xoauth2", USER, "AT"), ("login", "me@gmail.com", "pw")]
-    with pytest.raises(EmailLoginError, match="Microsoft rejected the sign-in"):
-        check_login(microsoft.IMAP_HOST, USER, "bad")
-    with pytest.raises(EmailLoginError, match="Let devices and apps use IMAP"):
-        check_login(microsoft.IMAP_HOST, USER, "imap-off")
+    (call,) = graph.calls
+    assert call["url"].endswith("/me/mailFolders/inbox")
+    assert call["headers"]["Authorization"] == "Bearer AT"
+    graph.status = 401
+    with pytest.raises(EmailLoginError, match="sign in with Microsoft again"):
+        check_login(microsoft.IMAP_HOST, USER, "AT")
+    graph.status = 503
+    with pytest.raises(EmailLoginError, match="Could not connect"):
+        check_login(microsoft.IMAP_HOST, USER, "AT")
 
 
-class FakeSMTP:
-    instances: ClassVar[list["FakeSMTP"]] = []
-    reject = False
-
-    def __init__(self, host: str, port: int, timeout: float = 0) -> None:
-        self.host, self.port = host, port
-        self.tls = self.hello = False
-        self.auth_line = ""
-        self.sent: list[EmailMessage] = []
-        FakeSMTP.instances.append(self)
-
-    def __enter__(self) -> "FakeSMTP":
-        return self
-
-    def __exit__(self, *a: object) -> None:
-        return None
-
-    def starttls(self, context: Any = None) -> None:
-        self.tls, self.hello = True, False  # like the real server: EHLO again after STARTTLS
-
-    def ehlo(self) -> None:
-        self.hello = True
-
-    def auth(self, mechanism: str, authobject: Any) -> None:
-        assert mechanism == "XOAUTH2" and self.tls and self.hello
-        self.auth_line = base64.b64encode(authobject().encode()).decode()
-        if FakeSMTP.reject:
-            raise smtplib.SMTPAuthenticationError(535, b"no")
-
-    def send_message(self, msg: EmailMessage) -> None:
-        self.sent.append(msg)
+def test_wait_for_verification_reads_inbox_and_junk(graph: FakeGraph) -> None:
+    graph.inbox = [mail("Newsletter", "<p>hello</p>")]
+    graph.junk = [mail("Your verification code", "<p>Your code is 482913</p>")]
+    cfg = MS.model_copy(update={"timeout_s": 1, "poll_s": 0.02})
+    got = asyncio.run(wait_for_verification(cfg, USER, "AT", ["acme.example"], NOW))
+    assert got == Verification(code="482913")
+    folders = [c["url"].rsplit("/", 2)[-2] for c in graph.calls]
+    assert folders == ["inbox", "junkemail"]
+    params = graph.calls[0]["params"]
+    assert params["$filter"] == "receivedDateTime ge 2026-11-05T11:58:00Z"  # 2-minute slack
+    graph.status = 403
+    with pytest.raises(EmailLoginError, match="sign in with Microsoft again"):
+        asyncio.run(wait_for_verification(cfg, USER, "AT", ["acme.example"], NOW))
 
 
-def test_smtp_sends_with_starttls_and_xoauth2(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    FakeSMTP.instances, FakeSMTP.reject = [], False
-    monkeypatch.setattr(smtplib, "SMTP", FakeSMTP)
+def test_send_posts_mime_to_graph(tmp_path: Path, graph: FakeGraph) -> None:
     v = _vault(tmp_path)
-    msg = build_message("Me", USER, OutgoingEmail("hr@acme.com", "S", "B"))
+    msg = build_message("Me", USER, OutgoingEmail("hr@acme.com", "Application", "Hello"))
     assert send(MS, v, USER, msg) == msg["Message-ID"]
-    (smtp,) = FakeSMTP.instances
-    assert (smtp.host, smtp.port, smtp.sent) == ("smtp-mail.outlook.com", 587, [msg])
-    assert (
-        base64.b64decode(smtp.auth_line) == f"user={USER}\x01auth=Bearer AT-fresh\x01\x01".encode()
-    )
-    FakeSMTP.reject = True
+    (call,) = graph.calls
+    assert call["method"] == "POST" and call["url"].endswith("/me/sendMail")
+    assert call["headers"]["Authorization"] == "Bearer AT-fresh"
+    sent = message_from_bytes(base64.b64decode(call["content"]))
+    assert sent["Subject"] == "Application" and sent["To"] == "hr@acme.com"
+    graph.status = 401
     with pytest.raises(SmtpAuthError, match="sign in with Microsoft again"):
+        send(MS, v, USER, msg)
+    graph.status = 500
+    with pytest.raises(SmtpError, match="Microsoft"):
         send(MS, v, USER, msg)
     FakeApp.expired = True
     with pytest.raises(SmtpAuthError, match="sign in with Microsoft again"):
