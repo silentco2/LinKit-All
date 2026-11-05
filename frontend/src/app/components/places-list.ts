@@ -35,7 +35,7 @@ import { PlacePick, PlacePicker } from './place-picker';
         </ul>
       }
       @for (g of [gen()]; track g) {
-        <app-place-picker [inputId]="inputId()" [placeholder]="'welcome.jobs.addPlace' | t" [ariaLabel]="'welcome.jobs.addPlace' | t" (picked)="add($event)" />
+        <app-place-picker [inputId]="inputId()" [requirePick]="true" [placeholder]="'welcome.jobs.addPlace' | t" [ariaLabel]="'welcome.jobs.addPlace' | t" (picked)="add($event)" />
       }
       <p class="hint !mt-0">{{ 'places.hint' | t }}</p>
     </div>

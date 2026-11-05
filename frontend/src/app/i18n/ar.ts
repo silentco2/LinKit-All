@@ -833,6 +833,7 @@ export const ar: Record<string, string> = {
   'places.visa': 'أحتاج تأشيرة',
   'places.ask': 'هل يمكنك العمل هنا؟ اختر أحد الخيارين ليتمكن LinKit من الإجابة عن أسئلة تصريح العمل.',
   'places.hint': 'تُستخدم للإجابة عن أسئلة تصريح العمل والتأشيرة نيابةً عنك.',
+  'places.pickHint': 'اختر مكانًا من القائمة',
   'places.workIn': 'تصريح العمل في {name}',
   'mode.remote': 'عن بُعد',
   'mode.hybrid': 'هجين',

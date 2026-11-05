@@ -779,6 +779,7 @@ export const en: Record<string, string> = {
   'places.visa': "I'd need a visa",
   'places.ask': 'Can you work here? Pick one so LinKit can answer work-permit questions.',
   'places.hint': 'Used to answer work-permit and visa questions for you.',
+  'places.pickHint': 'Pick a place from the list',
   'places.workIn': 'Work permit for {name}',
   'mode.remote': 'Remote',
   'mode.hybrid': 'Hybrid',
