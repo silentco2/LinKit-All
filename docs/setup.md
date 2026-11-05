@@ -152,8 +152,9 @@ LinKit All keeps the sign-in (a refresh token) in the vault and renews it by its
 Microsoft ends it (password change, or a long time without use), the app asks you to sign in
 again.
 
-This needs a Microsoft app id for LinKit All. If the page says Microsoft sign-in is not set
-up, register one and set it in the `LINKIT_MS_CLIENT_ID` environment variable:
+This uses LinKit All's own Microsoft app, so there is nothing to set up. A fork that wants its
+own app registration can register one and set it in the `LINKIT_MS_CLIENT_ID` environment
+variable:
 
 1. Open [the Azure portal](https://portal.azure.com), then **Microsoft Entra ID**, then
    **App registrations**, then **New registration**. A free Azure account works.

@@ -5,7 +5,7 @@ server-side for many personal accounts ("User is authenticated but not connected
 mail is read and sent through Graph instead. Sign-in is a public-client loopback flow (msal
 opens the browser and listens once on http://localhost). The serialized msal token cache, which
 holds the refresh token, is the vault secret (kind="imap", site=IMAP_HOST, kept as the marker).
-Tokens and mail bodies are never logged. The client id comes from LINKIT_MS_CLIENT_ID.
+Tokens and mail bodies are never logged. The client id is LinKit All's own (Settings.ms_client_id).
 """
 
 import base64

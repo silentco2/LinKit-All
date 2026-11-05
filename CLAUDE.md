@@ -148,7 +148,7 @@ Derived by rules. AI gap-fill must be verbatim from the CV (checked). On CV uplo
 - App data under platformdirs user data dir: db, CVs, tailored versions, screenshots, traces.
 - Vault: AES-GCM, key from master passphrase via Argon2id, cached with keyring; export re-asks it.
   Created just in time (first account sign-up or Gmail added), not as a setup step. Crypto unchanged.
-- IMAP/SMTP: app passwords (Gmail, Yahoo). Outlook/Hotmail: msal loopback sign-in (`LINKIT_MS_CLIENT_ID`), token cache in vault, mail via Microsoft Graph (IMAP XOAUTH2 fails server-side for personal accounts).
+- IMAP/SMTP: app passwords (Gmail, Yahoo). Outlook/Hotmail: msal loopback sign-in (our Azure app id in config; `LINKIT_MS_CLIENT_ID` overrides), token cache in vault, mail via Microsoft Graph (IMAP XOAUTH2 fails server-side for personal accounts).
 - External tools: LibreOffice required (DOCX->PDF), Chrome for applying, Tectonic for LaTeX.
   `linkit doctor` checks them. End-user install: `uv tool install linkit-all`.
 - LibreOffice: minimal portable bundle (Win 1.6 GB -> 439 MB) from `scripts/bundle_libreoffice.py` (removals kept only if renders stay identical);

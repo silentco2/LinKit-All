@@ -1,6 +1,6 @@
 import { Component, computed, inject, OnInit, signal, viewChild } from '@angular/core';
 import { Api } from '../../api';
-import { GmailConnect, GmailConnected } from '../../components/gmail-connect';
+import { EmailConnect, EmailConnected } from '../../components/email-connect';
 import { KeyForm } from '../../components/key-form';
 import { VaultGate, VaultReady } from '../../components/vault-gate';
 import { I18n, TPipe } from '../../i18n';
@@ -10,10 +10,10 @@ import { SettingsStore } from './store';
 
 type Note = { ok: boolean; text: string };
 
-/** Settings > Accounts & email: saved passwords (the vault), Gmail for sign-up codes and email applications, API keys. */
+/** Settings > Accounts & email: saved passwords (the vault), email for sign-up codes and email applications, API keys. */
 @Component({
   selector: 'app-settings-accounts',
-  imports: [GmailConnect, KeyForm, VaultGate, TPipe],
+  imports: [EmailConnect, KeyForm, VaultGate, TPipe],
   template: `
     <div class="space-y-6">
       @if (note(); as n) {
@@ -88,7 +88,7 @@ type Note = { ok: boolean; text: string };
       <section class="card space-y-4">
         <h2>{{ 'settings.acc.gmail' | t }}</h2>
         <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'setup.email.intro' | t }}</p>
-        <app-gmail-connect [unlocked]="unlocked()" (connected)="onGmail($event)" />
+        <app-email-connect [unlocked]="unlocked()" (connected)="onEmail($event)" />
       </section>
 
       <section class="card space-y-4">
@@ -239,10 +239,10 @@ export class AccountsSection implements OnInit {
     });
   }
 
-  // ---- Gmail ----------------------------------------------------------------------------------
+  // ---- Email ----------------------------------------------------------------------------------
 
   /** The component saved the address and host in the search config: keep our copy the same so a later autosave does not undo it. */
-  protected onGmail(r: GmailConnected): void {
+  protected onEmail(r: EmailConnected): void {
     this.store.cfg.email.imap_host = r.email.imap_host;
     this.store.cfg.email.imap_user = r.email.imap_user;
   }

@@ -6,7 +6,7 @@ import { EmailState } from '../types';
 type Note = { ok: boolean; text: string };
 
 /** What a successful connect did: the saved email state and how many waiting applications were requeued. */
-export type GmailConnected = { email: EmailState; count: number };
+export type EmailConnected = { email: EmailState; count: number };
 
 let nextId = 0;
 
@@ -17,7 +17,7 @@ let nextId = 0;
  * After a connect it requeues the applications parked for `needs_email` and emits `connected`.
  */
 @Component({
-  selector: 'app-gmail-connect',
+  selector: 'app-email-connect',
   imports: [TPipe],
   host: { class: 'block' },
   template: `
@@ -88,12 +88,12 @@ let nextId = 0;
     </div>
   `,
 })
-export class GmailConnect {
+export class EmailConnect {
   private readonly api = inject(Api);
   private readonly i18n = inject(I18n);
   readonly unlocked = input(true);
-  readonly connected = output<GmailConnected>();
-  protected readonly id = `gc${++nextId}`;
+  readonly connected = output<EmailConnected>();
+  protected readonly id = `ec${++nextId}`;
   protected readonly email = signal<EmailState | null>(null);
   protected readonly note = signal<Note | null>(null);
   protected readonly busy = signal(false);

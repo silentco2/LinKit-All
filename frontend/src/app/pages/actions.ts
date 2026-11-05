@@ -2,7 +2,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { Component, computed, effect, inject, signal, viewChildren } from '@angular/core';
 import { Api } from '../api';
 import { AllClear } from '../components/all-clear';
-import { GmailConnect, GmailConnected } from '../components/gmail-connect';
+import { EmailConnect, EmailConnected } from '../components/email-connect';
 import { MenuItem, MoreMenu } from '../components/more-menu';
 import { Toast } from '../components/toast';
 import { VaultGate, VaultReady } from '../components/vault-gate';
@@ -54,7 +54,7 @@ const SOURCES: Record<string, string> = {
 
 @Component({
   selector: 'app-actions',
-  imports: [AllClear, GmailConnect, MoreMenu, MsgPipe, NgTemplateOutlet, Toast, TPipe, VaultGate],
+  imports: [AllClear, EmailConnect, MoreMenu, MsgPipe, NgTemplateOutlet, Toast, TPipe, VaultGate],
   template: `
     <p class="text-sm text-slate-500">{{ 'actions.intro' | t }}</p>
 
@@ -157,7 +157,7 @@ const SOURCES: Record<string, string> = {
           <div class="mt-4">
             <app-vault-gate reason="fin.email.vaultFirst" (ready)="onVault($event)">
               <p class="mb-3 text-sm text-slate-700 dark:text-slate-300">{{ 'fin.email.why' | t }}</p>
-              <app-gmail-connect (connected)="onGmail($event)" />
+              <app-email-connect (connected)="onEmail($event)" />
             </app-vault-gate>
           </div>
           <button type="button" class="btn mt-4" [attr.aria-expanded]="shown().email" (click)="toggleShown('email')">{{ (shown().email ? 'fin.hide' : 'fin.show') | t }}</button>
@@ -404,7 +404,7 @@ export class ActionsPage {
     this.continued(r.needs_vault + r.vault_locked);
   }
 
-  protected onGmail(r: GmailConnected): void {
+  protected onEmail(r: EmailConnected): void {
     this.continued(r.count);
   }
 

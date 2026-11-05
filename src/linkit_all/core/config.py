@@ -30,7 +30,9 @@ class Settings(BaseSettings):
     llm_concurrency: int = Field(1, ge=1, le=3)
     llm_timeout_s: float = 300
 
-    ms_client_id: str = ""  # Azure public-client app id for Outlook sign-in (not a secret)
+    # LinKit All's Azure public-client app (Outlook sign-in). Not a secret; LINKIT_MS_CLIENT_ID
+    # points a fork at its own registration, "" turns Outlook sign-in off.
+    ms_client_id: str = "ecfe387f-8ded-4512-ba11-a770c6a800f8"
 
     tailor_max_growth: float = Field(0.10, ge=0, le=1)  # per segment, in characters
     tailor_max_word_change: float = Field(0.15, ge=0, le=1)  # whole CV
