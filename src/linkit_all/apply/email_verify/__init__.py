@@ -52,6 +52,12 @@ class EmailLoginError(Exception):
     """Plain-language reason the mailbox could not be opened."""
 
 
+IMAP_OFF = (
+    "Microsoft signed you in, but IMAP is off for this mailbox. On outlook.com open Settings, "
+    "Mail, Forwarding and IMAP, turn on 'Let devices and apps use IMAP', save, then try again"
+)
+
+
 class Verification(BaseModel):
     code: str | None = None
     link: str | None = None
@@ -134,6 +140,8 @@ def _login(host: str, user: str, secret: str) -> MailBox:
     try:
         return mb.xoauth2(user, secret)
     except imaplib.IMAP4.error as e:  # a refused AUTHENTICATE raises this, not MailboxLoginError
+        if "not connected" in str(e):  # token accepted, but the mailbox has IMAP switched off
+            raise EmailLoginError(IMAP_OFF) from None
         raise MailboxLoginError((str(e), []), "OK") from None
 
 

@@ -131,6 +131,8 @@ class FakeBox:
         self.how = ("xoauth2", user, token)
         if token == "bad":  # noqa: S105
             raise imaplib.IMAP4.error("AUTHENTICATE failed")
+        if token == "imap-off":  # noqa: S105
+            raise imaplib.IMAP4.error("User is authenticated but not connected.")
         return self
 
     def __enter__(self) -> "FakeBox":
@@ -148,6 +150,8 @@ def test_imap_uses_xoauth2_for_microsoft_only(monkeypatch: pytest.MonkeyPatch) -
     assert [b.how for b in boxes] == [("xoauth2", USER, "AT"), ("login", "me@gmail.com", "pw")]
     with pytest.raises(EmailLoginError, match="Microsoft rejected the sign-in"):
         check_login(microsoft.IMAP_HOST, USER, "bad")
+    with pytest.raises(EmailLoginError, match="Let devices and apps use IMAP"):
+        check_login(microsoft.IMAP_HOST, USER, "imap-off")
 
 
 class FakeSMTP:
@@ -156,7 +160,7 @@ class FakeSMTP:
 
     def __init__(self, host: str, port: int, timeout: float = 0) -> None:
         self.host, self.port = host, port
-        self.tls = False
+        self.tls = self.hello = False
         self.auth_line = ""
         self.sent: list[EmailMessage] = []
         FakeSMTP.instances.append(self)
@@ -168,10 +172,13 @@ class FakeSMTP:
         return None
 
     def starttls(self, context: Any = None) -> None:
-        self.tls = True
+        self.tls, self.hello = True, False  # like the real server: EHLO again after STARTTLS
+
+    def ehlo(self) -> None:
+        self.hello = True
 
     def auth(self, mechanism: str, authobject: Any) -> None:
-        assert mechanism == "XOAUTH2" and self.tls
+        assert mechanism == "XOAUTH2" and self.tls and self.hello
         self.auth_line = base64.b64encode(authobject().encode()).decode()
         if FakeSMTP.reject:
             raise smtplib.SMTPAuthenticationError(535, b"no")

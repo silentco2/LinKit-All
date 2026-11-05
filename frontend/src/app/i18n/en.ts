@@ -826,6 +826,7 @@ export const en: Record<string, string> = {
   'settings.acc.needVault': 'Unlock your saved passwords above first. Your app password is kept there, encrypted.',
   'settings.acc.needVaultKeys': 'Unlock your saved passwords above first. Your keys are kept there, encrypted.',
   'settings.acc.outlook': "Microsoft sign-in isn't set up in this copy of LinKit All (LINKIT_MS_CLIENT_ID, see the setup docs). Use a Gmail or Yahoo address for now.",
+  'settings.acc.ms.step0': "On outlook.com, turn on IMAP: Settings, Mail, Forwarding and IMAP, then 'Let devices and apps use IMAP'. Save.",
   'settings.acc.ms.step1': 'Click Sign in with Microsoft. A Microsoft sign-in page opens in your browser.',
   'settings.acc.ms.step2': 'Sign in, then allow LinKit All to read and send your email.',
   'settings.acc.ms.step3': 'Come back here. This page updates once you are signed in. No app password is needed.',

@@ -141,10 +141,12 @@ server.
 
 Microsoft no longer accepts app passwords, so these addresses sign in with Microsoft:
 
-1. Unlock the vault (step 7) and enter your address.
-2. Press **Sign in with Microsoft**. A Microsoft page opens in your browser.
-3. Sign in and allow LinKit All to read and send your email.
-4. Come back to LinKit All. It says you are connected.
+1. On outlook.com open **Settings**, then **Mail**, then **Forwarding and IMAP**. Turn on
+   **Let devices and apps use IMAP** and save. It is often off by default.
+2. Unlock the vault (step 7) and enter your address.
+3. Press **Sign in with Microsoft**. A Microsoft page opens in your browser.
+4. Sign in and allow LinKit All to read and send your email.
+5. Come back to LinKit All. It says you are connected.
 
 LinKit All keeps the sign-in (a refresh token) in the vault and renews it by itself. If
 Microsoft ends it (password change, or a long time without use), the app asks you to sign in

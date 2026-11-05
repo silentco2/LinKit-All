@@ -104,6 +104,7 @@ def send(cfg: EmailSection, vault: Vault, profile_email: str, msg: EmailMessage)
         if oauth:  # Outlook: STARTTLS on 587 only, XOAUTH2 instead of a password
             with smtplib.SMTP(host, microsoft.SMTP_PORT, timeout=30) as smtp:
                 smtp.starttls(context=ssl.create_default_context())
+                smtp.ehlo()  # STARTTLS resets the session; AUTH before EHLO gets 503 (taken as ok)
                 smtp.auth("XOAUTH2", lambda _=None: microsoft.xoauth2(user, password))
                 smtp.send_message(msg)
         else:

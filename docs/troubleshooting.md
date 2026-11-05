@@ -92,6 +92,9 @@ linkit ai-check
   [the Email step](setup.md#8-email).
 - **Outlook: "Microsoft sign-in isn't set up".** Set `LINKIT_MS_CLIENT_ID` (see
   [Outlook, Hotmail, Live and MSN](setup.md#outlook-hotmail-live-and-msn)).
+- **Outlook: "IMAP is off for this mailbox".** The sign-in worked, but the mailbox refuses
+  IMAP. On outlook.com: **Settings**, **Mail**, **Forwarding and IMAP**, turn on **Let devices
+  and apps use IMAP**, save, then sign in with Microsoft again.
 - **Outlook: "sign in with Microsoft again".** Microsoft ended the saved sign-in. Press
   **Disconnect**, then **Sign in with Microsoft**.
 
