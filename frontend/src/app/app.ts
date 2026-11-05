@@ -3,7 +3,7 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } fro
 import { Api } from './api';
 import { I18n, Lang, TPipe } from './i18n';
 import { Live } from './live';
-import { fmtNum, localeOf } from './locale';
+import { fmtNum, localeOf, runReason } from './locale';
 import { Shell } from './shell';
 import { LiveEvent, setupDone } from './types';
 
@@ -139,11 +139,19 @@ export class App {
   private async runEnded(end: LiveEvent): Promise<void> {
     if (!this.shell.notify()) return;
     const alert = (title: string, body: string) => this.shell.alert(title, body, 'run', '/activity');
-    if (end.error) return alert(this.i18n.t('shell.runFailed'), end.error);
+    if (end.error) {
+      // a run that stopped for a known reason is said in words; anything else is "Something went wrong." (never the raw text)
+      const known = end.reason_code && end.reason_code !== 'pipeline_error' && this.i18n.has('run.reason.' + end.reason_code);
+      return alert(this.i18n.t('shell.runFailed'), known ? runReason(this.i18n, end.reason_code, end.reason_params, end.error) : this.i18n.t('live.err.generic'));
+    }
     let pause: string | null = null;
     try {
-      const { recent } = await this.api.get<{ recent: { status: string; pause_reason: string | null }[] }>('/runs');
-      if (recent[0]?.status === 'paused') pause = recent[0].pause_reason ?? this.i18n.t('shell.resumeHint');
+      const { recent } = await this.api.get<{ recent: { status: string; pause_reason: string | null; reason_code: string | null; reason_params: Record<string, unknown> }[] }>('/runs');
+      if (recent[0]?.status === 'paused') {
+        const r = recent[0];
+        const known = r.reason_code && r.reason_code !== 'pipeline_error' && this.i18n.has('run.reason.' + r.reason_code);
+        pause = known ? runReason(this.i18n, r.reason_code, r.reason_params, r.pause_reason ?? '') : this.i18n.t('shell.resumeHint');
+      }
     } catch {
       // fall back to the plain message
     }

@@ -5,7 +5,7 @@ import { Countries } from '../../components/countries';
 import { PlacesList } from '../../components/places-list';
 import { TagInput } from '../../components/tag-input';
 import { I18n, TPipe } from '../../i18n';
-import { currencyLabel } from '../../locale';
+import { currencyLabel, levelTip } from '../../locale';
 import { expandQueries, Place, WorkMode } from '../../types';
 import { Field } from './saved';
 import { SettingsStore } from './store';
@@ -153,7 +153,7 @@ export class JobsSection implements OnInit {
 
   // computed: a new array on every check would make Angular think the input keeps changing
   protected readonly modeOptions = computed<ChipOption[]>(() => WORK_MODES.map((m) => ({ value: m, label: this.i18n.t(`mode.${m}`) })));
-  protected readonly levelOptions = computed<ChipOption[]>(() => SENIORITIES.map((s) => ({ value: s, label: this.i18n.t(`setup.seniority.${s}`) })));
+  protected readonly levelOptions = computed<ChipOption[]>(() => SENIORITIES.map((s) => ({ value: s, label: this.i18n.t(`setup.seniority.${s}`), tip: levelTip(this.i18n, s) })));
   protected readonly postedOptions = computed<ChipOption[]>(() => [...POSTED.map(([value, , key]) => ({ value, label: this.i18n.t(key) })), { value: 'custom', label: this.i18n.t('posted.customChip') }]);
 
   protected setModes(modes: string[]): void {

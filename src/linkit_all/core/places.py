@@ -12,6 +12,18 @@ from linkit_all.core.presets import country_preset
 from linkit_all.core.search import Place, SearchConfig
 
 
+def consistent_work(places: list[Place]) -> list[Place]:
+    """Work rights are per country: every row of a country gets the work right its last
+    explicit ("allowed" / "visa") row states. A country with only "ask" rows stays "ask"."""
+    stated = {p.country.upper(): p.work for p in places if p.country and p.work != "ask"}
+    return [
+        p.model_copy(update={"work": stated[p.country.upper()]})
+        if p.country.upper() in stated and p.work != stated[p.country.upper()]
+        else p
+        for p in places
+    ]
+
+
 def apply_places(cfg: SearchConfig, prev: list[Place]) -> SearchConfig:
     """`cfg` with the fields derived from its places; unchanged when there are none.
 
@@ -19,7 +31,9 @@ def apply_places(cfg: SearchConfig, prev: list[Place]) -> SearchConfig:
     places = cfg.search.places
     if not places and not prev:
         return cfg
-    s = cfg.search.model_copy(update={"remote": "remote" in cfg.filters.work_modes})
+    s = cfg.search.model_copy(
+        update={"remote": "remote" in cfg.filters.work_modes, "places": consistent_work(places)}
+    )
     # No places left means "anywhere": a lone "Remote" would filter to remote jobs only.
     labels = list(dict.fromkeys([p.label for p in places] + ["Remote"] * bool(places and s.remote)))
     s.locations = labels or [""]
@@ -40,6 +54,7 @@ def places_answers(
     had an explicit place before and has none now is taken off both lists."""
     if not places and not prev:
         return a
+    places = consistent_work(places)
     out = a.model_copy()
     now = _countries(places, "allowed") + _countries(places, "visa")
     gone = {canonical_country(c) for c in _countries(prev, "allowed") + _countries(prev, "visa")}

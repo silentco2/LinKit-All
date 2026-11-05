@@ -23,9 +23,13 @@ import { PlacePick, PlacePicker } from './place-picker';
           @for (p of places(); track p.label) {
             <li class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700">
               <bdi class="min-w-0 flex-1 basis-40 break-words font-medium">{{ shown(p) }}</bdi>
-              <app-chip-select class="order-3 w-full sm:order-2 sm:w-auto" [options]="workOptions()" [selected]="p.work === 'ask' ? [] : [p.work]" [single]="true" [label]="'places.workIn' | t: { name: shown(p) }" (changed)="setWork(p, $event[0])" />
+              @if (isFirst(p)) {
+                <app-chip-select class="order-3 w-full sm:order-2 sm:w-auto" [options]="workOptions()" [selected]="workOf(p) === 'ask' ? [] : [workOf(p)]" [single]="true" [label]="'places.workIn' | t: { name: countryName(p) || shown(p) }" (changed)="setWork(p, $event[0])" />
+              } @else {
+                <span class="order-3 w-full text-sm text-slate-600 sm:order-2 sm:w-auto dark:text-slate-400">{{ 'places.same' | t: { country: countryName(p) } }}</span>
+              }
               <button type="button" class="order-2 rounded-full px-2 text-slate-500 max-sm:min-h-10 max-sm:min-w-10 sm:order-3 hover:bg-slate-100 dark:hover:bg-slate-800" [attr.aria-label]="'settings.jobs.remove' | t: { name: shown(p) }" (click)="remove(p)"><span aria-hidden="true">×</span></button>
-              @if (p.work === 'ask') { <p class="order-4 w-full text-xs text-slate-600 dark:text-slate-400">{{ 'places.ask' | t }}</p> }
+              @if (isFirst(p) && workOf(p) === 'ask') { <p class="order-4 w-full text-xs text-slate-600 dark:text-slate-400">{{ 'places.ask' | t }}</p> }
             </li>
           }
         </ul>
@@ -79,9 +83,22 @@ export class PlacesList {
     return this.arNames()[`${p.city}|${p.country}`] || p.label;
   }
 
+  // Work rights are legal per country: one answer for every row of a country; only its first row asks.
+  private sameCountry = (a: Place, b: Place): boolean => !!a.country && a.country === b.country;
+  protected isFirst = (p: Place): boolean => this.places().find((x) => this.sameCountry(x, p)) === p || !p.country;
+  /** The country's answer: the last row that has one (rows saved before this rule may disagree). */
+  protected workOf(p: Place): Place['work'] {
+    const stated = this.places().filter((x) => this.sameCountry(x, p) && x.work !== 'ask');
+    return stated.length ? stated[stated.length - 1].work : p.work;
+  }
+  protected countryName(p: Place): string {
+    const c = p.country ? this.countries.byIso(p.country) : undefined;
+    return c ? this.countries.name(c) : p.country;
+  }
+
   protected setWork(p: Place, work: string | undefined): void {
     if (work !== 'allowed' && work !== 'visa') return;
-    this.changed.emit(this.places().map((x) => (x === p ? { ...x, work } : x)));
+    this.changed.emit(this.places().map((x) => (x === p || this.sameCountry(x, p) ? { ...x, work } : x)));
   }
 
   protected remove(p: Place): void {
@@ -95,6 +112,7 @@ export class PlacesList {
     const c = pick.country ? this.countries.byIso(pick.country) : undefined;
     const label = c ? (pick.city ? `${pick.city}, ${c.name}` : c.name) : pick.label;
     if (this.places().some((x) => x.label.toLowerCase() === label.toLowerCase())) return;
-    this.changed.emit([...this.places(), { label, city: pick.city, country: pick.country, work: 'ask' }]);
+    const known = this.places().filter((x) => x.country && x.country === pick.country && x.work !== 'ask');
+    this.changed.emit([...this.places(), { label, city: pick.city, country: pick.country, work: known.length ? known[known.length - 1].work : 'ask' }]);
   }
 }

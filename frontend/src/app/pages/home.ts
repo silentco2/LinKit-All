@@ -62,22 +62,30 @@ function goLiveSeen(): boolean {
               <button type="button" class="btn btn-danger" (click)="stop()" [disabled]="busy() || stopping()">{{ (stopping() ? 'live.stopping' : 'live.stop') | t }}</button>
             }
           </div>
-          @if (applyToo(); as ap) {
+          @for (r of extras(); track r.id) {
             <div class="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
-              <button type="button" class="btn" (click)="go(ap)" [disabled]="busy()">{{ busy() ? ('home.working' | t) : ap.label }}</button>
-              <p class="hint">{{ ap.message }}</p>
-            </div>
-          }
-          @if (goLiveOffer()) {
-            <div class="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
-              <div class="flex flex-wrap items-center gap-3">
-                <button type="button" class="btn max-sm:min-h-11" [attr.aria-expanded]="goLiveOpen()" aria-controls="home-golive" (click)="toggleGoLive()">{{ 'golive.offer' | t }}</button>
-                @if (!goLiveSeen()) { <span class="badge tier-high">{{ 'golive.new' | t }}</span> }
-              </div>
-              @if (goLiveOpen()) {
-                <div id="home-golive" class="mt-3 rounded-lg border border-slate-200 p-4 dark:border-slate-700">
-                  <app-golive (enabled)="justOn.set(true)" (cancel)="goLiveOpen.set(false)" />
-                </div>
+              @switch (r.id) {
+                @case ('golive') {
+                  <div class="flex flex-wrap items-center gap-3">
+                    <button type="button" class="btn max-sm:min-h-11" [attr.aria-expanded]="goLiveOpen()" aria-controls="home-golive" (click)="toggleGoLive()">{{ 'golive.offer' | t }}</button>
+                    @if (!goLiveSeen()) { <span class="badge tier-high">{{ 'golive.new' | t }}</span> }
+                  </div>
+                  @if (goLiveOpen()) {
+                    <div id="home-golive" class="mt-3 rounded-lg border border-slate-200 p-4 dark:border-slate-700">
+                      <app-golive (enabled)="justOn.set(true)" (cancel)="goLiveOpen.set(false)" />
+                    </div>
+                  }
+                }
+                @default {
+                  @if (r.smart; as x) {
+                    @if (x.link) {
+                      <a class="btn no-underline hover:no-underline" [routerLink]="x.link" [queryParams]="x.query">{{ x.label }}</a>
+                    } @else {
+                      <button type="button" class="btn" (click)="go(x)" [disabled]="busy()">{{ busy() ? ('home.working' | t) : x.label }}</button>
+                    }
+                    <p class="hint">{{ x.message }}</p>
+                  }
+                }
               }
             </div>
           }
@@ -227,6 +235,28 @@ export class HomePage {
   protected readonly applyToo = computed<Smart | null>(() => {
     const sm = this.smart();
     return sm && (sm.kind === 'finish' || sm.kind === 'review') ? this.applyAction() : null;
+  });
+
+  /** Jobs wait for a yes or no behind another main action (a parked application, a running search): keep the queue in sight. */
+  private readonly reviewToo = computed<Smart | null>(() => {
+    const sm = this.smart();
+    const n = this.shell.reviewCount(); // what the nav badge shows: jobs just approved or skipped (Undo window) are not counted
+    if (!sm || sm.kind === 'review' || n <= 0) return null;
+    return { kind: 'review', message: this.i18n.plural('smart.review.msg', n), label: this.i18n.plural('smart.review', n), link: '/needs-you', query: { tab: 'approve' } };
+  });
+
+  /** Rows under the main button, most important first, at most two (the card never grows past three rows). */
+  protected readonly extras = computed<{ id: 'review' | 'apply' | 'golive'; smart?: Smart }[]>(() => {
+    const rows: { id: 'review' | 'apply' | 'golive'; smart?: Smart }[] = [];
+    const review = this.reviewToo();
+    const apply = this.applyToo();
+    if (review) rows.push({ id: 'review', smart: review });
+    if (apply) rows.push({ id: 'apply', smart: apply });
+    if (this.goLiveOffer()) rows.push({ id: 'golive' });
+    const keep = rows.slice(0, 2);
+    // the guided card stays while it is open or just switched real applications on
+    if (rows.length > 2 && (this.goLiveOpen() || this.justOn())) keep[1] = rows[rows.length - 1];
+    return keep;
   });
 
   protected readonly funnel = computed(() => {

@@ -27,9 +27,31 @@ export class Countries {
   }
 }
 
-/** "EG" -> the flag emoji (some systems show the two letters instead; both are fine). */
+let flagsOk: boolean | undefined;
+
+/**
+ * Does this system draw flag emoji? Windows does not: it shows the two letters ("EG"). Checked once with a canvas:
+ * a flag is one glyph, so its width is less than its two regional-indicator letters drawn apart.
+ */
+function flagsSupported(): boolean {
+  if (flagsOk !== undefined) return flagsOk;
+  try {
+    const ctx = document.createElement('canvas').getContext('2d');
+    if (!ctx) return (flagsOk = false);
+    ctx.font = '32px sans-serif';
+    const pair = ctx.measureText(flag0('EG')).width;
+    flagsOk = pair < ctx.measureText(flag0('E')).width + ctx.measureText(flag0('G')).width - 1;
+  } catch {
+    flagsOk = false; // no canvas (a test, a locked-down browser): no flags is the safe side
+  }
+  return flagsOk;
+}
+
+const flag0 = (iso2: string): string => String.fromCodePoint(...[...iso2].map((c) => 0x1f1a5 + c.charCodeAt(0)));
+
+/** "EG" -> the flag emoji, or "" where the system cannot draw flags (callers then show the name alone). */
 export function flag(iso2: string): string {
-  return iso2.length === 2 ? String.fromCodePoint(...[...iso2.toUpperCase()].map((c) => 0x1f1a5 + c.charCodeAt(0))) : '';
+  return iso2.length === 2 && flagsSupported() ? flag0(iso2.toUpperCase()) : '';
 }
 
 /** Lower-cased with accents and Arabic marks stripped, for "does this name contain what was typed". */

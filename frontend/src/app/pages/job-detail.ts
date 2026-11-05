@@ -212,7 +212,8 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
           <h3 class="font-semibold">{{ 'detail.history' | t }}</h3>
           <ol class="mt-2 space-y-2 border-s border-slate-200 ps-4 text-xs sm:space-y-1 dark:border-slate-700">
             @for (e of j.events; track $index) {
-              <li class="max-sm:flex max-sm:flex-col max-sm:gap-0.5"><span class="text-slate-500">{{ e.at | dt: 'short' }}</span> <span><span class="inline-block rtl:rotate-180">→</span> <span class="font-medium">{{ 'common.state.' + e.to | t }}</span> <span dir="auto">{{ e | msg }}</span></span>
+              <li class="flex flex-col gap-0.5 sm:flex-row sm:gap-3"><bdi class="shrink-0 text-slate-500 sm:w-36">{{ e.at | dt: 'stamp' }}</bdi>
+                <span class="min-w-0"><span class="inline-block rtl:rotate-180">→</span> <span class="font-medium">{{ 'common.state.' + e.to | t }}</span> <span dir="auto">{{ e | msg }}</span>
                 @if (e.screenshots) {
                   <span class="ms-1">
                     @for (n of range(e.screenshots); track n) {
@@ -220,6 +221,7 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
                     }
                   </span>
                 }
+                </span>
               </li>
             }
           </ol>

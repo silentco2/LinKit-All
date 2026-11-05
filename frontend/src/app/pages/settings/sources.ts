@@ -17,6 +17,7 @@ type GroupId = 'sites' | 'regional' | 'aggregator' | 'board' | 'company' | 'tele
 interface Row {
   id: string;
   label: string;
+  title?: string; // hover text: the full URL behind a readable name
   plain?: boolean; // the label is already the text to show (a URL or a channel), not a source name
   region?: string;
   description?: string;
@@ -43,7 +44,7 @@ const OWN_ROW = new Set(['telegram', 'linkedin_posts']);
       <li class="px-3 py-2">
         @if (r.remove) {
           <div class="flex items-center gap-2 text-sm">
-            <bdi class="min-w-0 flex-1 break-all font-medium" dir="ltr">{{ r.label }}</bdi>
+            <bdi class="min-w-0 flex-1 break-all font-medium" [attr.dir]="r.title ? 'auto' : 'ltr'" [attr.title]="r.title || null">{{ r.label }}</bdi>
             <button type="button" class="rounded-full px-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" [attr.aria-label]="'settings.jobs.remove' | t: { name: r.label }" (click)="r.remove()"><span aria-hidden="true">×</span></button>
           </div>
         } @else {
@@ -234,7 +235,7 @@ export class SourcesSection implements OnInit {
       board: plugins.filter((s) => s.kind === 'board').map((s) => this.plugin(s)),
       company: [
         ...plugins.filter((s) => s.kind === 'company').map((s) => this.plugin(s)),
-        ...c.companies.map((u): Row => ({ id: `url:${u}`, label: u, remove: () => this.drop('sources.companies', u) })),
+        ...c.companies.map((u): Row => ({ id: `url:${u}`, label: this.companyLabel(u), title: u, remove: () => this.drop('sources.companies', u) })),
       ],
       telegram: [
         { id: 'telegram', label: this.i18n.t('setup.search.telegram'), plain: true, description: this.i18n.t('setup.search.telegramHint'), on: this.has('sources.enabled', 'telegram'), toggle: () => this.toggle('sources.enabled', 'telegram') },
@@ -249,6 +250,18 @@ export class SourcesSection implements OnInit {
       const count = id === 'telegram' ? shown.filter((r) => r.remove).length : shown.length;
       return { id, label: id === 'sites' ? 'src.group.sites' : id === 'regional' ? 'src.group.regional' : id === 'telegram' ? 'src.group.telegram' : `setup.sources.group.${id}`, count, rows: shown };
     }).filter((s) => s.rows.length);
+  }
+
+  /** "Stripe · Greenhouse" / "Notion · careers page" from the server; the raw URL until it has a name for it. */
+  protected companyLabel(url: string): string {
+    const label = this.store.cfg.sources.company_labels?.[url];
+    return label ? this.readable(label) : url;
+  }
+
+  /** The server writes "careers page" in English; say it in the UI language. */
+  private readable(label: string): string {
+    const tail = ' · careers page';
+    return label.endsWith(tail) ? label.slice(0, -tail.length) + ' · ' + this.i18n.t('src.careersPage') : label;
   }
 
   protected onCount(v: Section[]): number {
@@ -278,11 +291,9 @@ export class SourcesSection implements OnInit {
       const r = await this.api.post<{ kind: 'telegram' | 'ats' | 'careers'; label: string; config: Partial<SearchConfig['sources']> }>('/sources/add', { value });
       Object.assign(this.store.cfg.sources, r.config);
       box.value = '';
-      const [ats, name] = r.label.split(':');
       const text =
         r.kind === 'telegram' ? this.i18n.t('src.added.telegram', { name: r.label })
-        : r.kind === 'ats' ? this.i18n.t('src.added.ats', { ats: this.i18n.source(ats), name })
-        : this.i18n.t('src.added.careers', { name: r.label });
+        : this.i18n.t('src.added.company', { name: this.readable(r.label) });
       this.addNote.set({ kind: 'ok', text });
     } catch (err) {
       this.addNote.set({ kind: 'error', text: (err as Error).message });

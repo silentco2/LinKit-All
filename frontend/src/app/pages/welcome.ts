@@ -12,7 +12,7 @@ import { PlacePick, PlacePicker } from '../components/place-picker';
 import { PlacesList } from '../components/places-list';
 import { TagInput } from '../components/tag-input';
 import { I18n, Lang, SourcePipe, TPipe } from '../i18n';
-import { currencyLabel } from '../locale';
+import { currencyLabel, cvLabel, levelTip } from '../locale';
 import { expandQueries, InferPayload, Place, Profile, SearchConfig, Segment, Status, WorkMode } from '../types';
 
 type StepNo = 1 | 2 | 3 | 4;
@@ -125,7 +125,7 @@ const SRC_TEXT: Record<string, string> = {
 
               @if (cv(); as c) {
                 <div class="flex flex-wrap items-center gap-3 text-sm">
-                  <bdi class="font-medium">{{ c.name }}</bdi>
+                  <bdi class="font-medium">{{ cvName(c) }}</bdi>
                   @if (c.parts) { <span class="text-slate-500">{{ i18n.plural('welcome.cv.parts', c.parts) }}</span> }
                   @if (c.rendererOk ?? status()!.libreoffice) {
                     <a class="btn" href="/api/profile/cv/pdf" target="_blank" rel="noopener">{{ 'setup.cv.preview' | t }}</a>
@@ -317,6 +317,7 @@ export class WelcomePage implements OnInit {
   private readonly router = inject(Router);
   private readonly countries = inject(Countries);
   protected readonly i18n = inject(I18n);
+  protected cvName = (c: { name: string; format?: string }): string => cvLabel(this.i18n, c.name, c.format);
   private readonly heading = viewChild<ElementRef<HTMLElement>>('heading');
 
   protected readonly steps = STEPS;
@@ -392,7 +393,7 @@ export class WelcomePage implements OnInit {
   protected readonly placesShown = computed(() => this.placesEdited() ?? (this.savedPlaces().length ? this.savedPlaces() : this.homePlace()));
   // computed: a new array on every check would make Angular think an input keeps changing
   protected readonly modeOptions = computed<ChipOption[]>(() => (['remote', 'hybrid', 'onsite'] as const).map((m) => ({ value: m, label: this.i18n.t(`mode.${m}`) })));
-  protected readonly levelOptions = computed<ChipOption[]>(() => this.seniorities.map((s) => ({ value: s, label: this.i18n.t(`setup.seniority.${s}`) })));
+  protected readonly levelOptions = computed<ChipOption[]>(() => this.seniorities.map((s) => ({ value: s, label: this.i18n.t(`setup.seniority.${s}`), tip: levelTip(this.i18n, s) })));
   protected readonly trackOptions = computed<ChipOption[]>(() => [{ value: 'tech', label: this.i18n.t('welcome.jobs.tech') }, { value: 'general', label: this.i18n.t('welcome.jobs.general') }]);
   protected readonly trackSel = computed(() => [this.track()]);
   protected readonly sourceNames = computed(() => {

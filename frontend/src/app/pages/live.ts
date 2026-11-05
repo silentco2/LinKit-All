@@ -5,7 +5,7 @@ import { Api, ApiError } from '../api';
 import { LibreOfficeCard } from '../components/libreoffice-card';
 import { I18n, TPipe } from '../i18n';
 import { Live } from '../live';
-import { dayOf, DtPipe, fmtDate, fmtNum, labelOr, localeOf } from '../locale';
+import { DtPipe, fmtNum, labelOr, localeOf, runReason } from '../locale';
 import { LiveEvent, RunState, runKind, ScheduleSection, SEARCH_STAGES, SearchConfig, Stage, STAGES } from '../types';
 
 const STAGE_KEY: Record<Exclude<Stage, 'apply'>, string> = {
@@ -332,16 +332,7 @@ export class LivePage {
 
   /** Why a run stopped or paused, in the UI language; the server's English text when it sent no code we know. */
   protected reasonText(code: string | null | undefined, params: Record<string, unknown> | undefined, fallback: string): string {
-    if (!code) return fallback;
-    const p = { ...params };
-    let key = code;
-    if (code === 'ai_usage_limit') {
-      p['provider'] = this.i18n.provider(String(p['provider'] ?? ''));
-      const until = dayOf(typeof p['until'] === 'string' ? p['until'] : null);
-      if (until) p['until'] = fmtDate(this.loc(), until, 'date');
-      else key = 'ai_usage_limit.noDate';
-    }
-    return this.i18n.msg({ message: fallback, code: key, params: p }, 'run.reason.');
+    return runReason(this.i18n, code, params, fallback);
   }
 
   async start(): Promise<void> {
@@ -420,18 +411,31 @@ export class LivePage {
     return why.detail ? '' : why.text;
   }
 
-  /** "Filling Stripe — Backend Engineer…" / "Filled (practice) ✓ · Stripe — Backend Engineer": one line per job. */
+  /**
+   * "Filling Stripe — Backend Engineer…" / "Filled (practice) ✓ · Stripe — Backend Engineer": one line per job.
+   * A newer server adds `questions` and `reason` to the result line ("Needs you: 3 questions", "Skipped: job closed");
+   * without them, or with a reason we have no words for, the line is the plain one.
+   */
   private jobLine(e: LiveEvent): string | null {
-    const j = this.live.jobs()[Number(e.params?.['job'])];
-    const isolate = (s: string) => '\u2068' + s + '\u2069'; // names in any script keep their own direction
+    const p = e.params ?? {};
+    const j = this.live.jobs()[Number(p['job'])];
+    const isolate = (s: string) => '⁨' + s + '⁩'; // names in any script keep their own direction
     const job = j ? (j.company ? `${isolate(j.company)} — ${isolate(j.title)}` : isolate(j.title)) : this.i18n.t('live.line.thisJob');
-    const key = 'live.line.' + (e.code === 'apply_filling' ? 'filling' : String(e.params?.['status']));
+    if (e.code === 'apply_job_start') return this.i18n.t('live.line.filling', { job });
+    if (e.code === 'apply_crashed') return this.i18n.t('live.line.crashed', { job });
+    if (e.code === 'apply_filling') return this.i18n.t('live.line.filling', { job });
+    const status = String(p['status']);
+    const n = Number(p['questions']);
+    if (status === 'needs_user' && n > 0) return this.i18n.plural('live.line.needsQuestions', n, { job });
+    const reason = typeof p['reason'] === 'string' && this.i18n.has('live.reason.' + p['reason']) ? this.i18n.t('live.reason.' + p['reason']) : '';
+    if (reason && ['needs_user', 'failed', 'skipped'].includes(status)) return this.i18n.t(`live.line.${status}.why`, { reason, job });
+    const key = 'live.line.' + status;
     return this.i18n.has(key) ? this.i18n.t(key, { job }) : null;
   }
 
   describe(e: LiveEvent): string {
     if (e.type === 'log') {
-      const line = e.code === 'apply_filling' || e.code === 'apply_job' ? this.jobLine(e) : null;
+      const line = ['apply_filling', 'apply_job_start', 'apply_job', 'apply_crashed'].includes(e.code ?? '') ? this.jobLine(e) : null;
       if (line) return line;
       return e.code ? this.i18n.msg({ message: e.message ?? '', code: e.code, params: e.params }, 'log.') : (e.message ?? '');
     }
@@ -481,6 +485,7 @@ export class LivePage {
   }
 
   eventClass(e: LiveEvent): string {
+    if (e.code === 'apply_crashed') return 'text-rose-700 dark:text-rose-400';
     if (e.code === 'apply_job') {
       const s = String(e.params?.['status']);
       if (s === 'failed') return 'text-rose-700 dark:text-rose-400';

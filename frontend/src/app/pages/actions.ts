@@ -3,6 +3,7 @@ import { Component, computed, effect, inject, signal, viewChildren } from '@angu
 import { Api } from '../api';
 import { AllClear } from '../components/all-clear';
 import { GmailConnect, GmailConnected } from '../components/gmail-connect';
+import { MenuItem, MoreMenu } from '../components/more-menu';
 import { Toast } from '../components/toast';
 import { VaultGate, VaultReady } from '../components/vault-gate';
 import { I18n, MsgPipe, TPipe } from '../i18n';
@@ -53,7 +54,7 @@ const SOURCES: Record<string, string> = {
 
 @Component({
   selector: 'app-actions',
-  imports: [AllClear, GmailConnect, MsgPipe, NgTemplateOutlet, Toast, TPipe, VaultGate],
+  imports: [AllClear, GmailConnect, MoreMenu, MsgPipe, NgTemplateOutlet, Toast, TPipe, VaultGate],
   template: `
     <p class="text-sm text-slate-500">{{ 'actions.intro' | t }}</p>
 
@@ -172,7 +173,7 @@ const SOURCES: Record<string, string> = {
             <ng-container *ngTemplateOutlet="extras; context: { k: c.key, q: c.q, a: null, c: c }" />
           </div>
           @if (errors()[c.key]; as err) { <div class="alert alert-error mt-4" role="alert" dir="auto">{{ err }}</div> }
-          <div class="mt-4">
+          <footer class="mt-5 border-t border-slate-100 pt-4 dark:border-slate-800">
             @if (ackOf(c.q); as ack) {
               <p class="mb-2 text-sm font-medium">{{ 'fin.ack.' + ack | t }}</p>
               <div class="flex flex-wrap gap-3">
@@ -185,7 +186,7 @@ const SOURCES: Record<string, string> = {
             } @else {
               <button type="button" class="btn btn-primary" [disabled]="busy() || !hasValue(c.key, c.g.label)" (click)="answerGroup(c)">{{ 'fin.group.answerAll' | t: { n: num(c.g.count) } }}</button>
             }
-          </div>
+          </footer>
         </section>
       }
 
@@ -207,17 +208,6 @@ const SOURCES: Record<string, string> = {
           @if (a.message) { <p class="mt-1 text-sm text-slate-700 dark:text-slate-300" dir="auto">{{ a | msg }}</p> }
           @if (hasHelp(a.kind)) { <div class="alert alert-info mt-3">{{ 'actions.help.' + a.kind | t }}</div> }
 
-          @if (a.screenshots) {
-            <div class="mt-4 flex flex-wrap gap-3">
-              @for (n of range(a.screenshots); track n) {
-                <a [href]="shot(a.id, n)" target="_blank" rel="noopener">
-                  <img [src]="shot(a.id, n)" [alt]="'actions.screenshot' | t: { n: n + 1 }"
-                       class="max-h-64 rounded-lg border border-slate-200 dark:border-slate-700">
-                </a>
-              }
-            </div>
-          }
-
           @if (a.kind === 'unknown_question') {
             <div class="alert alert-info mt-4">{{ 'actions.unknown.info' | t }}</div>
             <div class="mt-4 space-y-5">
@@ -226,20 +216,6 @@ const SOURCES: Record<string, string> = {
                   <ng-container *ngTemplateOutlet="ctl; context: { k: a.id, q: q, i: i }" />
                   <ng-container *ngTemplateOutlet="extras; context: { k: a.id, q: q, a: a, c: null }" />
                 </div>
-              }
-            </div>
-            <div class="mt-4">
-              @if (ackQuestion(a); as ack) {
-                <p class="mb-2 text-sm font-medium">{{ 'fin.ack.' + ack.category | t }}</p>
-                <div class="flex flex-wrap gap-3">
-                  <button type="button" class="btn btn-primary" [disabled]="busy()" (click)="send(a, 'answer')">{{ 'fin.ack.once' | t }}</button>
-                  @if (acceptValue(ack) !== null) {
-                    <button type="button" class="btn" [disabled]="busy()" (click)="acceptAlways(ack, ack.category!, a, null)">{{ 'fin.ack.always' | t }}</button>
-                  }
-                  <button type="button" class="btn" [disabled]="busy()" (click)="send(a, 'answer')">{{ 'fin.ack.ask' | t }}</button>
-                </div>
-              } @else {
-                <button type="button" class="btn btn-primary" [disabled]="busy()" (click)="send(a, 'answer')">{{ 'actions.saveRetry' | t }}</button>
               }
             </div>
           }
@@ -261,10 +237,6 @@ const SOURCES: Record<string, string> = {
                 </tbody>
               </table>
             </div>
-            <div class="mt-4">
-              <button type="button" class="btn !border-emerald-700 !bg-emerald-600 !font-semibold !text-white hover:!bg-emerald-700"
-                      [disabled]="busy()" (click)="send(a, 'confirm')">{{ 'actions.submit' | t }}</button>
-            </div>
           }
 
           @if (a.kind === 'confirm_email' && a.email_draft; as d) {
@@ -285,39 +257,31 @@ const SOURCES: Record<string, string> = {
               </div>
             </div>
             @if (emailSaved()[a.id]) { <div class="alert alert-ok mt-3" role="status">{{ 'actions.email.saved' | t }}</div> }
-            <div class="mt-4 flex flex-wrap gap-3">
-              <button type="button" class="btn !border-emerald-700 !bg-emerald-600 !font-semibold !text-white hover:!bg-emerald-700"
-                      [disabled]="busy() || !emailValid(a)" (click)="confirmEmail(a)">{{ 'actions.email.send' | t }}</button>
-              <button type="button" class="btn" [disabled]="busy() || !emailDirty(a) || !emailValid(a)" (click)="saveDraft(a)">{{ 'actions.email.save' | t }}</button>
-            </div>
-          }
-
-          @if (browserKind(a.kind)) {
-            <div class="mt-4">
-              @if (browser().open && browser().item_id === a.id) {
-                <div class="flex flex-wrap items-center gap-3">
-                  <span class="badge tier-high">{{ 'actions.browser.open' | t }}</span>
-                  <button type="button" class="btn" [disabled]="browserBusy()" (click)="closeBrowser(a)">{{ 'actions.browser.close' | t }}</button>
-                </div>
-              } @else {
-                <button type="button" class="btn" [class.btn-primary]="a.kind !== 'unknown_question' && !isSetup(a)"
-                        [disabled]="browserBusy() || browser().open" (click)="openBrowser(a)">{{ 'actions.browser.openBtn' | t }}</button>
-                @if (browser().open) { <p class="hint mt-1">{{ 'actions.browser.other' | t }}</p> }
-              }
-              <p class="hint mt-1">{{ 'actions.browser.hint' | t }}</p>
-            </div>
           }
 
           @if (errors()[a.id]; as err) { <div class="alert alert-error mt-4" role="alert" dir="auto">{{ err }}</div> }
 
+          <!-- one main button for the kind of card; everything quiet is under "More" -->
           <footer class="mt-5 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
-            <button type="button" class="btn" [class.btn-primary]="retryIsMain(a)" [disabled]="busy()" (click)="send(a, 'retry')">{{ 'actions.retry' | t }}</button>
-            @if (hasPage(a)) {
-              <a class="btn no-underline hover:no-underline" [href]="a.job.apply_url" target="_blank" rel="noopener">{{ 'actions.openPage' | t }}</a>
+            @if (a.kind === 'unknown_question' && ackQuestion(a); as ack) {
+              <p class="w-full text-sm font-medium">{{ 'fin.ack.' + ack.category | t }}</p>
+              <button type="button" class="btn btn-primary" [disabled]="busy()" (click)="send(a, 'answer')">{{ 'fin.ack.once' | t }}</button>
+              @if (acceptValue(ack) !== null) {
+                <button type="button" class="btn" [disabled]="busy()" (click)="acceptAlways(ack, ack.category!, a, null)">{{ 'fin.ack.always' | t }}</button>
+              }
+              <button type="button" class="btn" [disabled]="busy()" (click)="send(a, 'answer')">{{ 'fin.ack.ask' | t }}</button>
             }
-            <button type="button" class="btn" [disabled]="busy()" (click)="send(a, 'applied_by_hand')">{{ 'actions.byHand' | t }}</button>
-            <button type="button" class="btn btn-danger" [disabled]="busy()" (click)="send(a, 'skip')">{{ 'actions.skip' | t }}</button>
+            @if (primary(a); as p) {
+              <button type="button" [class]="p.go ? 'btn !border-emerald-700 !bg-emerald-600 !font-semibold !text-white hover:!bg-emerald-700' : 'btn btn-primary'"
+                      [disabled]="busy() || browserBusy() || !p.ok" (click)="p.run()">{{ p.label }}</button>
+            }
+            @if (browser().open && browser().item_id === a.id) { <span class="badge tier-high">{{ 'actions.browser.open' | t }}</span> }
+            <app-more-menu class="ms-auto" [items]="moreItems()[a.id]" [context]="a.job.title" (picked)="more(a, $event)" />
           </footer>
+          @if (browserKind(a.kind) && primaryOpensBrowser(a)) {
+            <p class="hint mt-2">{{ 'actions.browser.hint' | t }}</p>
+            @if (browser().open && browser().item_id !== a.id) { <p class="hint mt-1">{{ 'actions.browser.other' | t }}</p> }
+          }
         </section>
       }
 
@@ -600,8 +564,68 @@ export class ActionsPage {
   hasPage = (a: ActionItem): boolean => a.kind !== 'confirm_email' && !a.job.apply_url.toLowerCase().startsWith('mailto:');
   browserKind = (k: ActionKind): boolean => BROWSER_KINDS.includes(k);
   hasHelp = (k: ActionKind): boolean => k !== 'unknown_question' && k !== 'confirm_submit';
-  /** Retry is the main button when nothing else on the card is: setup cards, and kinds Chrome cannot fix. */
-  retryIsMain = (a: ActionItem): boolean => a.kind !== 'confirm_submit' && a.kind !== 'confirm_email' && (this.isSetup(a) || !this.browserKind(a.kind));
+  /** This card's Chrome window is open now. */
+  windowOpenFor = (a: ActionItem): boolean => this.browser().open && this.browser().item_id === a.id;
+  /** Cards whose main button opens the page in the app browser (CAPTCHA, sign-in, code, rejected form). */
+  primaryOpensBrowser = (a: ActionItem): boolean => !this.isSetup(a) && this.browserKind(a.kind) && a.kind !== 'unknown_question';
+
+  /** Enough is typed to save: every required question, or at least one answer when none is required. */
+  private canSave(a: ActionItem): boolean {
+    const has = (q: ActionQuestion) => this.hasValue(a.id, q.label);
+    const need = a.questions.filter((q) => q.required);
+    return !a.questions.length || (need.length ? need.every(has) : a.questions.some(has));
+  }
+
+  /** The one main button of a card, by kind; null when the card has its own answer buttons (agreements). */
+  protected primary(a: ActionItem): { label: string; run: () => void; ok: boolean; go?: boolean } | null {
+    const t = (key: string) => this.i18n.t(key);
+    if (this.isSetup(a)) return { label: t('actions.retry'), run: () => void this.send(a, 'retry'), ok: true };
+    switch (a.kind) {
+      case 'unknown_question':
+        return this.ackQuestion(a) ? null : { label: t('actions.saveRetry'), run: () => void this.send(a, 'answer'), ok: this.canSave(a) };
+      case 'confirm_submit':
+        return { label: t('actions.submit'), run: () => void this.send(a, 'confirm'), ok: true, go: true };
+      case 'confirm_email':
+        return { label: t('actions.email.send'), run: () => void this.confirmEmail(a), ok: this.emailValid(a), go: true };
+      default:
+        if (this.windowOpenFor(a)) return { label: t('actions.doneRetry'), run: () => void this.doneRetry(a), ok: true };
+        return { label: t(a.kind === 'validation_error' ? 'actions.fixInPage' : 'actions.openPage'), run: () => void this.openBrowser(a), ok: !this.browser().open };
+    }
+  }
+
+  /** The quiet actions of each card, under "More". A computed: a new array on every check would make Angular think the input keeps changing. */
+  protected readonly moreItems = computed<Record<number, MenuItem[]>>(() => {
+    const t = (key: string, p?: Record<string, number>) => this.i18n.t(key, p);
+    const out: Record<number, MenuItem[]> = {};
+    for (const a of this.items()) {
+      const list: MenuItem[] = [];
+      if (a.kind === 'confirm_email' && a.email_draft) list.push({ id: 'saveDraft', label: t('actions.email.save'), disabled: !this.emailDirty(a) || !this.emailValid(a) });
+      if (!this.isSetup(a)) list.push({ id: 'retry', label: t('actions.retry') });
+      if (this.hasPage(a) && !this.primaryOpensBrowser(a)) list.push({ id: 'page', label: t('actions.openPage'), href: a.job.apply_url });
+      if (this.windowOpenFor(a)) list.push({ id: 'closeBrowser', label: t('actions.browser.close') });
+      else if (this.browserKind(a.kind) && !this.primaryOpensBrowser(a) && !this.isSetup(a)) list.push({ id: 'browser', label: t('actions.browser.openBtn'), disabled: this.browser().open });
+      for (const n of this.range(a.screenshots)) list.push({ id: `shot${n}`, label: t('actions.viewShot', { n: n + 1 }), href: this.shot(a.id, n) });
+      list.push({ id: 'byHand', label: t('actions.byHand') }, { id: 'skip', label: t('actions.skip'), danger: true });
+      out[a.id] = list;
+    }
+    return out;
+  });
+
+  protected more(a: ActionItem, id: string): void {
+    if (id === 'saveDraft') void this.saveDraft(a);
+    else if (id === 'retry') void this.send(a, 'retry');
+    else if (id === 'browser') void this.openBrowser(a);
+    else if (id === 'closeBrowser') void this.closeBrowser(a);
+    else if (id === 'byHand') void this.send(a, 'applied_by_hand');
+    else if (id === 'skip') void this.send(a, 'skip');
+  }
+
+  /** Done in the page: close the window (the profile is busy while it is open), then try the application again. */
+  private async doneRetry(a: ActionItem): Promise<void> {
+    await this.closeBrowser(a);
+    if (!this.errors()[a.id]) await this.send(a, 'retry');
+  }
+
   num = (n: number | null): string => fmtNum(this.loc(), n);
   sourceLabel = (s: string): string => labelOr(this.i18n, 'common.answerSource.', s || 'unknown');
   range = (n: number): number[] => Array.from({ length: n }, (_, i) => i);

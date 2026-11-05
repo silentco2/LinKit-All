@@ -7,6 +7,7 @@ import { PhoneInput } from '../../components/phone-input';
 import { PlacePick, PlacePicker } from '../../components/place-picker';
 import { TagInput } from '../../components/tag-input';
 import { I18n, TPipe } from '../../i18n';
+import { cvLabel } from '../../locale';
 import { ApplicationAnswers, Profile, Segment, splitName, Status } from '../../types';
 import { Field } from './saved';
 import { SettingsStore } from './store';
@@ -30,7 +31,7 @@ type Row = { key: string; id: string; label: string; type?: string; dir?: 'ltr';
             <input type="file" accept=".docx,.odt,.pdf,.tex,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.oasis.opendocument.text,application/pdf,application/x-tex,text/x-tex" class="sr-only" (change)="upload($event)">
           </label>
           @if (store.profile.cv_name) {
-            <bdi class="text-sm">{{ store.profile.cv_name }}</bdi>
+            <bdi class="text-sm">{{ cvName() }}</bdi>
             @if (store.profile.cv_renderer_ok ?? status()?.libreoffice) {
               <a class="btn" href="/api/profile/cv/pdf" target="_blank" rel="noopener">{{ 'setup.cv.preview' | t }}</a>
             }
@@ -146,6 +147,7 @@ export class ProfileSection implements OnInit {
   protected readonly store = inject(SettingsStore);
   private readonly api = inject(Api);
   protected readonly i18n = inject(I18n);
+  protected cvName = (): string => cvLabel(this.i18n, this.store.profile.cv_name, this.store.profile.cv_source_format);
   private readonly countries = inject(Countries);
   protected readonly status = signal<Status | null>(null);
   protected readonly segments = signal<Segment[]>([]);

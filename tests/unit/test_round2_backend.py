@@ -319,6 +319,28 @@ def test_only_explicit_places_change_the_country_lists(client: TestClient) -> No
     assert got["authorized_countries"] == ["Germany"] and got["visa_countries"] == []
 
 
+def test_work_right_is_per_country(client: TestClient) -> None:  # noqa: F811
+    save_profile(client, home_country="EG")
+
+    def put(*rows: tuple[str, str, str]) -> list[str]:
+        places = [{"label": lab, "country": c, "work": w} for lab, c, w in rows]
+        got = client.put("/api/search", json={"search": {"places": places}}, headers=SAME_ORIGIN)
+        return [p["work"] for p in got.json()["search"]["places"]]
+
+    # an answered row spreads to the "ask" rows of its country, never to another country
+    assert put(("Saudi Arabia", "SA", "visa"), ("Riyadh", "SA", "ask"), ("Dubai", "AE", "ask")) == [
+        "visa", "visa", "ask",
+    ]  # fmt: skip
+    answers = client.get("/api/profile/answers").json()
+    assert answers["visa_countries"] == ["SA"] and answers["authorized_countries"] == []
+    # explicit rows that disagree: the last one wins for the whole country
+    assert put(("Riyadh", "SA", "allowed"), ("Jeddah", "SA", "visa")) == ["visa", "visa"]
+    # nothing stated for a country: nothing is assumed
+    assert put(("Riyadh", "SA", "ask"), ("Jeddah", "SA", "ask")) == ["ask", "ask"]
+    answers = client.get("/api/profile/answers").json()
+    assert answers["visa_countries"] == [] and answers["authorized_countries"] == []
+
+
 def test_place_needs_label_and_iso2() -> None:
     with pytest.raises(ValueError, match="label"):
         SearchConfig.model_validate({"search": {"places": [{"label": " ", "work": "allowed"}]}})

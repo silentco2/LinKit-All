@@ -36,13 +36,13 @@ export class PhoneInput {
 
   private readonly shownCode = computed(() => {
     const c = this.countries.byIso(this.iso());
-    return c ? `${flag(c.iso2)} +${c.phone}` : '+';
+    return c ? `${flag(c.iso2)} +${c.phone}`.trim() : '+';
   });
 
   protected readonly options = computed<ComboOption[]>(() => {
     const q = fold(this.query()).replace(/^\+/, '');
     const hit = (c: Country) => !q || fold(c.name).includes(q) || (!!c.name_ar && fold(c.name_ar).includes(q)) || c.iso2.toLowerCase() === q || c.phone.startsWith(q);
-    return this.countries.list().filter(hit).map((c) => ({ key: c.iso2, label: `${flag(c.iso2)} ${this.countries.name(c)} +${c.phone}` }));
+    return this.countries.list().filter(hit).map((c) => ({ key: c.iso2, label: `${flag(c.iso2)} ${this.countries.name(c)} +${c.phone}`.trim() }));
   });
 
   constructor() {
