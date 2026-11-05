@@ -21,12 +21,19 @@ changing a decision in either file.
   - UX7 simulated round (5 AI personas, mean SUS 60; results in `docs/usability/simulated-round-1.md`) and its fixes:
     `92709c3` (frontend: reasons, phone width, Arabic), `ba46591` (backend: AI limits pause, optional LibreOffice,
     real go-live checks), `717f827` (frontend: apply path, LibreOffice choice, honest go-live, privacy panel).
-    U1-U14 fixed; U15-U18 and the smaller items are still open (`ux-plan.md` section 3.7). No more simulated rounds.
+    U1-U14 fixed. No more simulated rounds.
+  - After UX7 (2026-11-01 to 11-05): `e576eb0` headless Chrome client-hints fix; `dfb7c26` one-click LibreOffice
+    install points at release `libreoffice-26.2.6-win-x64` of silentco2/LinKit-All (verified with a real install);
+    `60b9c97` source names "Company · platform" and a structured AI check; `d821983` go-live in Home's main card with
+    the CV red-line, plain words, visible apply runs, practice badge on welcome; `93637ec` per-job apply events;
+    `52b068e` Needs-you cards with one main action, work rights per country, level tips, flags, PDF name. This fixes
+    U15-U18 and the smaller items (`ux-plan.md` section 3.7). Known limits: no `daily_cap` per-job event; level
+    tips are hover/focus only; the place-picker Enter fix landed in 46d5521.
   - Not verified: a real Gmail connect; real Outlook (branch `claude/outlook-oauth-898770`, not merged, needs an
-    Azure client id); the LibreOffice install (needs a hosted bundle URL and SHA-256, not set); the local-model pick on
-    a real server; the Arabic SUS and new Arabic terms (no native review yet).
-  - Remaining: the usability study with 5 real people (kit in `docs/usability/`); host the LibreOffice bundle; merge
-    the Outlook branch; native Arabic review; open items U15-U18.
+    Azure client id); the local-model pick on a real server; the Arabic SUS and new Arabic terms (no native review yet).
+  - Remaining: the usability study with 5 real people (kit in `docs/usability/`); merge the Outlook branch; native
+    Arabic review.
+  - Local `main` has unpushed commits (16 ahead of `origin/main` when checked).
 - Phases 0-8 are built, except the items blocked on the maintainer (see "Needs the
   maintainer"). Every task in `plan.md` is done or marked blocked.
 - Phase 8 (sources ported from freehire) is built too: see "Phase 8 - sources from freehire".

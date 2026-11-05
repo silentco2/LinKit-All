@@ -119,16 +119,16 @@ Severity: 1 cosmetic, 2 minor, 3 major, 4 blocker. Impact = worst severity x par
 | U12 | Salary input (T12) | 2 | 4 | 8 | S | Example text, not a number, as placeholder. Default the currency from the home country. Searchable list. Text input with thousands separators | Fixed (92709c3) |
 | U13 | "Use this for every application" wording (T13) | 2 | 4 | 8 | S | Say what it does ("Also use this answer for similar questions later"). Check that an unticked box does not save a standing answer (P5 saw one) | Fixed (92709c3) |
 | U14 | Real-apply confirm does not say each one still asks (T14) | 3 | 4 | 12 | S | State the actual setting in the confirm ("LinKit will still ask before each one"). Make Cancel the safe default. Link to "Submit without asking" | Fixed (717f827) |
-| U15 | Go-live entry, thumbnails, no CV diff (T15) | 2 | 5 | 10 | S-M | Put "Ready to apply for real?" in the main Home card when practice has run. Open thumbnails in an in-app viewer. Add the CV red-line diff | Open (lightbox and tailored-CV link in 717f827; no CV diff) |
-| U16 | Internal words (T16) | 2 | 5 | 10 | S | Hide internal states in the filter. Rename "Practised". Name the apply button "Apply". Do not print `claude_cli (default model) ok` | Open |
-| U17 | Silent runs, raw log text, no "stopped" notice (T17) | 2 | 4 | 8 | S-M | Per-job lines during apply, a plain-words version of known errors, a "Stopped" state | Open (log lines translated in 717f827) |
-| U18 | Needs-you card has too many controls (T18) | 2 | 3 | 6 | S | One main button. Move the rest into a menu. A select answer needs a Save button | Open |
+| U15 | Go-live entry, thumbnails, no CV diff (T15) | 2 | 5 | 10 | S-M | Put "Ready to apply for real?" in the main Home card when practice has run. Open thumbnails in an in-app viewer. Add the CV red-line diff | Fixed (d821983; lightbox and tailored-CV link in 717f827) |
+| U16 | Internal words (T16) | 2 | 5 | 10 | S | Hide internal states in the filter. Rename "Practised". Name the apply button "Apply". Do not print `claude_cli (default model) ok` | Fixed (d821983, 60b9c97) |
+| U17 | Silent runs, raw log text, no "stopped" notice (T17) | 2 | 4 | 8 | S-M | Per-job lines during apply, a plain-words version of known errors, a "Stopped" state | Fixed (d821983, 93637ec; log lines translated in 717f827) |
+| U18 | Needs-you card has too many controls (T18) | 2 | 3 | 6 | S | One main button. Move the rest into a menu. A select answer needs a Save button | Fixed (52b068e) |
 
 \* One person tested this condition (Arabic UI, 375 px). Impact is low only because of the sample. For Arabic readers and phone users it applies to everyone.
 
 **Do first** (impact 12 or more, effort S): U4, U6, U14. **Then** the M items with impact 15: U1, U2, U3, U9. U5 is mostly copy and quick.
 
-Smaller items, one line each:
+Smaller items, one line each (all fixed: d821983, 60b9c97, 52b068e; the select-all focus and shareable URL items were already done in 92709c3):
 
 - Practice badge missing on the welcome screens (P3, P5).
 - Level chips: "all lit" is not explained (P1, P3).
@@ -167,7 +167,7 @@ Smaller items, one line each:
 
 ## 7. Next step
 
-1. U1-U14 are fixed (92709c3, ba46591, 717f827). Still to do: U15-U18 and the smaller items.
+1. U1-U18 and the smaller items are fixed (92709c3, ba46591, 717f827, d821983, 93637ec, 60b9c97, 52b068e).
 2. **Rerun with five real people** using the kit (`README.md`, `script.md`). Before that:
    - install LibreOffice (or run `linkit install-libreoffice`);
    - sign in to an AI that has quota;

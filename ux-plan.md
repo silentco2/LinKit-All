@@ -1,7 +1,7 @@
 # UX plan and audit: LinKit All V1
 
-Written 2026-10-29, brought up to date 2026-11-01. Status: **UX1–UX6, round 2 and the UX7 fixes are built.**
-What is left: the study with real people, a hosted LibreOffice bundle, merging the Outlook branch (section 12).
+Written 2026-10-29, brought up to date 2026-11-05. Status: **UX1–UX6, round 2, the UX7 fixes and U15–U18 are built.**
+What is left: the study with real people, merging the Outlook branch (section 12).
 Goal: make the app **simple, usable, learnable and memorable**, and get a new user from install to the first
 job search with as few inputs as possible, with no invented answers (CLAUDE.md §2 applies to everything).
 
@@ -21,10 +21,10 @@ Read with `CLAUDE.md` (binding rules), `plan.md` and `handoff.md`.
 | CV upload | filled nothing | fills empty non-sensitive fields; employers, titles and degrees are protected automatically |
 | Save buttons | ~12 | 0: autosave with a "Saved" tick |
 | Nav items | 8 | 5: Home, Jobs, Needs you, Activity, Settings |
-| Starting a run | 5 stage checkboxes + "new vs resume" | 1 smart button that follows the state, plus an "Apply to N jobs" button |
-| Going live | a checkbox anytime | "Ready to apply for real?" with real checks, screenshots and a named confirm |
+| Starting a run | 5 stage checkboxes + "new vs resume" | 1 smart button that follows the state, plus an "Apply to N jobs" button; a line per job while applying |
+| Going live | a checkbox anytime | "Ready to apply for real?" in Home's main card, with real checks, screenshots, the CV red-line and a named confirm |
 | AI limits | raw vendor error, run "failed" | one plain message, run paused, "use another AI" |
-| LibreOffice | red box, `linkit doctor` | optional; install for me (when a bundle is hosted) or use the CV as it is |
+| LibreOffice | red box, `linkit doctor` | optional; one-click install from the hosted bundle (Windows x64) or use the CV as it is |
 | Privacy | "everything stays on this computer" | the exact list of what leaves it ("What leaves this computer") |
 | Arabic | partly English at run time | one numeral system, six plural forms, translated reasons, errors and log lines |
 
@@ -62,8 +62,12 @@ every other setting. Each derived value shows its source and stays editable.
 | D23 | 2026-10-31 | Sensitive answers | Nationality, date of birth, marital status and military status are sensitive: "Ask me", never sent to the AI |
 | D24 | 2026-10-31 | CV upload | Fills empty non-sensitive fields. Locked facts are automatic (no "never changed" input) |
 | D25 | 2026-11-01 | Browser | **One Show/Hide setting** for every browser LinKit runs |
-| D26 | 2026-11-01 | LibreOffice | **Optional one-click install** (needs a hosted bundle URL and SHA-256, **not set yet**). Declining means the original CV is used, no tailoring. **Practice works without LibreOffice** |
+| D26 | 2026-11-01 | LibreOffice | **Optional one-click install.** Declining means the original CV is used, no tailoring. **Practice works without LibreOffice** |
 | D27 | 2026-11-01 | Testing | **No more simulated users.** Further findings come from the maintainer |
+| D28 | 2026-11-05 | Level tips | Level chips explain themselves in **hover/focus tooltips** (maintainer's choice), not inline text |
+| D29 | 2026-11-05 | Source names | Added sources are named **"Company · platform"** (60b9c97) |
+| D30 | 2026-11-05 | Work rights | A work right **belongs to the country**: a new place in a listed country inherits it, a change applies to all its rows (52b068e) |
+| D31 | 2026-11-05 | LibreOffice bundle | **Hosted on the GitHub release** `libreoffice-26.2.6-win-x64` of silentco2/LinKit-All, with a pinned SHA-256 (dfb7c26). Verified with a real install |
 
 ---
 
@@ -148,15 +152,20 @@ Status: **Fixed** (built as planned) · **Changed** (solved a different way) · 
 
 ### 3.7 Found by the simulated round (details: `docs/usability/simulated-round-1.md`)
 
-Fixed items are in the round file. Still **Open**:
+U1–U14 are in the round file. U15–U18 and the smaller items are now fixed:
 
 | # | Finding | Sev | Status |
 |---|---|---|---|
-| U15 | Go-live entry is a small link; no CV red-line diff | 🟡 | **Open** (lightbox and tailored-CV link done in 717f827) |
-| U16 | Internal words: "Practised", "Find new jobs" label, raw state names | 🟡 | **Open** (Activity buttons and run titles fixed in 717f827) |
-| U17 | Silent apply runs, raw log lines, no "stopped" notice | 🟡 | **Open** (log lines translated in 717f827) |
-| U18 | Needs-you cards carry 5–8 controls and no clear main button | 🟡 | **Open** |
-| – | Smaller items: practice badge missing on welcome, level chips unexplained, Riyadh asks about work rights again, select-all focus, silent chip delete, added source lands as a raw URL, job history dates, shareable job URL, "EG" phone flag letters on Windows, filename after PDF upload, Home "Next" ignores the approve queue | 🟢 | **Open** |
+| U15 | Go-live entry is a small link; no CV red-line diff | 🟡 | **Fixed** go-live in Home's main card with the red-line (d821983; lightbox in 717f827) |
+| U16 | Internal words: "Practised", "Find new jobs" label, raw state names | 🟡 | **Fixed** plain words, "Connected to Claude", states mapped to user words (d821983, 60b9c97; buttons in 717f827) |
+| U17 | Silent apply runs, raw log lines, no "stopped" notice | 🟡 | **Fixed** a line per job, a Stopped state, plain errors with Details (d821983, 93637ec) |
+| U18 | Needs-you cards carry 5–8 controls and no clear main button | 🟡 | **Fixed** one main button per card kind, the rest in a More menu; choice answers save explicitly (52b068e) |
+| – | Smaller items: practice badge on welcome (d821983) · level tips (52b068e) · work rights per country, so no second Riyadh question (52b068e) · select-all focus and undo key (92709c3) · two-step Backspace on tags (52b068e) · added source named "Company · platform" (60b9c97, 52b068e) · job history dates (52b068e) · shareable job URL (92709c3) · flags hidden where Windows can't draw them (52b068e) · PDF name shown after upload (52b068e) · Home "Next" counts the approve queue (52b068e) | 🟢 | **Fixed** |
+
+Remaining limits:
+- No `daily_cap` per-job event. Jobs over the daily cap are skipped before a run starts, so Activity has no line for them.
+- Level tips show on hover and focus only. Touch screens get no tip.
+- Place picker: Enter now picks the first suggestion; unmatched text in the places list shows a hint (fixed in 46d5521).
 
 ### 3.8 What already works well (keep)
 
@@ -281,8 +290,8 @@ Kind        Tech ✓ · Change                              From your skills
 
 The server computes `setup_state = {required_done, next_step}`. Required = CV approved + AI tested + at least one role + a place.
 LibreOffice is **never required**: practice works without it, a real run that needs it is refused up front with a code,
-and declining means the original CV is used for every job (D26). It shows as one card (install for me when a bundle is
-hosted / get it / check again / use my CV as it is). No terminal commands.
+and declining means the original CV is used for every job (D26). It shows as one card (install for me, a one-click 145 MB download on Windows x64 /
+get it / check again / use my CV as it is). No terminal commands.
 
 ---
 
@@ -387,7 +396,7 @@ Code names (`dry run`, `tier`, `needs_user`…) stay. UI copy only: `i18n/en.ts`
 
 - **Approve jobs**: card list, J/K/A/S/O/X keys with a `?` cheat sheet, bulk approve with a 10 s Undo, reason and missing skills on each card.
 - **Finish applications**: setup cards (saved passwords, Gmail) above the jobs waiting on them; parked items **grouped by question** ("9 applications ask: …" → "Answer all 9"). Sensitive questions group only on exact wording. CAPTCHA, login and 2FA stay one per item.
-- Each card: what happened · why · one primary fix button (U18 is still open: too many controls on some cards).
+- Each card: what happened · why · one primary fix button; everything else sits in a More menu (52b068e).
 - Empty state: "Nothing needs you." with the notification toggle inline.
 
 ---
@@ -428,17 +437,22 @@ Code names (`dry run`, `tier`, `needs_user`…) stay. UI copy only: `i18n/en.ts`
 | UX7 fixes | Frontend: reasons that lead somewhere, phone width, Arabic | 92709c3 |
 | UX7 fixes | Backend: AI limits pause, optional LibreOffice, real go-live checks | ba46591 |
 | UX7 fixes | Frontend: apply path, LibreOffice choice, honest go-live and privacy | 717f827 |
+| After UX7 | Headless Chrome client-hints fix | e576eb0 |
+| After UX7 | LibreOffice one-click install points at the hosted bundle | dfb7c26 |
+| U16 | "Company · platform" source names; structured AI check | 60b9c97 |
+| U15–U17 | Go-live in Home's main card with CV red-line; plain words; visible apply runs; practice badge on welcome | d821983 |
+| U17 | Per-job apply events (start, reason code, question count) | 93637ec |
+| U18 | Needs-you cards with one main action; work rights per country; level tips; flags; PDF name; small items | 52b068e |
 
 ### Left
 
 | Item | Notes |
 |---|---|
-| Study with real people | Use the kit in `docs/usability/` (5 people, Task 5 seven days later). Install LibreOffice and sign in to an AI with quota first |
-| Host the LibreOffice bundle | Set the URL and SHA-256 so "install for me" works |
+| Study with real people | Use the kit in `docs/usability/` (5 people, Task 5 seven days later). Install LibreOffice (one click) and sign in to an AI with quota first |
 | Merge the Outlook branch | `claude/outlook-oauth-898770`; needs an Azure client id |
 | Native review of the Arabic SUS | and of the new Arabic terms (section 9) |
-| Open findings in 3.7 | U15–U18 and the smaller items |
-| Unverified | Real Gmail connect; LibreOffice install (needs the bundle); local-model pick on a real server; Indeed country (U11) on a real Egypt place |
+| Place picker Enter key | Built (46d5521) |
+| Unverified | Real Gmail connect; local-model pick on a real server; Indeed country (U11) on a real Egypt place. The LibreOffice install is verified (real install from the release) |
 
 ---
 
@@ -464,7 +478,7 @@ Done (b32a249 and later commits): §5.5 sponsorship per job, §5.7 Needs you, §
 | Derived CV fields correct | ≥ 90 % | 86.7 % on the sample |
 
 **The round was simulated** (AI agents played five personas). It found 18 issues (U1–U18); the fixes in 92709c3, ba46591 and 717f827
-cover U1–U14 (U15–U18 open). It does **not** replace the study with real people. Full results and caveats: `docs/usability/simulated-round-1.md`.
+cover U1–U14; d821983, 93637ec, 60b9c97 and 52b068e cover U15–U18 and the smaller items. It does **not** replace the study with real people. Full results and caveats: `docs/usability/simulated-round-1.md`.
 Per D27 there are no more simulated rounds.
 
 ---
@@ -474,12 +488,11 @@ Per D27 there are no more simulated rounds.
 | # | Question | State |
 |---|---|---|
 | Q1 | Telegram channel lists for Gulf and non-tech MENA: who curates them? | The first MENA tech channels are in; the rest ship empty until you give a list |
-| Q5 | Hosted URL and SHA-256 for the LibreOffice bundle | Not set; "install for me" is hidden until then |
 | Q6 | Azure client id for Outlook | Needed before the Outlook branch can be merged and tested |
 | Q7 | Native Arabic reviewer for the UI terms and the SUS | Not arranged |
 | Q8 | Is the Indeed country bug (U11) real? | Fixed in ba46591 by mapping each jobspy key to one country; not re-checked on a real Egypt place |
 
-Answered: Q2 internships count (D13); Q3 Outlook branch (D14); Q4 no power-user wizard (D15).
+Answered: Q2 internships count (D13); Q3 Outlook branch (D14); Q4 no power-user wizard (D15); Q5 LibreOffice bundle hosted (D31).
 
 ---
 
@@ -500,3 +513,4 @@ Rules: one commit per phase on `main`; Arabic written for every new key; no new 
 | T7.2 | Browser E2E on a fresh install: 10 of 10 flows, 1813 tests, ruff, mypy, ng build clean | done | 743a70b (fix found) |
 | Round 2 | Places, suggestions, FX, inputs, Settings rework | done | ec1d220 … a11af9f |
 | UX7 | Study kit; simulated round; fixes | kit and fixes done, real study pending | c8b23aa, 92709c3, ba46591, 717f827 |
+| UX7 follow-up | U15–U18 and the smaller items; LibreOffice hosted; headless fix | done | e576eb0, dfb7c26, 60b9c97, d821983, 93637ec, 52b068e, 46d5521 |
