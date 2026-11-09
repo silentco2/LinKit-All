@@ -66,6 +66,8 @@ CAPTCHA = FORM.replace("<body>", '<body><iframe title="reCAPTCHA challenge" widt
 def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     settings = Settings(data_dir=tmp_path / "data")
     db = init_db(settings.db_path)
+    # these jobs are already tailored, so nothing renders: LibreOffice need not be installed
+    monkeypatch.setattr("linkit_all.tailor.pipeline.soffice_path", lambda: "soffice")
     cv = make_cv(tmp_path / "cv.docx")
     import_profile(db, ProfileIn(full_name="Jane Doe", email="jane@example.com", phone="+44 20 0000 0000",
                                  location="London", cv_path=cv), settings.data_dir)  # fmt: skip
@@ -98,7 +100,8 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         req = route.request
         state["seen"].append(req.url)
         if req.method == "POST":
-            state["posts"].append(req.url)
+            if req.url.split("/")[2].endswith(".test"):  # not Chrome's own background calls
+                state["posts"].append(req.url)
             await route.fulfill(body=state["after_submit"], content_type="text/html")
         elif req.url == URL:
             await route.fulfill(body=state["page"], content_type="text/html")

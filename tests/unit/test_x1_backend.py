@@ -6,6 +6,7 @@ import hashlib
 import io
 import json
 import platform
+import shutil
 import sys
 import time
 import zipfile
@@ -360,6 +361,8 @@ def test_default_bundle_is_windows_x64_only(
 ) -> None:
     monkeypatch.setattr(sys, "platform", plat)
     monkeypatch.setattr(platform, "machine", lambda: machine)
+    # shutil.which reads sys.platform and needs Windows-only modules when told it is win32
+    monkeypatch.setattr(shutil, "which", lambda *_a, **_k: None)
     installer = LibreOfficeInstaller(Settings(data_dir=tmp_path))
     assert installer.settings.lo_bundle_sha256 == LO_BUNDLE_SHA256 and LO_BUNDLE_SHA256
     assert installer.available() is expected
