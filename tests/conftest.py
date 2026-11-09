@@ -11,6 +11,12 @@ from linkit_all.apply import runner
 from linkit_all.core import fx
 
 
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """The UI tests' session browser keeps Playwright's sync loop running on this thread, and
+    asyncio.run then fails in every later test: so they go last."""
+    items.sort(key=lambda item: "/e2e/ui/" in item.nodeid)
+
+
 def _no_network(*args: object, **kwargs: object) -> NoReturn:
     raise RuntimeError("no live network in tests")
 

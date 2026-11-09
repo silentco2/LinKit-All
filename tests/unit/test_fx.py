@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 from pathlib import Path
 
 import httpx
@@ -35,12 +36,20 @@ def test_convert(tmp_path: Path) -> None:
 def test_newest_table_wins_and_bad_files_are_ignored(tmp_path: Path) -> None:
     shipped = fx.rates(Path("/nonexistent"))
     file = tmp_path / "fx.json"
-    file.write_text(json.dumps(table("2999-01-01", EGP=1)))
+    tick = iter(range(1, 100))
+
+    def write(text: str) -> None:
+        """Each write gets its own time: Windows can give two quick writes the same one."""
+        file.write_text(text)
+        stamp = next(tick) * 1_000_000_000
+        os.utime(file, ns=(stamp, stamp))
+
+    write(json.dumps(table("2999-01-01", EGP=1)))
     assert fx.rates(tmp_path).date == "2999-01-01"
-    file.write_text(json.dumps(table("2000-01-01", EGP=1)))  # older than the shipped one
+    write(json.dumps(table("2000-01-01", EGP=1)))  # older than the shipped one
     assert fx.rates(tmp_path).date == shipped.date
     for junk in ("not json", "[]", '{"base": "USD"}', json.dumps(table("2999-01-01", EGP=-1))):
-        file.write_text(junk)
+        write(junk)
         assert fx.rates(tmp_path).date == shipped.date
 
 

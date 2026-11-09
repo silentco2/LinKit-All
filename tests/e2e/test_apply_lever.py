@@ -74,6 +74,8 @@ class FakeAI(LLMProvider):
 def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     settings = Settings(data_dir=tmp_path / "data")
     db = init_db(settings.db_path)
+    # these jobs are already tailored, so nothing renders: LibreOffice need not be installed
+    monkeypatch.setattr("linkit_all.tailor.pipeline.soffice_path", lambda: "soffice")
     cv = make_cv(tmp_path / "cv.docx")
     import_profile(db, ProfileIn(full_name="Jane Doe", email="jane@example.com", phone="+44 20 0000 0000",
                                  location="London", cv_path=cv), settings.data_dir)  # fmt: skip
@@ -97,7 +99,8 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     async def handle(route: Route) -> None:
         req = route.request
         if req.method == "POST":
-            posts.append(req.url)
+            if req.url.startswith(URL):  # not Chrome's own background calls
+                posts.append(req.url)
             await route.fulfill(body=CONFIRM, content_type="text/html")
         elif req.url.startswith(f"{URL}/apply"):
             await route.fulfill(body=FORM, content_type="text/html")

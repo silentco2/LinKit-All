@@ -150,6 +150,8 @@ def mem_keyring() -> Any:
 def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     settings = Settings(data_dir=tmp_path / "data")
     db = init_db(settings.db_path)
+    # these jobs are already tailored, so nothing renders: LibreOffice need not be installed
+    monkeypatch.setattr("linkit_all.tailor.pipeline.soffice_path", lambda: "soffice")
     cv = make_cv(tmp_path / "cv.docx")
     import_profile(db, ProfileIn(full_name="Jane Doe", email=EMAIL, phone="+44 20 0000 0000",
                                  location="London", cv_path=cv), settings.data_dir)  # fmt: skip
