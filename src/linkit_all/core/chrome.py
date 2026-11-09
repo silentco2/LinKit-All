@@ -345,7 +345,8 @@ async def _headless_identity(exe: str, timeout: float) -> Identity:
     """User agent and client hints of this binary, read once per binary from a short headless
     run (its hints already name the real browser; only the UA string says HeadlessChrome)."""
     if exe not in _identity_cache:
-        with tempfile.TemporaryDirectory(prefix="linkit-ua-") as tmp:
+        # Windows: Chrome can hold a file a moment after it exits; a leftover temp folder is harmless
+    with tempfile.TemporaryDirectory(prefix="linkit-ua-", ignore_cleanup_errors=True) as tmp:
             proc, _port, info = await _start(exe, Path(tmp) / "p", headless=True, timeout=timeout)
             try:
                 hints = await _read_hints(str(info["webSocketDebuggerUrl"]))
