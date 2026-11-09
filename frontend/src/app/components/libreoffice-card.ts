@@ -101,7 +101,7 @@ export class LibreOffice {
       @if (info.installed) {
         @if (lo.justInstalled()) { <div class="alert alert-ok" role="status">{{ 'lo.installed' | t }}</div> }
       } @else if (lo.tailor() === false) {
-        <p class="text-sm text-slate-600 dark:text-slate-400" role="status">{{ 'lo.asIs' | t }} · <button type="button" class="linkish" (click)="lo.setTailor(null)">{{ 'lo.change' | t }}</button></p>
+        <p class="text-sm text-slate-600 dark:text-slate-400" role="status">{{ 'lo.asIs' | t }} <span class="gap-dot"></span><button type="button" class="linkish" (click)="lo.setTailor(null)">{{ 'lo.change' | t }}</button></p>
       } @else {
         <div class="alert alert-warn space-y-3" role="region" [attr.aria-label]="'lo.title' | t">
           <p>{{ 'lo.text' | t }}</p>
@@ -120,7 +120,7 @@ export class LibreOffice {
               }
               <button type="button" class="btn" (click)="lo.setTailor(false)">{{ 'lo.decline' | t }}</button>
             </div>
-            @if (!info.available) { <p class="text-xs">{{ (notFound() ? 'lo.notFound' : 'lo.getHint') | t }}</p> }
+            @if (!info.available) { <p class="text-xs">{{ (notFound() ? 'lo.notFound' : 'lo.getHint') | t }}</p> } @else { <p class="text-xs">{{ 'lo.size' | t }}</p> }
           }
           @if (info.error || lo.error(); as err) { <p class="text-sm font-medium" role="alert" dir="auto">{{ err }}</p> }
         </div>

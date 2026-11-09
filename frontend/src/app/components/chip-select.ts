@@ -18,7 +18,7 @@ let nextId = 0;
       @for (o of options(); track o.value) {
         <span class="group relative">
           <button type="button" [attr.aria-pressed]="on(o.value)" [attr.aria-describedby]="o.tip ? tipId(o.value) : null" (click)="toggle(o.value)"
-                  [class]="'rounded-full border px-3 py-1 text-sm max-sm:min-h-10 max-sm:px-4 ' + (on(o.value) ? 'border-brand-500 bg-brand-50 font-medium text-brand-700 dark:bg-slate-800 dark:text-white' : 'border-slate-300 text-slate-500 dark:border-slate-700 dark:text-slate-400')">{{ o.label }}</button>
+                  [class]="'rounded-md border px-3 py-1 text-sm max-sm:min-h-10 max-sm:px-4 ' + (on(o.value) ? 'border-brand-500 bg-brand-50 font-medium text-brand-700 dark:bg-slate-800 dark:text-white' : 'border-slate-300 text-slate-500 dark:border-slate-700 dark:text-slate-400')">{{ o.label }}</button>
           @if (o.tip) {
             <span role="tooltip" [id]="tipId(o.value)" class="pointer-events-none absolute start-0 top-full z-30 mt-1 hidden w-56 max-w-[80vw] rounded-md bg-slate-900 px-2.5 py-1.5 text-xs font-normal text-white shadow-lg group-hover:block group-has-[:focus-visible]:block dark:bg-slate-700">{{ o.tip }}</span>
           }

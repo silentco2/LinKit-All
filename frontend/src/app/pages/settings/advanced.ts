@@ -7,7 +7,7 @@ import { Field } from './saved';
 import { SettingsStore } from './store';
 import { cardClass, Tuning } from './tuning';
 
-const MATCHING = ['matching.tier_high', 'matching.tier_mid', 'matching.ai_max_jobs', 'matching.batch_size', 'matching.auto_apply_low', 'filters.one_per_company', 'search.max_results_per_query'];
+const MATCHING = ['matching.tier_high', 'matching.tier_mid', 'matching.ai_max_jobs', 'matching.batch_size', 'matching.auto_apply_low', 'filters.one_per_company', 'search.max_results_per_query', 'sources.linkedin_window', 'sources.linkedin_max_posts'];
 const APPLYING = ['apply.min_pause_s', 'apply.max_pause_s', 'apply.parallel_sites', 'apply.submit_without_asking'];
 const TRUST = ['trust.enabled', 'trust.scam_threshold', 'trust.ghost_threshold', 'trust.filter_ghost', 'trust.allow_companies'];
 
@@ -116,6 +116,24 @@ export class Changed {
                 <input id="adv-max" type="number" min="1" max="1000" class="input" [value]="store.cfg.search.max_results_per_query" (change)="store.update('search.max_results_per_query', num($event))">
               </app-field>
               <app-changed key="search.max_results_per_query" [label]="'setup.search.max' | t" />
+            </div>
+
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div>
+                <app-field key="sources.linkedin_window" for="adv-liwin" [label]="'settings.adv.liWindow' | t">
+                  <select id="adv-liwin" class="input" (change)="store.update('sources.linkedin_window', val($event))">
+                    <option value="day" [selected]="store.cfg.sources.linkedin_window === 'day'">{{ 'setup.linkedin.window.day' | t }}</option>
+                    <option value="week" [selected]="store.cfg.sources.linkedin_window === 'week'">{{ 'setup.linkedin.window.week' | t }}</option>
+                  </select>
+                </app-field>
+                <app-changed key="sources.linkedin_window" [label]="'settings.adv.liWindow' | t" />
+              </div>
+              <div>
+                <app-field key="sources.linkedin_max_posts" for="adv-limax" [label]="'settings.adv.liMax' | t" [hint]="'settings.adv.liMaxHint' | t">
+                  <input id="adv-limax" type="number" min="1" max="50" class="input" [value]="store.cfg.sources.linkedin_max_posts" (change)="store.update('sources.linkedin_max_posts', num($event))">
+                </app-field>
+                <app-changed key="sources.linkedin_max_posts" [label]="'settings.adv.liMax' | t" />
+              </div>
             </div>
           </div>
         </details>

@@ -2,7 +2,7 @@
 
 import re
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Literal
@@ -65,6 +65,11 @@ class Source(ABC):
     # ATS plugins: Common Crawl CDX url patterns that list the vendor's boards, e.g.
     # "jobs.lever.co/*" or "*.recruitee.com". Empty = not discoverable (see discovery.py).
     cdx_hosts: Sequence[str] = ()
+    # Set by discovery: is this URL stored already? Lets a source skip work it would throw away.
+    seen_url: Callable[[str], bool] | None = None
+
+    def is_known(self, url: str) -> bool:
+        return self.seen_url is not None and self.seen_url(url)
 
     def is_enabled(self, cfg: SearchConfig) -> bool:
         """Should discovery ask this source for tasks? Opt-in kinds need `sources.enabled`;

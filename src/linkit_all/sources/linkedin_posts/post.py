@@ -1,7 +1,6 @@
 """One LinkedIn post as read from its public page, plus its text helpers (emails, links)."""
 
 import json
-import re
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -9,6 +8,9 @@ from typing import Any
 from selectolax.lexbor import LexborHTMLParser
 
 from linkit_all.sources.base import from_iso
+from linkit_all.sources.posts import find_emails, find_links
+
+__all__ = ["RawPost", "find_emails", "find_links", "read_post"]
 
 
 @dataclass(frozen=True)
@@ -62,36 +64,3 @@ def read_post(html: str, url: str, urn: str, scraped_at: datetime) -> RawPost | 
         emails=find_emails(text),
         scraped_at=scraped_at,
     )
-
-
-_EMAIL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._%+-]*@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")
-_ASSET_TLDS = {"png", "jpg", "jpeg", "gif", "svg", "webp", "bmp", "ico", "css", "js", "pdf", "mp4"}
-_URL = re.compile(
-    r"(?:https?://|(?<![\w@./-])(?:www\.|lnkd\.in/|bit\.ly/))[^\s<>\"'؀-ۿ]+",
-    re.IGNORECASE,
-)
-_TRAIL = ".,;:!?)]}>»'\"…"
-
-
-def find_emails(text: str) -> tuple[str, ...]:
-    """Distinct, lower-cased addresses in order of appearance. Trailing punctuation is not part
-    of an address; `logo@2x.png` style asset names are not addresses."""
-    found: dict[str, None] = {}
-    for m in _EMAIL.finditer(text):
-        mail = m.group(0).rstrip(_TRAIL).lower()
-        domain = mail.partition("@")[2]
-        if domain.rsplit(".", 1)[-1] in _ASSET_TLDS or re.fullmatch(r"\d+x", domain.split(".")[0]):
-            continue
-        found[mail] = None
-    return tuple(found)
-
-
-def find_links(text: str) -> tuple[str, ...]:
-    """Distinct URLs in order of appearance (scheme added to bare www., lnkd.in/, bit.ly/)."""
-    found: dict[str, None] = {}
-    for m in _URL.finditer(text):
-        url = m.group(0).rstrip(_TRAIL)
-        if not url.lower().startswith("http"):
-            url = "https://" + url
-        found[url] = None
-    return tuple(found)

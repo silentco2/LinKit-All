@@ -1,5 +1,5 @@
 # ruff: noqa: RUF001, F811
-"""Apply by email: mailto jobs get a tailored CV + short cover email (dry run, confirm, caps)."""
+"""Apply by email: mailto jobs get the CV as uploaded + short cover email (dry run, confirm, caps)."""
 
 import asyncio
 import json
@@ -18,7 +18,13 @@ from test_matching import fake_embed
 from test_vault import CHEAP, PASS
 
 from linkit_all.apply import runner
-from linkit_all.apply.email_apply import ApplicationEmail, greeting, mailto_address, subject_for
+from linkit_all.apply.email_apply import (
+    ApplicationEmail,
+    attachment_copy,
+    greeting,
+    mailto_address,
+    subject_for,
+)
 from linkit_all.apply.vault import Vault
 from linkit_all.core.config import Settings
 from linkit_all.core.db import init_db
@@ -71,8 +77,8 @@ class Env:
     def __init__(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cfg: dict[str, Any]):
         self.settings = Settings(data_dir=tmp_path / "data")
         self.db = init_db(self.settings.db_path)
-        self.pdf = tmp_path / "tailored.pdf"
-        self.pdf.write_bytes(b"%PDF-1.4 tailored")
+        self.pdf = tmp_path / "uploaded.pdf"
+        self.pdf.write_bytes(b"%PDF-1.4 uploaded")
         with self.db.begin() as s:
             s.add(
                 Profile(
@@ -80,7 +86,7 @@ class Env:
                     full_name="Jane Doe",
                     email="jane@example.com",
                     phone="+20 100 000 0000",
-                    cv_path="cv.docx",
+                    cv_path=str(self.pdf),
                     answers={
                         "linkedin": "https://linkedin.com/in/jane",
                         "salary_expectation": "99999",
@@ -156,7 +162,7 @@ def test_helpers() -> None:
     assert greeting("Sara Ahmed") == "Hello Sara,"
     assert greeting("Acme Recruitment Team") == "Hello,"
     assert greeting("Acme") == "Hello," and greeting(None) == "Hello,"
-    assert subject_for("Dev", "Jane Doe") == "Application: Dev – Jane Doe"
+    assert subject_for("Dev", "Jane Doe") == "Dev"
     assert subject_for("", "Jane Doe") == "Application – Jane Doe"
     with pytest.raises(ValueError):
         ApplicationEmail(body="word " * 181)
@@ -172,14 +178,14 @@ def test_dry_run_writes_eml_and_never_sends(make: Any, smtp: type[FakeSMTP]) -> 
     eml = Path(out.artifacts[0])
     assert eml.name == "application.eml"
     msg = message_from_bytes(eml.read_bytes(), policy=policy.default)
-    assert msg["To"] == "hr@acme.com" and msg["Subject"] == "Application: Python Dev – Jane Doe"
+    assert msg["To"] == "hr@acme.com" and msg["Subject"] == "Python Dev"
     body = msg.get_body(("plain",)).get_content()  # type: ignore[union-attr]
     assert body.startswith("Hello Sara,") and "Best regards,\nJane Doe\n+20 100 000 0000" in body
     assert "https://linkedin.com/in/jane" in body and "CV attached" in body
     att = next(p for p in msg.walk() if p.get_filename())
     assert (
         att.get_filename() == "Jane Doe - CV.pdf"
-        and att.get_payload(decode=True) == b"%PDF-1.4 tailored"
+        and att.get_payload(decode=True) == b"%PDF-1.4 uploaded"
     )
     ev = env.events(job_id)[-1]
     assert (ev.code, ev.artifacts, ev.params) == (
@@ -214,7 +220,7 @@ def test_invalid_model_output_is_retried_and_validated(make: Any) -> None:
     out = env.apply(env.job())
     assert out.status == "dry_run"
     msg = message_from_bytes(Path(out.artifacts[0]).read_bytes(), policy=policy.default)
-    assert msg["Subject"] == "Application: Python Dev – Jane Doe (Ref 42)"
+    assert msg["Subject"] == "Python Dev (Ref 42)"
 
 
 def test_ai_usage_limit_blocks_the_run(make: Any) -> None:
@@ -236,11 +242,11 @@ def test_live_parks_confirm_email_with_editable_draft(make: Any, smtp: type[Fake
     assert item is not None and item.kind == ActionKind.confirm_email
     assert (item.code, item.params) == (
         "confirm_email",
-        {"to": "hr@acme.com", "subject": "Application: Python Dev – Jane Doe"},
+        {"to": "hr@acme.com", "subject": "Python Dev"},
     )
     draft = job.data["email_draft"]
     assert draft["to"] == "hr@acme.com" and draft["body"].startswith("Hello Sara,")
-    assert Path(draft["attachment"]).read_bytes() == b"%PDF-1.4 tailored"
+    assert Path(draft["attachment"]).read_bytes() == b"%PDF-1.4 uploaded"
 
 
 def test_confirm_sends_the_edited_draft(
@@ -314,7 +320,7 @@ def test_duplicate_address_is_skipped(make: Any, smtp: type[FakeSMTP]) -> None:
     assert job.state == JobState.skipped
     assert env.events(second)[-1].code == "email_already_sent"
     assert len(smtp.instances) == 1  # nothing more was sent
-    assert env.tailor_calls == 1  # and the second job was never tailored
+    assert env.tailor_calls == 0  # email jobs send the CV as uploaded
 
 
 def test_smtp_auth_error_fails_without_the_password(make: Any, smtp: type[FakeSMTP]) -> None:
@@ -432,3 +438,9 @@ def test_arabic_email_twice_is_never_sent_even_without_asking(
     assert env.apply(job_id).status == "applied"
     (sent,) = smtp.instances[0].sent
     assert "My own words." in sent.get_body(("plain",)).get_content()  # type: ignore[union-attr]
+
+
+def test_attachment_keeps_the_uploaded_files_type(tmp_path: Path) -> None:
+    src = tmp_path / "my cv.DOCX"
+    src.write_bytes(b"x")
+    assert attachment_copy(src, tmp_path / "o", "Jane Doe").name == "Jane Doe - CV.docx"

@@ -18,6 +18,7 @@ from linkit_all.core.runs import pause_run
 from linkit_all.core.search import SearchConfig
 from linkit_all.core.state import transition
 from linkit_all.matching.rank import LOW_OPT_IN, cv_text
+from linkit_all.matching.trash import not_trash
 from linkit_all.matching.trust_stage import add_ai_flag
 from linkit_all.providers.base import LLMProvider, UsageLimitError, render
 
@@ -72,7 +73,9 @@ async def score_jobs(
         if profile is None:
             raise ValueError("No profile yet: run `linkit profile import profile.json`")
         if opt_in:  # opt-in turned on later: pick up earlier lows too
-            old_lows = list(s.scalars(select(Job).filter_by(state=JobState.below_threshold)))
+            old_lows = list(
+                s.scalars(select(Job).filter_by(state=JobState.below_threshold).where(not_trash()))
+            )
             for job in old_lows:
                 transition(s, job, JobState.queued_apply, LOW_OPT_IN, code="low_opt_in")
             counts["requeued_low"] = len(old_lows)

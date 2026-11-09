@@ -4,14 +4,16 @@ import { I18n, TPipe } from '../i18n';
 import { Combo, ComboOption } from './combo';
 import { Countries, fold } from './countries';
 
-export interface PlacePick { label: string; city: string; country: string; kind: 'city' | 'country' }
-type Place = { label: string; label_ar: string; city: string; country: string; iso2: string; kind: 'city' | 'country' };
+export interface PlacePick { label: string; city: string; state?: string; country: string; kind: 'city' | 'country' | 'typed' }
+type Place = { label: string; label_ar: string; city: string; state?: string; country: string; iso2: string; kind: PlacePick['kind'] };
 
 const DEBOUNCE_MS = 200;
+const PARTS = /[,،/\-–—]/;
 
 /**
  * Type a city or country, pick from the bundled list (works offline). The list shows the Arabic name when the UI is Arabic.
- * `value` is the text to show; `(picked)` emits `{label, city, country (ISO2), kind}`. Text that matches nothing is
+ * Text in parts ("Maadi / Cairo / Egypt", split on , / or -) is read on the server into city, state and country (kind `typed`).
+ * `value` is the text to show; `(picked)` emits `{label, city, state, country (ISO2), kind}`. Text that matches nothing is
  * emitted as a city with no country; clearing the box emits all-empty. Enter picks the first suggestion (after
  * waiting for a pending search). `countriesOnly` lists countries only (and never emits free text); `requirePick`
  * never emits free text either: Enter on text that matches nothing shows a hint instead.
@@ -69,11 +71,16 @@ export class PlacePicker {
     this.ready = new Promise<void>((r) => (done = r));
     this.release = done;
     this.timer = setTimeout(async () => {
-      const lang = this.i18n.lang();
-      const rows = await this.api.get<Place[]>(`/suggest/places?q=${encodeURIComponent(q)}&lang=${lang}`).catch(() => [] as Place[]);
-      if (mine === this.seq) this.show(rows.map((p) => ({ label: (lang === 'ar' && p.label_ar) || p.label, city: p.city, country: p.iso2, kind: p.kind })));
+      const rows = await this.search(q);
+      if (mine === this.seq) this.show(rows.filter((p) => p.country || !this.requirePick()));
       done();
     }, DEBOUNCE_MS);
+  }
+
+  private async search(q: string): Promise<PlacePick[]> {
+    const lang = this.i18n.lang();
+    const rows = await this.api.get<Place[]>(`/suggest/places?q=${encodeURIComponent(q)}&lang=${lang}`).catch(() => [] as Place[]);
+    return rows.map((p) => ({ label: (lang === 'ar' && p.label_ar) || p.label, city: p.city, state: p.state, country: p.iso2, kind: p.kind }));
   }
 
   private localCountries(q: string): PlacePick[] {
@@ -117,7 +124,7 @@ export class PlacePicker {
   }
 
   /** Enter or leaving the box: keep what was typed as a free-text city, or put the old text back. */
-  protected commit(): void {
+  protected async commit(): Promise<void> {
     this.seq++;
     this.options.set([]);
     const text = this.text().trim();
@@ -130,8 +137,12 @@ export class PlacePicker {
     } else if (this.requirePick()) {
       return; // a place needs a country: wait for a pick
     } else {
-      this.shown = text;
-      this.picked.emit({ label: text, city: text.split(/[,،]/)[0].trim(), country: '', kind: 'city' });
+      const parts = PARTS.test(text) ? (await this.search(text)).find((p) => p.kind === 'typed') : undefined;
+      if (this.text().trim() !== text) return; // the user kept typing or picked a row meanwhile
+      const pick = parts ?? { label: text, city: text.split(/[,،]/)[0].trim(), country: '', kind: 'city' as const };
+      this.text.set(pick.label);
+      this.shown = pick.label;
+      this.picked.emit(pick);
     }
   }
 }

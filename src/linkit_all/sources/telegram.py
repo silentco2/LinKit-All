@@ -2,49 +2,38 @@
 
 No login, no Bot API: the preview shows the latest ~20 posts of a public channel, older ones
 via `?before=<id>`. A post is kept when it holds a hiring word (English, Russian, Ukrainian,
-Spanish, Arabic) or links to a known ATS. A post linking to an ATS becomes a stub pointing at
-that ATS (no AI); the others go to the AI in batches of AI_BATCH posts per call, when a provider
-is available. The stub's url is the post (https://t.me/<channel>/<id>), which is the dedupe key;
-a second job in the same post gets `?job=2`. Posts older than MAX_AGE_DAYS are skipped.
+Spanish, Arabic) or links to a known ATS. No AI here: a post linking to an ATS becomes a stub
+pointing at that ATS; any other post is read by script (`posts`): an email makes it an email
+application, a link goes to the careers scraper, and a post with neither is dropped. The stub's
+url is the post (https://t.me/<channel>/<id>), the dedupe key. Posts older than MAX_AGE_DAYS are
+skipped.
 Idea and word lists after freehire (MIT, https://github.com/strelov1/freehire), re-implemented.
 """
 
-# ruff: noqa: RUF001, RUF002, RUF003  (Cyrillic and Arabic hiring words are the point here)
+# ruff: noqa: RUF001, RUF003  (Cyrillic and Arabic hiring words are the point here)
 import asyncio
 import re
 import time
+from collections import Counter
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Literal
 
-from pydantic import BaseModel
 from selectolax.lexbor import LexborHTMLParser, LexborNode
 
 from linkit_all.core.models import utcnow
 from linkit_all.core.search import SearchConfig
-from linkit_all.providers.base import LLMProvider, ProviderError, UsageLimitError, render
 from linkit_all.sources.ats_detector import detect
 from linkit_all.sources.base import JobStub, Source, Task, from_iso, remote_from_text
-from linkit_all.sources.careers import Unsupported
+from linkit_all.sources.careers import Careers, Unsupported
 from linkit_all.sources.http import Http
+from linkit_all.sources.posts import PostJob, PostRules, find_links, fold, is_seeker, post_stub
 
 PREVIEW = "https://t.me/s/{channel}"
 MAX_AGE_DAYS = 45
 MAX_PAGES = 5  # preview pages per channel and run (~20 posts each)
 DELAY = 2.0  # seconds between two preview fetches
-AI_BATCH = 10  # posts per AI call
-EXCERPT = 1500  # characters of each post sent to the model
 DESCRIPTION = 4000  # characters of a post kept as the job description
-
-_MARKS = re.compile("[ؐ-ًؚ-ٰٟـ]")  # Arabic diacritics, tatweel
-_LETTERS = str.maketrans("أإآٱةىئؤ", "ااااهييو")
-
-
-def fold(text: str) -> str:
-    """Lower case; Arabic alef forms -> ا, ة -> ه, ى/ئ -> ي, ؤ -> و; diacritics and tatweel gone."""
-    return _MARKS.sub("", text.translate(_LETTERS)).lower()
-
 
 _MARKERS = re.compile(
     fold(
@@ -54,7 +43,8 @@ _MARKERS = re.compile(
                 r"ваканси|ищем|ищут|требуетс|нужен|нужна|нужны|наним|набираем|зарплат|оклад|"
                 r"на руки|стажировк|резюме",
                 # English
-                r"hiring|vacanc|looking for|join (?:our|the) team|apply|salary",
+                r"hiring|vacanc|looking for|join (?:our|the) team|apply|salary|needed\b|"
+                r"send (?:us )?(?:your |an? )?(?:cv|resume)",
                 # Ukrainian ("шукає" covers "шукаємо", not the job-seeker "шукаю")
                 r"вакансі|шукає|запрошуємо|стажуванн|досвід роботи",
                 # Spanish: the labelled field, not the bare noun (the noun is ordinary prose)
@@ -112,23 +102,6 @@ def parse_posts(html: str, channel: str) -> list[Post]:
     return sorted(posts, key=lambda p: p.id)
 
 
-class ExtractedJob(BaseModel):
-    title: str = ""
-    company: str = ""
-    location: str = ""
-    remote: Literal["remote", "hybrid", "onsite"] | None = None
-    description: str = ""
-
-
-class ExtractedPost(BaseModel):
-    id: int  # our number in the batch; replies with other ids are ignored
-    jobs: list[ExtractedJob] = []
-
-
-class ExtractedPosts(BaseModel):
-    posts: list[ExtractedPost]
-
-
 def _ats_link(post: Post) -> tuple[str, str, str] | None:
     """(ats, board slug, url) of the first link in the post that a known ATS hosts."""
     for url in post.links:
@@ -143,11 +116,13 @@ class Telegram(Source):
     priority = 5  # the same job from its ATS or a job board has better data
     parallel = 1  # one channel at a time, DELAY apart
 
-    def __init__(self, provider: LLMProvider | None = None) -> None:
-        self.provider = provider
+    def __init__(self) -> None:
         self._last_fetch = 0.0
+        self._rules = PostRules()
+        self._reader = Careers()  # no provider: one page at a time, no AI
 
     def tasks(self, cfg: SearchConfig) -> list[Task]:
+        self._rules = PostRules.of(cfg)
         return [
             Task(self.name, f"telegram:{c.lower()}", board=c, posted_within_days=MAX_AGE_DAYS)
             for c in cfg.sources.telegram_channels
@@ -165,7 +140,7 @@ class Telegram(Source):
                 return
             before = posts[0].id
             if page >= start_page:  # a resumed run walks the earlier pages again, for `before`
-                yield await self._stubs(channel, [p for p in posts if p.posted_at >= cutoff])
+                yield await self._stubs(http, channel, [p for p in posts if p.posted_at >= cutoff])
             if posts[0].posted_at < cutoff:  # the oldest post of this page is already too old
                 return
 
@@ -180,17 +155,23 @@ class Telegram(Source):
         resp.raise_for_status()
         return parse_posts(resp.text, channel)
 
-    async def _stubs(self, channel: str, posts: list[Post]) -> list[JobStub]:
-        stubs: list[JobStub] = []
-        ask: list[Post] = []
-        for post in posts:
+    async def _stubs(self, http: Http, channel: str, posts: list[Post]) -> list[JobStub]:
+        links = {p.id: tuple(dict.fromkeys((*p.links, *find_links(p.text)))) for p in posts}
+        counts = Counter(u for found in links.values() for u in found)
+
+        async def one(post: Post) -> JobStub | None:
             if link := _ats_link(post):
-                stubs.append(self._linked(channel, post, *link))
-            elif looks_like_vacancy(post.text):
-                ask.append(post)
-        for start in range(0, len(ask), AI_BATCH):
-            stubs += await self._extract(channel, ask[start : start + AI_BATCH])
-        return stubs
+                return self._linked(channel, post, *link)
+            if is_seeker(post.text) or not looks_like_vacancy(post.text):
+                return None
+            url = f"https://t.me/{channel}/{post.id}"
+            own = tuple(u for u in links[post.id] if counts[u] == 1)  # shared = a channel footer
+            job = PostJob(self.name, url, post.text, own, post.posted_at,
+                          {"channel": channel, "post": post.id})  # fmt: skip
+            return await post_stub(http, self._reader, job, self._rules,
+                                   fetch=not self.is_known(url))  # fmt: skip
+
+        return [s for s in await asyncio.gather(*(one(p) for p in posts)) if s]
 
     def _linked(self, channel: str, post: Post, ats: str, board: str, link: str) -> JobStub:
         first = post.text.splitlines()[0]
@@ -206,46 +187,3 @@ class Telegram(Source):
             remote=remote_from_text(first),
             extra={"channel": channel, "post": post.id},
         )
-
-    async def _extract(self, channel: str, posts: list[Post]) -> list[JobStub]:
-        """One AI call for a batch of posts; ids are ours, any other id in the reply is dropped.
-        Without a provider nothing is guessed: such posts yield no job."""
-        if self.provider is None:
-            return []
-        sent = [{"id": n, "text": p.text[:EXCERPT]} for n, p in enumerate(posts)]
-        try:
-            result = await self.provider.complete(
-                render("extract_telegram.j2", posts=sent), ExtractedPosts
-            )
-        except UsageLimitError:
-            raise  # pause the run cleanly instead of silently degrading
-        except ProviderError:
-            return []
-        stubs: list[JobStub] = []
-        seen: set[int] = set()
-        for found in result.posts:
-            if not 0 <= found.id < len(posts) or found.id in seen:
-                continue
-            seen.add(found.id)
-            post = posts[found.id]
-            post_url = f"https://t.me/{channel}/{post.id}"
-            jobs = [j for j in found.jobs if j.title.strip()]
-            for n, job in enumerate(jobs, 1):
-                # The post itself is the safest description. A post with several jobs covers
-                # all of them, so those keep the model's own summary of theirs.
-                text = post.text if len(jobs) == 1 else job.description or post.text
-                stubs.append(
-                    JobStub(
-                        source=self.name,
-                        url=post_url + (f"?job={n}" if n > 1 else ""),
-                        title=job.title.strip(),
-                        company=job.company.strip() or "Unknown",
-                        location=job.location.strip(),
-                        description=text[:DESCRIPTION],
-                        posted_at=post.posted_at,
-                        apply_url=post_url,
-                        remote=job.remote or remote_from_text(job.title, job.location),
-                        extra={"channel": channel, "post": post.id},
-                    )
-                )
-        return stubs

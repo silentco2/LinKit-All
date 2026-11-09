@@ -1,8 +1,7 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnInit } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { focusFragment } from '../../focus';
-import { Hint, resetHints } from '../../components/hint';
 import { TPipe } from '../../i18n';
 import { AccountsSection } from './accounts';
 import { AdvancedSection } from './advanced';
@@ -19,11 +18,10 @@ type Section = { id: string; label: string };
 /** Settings shell: the section list (a select on a phone) and the open section. */
 @Component({
   selector: 'app-settings',
-  imports: [Hint, RouterLink, TPipe, ProfileSection, JobsSection, SourcesSection, AnswersSection, ApplyingSection, AccountsSection, AiSection, AdvancedSection],
+  imports: [RouterLink, TPipe, ProfileSection, JobsSection, SourcesSection, AnswersSection, ApplyingSection, AccountsSection, AiSection, AdvancedSection],
   template: `
     <h1>{{ 'settings.title' | t }}</h1>
     <p class="mt-1 text-sm text-slate-500">{{ 'settings.subtitle' | t }}</p>
-    <app-hint id="settings">{{ 'hint.settings' | t }}</app-hint>
 
     <div class="mt-6 grid gap-6 md:grid-cols-[14rem_minmax(0,1fr)]">
       <aside>
@@ -37,7 +35,7 @@ type Section = { id: string; label: string };
               <li>
                 <a [routerLink]="['/settings', s.id]" [attr.aria-current]="s.id === section() ? 'page' : null"
                    class="block rounded-lg px-3 py-2 text-sm font-medium no-underline hover:bg-slate-100 hover:no-underline dark:hover:bg-slate-800"
-                   [class]="s.id === section() ? 'bg-brand-50 text-brand-700 dark:bg-slate-800 dark:text-white' : 'text-slate-600 dark:text-slate-300'">
+                   [class]="s.id === section() ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-300'">
                   {{ s.label | t }}
                 </a>
               </li>
@@ -45,8 +43,6 @@ type Section = { id: string; label: string };
           </ul>
         </nav>
         <a routerLink="/welcome" class="mt-4 block px-3 text-sm max-sm:py-2.5">{{ 'settings.rerun' | t }}</a>
-        <button type="button" class="mt-2 block px-3 text-start text-sm text-brand-700 hover:underline max-sm:py-2.5 dark:text-brand-300" (click)="showTips()">{{ 'settings.tips' | t }}</button>
-        @if (tipsReset()) { <p class="hint px-3" role="status">{{ 'settings.tipsDone' | t }}</p> }
       </aside>
 
       <div class="min-w-0 max-w-3xl">
@@ -99,13 +95,6 @@ export class SettingsPage implements OnInit {
   ngOnInit(): void {
     void this.store.load();
     focusFragment(this.route.snapshot.fragment); // /settings/jobs#exc, from a "why was this left out" link
-  }
-
-  protected readonly tipsReset = signal(false);
-
-  protected showTips(): void {
-    resetHints();
-    this.tipsReset.set(true);
   }
 
   protected pick(event: Event): void {

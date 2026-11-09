@@ -31,10 +31,11 @@ class ProfileFields(BaseModel):
     full_name: str = ""
     email: str = ""
     phone: str = ""  # international: "+" and digits; a number typed without "+" is kept as typed
-    location: str = ""  # derived "City, Country" whenever home_city or home_country is set
+    location: str = ""  # derived "City, State, Country" whenever home_city or home_country is set
     address: str = ""
     postal_code: str = ""
     home_city: str = ""
+    home_state: str = ""  # state, governorate or province
     home_country: str = ""  # ISO2
     skills: list[str] = []
     locked_facts: list[str] = []
@@ -58,7 +59,9 @@ class ProfileFields(BaseModel):
         if self.home_city.strip() or self.home_country:
             found = geo.country(self.home_country)
             country = (found.name if found else self.home_country) if self.home_country else ""
-            self.location = ", ".join(x for x in (self.home_city.strip(), country) if x)
+            self.location = ", ".join(
+                x for x in (self.home_city.strip(), self.home_state.strip(), country) if x
+            )
         return self
 
 
@@ -102,6 +105,7 @@ def load_fields(db: sessionmaker[Session]) -> tuple[ProfileFields, str]:
             address=row.address,
             postal_code=row.postal_code,
             home_city=row.home_city,
+            home_state=row.home_state,
             home_country=row.home_country,
             skills=row.skills,
             locked_facts=facts,
@@ -165,10 +169,11 @@ def fill_from_cv(db: sessionmaker[Session], cv: Path) -> list[str]:
 _EMPTY: tuple[Any, ...] = ("", None, [])
 _FILLABLE = {  # the non-sensitive fields a CV may fill
     "profile": {
-        "full_name", "email", "phone", "location", "home_city", "home_country", "skills",
+        "full_name", "email", "phone", "location", "home_city", "home_state", "home_country",
+        "skills",
     },
     "answers": {
-        "first_name", "last_name", "city", "country", "current_company", "current_title",
+        "city", "country", "current_company", "current_title",
         "linkedin", "github", "portfolio", "years_experience",
     },
 }  # fmt: skip

@@ -111,7 +111,7 @@ async def fill_in(
                     await _choose(page, box, str(v), "checkbox")
             case "checkbox":
                 if value:
-                    await _inside(page, box, "input[type=checkbox]").first.check()
+                    await _tick(_inside(page, box, "input[type=checkbox]").first)
             case "yesno":
                 await box.get_by_role("button", name=str(value), exact=True).click()
             case "combobox":
@@ -124,6 +124,17 @@ async def fill_in(
         raise FillError(f"could not fill {q.label!r}: {e}") from e
 
 
+async def _tick(box: Locator) -> None:
+    """Tick a checkbox. Custom-styled ones hide the input under a styled label, so Playwright's
+    check() waits forever: then click it from the page, as the user's click on the label does."""
+    try:
+        await box.check(timeout=5000)
+    except Exception:
+        await box.evaluate("el => { if (!el.checked) el.click(); }")
+    if not await box.is_checked():
+        raise FillError("the box stays unticked")
+
+
 def _inside(page: Page | Frame, box: Locator, css: str) -> Locator:
     """`css` below `box`, or `box` itself when it is that element."""
     return box.locator(css).or_(box.and_(page.locator(css)))
@@ -132,7 +143,7 @@ def _inside(page: Page | Frame, box: Locator, css: str) -> Locator:
 async def _choose(page: Page | Frame, box: Any, text: str, role: str) -> None:
     control = box.get_by_role(role, name=text, exact=True)
     if await control.count():
-        await control.first.check()
+        await _tick(control.first)
         return
     label = box.locator("label").filter(has_text=text)  # custom-styled inputs: click the label
     if not await label.count():

@@ -223,11 +223,12 @@ class SourcesSection(BaseModel):
 
     use_discovered_boards: bool = False  # also crawl stored boards (`linkit discover-boards`)
     boards_per_run: int = Field(300, ge=0, le=20000)  # stored boards crawled per run, oldest first
-    # LinkedIn hiring posts; read when "linkedin_posts" is in `enabled`.
-    linkedin_keywords: list[str] = []
+    # LinkedIn hiring posts; read when "linkedin_posts" is in `enabled`. The keywords are the job
+    # titles (`search.queries`).
+    linkedin_keywords: list[str] = []  # deprecated and ignored: the job titles are the keywords
     linkedin_window: Literal["day", "week"] = "week"
     # posts read per keyword; Google gives at most 50 (linkedin_posts.google.MAX_PAGES)
-    linkedin_max_posts: int = Field(30, ge=1, le=200)
+    linkedin_max_posts: int = Field(50, ge=1, le=200)
     linkedin_headless: bool = True  # deprecated and ignored: `apply.headless` is the one setting
 
 
@@ -278,7 +279,7 @@ class FiltersSection(BaseModel):
 
 
 class MatchingSection(BaseModel):
-    ai_max_jobs: int = Field(300, ge=0)  # best locally-ranked jobs sent to the AI per run
+    ai_max_jobs: int = Field(100, ge=0)  # best locally-ranked jobs sent to the AI per run
     tier_high: int = Field(8, ge=1, le=10)  # score >= this: auto-apply
     tier_mid: int = Field(5, ge=1, le=10)  # score >= this: needs your approval
     batch_size: int = Field(15, ge=1, le=30)  # jobs per AI call
@@ -295,6 +296,9 @@ class ApplySection(BaseModel):
     max_pause_s: int = Field(60, ge=0)
     parallel_sites: int = Field(3, ge=1, le=3)  # sites worked on at the same time
     generic_agent: bool = True  # use the AI form agent for sites without a dedicated handler
+    google_signin: bool = False  # live: press a site's "Sign in with Google" (see google_signin)
+    # ban-risk sites: never driven by the app; the job waits in Needs you for the user's browser
+    assisted_hosts: list[str] = ["linkedin.com", "indeed.com", "glassdoor.com"]
     email_daily_cap: int = Field(15, ge=1, le=100)  # live application emails per day
     # None = not decided yet, True = tailor the CV per job (needs LibreOffice), False = send
     # the CV as uploaded. Without LibreOffice, practice mode sends it as uploaded either way.

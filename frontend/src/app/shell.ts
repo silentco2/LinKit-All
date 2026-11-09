@@ -20,7 +20,9 @@ export class Shell {
   /** Jobs waiting for a yes or no, as the user sees it (the server count minus what was just approved or skipped). */
   readonly reviewCount = computed(() => Math.max(0, (this.status()?.states['awaiting_review'] ?? 0) - this.pendingReview()));
   /** The one number for everything waiting on the user: nav badge, Needs you tabs and Home all read it. */
-  readonly needsCount = computed(() => this.reviewCount() + (this.status()?.actions_open ?? 0));
+  readonly needsCount = computed(() => this.reviewCount() + this.finishCount());
+  /** Cards on Needs you > Finish applications: parked applications plus the Google check, if any. */
+  readonly finishCount = computed(() => finish(this.status()));
   readonly notifySupported = typeof Notification !== 'undefined';
   readonly notify = signal(this.notifySupported && readNotifyPref() && Notification.permission === 'granted');
   readonly notifyHint = signal('');
@@ -29,10 +31,10 @@ export class Shell {
     try {
       const s = await this.api.get<Status>('/status');
       const known = this.status() !== null; // the first load is not news
-      const before = this.status()?.actions_open ?? 0;
+      const before = finish(this.status());
       this.status.set(s);
-      if (known && s.actions_open > before) {
-        this.alert(this.i18n.t('shell.actionNeeded'), this.i18n.plural('shell.actionNeededBody', s.actions_open), 'actions', '/needs-you?tab=finish');
+      if (known && finish(s) > before) {
+        this.alert(this.i18n.t('shell.actionNeeded'), this.i18n.plural('shell.actionNeededBody', finish(s)), 'actions', '/needs-you?tab=finish');
       }
       if (!this.live.run()) this.live.run.set(s.run);
     } catch {
@@ -80,4 +82,8 @@ function readNotifyPref(): boolean {
   } catch {
     return false;
   }
+}
+
+function finish(s: Status | null): number {
+  return (s?.actions_open ?? 0) + (s?.google_check ? 1 : 0);
 }

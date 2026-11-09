@@ -89,9 +89,7 @@ def greeting(author: str | None) -> str:
 
 def subject_for(title: str, full_name: str, suffix: str | None = None) -> str:
     title, full_name = " ".join(title.split()), " ".join(full_name.split())
-    base = (
-        f"Application: {title} {_DASH} {full_name}" if title else f"Application {_DASH} {full_name}"
-    )
+    base = title or f"Application {_DASH} {full_name}"
     return f"{base} ({suffix})" if suffix else base
 
 
@@ -127,9 +125,9 @@ async def compose(
 
 
 def attachment_copy(src: str | Path, out_dir: Path, full_name: str) -> Path:
-    """The tailored PDF under a name fit for a recruiter's inbox ("Jane Doe - CV.pdf")."""
+    """The CV under a name fit for a recruiter's inbox ("Jane Doe - CV.pdf")."""
     safe = re.sub(r"[^\w .-]", "", full_name).strip() or "Candidate"
     out_dir.mkdir(parents=True, exist_ok=True)
-    dst = out_dir / f"{safe} - CV.pdf"
+    dst = out_dir / f"{safe} - CV{Path(src).suffix.lower() or '.pdf'}"
     shutil.copyfile(src, dst)
     return dst

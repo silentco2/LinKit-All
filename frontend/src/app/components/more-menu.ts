@@ -24,7 +24,7 @@ let nextId = 0;
   template: `
     <button type="button" class="btn" aria-haspopup="menu" [attr.aria-expanded]="open()" [attr.aria-controls]="open() ? menuId : null"
             [attr.aria-label]="context() ? (('actions.more' | t) + ': ' + context()) : null" (click)="toggle()" (keydown)="buttonKey($event)">
-      {{ 'actions.more' | t }} <span aria-hidden="true">▾</span>
+      {{ 'actions.more' | t }} <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
     </button>
     @if (open()) {
       <div [id]="menuId" role="menu" [attr.aria-label]="'actions.more' | t"

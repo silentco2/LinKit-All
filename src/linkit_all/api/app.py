@@ -1,6 +1,7 @@
 """FastAPI app: API, live events, and the built Angular UI from the wheel."""
 
 import asyncio
+import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -8,7 +9,9 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from loguru import logger
+from sqlalchemy.orm import Session, sessionmaker
 
+from linkit_all.api.assist import router as assist_router
 from linkit_all.api.events import EventBus
 from linkit_all.api.routes import router
 from linkit_all.api.runner import PipelineRunner
@@ -22,8 +25,10 @@ from linkit_all.core.lo_install import LibreOfficeInstaller
 from linkit_all.core.log import setup_logging
 from linkit_all.core.scheduler import apply_schedule, make_scheduler, register_runner
 from linkit_all.core.search import SearchConfig, load_search
+from linkit_all.matching.trash import sweep
 
 STATIC = Path(__file__).parent.parent / "static" / "browser"  # Angular build output
+EXTENSION_ADDRESS = Path(__file__).parent.parent / "extension" / "app.json"
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -59,21 +64,44 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(LocalOnly, extra_origins=settings.dev_origins)
     app.include_router(router)
     app.include_router(suggest_router)
+    app.include_router(assist_router)
 
     @app.get("/{path:path}", include_in_schema=False)
     def spa(path: str) -> FileResponse:
         """Static files, else index.html so Angular's router handles deep links."""
         if path.startswith("api/"):
             raise HTTPException(404)
+        # index.html must be revalidated, or browsers keep an old build for hours (no Cache-Control
+        # means a guessed lifetime); the hashed JS/CSS names change per build, so they cache fine
+        fresh = {"Cache-Control": "no-cache"}
         file = (STATIC / path).resolve()
         if path and file.is_file() and file.is_relative_to(STATIC.resolve()):
-            return FileResponse(file)
+            return FileResponse(file, headers=fresh if file.suffix == ".html" else None)
         index = STATIC / "index.html"
         if not index.is_file():
             raise HTTPException(404, "UI not built: run `npm run build` in frontend/")
-        return FileResponse(index)
+        return FileResponse(index, headers=fresh)
 
     return app
+
+
+def _tell_extension(port: int) -> None:
+    """LinkIt Fill reads this from its own folder, so nobody has to type the port."""
+    try:
+        EXTENSION_ADDRESS.write_text(json.dumps({"port": port}), "utf-8")
+    except OSError as e:  # the extension then tries the default port
+        logger.warning("could not tell LinkIt Fill the port: {}", e)
+
+
+def _sweep_trash(db: sessionmaker[Session], settings: Settings) -> None:
+    """Start-up pass, so a change of rules needs no new search before old jobs disappear."""
+    from linkit_all.pipeline import _get_embedder
+
+    try:
+        sweep(db, load_search(db) or SearchConfig(),
+              lambda texts: asyncio.run(_get_embedder(settings))(texts))  # fmt: skip
+    except Exception:
+        logger.exception("could not update the hidden jobs")
 
 
 def serve(host: str = "127.0.0.1", port: int = 8765, open_browser: bool = True) -> None:
@@ -86,4 +114,7 @@ def serve(host: str = "127.0.0.1", port: int = 8765, open_browser: bool = True) 
     setup_logging(settings)
     if open_browser:
         threading.Timer(1.5, webbrowser.open, [f"http://{host}:{port}/"]).start()
-    uvicorn.run(create_app(settings), host=host, port=port, log_level="warning")
+    app = create_app(settings)
+    _tell_extension(port)
+    threading.Thread(target=_sweep_trash, args=(app.state.db, settings), daemon=True).start()
+    uvicorn.run(app, host=host, port=port, log_level="warning")

@@ -14,11 +14,17 @@ If you prefer files to forms, two steps have a command-line twin:
 
 | Field | Used for |
 |---|---|
-| Full name, email, phone, location | Application forms, and your CV's contact details |
+| Full name, email, phone, location | Application forms, and your CV's contact details. Forms get your name split on spaces: the first word is the first name, the last word is the last name, and the 2nd word goes in a middle-name box (a form with a box for a third name gets the 3rd word). |
+| Your name in Arabic or English | Only for forms that ask for your name in both languages. Leave it empty to use the spelling shown, which comes from a list of names on your computer, not AI. |
 | Skills (one per line) | Ranking, and the only extra skills tailoring may mention |
 | Locked facts (one per line) | Text the AI must never change: employers, job titles, degrees |
 
 Numbers, dates and contact details are always locked, even if you list nothing.
+
+Your home place goes in one box as city, state or governorate, and country, separated by a
+comma, slash or dash: `Maadi, Cairo, Egypt`, `Maadi / Cairo / Egypt` or `Maadi - Cairo - Egypt`.
+The state is optional, and the country can come first. It fills "State" or "Governorate"
+questions on application forms.
 
 **Your CV.** Upload a Word (`.docx`), OpenDocument (`.odt`), PDF or single-file LaTeX
 (`.tex`) file. Only words are ever changed, never layout or style. Maximum size is 10 MB.
@@ -133,9 +139,9 @@ For Gmail you need an **app password**. It is not your normal password.
 
 Unlock the vault first (step 7). The app password is kept in the vault.
 
-Under **Advanced** you can change the IMAP server (default `imap.gmail.com`). Only Gmail
-has been tested. Another IMAP provider that accepts app passwords may work if you enter its
-server.
+The address comes from your profile. Press the pencil next to it to use another one. The mail
+server is worked out from the address for Gmail, Yahoo and Outlook. Any other address uses
+Gmail's server, so it works only for a company mailbox hosted by Google.
 
 ### Outlook, Hotmail, Live and MSN
 

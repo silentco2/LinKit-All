@@ -43,7 +43,7 @@ PAGES = {
 URL = "https://forms.test/apply"
 T = TypeVar("T")
 
-_CONTROL = re.compile(r'^- id: (\w+) \| (\w+)((?: \| \w+)*)\n  name: (".*")$', re.M)
+_CONTROL = re.compile(r'^- id: (\w+) \| (\w+)((?: \| [^|\n]+)*)\n  name: (".*")$', re.M)
 _QUESTION = re.compile(r"^- key: (\w+) \| (\w+).*\n  question: (.*)$", re.M)
 
 
@@ -76,9 +76,15 @@ class FakeAI(LLMProvider):
         return json.dumps({"answers": out})
 
     def _map(self, prompt: str) -> dict[str, Any]:
-        fields, nxt, sub = [], None, None
+        fields, nxt, sub, apply, dismiss = [], None, None, None, None
         for cid, kind, extra, quoted in _CONTROL.findall(prompt):
             name = json.loads(quoted)
+            if kind == "link" or (kind == "button" and re.match(r"apply\b", name, re.I)):
+                apply = apply or cid
+                continue
+            if kind == "button" and re.search(r"close|dismiss|reject", name, re.I):
+                dismiss = cid
+                continue
             if kind == "button":
                 if re.search(r"next", name, re.I):
                     nxt = cid
@@ -94,6 +100,8 @@ class FakeAI(LLMProvider):
         if self.bogus:
             fields.append({"id": "zz9", "question": "Mystery", "kind": "text", "required": True})
             sub = sub or "zz8"
+        if apply and not fields and not sub:  # a job ad: only an Apply button or link
+            return {"page_kind": "listing", "apply_button": apply, "dismiss_button": dismiss}
         return {
             "page_kind": self.page_kind,
             "fields": fields,

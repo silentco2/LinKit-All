@@ -8,11 +8,15 @@ Open **Live run** to start and watch a run.
   *Filter and rank*, *AI scoring* and *Apply*. By default all five run, in that order.
 - Tick **Start a new run** for a fresh run. Otherwise an unfinished run carries on.
 - **Stop** cancels the run. Work already saved is kept.
-- The **Activity** list streams what is happening, and each stage shows a short summary.
+- Each step on Home has an icon: a check when done, an empty circle when not run. Press pause on
+  the running step to stop it. Press play on the stopped step to resume it, or play on the next
+  step to count the stopped one as done and go on with what it finished. **Find new jobs** starts
+  over and discards a stopped search.
+- The **Activity log** on Home streams what is happening, and each stage shows a short summary.
 - Only one run goes at a time.
 
-If your AI plan hits a usage limit, the run is **paused**, with the reason shown. Start it
-again later and it continues with the jobs not yet scored.
+If your AI plan hits a usage limit, the run is **paused**, with the reason shown. Press play on
+the step later and it continues with the jobs not yet scored.
 
 ## Scheduled runs
 

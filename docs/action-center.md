@@ -27,6 +27,8 @@ Each item shows the job, a message, and screenshots of the page when it stopped.
 - **Retry**: puts the job back in the apply queue unchanged.
 - **Open application page**: opens the posting's apply link in a new tab.
 - **I applied by hand**: records the job as applied, because you did it yourself.
+- **Mark as closed/expired** (under **More**): drops the job because the posting is gone. It
+  counts as skipped, and the job's history says you marked it closed.
 - **Skip**: drops the job.
 
 !!! note "After you answer"
@@ -58,4 +60,5 @@ LinKit All also never picks "Prefer not to say" on its own. You must choose it.
 Every answer you give here is saved to the **Answer bank** page, where you can read, edit and
 delete it. Answers drafted by the AI are marked `ai`. Editing one changes it to `user`.
 Later forms with similar questions reuse the answer, matched by meaning. Sensitive answers are
-reused only when the wording is nearly identical.
+reused only when the wording is nearly identical. Answers are grouped as **General**, **Per role**
+(reused for the same job title) or **Per company** (reused for that company only).

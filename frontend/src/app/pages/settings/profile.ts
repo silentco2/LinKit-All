@@ -8,7 +8,7 @@ import { PlacePick, PlacePicker } from '../../components/place-picker';
 import { TagInput } from '../../components/tag-input';
 import { I18n, TPipe } from '../../i18n';
 import { cvLabel } from '../../locale';
-import { ApplicationAnswers, Profile, Segment, splitName, Status } from '../../types';
+import { ApplicationAnswers, Profile, Segment, Status } from '../../types';
 import { Field } from './saved';
 import { SettingsStore } from './store';
 
@@ -57,7 +57,7 @@ type Row = { key: string; id: string; label: string; type?: string; dir?: 'ltr';
           <details class="text-sm">
             <summary class="cursor-pointer font-medium">{{ i18n.plural('setup.cv.reads', segments().length) }}</summary>
             <ol class="mt-2 max-h-72 space-y-1 overflow-auto rounded-lg bg-slate-50 p-3 dark:bg-slate-950">
-              @for (s of segments(); track s.id) { <li class="whitespace-pre-wrap" dir="auto"><span class="text-slate-400">{{ s.id }}</span> {{ s.text }}</li> }
+              @for (s of segments(); track s.id) { <li class="whitespace-pre-wrap" dir="auto"><span class="text-slate-500">{{ s.id }}</span> {{ s.text }}</li> }
             </ol>
           </details>
         }
@@ -68,13 +68,9 @@ type Row = { key: string; id: string; label: string; type?: string; dir?: 'ltr';
         <app-field key="profile.full_name" for="p-name" [label]="'setup.profile.fullName' | t">
           <input id="p-name" class="input" type="text" dir="auto" autocomplete="name" [value]="v('profile.full_name') ?? ''" (change)="setName(val($event))">
         </app-field>
-        <details class="text-sm">
-          <summary class="cursor-pointer font-medium text-brand-700 dark:text-brand-300">{{ 'settings.profile.nameSplit' | t }}</summary>
-          <p class="hint">{{ 'settings.profile.nameSplitHint' | t }}</p>
-          <div class="mt-3 grid gap-4 sm:grid-cols-2">
-            @for (f of split; track f.key) { <ng-container [ngTemplateOutlet]="plain" [ngTemplateOutletContext]="{ $implicit: f }" /> }
-          </div>
-        </details>
+        <app-field key="answers.name_other" for="p-name-other" [label]="(otherName().lang === 'ar' ? 'settings.profile.nameArabic' : 'settings.profile.nameEnglish') | t" [hint]="'settings.profile.nameOtherHint' | t">
+          <input id="p-name-other" class="input" type="text" [attr.dir]="otherName().lang === 'ar' ? 'rtl' : 'ltr'" [placeholder]="otherName().value" [value]="v('answers.name_other') ?? ''" (change)="store.update('answers.name_other', val($event))">
+        </app-field>
         <div class="grid gap-4 sm:grid-cols-2">
           <app-field key="profile.email" for="p-email" [label]="'setup.profile.email' | t">
             <input id="p-email" class="input" type="email" dir="ltr" autocomplete="email" [value]="v('profile.email') ?? ''" (change)="store.update('profile.email', val($event))">
@@ -161,10 +157,8 @@ export class ProfileSection implements OnInit {
   /** Bumped when the store's plain objects change behind the template's back (a CV upload filled fields). */
   private readonly rev = signal(0);
 
-  protected readonly split: Row[] = [
-    { key: 'answers.first_name', id: 'a-first', label: 'setup.answers.first' },
-    { key: 'answers.last_name', id: 'a-last', label: 'setup.answers.last' },
-  ];
+  /** What forms get for "name in Arabic/English" when the box under the full name is left empty. */
+  protected readonly otherName = signal({ value: '', lang: 'ar' });
   protected readonly work: Row[] = [
     { key: 'answers.current_title', id: 'a-title', label: 'setup.answers.jobTitle', view: true },
     { key: 'answers.current_company', id: 'a-company', label: 'setup.answers.company', view: true },
@@ -177,13 +171,21 @@ export class ProfileSection implements OnInit {
   ];
 
   constructor() {
+    effect(() => {
+      const full: string = this.v('profile.full_name') ?? '';
+      untracked(() => void this.loadOtherName(full));
+    });
     // the stored home city is English; in Arabic look up its Arabic name once per city
     effect(() => {
       const lang = this.i18n.lang();
       this.rev();
-      const { home_city: city, home_country: iso } = this.store.profile;
-      if (lang === 'ar' && city && iso) untracked(() => void this.loadAr(city, iso));
+      const { home_city: city, home_state: state, home_country: iso } = this.store.profile;
+      if (lang === 'ar' && iso) for (const name of [city, state]) if (name) untracked(() => void this.loadAr(name, iso));
     });
+  }
+
+  private async loadOtherName(full: string): Promise<void> {
+    this.otherName.set(await this.api.get<{ value: string; lang: string }>(`/suggest/name-other?name=${encodeURIComponent(full)}`).catch(() => ({ value: '', lang: 'ar' })));
   }
 
   private async loadAr(city: string, iso: string): Promise<void> {
@@ -228,14 +230,10 @@ export class ProfileSection implements OnInit {
 
   // ---- name, home ------------------------------------------------------------------------
 
-  /** Save the name; first and last follow it unless the user wrote their own. */
+  /** Save the name. Forms split it on spaces themselves, so nothing else follows it. */
   protected setName(full: string): void {
-    const old = splitName(this.store.profile.full_name);
-    const now = splitName(full);
     this.store.update('profile.full_name', full);
-    const a = this.store.answers;
-    if (!a.first_name || a.first_name === old.first) this.derive('answers.first_name', now.first);
-    if (!a.last_name || a.last_name === old.last) this.derive('answers.last_name', now.last);
+    void this.loadOtherName(full);
   }
 
   private derive(key: string, value: string): void {
@@ -245,19 +243,20 @@ export class ProfileSection implements OnInit {
   protected homeText(): string {
     this.rev();
     const p = this.store.profile;
-    const ar = this.i18n.lang() === 'ar' && p.home_city ? this.arNames()[`${p.home_city}|${p.home_country}`] : '';
-    if (ar) return ar;
+    const ar = this.i18n.lang() === 'ar';
+    const named = (name: string) => (ar && this.arNames()[`${name}|${p.home_country}`]?.split('،')[0].trim()) || name;
     const c = p.home_country ? this.countries.byIso(p.home_country) : undefined;
     const country = c ? this.countries.name(c) : p.home_country;
-    return [p.home_city, country].filter(Boolean).join(this.i18n.lang() === 'ar' ? '، ' : ', ');
+    return [named(p.home_city), named(p.home_state), country].filter(Boolean).join(ar ? '، ' : ', ');
   }
 
-  /** A picked city sets city and country; a country sets country only; typed text keeps the country; cleared clears both. */
+  /** A picked city sets city and country; a country sets country only; typed text keeps the country; cleared clears all. Only text typed in parts has a state. */
   protected setHome(p: PlacePick): void {
     this.store.profile.home_country = p.label ? p.country || this.store.profile.home_country : '';
     this.store.profile.home_city = p.city;
+    this.store.profile.home_state = p.state ?? '';
     if (p.city && p.country && this.i18n.lang() === 'ar') this.arNames.update((m) => ({ ...m, [`${p.city}|${p.country}`]: p.label }));
-    this.store.update('profile.home_city', p.city, ['profile.home_country']);
+    this.store.update('profile.home_city', p.city, ['profile.home_state', 'profile.home_country']);
   }
 
   // ---- text boxes that can show the CV's value --------------------------------------------

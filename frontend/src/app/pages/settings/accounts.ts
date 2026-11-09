@@ -92,6 +92,20 @@ type Note = { ok: boolean; text: string };
       </section>
 
       <section class="card space-y-4">
+        <h2>{{ 'settings.acc.google' | t }}</h2>
+        <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'settings.acc.googleIntro' | t }}</p>
+        <label class="flex items-center gap-2 text-sm font-medium">
+          <input type="checkbox" role="switch" [checked]="store.cfg.apply.google_signin" (change)="store.update('apply.google_signin', !store.cfg.apply.google_signin)">
+          {{ 'settings.acc.googleOn' | t }}
+        </label>
+        <div>
+          <button type="button" class="btn" [disabled]="busy()" (click)="openGoogle()">{{ 'settings.acc.googleOpen' | t }}</button>
+          <p class="hint">{{ 'settings.acc.googleHint' | t }}</p>
+        </div>
+        @if (googleNote(); as n) { <div class="alert" [class.alert-ok]="n.ok" [class.alert-error]="!n.ok" role="status" dir="auto">{{ n.text }}</div> }
+      </section>
+
+      <section class="card space-y-4">
         <h2>{{ 'setup.keys.title' | t }}</h2>
         <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'setup.keys.intro' | t }}</p>
         @if (!unlocked()) {
@@ -123,9 +137,25 @@ export class AccountsSection implements OnInit {
   protected readonly vault = signal<VaultState | null>(null);
   protected readonly keys = signal<ApiKeyProvider[]>([]);
   protected readonly note = signal<Note | null>(null);
+  protected readonly googleNote = signal<Note | null>(null);
   protected readonly busy = signal(false);
   protected readonly unlocked = computed(() => !!this.vault()?.unlocked);
   protected readonly entries = computed(() => this.vault()?.entries ?? []);
+
+  /** Chrome opens on the form agent's profile and the user signs in there; signing in is what the switch needs, so it turns on too. */
+  protected async openGoogle(): Promise<void> {
+    this.busy.set(true);
+    this.googleNote.set(null);
+    try {
+      await this.api.post('/google/sign-in');
+      if (!this.store.cfg.apply.google_signin) this.store.update('apply.google_signin', true);
+      this.googleNote.set({ ok: true, text: this.i18n.t('settings.acc.googleOpened') });
+    } catch (e) {
+      this.googleNote.set({ ok: false, text: (e as Error).message });
+    } finally {
+      this.busy.set(false);
+    }
+  }
 
   protected readonly asking = signal<number | null>(null);
   protected readonly secret = signal<{ id: number; value: string } | null>(null);

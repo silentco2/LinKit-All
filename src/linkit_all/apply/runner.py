@@ -30,17 +30,24 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from linkit_all.apply.accounts import (
     Account,
+    PasswordRules,
     create_account,
     find_account,
     mark_active,
 )
 from linkit_all.apply.agent import (
     captcha_shown,
+    enter_code,
     field_map,
     locate,
+    login_form,
+    open_signup,
     page_errors,
     page_text,
+    press_apply,
     press_next,
+    sign_in,
+    signup_link_needed,
     snapshot,
     step,
     wait_for_confirmation,
@@ -71,6 +78,7 @@ from linkit_all.apply.email_send import (
 )
 from linkit_all.apply.email_verify import EmailLoginError, credentials, wait_for_verification
 from linkit_all.apply.form import FillError, fill, lost_values
+from linkit_all.apply.google_signin import sign_in_with_google
 from linkit_all.apply.handlers import HANDLERS, Handler, JobInfo
 from linkit_all.apply.handlers.base import GENERIC_CONFIRMATION
 from linkit_all.apply.vault import Vault, vault_for
@@ -93,6 +101,7 @@ from linkit_all.sources import registry
 from linkit_all.sources.ats_detector import detect
 from linkit_all.sources.base import JobStub, Source
 from linkit_all.sources.http import Http, make_client
+from linkit_all.sources.jobspy_sites import linkedin_apply
 from linkit_all.tailor.pipeline import TailorError, cv_plan, original_cv, tailor_job
 from linkit_all.tailor.render.libreoffice import RenderError
 
@@ -126,6 +135,53 @@ NEEDS_TOOL = {
 
 
 MAX_AGENT_PAGES = 8
+MAX_APPLY_HOPS = 3  # job ad -> Apply -> maybe another ad or a redirect page -> the form
+APPLY_REDIRECT_WAIT_S = 20.0  # longest we watch for a board's delayed script redirect after Apply
+
+
+def assisted(url: str | None, hosts: list[str]) -> bool:
+    """A ban-risk site (LinkedIn, Indeed, Glassdoor): the app never drives it, the user applies in
+    their own browser. Matched on the site's name, so every country domain counts."""
+    labels = urlparse(url or "").netloc.lower().split(".")
+    return any(h.lower().split(".")[0] in labels for h in hosts)
+
+
+def job_context(profile: Profile, job: Job, resume_path: str = "") -> Context:
+    """What the answer engine knows when applying to `job` (profile facts, job place)."""
+    return Context(
+        full_name=profile.full_name,
+        email=profile.email,
+        phone=profile.phone,
+        location=profile.location,
+        answers=ApplicationAnswers.model_validate(profile.answers),
+        address=profile.address,
+        postal_code=profile.postal_code,
+        home_city=profile.home_city,
+        home_state=profile.home_state,
+        home_country=profile.home_country,
+        job_location=job.location,
+        job_source=job.source,
+        resume_path=resume_path,
+    )
+
+
+def _fields(controls: list[Any]) -> list[Any]:
+    """Controls that take an answer (not buttons or links)."""
+    return [c for c in controls if c.kind not in ("button", "link")]
+
+
+BY_HAND_MSG = (
+    'the app could not finish this application on its own: press "Open in my browser", apply '
+    'there, then press "I applied"'
+)
+OFFSITE_MSG = (
+    'LinkedIn links this job to the employer\'s own site: press "Open in my browser", press Apply '
+    'on LinkedIn, then on the employer\'s form press "Fill this step" in the LinkIt panel'
+)
+IN_BROWSER_MSG = (
+    'this site bans automated applying, so apply in your own browser: press "Open in my '
+    'browser" (the LinkIt extension fills the form), then press Next and Submit yourself'
+)
 
 
 def hand_off(what: str) -> str:
@@ -137,6 +193,9 @@ def hand_off(what: str) -> str:
 
 
 CAPTCHA_MSG = f"a CAPTCHA appeared: {hand_off('solve it')}"
+# the page after a sign-up click asks for the emailed link or code
+VERIFY_PAGE = re.compile(r"verif|confirm (your )?e-?mail|check your (e-?mail|inbox)|\bcode\b", re.I)
+WEB = "web"  # vault "ats" of accounts on sites without a handler; the tenant is the host
 
 
 async def click_submit(page: Page, target: Handler | Locator, dry_run: bool) -> None:
@@ -180,6 +239,25 @@ async def run_signup(
     if dry_run:
         raise DryRunViolation("refusing to submit a sign-up form in dry-run mode")
     await handler.signup(page, job, account)
+
+
+async def _where(page: Page) -> tuple[str, int]:
+    return page.url.split("#")[0], len(_fields(await snapshot(page)))
+
+
+async def _moved_on(page: Page, before: tuple[str, int]) -> bool:
+    """Apply led somewhere. Boards like RemoteOK redirect from a script, seconds later, so the
+    page is watched for a while. A half-loaded page looks different: it must differ once settled."""
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + APPLY_REDIRECT_WAIT_S
+    while True:
+        if await _where(page) != before:
+            await _settle(page)
+            if await _where(page) != before:
+                return True
+        if loop.time() >= deadline:
+            return False
+        await asyncio.sleep(0.5)
 
 
 @dataclass
@@ -465,14 +543,14 @@ class Applier:
             )
         return True
 
-    async def _cv_pdf(self, job_id: int) -> str:
-        """The CV file this application sends. A tailored PDF, or (user declined tailoring, or
-        practice mode without LibreOffice) the CV as uploaded, with no AI call at all. Never an
-        untailored CV when tailoring was chosen and the tool is there."""
+    async def _cv_pdf(self, job_id: int, tailor: bool = True) -> str:
+        """The CV file this application sends. A tailored PDF, or (`tailor` False, user declined
+        tailoring, or practice mode without LibreOffice) the CV as uploaded, with no AI call at
+        all. Never an untailored CV when tailoring was chosen and the tool is there."""
         with self.db() as s:
             profile = s.get(Profile, 1)
             fmt = profile.cv_source_format if profile else "docx"
-        plan = cv_plan(fmt, self.cfg.apply.tailor_cv, self.cfg.apply.live)
+        plan = cv_plan(fmt, self.cfg.apply.tailor_cv if tailor else False, self.cfg.apply.live)
         if plan.mode == "blocked":
             raise ApplyBlocked(NEEDS_TOOL[plan.reason], plan.reason)
         try:
@@ -515,24 +593,16 @@ class Applier:
         if await self._posting_closed(job, info):  # a read-only check; costs no AI
             return Outcome("skipped", f"the posting is no longer open on {job.ats}")
         cv_pdf = await self._cv_pdf(job_id)
+        with self.db.begin() as s:  # the file the LinkIt extension uploads if the user takes over
+            row = s.get_one(Job, job_id)
+            row.data = {**row.data, "cv_pdf": cv_pdf}
+        if handler is None and assisted(info.apply_url, self.cfg.apply.assisted_hosts):
+            return await self._park_in_browser(job_id, info.apply_url)
         with self.db() as s:
             profile = s.get_one(Profile, 1)
         out_dir = self.settings.data_dir / "applications" / f"job_{job_id}"
         out_dir.mkdir(parents=True, exist_ok=True)
-        ctx = Context(
-            full_name=profile.full_name,
-            email=profile.email,
-            phone=profile.phone,
-            location=profile.location,
-            answers=ApplicationAnswers.model_validate(profile.answers),
-            address=profile.address,
-            postal_code=profile.postal_code,
-            home_city=profile.home_city,
-            home_country=profile.home_country,
-            job_location=job.location,
-            job_source=job.source,
-            resume_path=cv_pdf,
-        )
+        ctx = job_context(profile, job, cv_pdf)
         key = handler.ats if handler else "generic"
         browser = await self._context(key)
         await self._trace_start(key, browser)
@@ -589,8 +659,43 @@ class Applier:
             await self._trace_stop(key, browser, out_dir if keep_trace else None)
             await page.close()
 
+    async def _park_in_browser(
+        self, job_id: int, url: str, answers: dict[str, Any] | None = None
+    ) -> Outcome:
+        """Hand a ban-risk site to the user's own browser (the extension fills it there). For
+        LinkedIn, its public page says whether this is Easy Apply or a link to the employer."""
+        how = await self._linkedin_kind(url)
+        offsite = how == "offsite"
+        msg, code = (
+            (OFFSITE_MSG, "apply_in_browser_offsite")
+            if offsite
+            else (IN_BROWSER_MSG, "apply_in_browser")
+        )
+        with self.db.begin() as s:
+            job = s.get_one(Job, job_id)
+            job.data = {**job.data, "apply_url": url, **({"linkedin_apply": how} if how else {})}
+            _park(
+                s, job, ActionKind.apply_in_browser, msg, [], answers or {}, [], code,
+                {"site": urlparse(url).netloc},
+            )  # fmt: skip
+        return Outcome("needs_user", "waiting for you to apply in your browser")
+
+    async def _linkedin_kind(self, url: str) -> str | None:
+        """ "offsite" or "easy_apply" from LinkedIn's public job page (one plain GET, no login,
+        what any visitor's browser fetches); None for other sites or when it cannot be read."""
+        if "linkedin" not in urlparse(url).netloc.lower().split("."):
+            return None
+        try:
+            if self._http is not None:
+                return linkedin_apply((await self._http.get(url)).text)
+            async with make_client() as client:
+                return linkedin_apply((await Http(client).get(url)).text)
+        except Exception as e:  # offline, blocked or changed: the card stays generic
+            logger.debug("LinkedIn apply kind unknown for {}: {}", url, e)
+            return None
+
     async def _apply_email(self, job_id: int, addr: str) -> Outcome:
-        """A `mailto:` posting: tailored CV + short cover email. Dry run only writes an .eml;
+        """A `mailto:` posting: the CV as uploaded + short cover email. Dry run only writes an .eml;
         live waits for the user's confirm (draft editable) unless told not to. Sent = applied."""
         apply_cfg = self.cfg.apply
         with self.db() as s:
@@ -611,7 +716,7 @@ class Applier:
                     params={"to": addr},
                 )
             return Outcome("skipped", f"already emailed {addr}")
-        cv_pdf = await self._cv_pdf(job_id)
+        cv_pdf = await self._cv_pdf(job_id, tailor=False)  # the AI writes the message, nothing else
         with self.db() as s:
             job = s.get_one(Job, job_id)
             profile = s.get_one(Profile, 1)
@@ -807,6 +912,7 @@ class Applier:
         cv, summary = cv_text(profile), profile_summary(ctx)
         filled: dict[str, Any] = {}
         shots: list[str] = []
+        tried_google = tried_account = False
 
         def park(
             kind: ActionKind,
@@ -823,14 +929,25 @@ class Applier:
                 )
             return Outcome("needs_user", message, shots[-1:])
 
-        def fail(reason: str) -> Outcome:
+        def fail(reason: str, code: str) -> Outcome:
             with self.db.begin() as s:
                 job = s.get_one(Job, info.id)
                 if job.state != JobState.applying:
                     transition(s, job, JobState.applying, "filling the application", code="filling")
-                transition(s, job, JobState.failed, reason, shots[-1:])
+                transition(s, job, JobState.failed, reason, shots[-1:], code)
             return Outcome("failed", reason, shots[-1:])
 
+        def by_hand(reason: str, code: str) -> Outcome:
+            """A dead end: the user finishes it in their own browser with what was prepared."""
+            return park(
+                ActionKind.apply_by_hand,
+                f"{BY_HAND_MSG} ({reason})",
+                "apply_by_hand",
+                {"why": code, "site": urlparse(page.url).netloc},
+                answers=filled,
+            )
+
+        hops = 0
         for n in range(1, MAX_AGENT_PAGES + 1):
             r = await step(
                 page, self.provider, ctx, self.bank, cv, summary, brief, out_dir, dry_run=not live
@@ -841,6 +958,39 @@ class Applier:
             if await captcha_shown(page):
                 return park(ActionKind.captcha, CAPTCHA_MSG, "captcha")
             if r.page_kind in ("login", "signup"):
+                # sign-up is never touched in a dry run; one try, so a site that keeps asking parks
+                if live and apply_cfg.google_signin and not tried_google:
+                    tried_google = True
+                    google = await sign_in_with_google(page, profile.email)
+                    if google == "signed_in":
+                        with self.db.begin() as s:
+                            job = s.get_one(Job, info.id)
+                            _event(s, job, "signed in with Google", [], "signed_in_google")
+                        await page.goto(
+                            info.apply_url or info.url,
+                            wait_until="domcontentloaded",
+                            timeout=60000,
+                        )
+                        await _settle(page)
+                        continue
+                    if google == "needs_user":
+                        return park(
+                            ActionKind.login_issue,
+                            f"Google needs you for this site: {hand_off('sign in with Google')}",
+                            "google_needed",
+                        )
+                if not tried_account:  # one try: a site that keeps asking parks
+                    tried_account = True
+                    gated = await self._agent_account(
+                        page, info, ctx, profile, out_dir, brief, park
+                    )
+                    if gated is not None:
+                        return gated
+                    await page.goto(
+                        info.apply_url or info.url, wait_until="domcontentloaded", timeout=60000
+                    )
+                    await _settle(page)
+                    continue
                 return park(
                     ActionKind.login_issue,
                     f"This site needs an account: {hand_off('sign in')}",
@@ -865,8 +1015,30 @@ class Applier:
                     {"detail": detail},
                     answers=filled,
                 )
+            if r.action == "open":  # a job ad: press its Apply and see where it leads
+                hops += 1
+                if hops > MAX_APPLY_HOPS:
+                    return by_hand("Apply kept leading to more job ads", "too_many_hops")
+                before = await _where(page)
+                await press_apply(page, r)
+                await _settle(page)
+                # same page, no new questions, even after waiting: e.g. a sign-up teaser popup
+                if not await _moved_on(page, before):
+                    return by_hand("pressing Apply opened nothing", "apply_no_effect")
+                if assisted(page.url, apply_cfg.assisted_hosts):
+                    return await self._park_in_browser(info.id, page.url, filled)
+                handed = await self._hand_to_handler(page, info, ctx, profile, out_dir)
+                if handed is not None:
+                    return handed
+                continue
+            if r.code in ("not_eligible", "posting_gone"):
+                with self.db.begin() as s:
+                    transition(
+                        s, s.get_one(Job, info.id), JobState.skipped, r.reason, shots[-1:], r.code
+                    )
+                return Outcome("skipped", r.reason, shots[-1:])
             if r.action == "stop" or r.button is None:
-                return fail(r.reason or "the form agent found no way forward")
+                return by_hand(r.reason or "no way forward", r.code or "no_way_forward")
             if r.action == "next":
                 await press_next(page, r)
                 await _settle(page)
@@ -930,8 +1102,122 @@ class Applier:
                     {"detail": detail},
                     answers=filled,
                 )
-            return fail("no confirmation page after submitting")
-        return fail(f"more than {MAX_AGENT_PAGES} pages: the form agent gave up")
+            return fail("no confirmation page after submitting", "no_confirmation")
+        return by_hand(f"more than {MAX_AGENT_PAGES} pages", "too_many_pages")
+
+    async def _agent_account(
+        self,
+        page: Page,
+        info: JobInfo,
+        ctx: Context,
+        profile: Profile,
+        out_dir: Path,
+        brief: dict[str, str],
+        park: Callable[..., Outcome],
+    ) -> Outcome | None:
+        """A site without a handler wants an account: sign in with the vault's login for this
+        host, or (live only) sign up first: password saved before the click, the emailed link
+        or code read from the inbox. None = signed in; the caller goes back to the job."""
+        host = (urlparse(page.url).hostname or "").removeprefix("www.")
+        vault = self._unlocked_vault()
+        account = find_account(vault, WEB, host) if vault is not None else None
+        if account is None and not self.cfg.apply.live:  # a dry run never touches sign-up
+            msg = f"would sign up on {host}"
+            with self.db.begin() as s:
+                job = s.get_one(Job, info.id)
+                _event(
+                    s, job, f"dry run: {msg}, not submitted", [], "dry_run_signup", {"site": host}
+                )
+                job.data = {**job.data, "dry_run_at": utcnow().isoformat()}
+            return Outcome("dry_run", msg)
+        if vault is None:
+            msg = f"Unlock (or create) the vault so the app can sign in to {host}"
+            return park(ActionKind.login_issue, msg, self._vault_code(), {"site": host})
+        if account is None:
+            try:
+                mail = await asyncio.to_thread(credentials, self.cfg.email, vault, profile.email)
+            except EmailLoginError as e:
+                return park(
+                    ActionKind.login_issue, str(e), "email_login_failed", {"detail": str(e)}
+                )
+            if mail is None:
+                msg = "Connect your email in Setup so the app can read the verification email"
+                return park(
+                    ActionKind.login_issue, msg, "needs_email", {"site": host, "purpose": "verify"}
+                )
+            if await signup_link_needed(page) and not await open_signup(page):
+                msg = f"No sign-up link found on {host}: {hand_off('create an account')}"
+                return park(ActionKind.login_issue, msg, "account_needed")
+            # saved before the sign-up click: a crash never loses the password
+            account = create_account(vault, WEB, host, profile.email, PasswordRules())
+            since = utcnow()
+            r = await step(
+                page, self.provider, ctx, self.bank, cv_text(profile), profile_summary(ctx),
+                brief, out_dir, dry_run=False, password=account.password,
+            )  # fmt: skip
+            if r.missing:
+                return park(
+                    ActionKind.unknown_question,
+                    f"{len(r.missing)} question(s) need your answer",
+                    "unknown_question",
+                    {"n": len(r.missing)},
+                    [_missing_dict(m) for m in r.missing],
+                )
+            if not r.ready or r.button is None:
+                detail = "; ".join([*r.failed.values(), *r.unfilled, *r.errors]) or r.reason
+                msg = f"Sign-up on {host} needs you ({detail[:300]}): {hand_off('create it')}"
+                return park(ActionKind.login_issue, msg, "signup_failed", {"site": host})
+            await (await locate(page, r.button.id)).click()
+            await _settle(page)
+            if await captcha_shown(page):
+                return park(ActionKind.captcha, CAPTCHA_MSG, "captcha")
+            if await login_form(page) or VERIFY_PAGE.search(await page_text(page, 5000)):
+                try:
+                    found = await wait_for_verification(
+                        self.cfg.email, *mail, [host], since, self.provider
+                    )
+                except EmailLoginError as e:
+                    return park(
+                        ActionKind.login_issue, str(e), "email_login_failed", {"detail": str(e)}
+                    )
+                if found is not None and found.link:
+                    await page.goto(found.link, wait_until="domcontentloaded", timeout=60000)
+                    await _settle(page)
+                elif found is None or not found.code or not await enter_code(page, found.code):
+                    msg = f"No verification email from {host} arrived in time: check your inbox"
+                    return park(ActionKind.login_issue, msg, "verification_missing", {"site": host})
+            account = mark_active(vault, account, WEB, host)
+            with self.db.begin() as s:
+                job = s.get_one(Job, info.id)
+                _event(s, job, f"account created on {host}", [], "account_created", {"site": host})
+        # ponytail: an emailed sign-in code after the password is not read; it parks below
+        if await login_form(page):
+            await sign_in(page, account.username, account.password)
+            await _settle(page)
+            if await login_form(page):
+                msg = f"{host} rejected the saved login: {hand_off('sign in')}"
+                return park(ActionKind.login_issue, msg, "login_rejected", {"site": host})
+        if account.status != "active":
+            mark_active(vault, account, WEB, host)
+        return None
+
+    async def _hand_to_handler(
+        self, page: Page, info: JobInfo, ctx: Context, profile: Profile, out_dir: Path
+    ) -> Outcome | None:
+        """Apply led to an ATS we have a handler for (Greenhouse, Lever, Ashby): remember the
+        real link on the job and let the handler fill it. None = keep going with the agent."""
+        found = detect(page.url)
+        if found is None:
+            return None
+        with self.db.begin() as s:
+            job = s.get_one(Job, info.id)
+            job.ats = found[0]
+            job.data = {**job.data, "apply_url": page.url}
+            _event(s, job, f"Apply leads to {found[0]}", [], "apply_resolved", {"ats": found[0]})
+            handler, real = HANDLERS.get(found[0]), job_info(job)
+        if handler is None or real is None:
+            return None
+        return await self._fill_and_decide(page, handler, real, ctx, profile, out_dir)
 
     async def _form_again(self, page: Page) -> bool:
         """Extra check once the confirmation text matched: if the page still has form controls,

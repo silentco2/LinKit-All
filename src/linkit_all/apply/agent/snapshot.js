@@ -1,5 +1,10 @@
 (prefix) => {  // prefix: makes ids unique across the page's frames
   const S = (window.__lkAgent ||= {n: 0, ids: new WeakMap(), groups: new WeakMap(), g: 0});
+  // Apply links of job ads: "Apply", "Apply now", "Apply for this job", "Sign in to apply", "Bewerben",
+  // "Postular", "Candidatar", "Postuler", Arabic "takadam"
+  const APPLY = /^(easy |quick )?(apply|bewerben|jetzt bewerben|postular|postúlate|candidat|postuler)\b|\bapply (now|here|for|on|to|online|externally|with)\b|\b(sign|log) ?(in|up) to apply\b|^i'?m interested$|^me interesa\b|^quiero (aplicar|postular)|^ap[uú]ntate|^inscr[ií]bete|^(aplicar|candidatar|solicitar|откликнуться|отклик|ansök|sök tjänsten|solliciteer|søg|hae|aplikuj|bewirb|postularme|応募|申请|지원)|^(تقدم|قدم|التقديم)/i;
+  // Sign-up links of a sign-in form, for the account flow
+  const SIGNUP = /^(sign ?up|create (an |your |a free )?account|register|join( now| free| us)?|new (user|here)|don.?t have an account)/i;
   const clean = (t) => (t || '').replace(/[*✱]/g, '').replace(/\s+/g, ' ').trim();
   const parent = (n) => n.parentElement || (n.getRootNode() instanceof ShadowRoot ? n.getRootNode().host : null);
   const all = [];
@@ -71,8 +76,13 @@
   // 1. visible, enabled controls
   const items = [];
   for (const e of all) {
-    if (!e.matches('input, select, textarea, button, [role=combobox], [role=radio], [role=checkbox], [role=switch], [role=button]')) continue;
-    if (e.disabled || hiddenUp(e)) continue;
+    // links count only when they look like an Apply button (job ads on boards link out to the real form);
+    // an Apply link with no address is a script button (NoDesk)
+    const says = clean(e.innerText || e.getAttribute('aria-label') || '');
+    const opensApply = e.matches('a, button, [role=button]') && APPLY.test(says);
+    const link = e.tagName === 'A' && !e.matches('[role]') && ((opensApply) || (e.hasAttribute('href') && SIGNUP.test(clean(e.innerText || ''))));
+    if (!link && !e.matches('input, select, textarea, button, [role=combobox], [role=radio], [role=checkbox], [role=switch], [role=button]')) continue;
+    if (e.disabled || (hiddenUp(e) && !opensApply)) continue;  // a cookie popup hides the whole page from screen readers, Apply included
     const type = (e.getAttribute('type') || '').toLowerCase(), role = e.getAttribute('role') || '';
     if (e.tagName === 'INPUT' && ['hidden', 'image', 'reset', 'range', 'color'].includes(type)) continue;
     if (/captcha-response/.test(e.name || '')) continue;
@@ -87,6 +97,7 @@
     else if (e.tagName === 'TEXTAREA') kind = 'textarea';
     else if (type === 'file') kind = 'file';
     else if (role === 'combobox' || e.classList.contains('select__input')) kind = 'combobox';
+    else if (link) kind = 'link';
     else if (e.hasAttribute('aria-pressed')) kind = 'toggle';
     else if (e.tagName === 'BUTTON' || ['submit', 'button'].includes(type) || role === 'button') kind = 'button';
     else kind = ['email', 'tel', 'number', 'url', 'date', 'password'].includes(type) ? type : 'text';
@@ -141,14 +152,14 @@
       const box = first.closest('[class*=container i], [class*=select i]') || parent(first);
       const chosen = clean(box?.querySelector('[class*=single-value i], [class*=multi-value i]')?.textContent);
       value = first.value || chosen; empty = !value;
-    } else if (kind !== 'button') { value = kind === 'password' ? '' : first.value; empty = !first.value.trim(); }
+    } else if (kind !== 'button' && kind !== 'link') { value = kind === 'password' ? '' : first.value; empty = !first.value.trim(); }
 
     let raw, nameEl;
-    if (kind === 'button') { raw = first.innerText || first.value || first.getAttribute('aria-label') || first.title || ''; nameEl = first; }
+    if (kind === 'button' || kind === 'link') { raw = first.innerText || first.value || first.getAttribute('aria-label') || first.title || ''; nameEl = first; }
     else if (kind === 'radio' || kind === 'multi' || kind === 'yesno') [raw, nameEl] = nearText(tagEl, u.els);
     else [raw, nameEl] = nameOf(first);
     const name = clean(raw).slice(0, 240);
-    if (kind === 'button' && !name) continue;  // nothing to choose it by (hidden helper buttons)
+    if ((kind === 'button' || kind === 'link') && !name) continue;  // nothing to choose it by (hidden helper buttons)
 
     if (!S.ids.has(first)) S.ids.set(first, (prefix || '') + 'a' + S.n++);
     const id = S.ids.get(first);
@@ -156,9 +167,11 @@
     first.setAttribute('data-lk-input', id);
     out.push({
       id, kind, name, options, value: value.slice(0, 120), empty,
-      required: kind !== 'button' && (reqOf(u.els, nameEl, raw)
+      required: kind !== 'button' && kind !== 'link' && (reqOf(u.els, nameEl, raw)
         || (kind === 'checkbox' && /required/i.test(nearText(first, u.els)[1].className || ''))),  // Ashby: asterisk on the fieldset title
       html_name: first.name || first.id || '',
+      href: kind === 'link' ? first.href : '',
+      apply: (kind === 'button' || kind === 'link') && APPLY.test(name) && !first.closest('header, nav'),  // a site menu's own Apply is something else
       type: kind === 'button' ? (first.getAttribute('type') || (first.tagName === 'BUTTON' ? 'submit' : '')).toLowerCase() : u.type,
     });
   }

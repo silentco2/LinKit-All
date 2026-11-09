@@ -15,7 +15,12 @@ Also return:
 - submit_button: id of the button that submits the final application, else null
   (a button is never both)
 - page_kind: form (questions to answer), review (summary before submitting), confirmation
-  (application sent), login, signup, or other
+  (application sent), login, signup, listing (a job ad whose application opens from an Apply
+  button or link, on a job board or a careers page), or other
+- apply_button: on a listing, the id of the button or link that opens the application
+  (Apply, Apply now, Apply on company site, Sign in to apply, Easy Apply), else null
+- dismiss_button: id of the button that closes a popup covering the page (sign-in prompt,
+  cookie banner, newsletter), else null. Prefer the one that declines optional cookies.
 
 Page title: {{ title }}
 --- page text start ---
@@ -24,7 +29,7 @@ Page title: {{ title }}
 
 Controls:
 {% for c in controls %}
-- id: {{ c.id }} | {{ c.kind }}{% if c.required %} | required{% endif %}{% if c.kind == "button" %} | {{ c.type or "button" }}{% endif %}
+- id: {{ c.id }} | {{ c.kind }}{% if c.required %} | required{% endif %}{% if c.kind == "button" %} | {{ c.type or "button" }}{% endif %}{% if "//" in c.href %} | goes to {{ c.href.split("/")[2] }}{% endif %}
   name: {{ c.name | tojson }}
 {%- if c.options and c.options | length > 40 %}
   options: a long list ({{ c.options | length }})

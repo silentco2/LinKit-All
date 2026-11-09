@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import re
 from collections.abc import AsyncIterator, Callable
 from typing import Any
 
@@ -122,6 +123,19 @@ class JobSpySite(Source):
         if node is not None:
             stub.description = html_to_text(node.html or "")
         return stub
+
+
+# The public job page names its Apply button: "offsite" links to the employer's own site (the
+# address is only shown after signing in), "onsite"/"simple" is LinkedIn Easy Apply.
+_APPLY_KIND = re.compile(r"public_jobs_apply-link-(offsite|onsite|simple)")
+
+
+def linkedin_apply(html: str) -> str | None:
+    """How a LinkedIn job is applied to: "offsite" (the employer's site) or "easy_apply"."""
+    m = _APPLY_KIND.search(html)
+    if m is None:
+        return None
+    return "offsite" if m.group(1) == "offsite" else "easy_apply"
 
 
 JOBSPY_SITES = ("linkedin", "indeed", "glassdoor", "google", "zip_recruiter", "bayt")

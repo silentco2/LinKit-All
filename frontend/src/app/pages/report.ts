@@ -25,10 +25,10 @@ interface RunRow {
 }
 
 const SERIES = [
-  { label: 'report.col.applied', key: 'applied', color: '#10b981' },
-  { label: 'report.col.failed', key: 'failed', color: '#ef4444' },
-  { label: 'report.col.needsYou', key: 'needs_user', color: '#f59e0b' },
-  { label: 'report.col.skipped', key: 'skipped', color: '#94a3b8' },
+  { label: 'report.col.applied', key: 'applied', color: '--go' },
+  { label: 'report.col.failed', key: 'failed', color: '--stop' },
+  { label: 'report.col.needsYou', key: 'needs_user', color: '--note-ink' },
+  { label: 'report.col.skipped', key: 'skipped', color: '--ink-3' },
 ] as const;
 
 // The server names the funnel steps in English; unknown steps are shown as they come.
@@ -74,6 +74,8 @@ const FUNNEL: Record<string, string> = {
         <h2>{{ 'report.overtime.title' | t }}</h2>
         <div class="mt-4 h-64"><canvas #overtime [attr.aria-label]="'report.overtime.aria' | t" role="img"></canvas></div>
       </section>
+      <details id="report" class="mt-6">
+        <summary class="cursor-pointer text-lg font-semibold text-slate-900 dark:text-white">{{ 'report.full' | t }}</summary>
 
       <section class="card mt-6 overflow-x-auto">
         <h2>{{ 'report.platform.title' | t }}</h2>
@@ -89,7 +91,7 @@ const FUNNEL: Record<string, string> = {
       <section class="card mt-6 overflow-x-auto">
         <h2>{{ 'report.source.title' | t }}</h2>
         <table class="mt-3 w-full text-sm">
-          <thead class="text-start text-xs tracking-wide text-slate-500 uppercase rtl:tracking-normal">
+          <thead class="text-start text-xs text-slate-500">
             <tr><th class="py-2">{{ 'report.col.source' | t }}</th><th class="text-end">{{ 'report.col.found' | t }}</th><th class="text-end">{{ 'report.col.filteredOut' | t }}</th><th class="text-end">{{ 'report.col.toReview' | t }}</th><th class="text-end">{{ 'report.col.toApply' | t }}</th><th class="text-end">{{ 'report.col.applied' | t }}</th><th class="text-end">{{ 'report.col.failed' | t }}</th></tr>
           </thead>
           <tbody>
@@ -113,7 +115,7 @@ const FUNNEL: Record<string, string> = {
       <section class="card mt-6 overflow-x-auto">
         <h2>{{ 'report.runs.title' | t }}</h2>
         <table class="mt-3 w-full text-sm">
-          <thead class="text-start text-xs tracking-wide text-slate-500 uppercase rtl:tracking-normal">
+          <thead class="text-start text-xs text-slate-500">
             <tr><th class="py-2">{{ 'report.run' | t }}</th><th>{{ 'report.col.started' | t }}</th><th>{{ 'report.col.status' | t }}</th><th class="text-end">{{ 'report.col.newJobs' | t }}</th><th class="text-end">{{ 'report.col.ranked' | t }}</th><th class="text-end">{{ 'common.tier.high' | t }}</th><th class="text-end">{{ 'common.tier.mid' | t }}</th></tr>
           </thead>
           <tbody>
@@ -135,7 +137,7 @@ const FUNNEL: Record<string, string> = {
       <section class="card mt-6 overflow-x-auto">
         <h2>{{ 'report.outcomes.title' | t }}</h2>
         <table class="mt-3 w-full text-sm">
-          <thead class="text-start text-xs tracking-wide text-slate-500 uppercase rtl:tracking-normal">
+          <thead class="text-start text-xs text-slate-500">
             <tr><th class="py-2">{{ 'report.run' | t }}</th><th class="text-end">{{ 'report.col.found' | t }}</th><th class="text-end">{{ 'report.col.applied' | t }}</th><th class="text-end">{{ 'report.col.failed' | t }}</th><th class="text-end">{{ 'report.col.skipped' | t }}</th><th class="text-end">{{ 'report.col.needsYou' | t }}</th></tr>
           </thead>
           <tbody>
@@ -152,11 +154,12 @@ const FUNNEL: Record<string, string> = {
           </tbody>
         </table>
       </section>
+      </details>
     }
 
     <ng-template #outcomes let-rows let-label="label" let-names="names">
       <table class="mt-3 w-full text-sm">
-        <thead class="text-start text-xs tracking-wide text-slate-500 uppercase rtl:tracking-normal">
+        <thead class="text-start text-xs text-slate-500">
           <tr><th class="py-2">{{ label | t }}</th><th class="text-end">{{ 'report.col.found' | t }}</th><th class="text-end">{{ 'report.col.applied' | t }}</th><th class="text-end">{{ 'report.col.failed' | t }}</th><th class="text-end">{{ 'report.col.skipped' | t }}</th><th class="text-end">{{ 'report.col.needsYou' | t }}</th></tr>
         </thead>
         <tbody>
@@ -247,20 +250,21 @@ export class ReportPage implements OnDestroy {
 
   private draw(r: Report, funnel: HTMLCanvasElement, tiers: HTMLCanvasElement, overtime: HTMLCanvasElement): void {
     this.charts.forEach((c) => c.destroy());
-    const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+    const css = getComputedStyle(document.documentElement);
+    const ink = (name: string) => css.getPropertyValue(name).trim(); // the desk palette, so charts follow light and dark
     const t = (key: string) => this.i18n.t(key);
     const loc = this.loc();
     const rtl = this.i18n.lang() === 'ar';
     const legend = { position: 'bottom' as const, rtl, textDirection: rtl ? 'rtl' : 'ltr' };
     Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
-    Chart.defaults.color = dark ? '#cbd5e1' : '#475569';
-    Chart.defaults.borderColor = dark ? '#1e293b' : '#e2e8f0';
+    Chart.defaults.color = ink('--ink-2');
+    Chart.defaults.borderColor = ink('--line');
     this.charts = [
       new Chart(funnel, {
         type: 'bar',
         data: {
           labels: r.funnel.map((f) => `${FUNNEL[f.step] ? t(FUNNEL[f.step]) : f.step} (${fmtNum(loc, f.count)})`),
-          datasets: [{ data: r.funnel.map((f) => f.count), backgroundColor: '#3b6fd8', borderRadius: 6 }],
+          datasets: [{ data: r.funnel.map((f) => f.count), backgroundColor: r.funnel.map((_, i) => (i === r.funnel.length - 1 ? ink('--stamp') : ink('--ink'))), borderRadius: 2, maxBarThickness: 28 }],
         },
         options: { indexAxis: 'y', maintainAspectRatio: false, plugins: { legend: { display: false } } },
       }),
@@ -268,9 +272,9 @@ export class ReportPage implements OnDestroy {
         type: 'doughnut',
         data: {
           labels: [t('report.tier.high'), t('report.tier.mid'), t('report.tier.low')],
-          datasets: [{ data: [r.tiers['high'] ?? 0, r.tiers['mid'] ?? 0, r.tiers['low'] ?? 0], backgroundColor: ['#10b981', '#f59e0b', '#94a3b8'] }],
+          datasets: [{ data: [r.tiers['high'] ?? 0, r.tiers['mid'] ?? 0, r.tiers['low'] ?? 0], backgroundColor: [ink('--stamp'), ink('--ink'), ink('--line-2')], borderWidth: 0 }],
         },
-        options: { maintainAspectRatio: false, plugins: { legend } },
+        options: { maintainAspectRatio: false, cutout: '72%', plugins: { legend } },
       }),
       new Chart(overtime, {
         type: 'line',
@@ -279,8 +283,9 @@ export class ReportPage implements OnDestroy {
           datasets: SERIES.map((s) => ({
             label: t(s.label),
             data: r.over_time.map((d) => d[s.key]),
-            borderColor: s.color,
-            backgroundColor: s.color,
+            borderColor: ink(s.color),
+            backgroundColor: ink(s.color),
+            borderWidth: 1.5,
             pointRadius: 0,
             tension: 0.2,
           })),

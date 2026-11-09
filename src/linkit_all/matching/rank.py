@@ -13,6 +13,7 @@ from linkit_all.core.models import Job, JobState, Profile, Tier, utcnow
 from linkit_all.core.search import SearchConfig
 from linkit_all.core.state import transition
 from linkit_all.matching.rules import expectation_of, rule_violation
+from linkit_all.matching.trash import sweep
 from linkit_all.matching.trust_stage import allowed, score_jobs_trust, top_codes
 from linkit_all.sources.text import norm_company
 from linkit_all.tailor.pipeline import cv_segments
@@ -140,12 +141,16 @@ def rank_jobs(db: sessionmaker[Session], cfg: SearchConfig, embed: Embed) -> dic
     cv = cv_text(profile)
     expect = expectation_of(profile.answers, cfg)
     counts = {"ranked": 0, "filtered_out": 0}
+    if dropped := sweep(db, cfg, embed):
+        counts["trashed"] = dropped
     now = utcnow()
     with db.begin() as s:
         # Jobs a hard rule dropped earlier get another look when they pass today's filters
         # (filters changed, or a rule was fixed). Company-rule drops stay put.
         for job in s.scalars(select(Job).filter_by(state=JobState.filtered_out)):
-            if job.data.get("company_rule") or rule_violation(job, cfg, now, expect) is not None:
+            if job.data.get("trash") or job.data.get("company_rule"):
+                continue
+            if rule_violation(job, cfg, now, expect) is not None:
                 continue
             if job.data.get("trust_filter") and _trust_filtered(job, cfg):
                 continue  # still a scam / ghost under today's trust settings
@@ -164,6 +169,10 @@ def rank_jobs(db: sessionmaker[Session], cfg: SearchConfig, embed: Embed) -> dic
             if reason := rule_violation(job, cfg, now, expect):
                 transition(s, job, JobState.filtered_out, reason)
                 counts["filtered_out"] += 1
+            elif job.data.get("trash"):
+                transition(s, job, JobState.filtered_out, "not a job you are looking for",
+                           code="trashed")  # fmt: skip
+                counts["filtered_out"] += 1
             else:
                 keep.append(job)
         if cfg.trust.enabled and keep:
@@ -180,7 +189,9 @@ def rank_jobs(db: sessionmaker[Session], cfg: SearchConfig, embed: Embed) -> dic
         best: dict[str, Job] = {}
         for job in sorted(keep, key=lambda j: -j.data["rank"]):
             company = norm_company(job.company)
-            if cfg.filters.one_per_company and (company in taken or company in best):
+            # "Unknown" is many companies (posts that name none), so the rule cannot apply
+            named = company != norm_company("Unknown")
+            if named and cfg.filters.one_per_company and (company in taken or company in best):
                 why = (
                     "already in your pipeline for this company"
                     if company in taken

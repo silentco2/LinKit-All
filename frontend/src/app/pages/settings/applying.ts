@@ -1,4 +1,5 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
+import { Api } from '../../api';
 import { RouterLink } from '@angular/router';
 import { GoLiveCard } from '../../components/golive';
 import { LibreOffice, LibreOfficeCard } from '../../components/libreoffice-card';
@@ -118,6 +119,23 @@ const MODE = 'rounded-lg border p-3 text-start text-sm focus-visible:outline-2 f
           <input id="agent" type="checkbox" class="mt-1" [checked]="store.cfg.apply.generic_agent" (change)="store.update('apply.generic_agent', checked($event))">
         </app-field>
       </section>
+
+      <section class="card space-y-3" aria-labelledby="ext-title">
+        <h2 id="ext-title">{{ 'settings.apply.ext' | t }}</h2>
+        <p class="text-sm text-slate-600 dark:text-slate-400">{{ 'settings.apply.extWhy' | t }}</p>
+        <ol class="list-decimal space-y-1 ps-5 text-sm">
+          <li>{{ 'settings.apply.extStep1' | t }}</li>
+          <li>{{ 'settings.apply.extStep2' | t }} @if (ext(); as e) { <code class="break-all" dir="ltr">{{ e.extension_dir }}</code> }</li>
+          <li>{{ 'settings.apply.extStep3' | t }}</li>
+        </ol>
+        @if (ext(); as e) {
+          <div class="flex flex-wrap items-center gap-2">
+            <label class="label !mb-0" for="ext-token">{{ 'settings.apply.extCode' | t }}</label>
+            <input id="ext-token" class="input max-w-xs font-mono" readonly dir="ltr" [value]="e.token">
+            <button type="button" class="btn" (click)="copy(e.token)">{{ (copied() ? 'settings.apply.extCopied' : 'settings.apply.extCopy') | t }}</button>
+          </div>
+        }
+      </section>
     </div>
   `,
 })
@@ -129,10 +147,19 @@ export class ApplyingSection implements OnInit {
   protected readonly card = cardClass;
   /** Switching to "Applying for real" opens the guided card instead of flipping the switch. */
   protected readonly guide = signal(false);
+  private readonly api = inject(Api);
+  /** LinkIt Fill: the pairing code and the folder to load it from. */
+  protected readonly ext = signal<{ token: string; extension_dir: string } | null>(null);
+  protected readonly copied = signal(false);
 
   ngOnInit(): void {
     void this.tuning.load();
     void this.lo.load();
+    this.api.get<{ token: string; extension_dir: string }>('/assist/token').then((e) => this.ext.set(e), () => this.ext.set(null));
+  }
+
+  protected copy(text: string): void {
+    void navigator.clipboard?.writeText(text).then(() => this.copied.set(true));
   }
 
   protected live(): boolean {

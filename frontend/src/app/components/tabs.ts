@@ -12,13 +12,13 @@ export interface TabItem { id: string; label: string; count?: number }
   selector: 'app-tabs',
   imports: [TPipe],
   template: `
-    <div role="tablist" class="flex flex-wrap gap-2" [attr.aria-label]="label() | t" (keydown)="key($event)">
+    <div role="tablist" class="tray-tabs" [attr.aria-label]="label() | t" (keydown)="key($event)">
       @for (t of tabs(); track t.id) {
-        <button type="button" role="tab" class="btn" [id]="prefix() + '-tab-' + t.id" [attr.aria-controls]="prefix() + '-panel-' + t.id"
-                [class.btn-primary]="t.id === active()" [attr.aria-selected]="t.id === active()" [attr.aria-current]="t.id === active() ? 'true' : null"
+        <button type="button" role="tab" class="tray-tab" [id]="prefix() + '-tab-' + t.id" [attr.aria-controls]="prefix() + '-panel-' + t.id"
+                [attr.aria-selected]="t.id === active()" [attr.aria-current]="t.id === active() ? 'true' : null"
                 [attr.tabindex]="t.id === active() ? 0 : -1" (click)="pick.emit(t.id)">
           {{ t.label | t }}
-          @if (t.count) { <span class="badge tier-mid">{{ num(t.count) }}</span> }
+          @if (t.count) { <b>{{ num(t.count) }}</b> }
         </button>
       }
     </div>

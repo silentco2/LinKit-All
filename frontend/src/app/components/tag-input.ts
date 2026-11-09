@@ -22,10 +22,10 @@ const DEBOUNCE_MS = 150;
       @if (values().length) {
         <ul class="flex flex-wrap gap-2" [attr.aria-label]="ariaLabel() || null">
           @for (v of values(); track v) {
-            <li class="inline-flex items-center gap-1 rounded-full border border-brand-500 bg-brand-50 py-0.5 ps-3 pe-1 text-sm max-sm:min-h-10 text-brand-700 dark:bg-slate-800 dark:text-white"
+            <li class="inline-flex items-center gap-1 rounded-md border border-brand-500 bg-brand-50 py-0.5 ps-3 pe-1 text-sm max-sm:min-h-10 text-brand-700 dark:bg-slate-800 dark:text-white"
                 [class.ring-2]="v === marked()" [class.ring-rose-500]="v === marked()" [class.!bg-rose-50]="v === marked()">
               <bdi>{{ v }}</bdi>
-              <button type="button" class="rounded-full px-1.5 leading-none text-brand-700 max-sm:min-h-10 max-sm:min-w-10 hover:bg-brand-100 dark:text-slate-300 dark:hover:bg-slate-700"
+              <button type="button" class="rounded-md px-1.5 leading-none text-brand-700 max-sm:min-h-10 max-sm:min-w-10 hover:bg-brand-100 dark:text-slate-300 dark:hover:bg-slate-700"
                       [attr.aria-label]="'tags.remove' | t: { name: v }" (click)="remove(v)"><span aria-hidden="true">×</span></button>
             </li>
           }
@@ -41,7 +41,7 @@ const DEBOUNCE_MS = 150;
           @if (caption()) { <p class="hint !mt-0 mb-1.5">{{ caption() }}</p> }
           <ul class="flex flex-wrap gap-2">
             @for (r of left(); track r) {
-              <li><button type="button" class="rounded-full border border-dashed border-slate-300 px-3 py-0.5 text-sm max-sm:min-h-10 text-slate-600 hover:border-brand-500 hover:text-brand-700 dark:border-slate-600 dark:text-slate-300 dark:hover:text-white" (click)="add(r)"><span aria-hidden="true">+ </span><bdi>{{ r }}</bdi></button></li>
+              <li><button type="button" class="rounded-md border border-dashed border-slate-300 px-3 py-0.5 text-sm max-sm:min-h-10 text-slate-600 hover:border-brand-500 hover:text-brand-700 dark:border-slate-600 dark:text-slate-300 dark:hover:text-white" (click)="add(r)"><span aria-hidden="true">+ </span><bdi>{{ r }}</bdi></button></li>
             }
           </ul>
         </div>

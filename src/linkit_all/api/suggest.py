@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from linkit_all.core import fx, geo
 from linkit_all.core.infer import _LEX, _LEX_CI, _LEX_CS, read_cv
 from linkit_all.core.models import Job
+from linkit_all.core.names import script_of, translate
 from linkit_all.core.profile import load_fields
 
 router = APIRouter(prefix="/api")
@@ -28,6 +29,12 @@ _CANON = {w.casefold(): w for w in _LEX}
 def _db(request: Request) -> sessionmaker[Session]:
     db: sessionmaker[Session] = request.app.state.db
     return db
+
+
+@router.get("/suggest/name-other")
+def name_other(name: str = "") -> dict[str, str]:
+    """The name in the other script, from the bundled name list."""
+    return {"value": translate(name), "lang": "en" if script_of(name) == "ar" else "ar"}
 
 
 def _cv_titles(db: sessionmaker[Session]) -> list[str]:

@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from linkit_all.api.events import EventBus
 from linkit_all.api.runner import PipelineRunner, RunBlocked, RunBusy
 from linkit_all.apply.answers import ApplicationAnswers, Question, sensitive_category
-from linkit_all.apply.assist import AnswerBank
+from linkit_all.apply.assist import GENERAL, AnswerBank, scope_of
 from linkit_all.apply.browser import UserBrowser, fresh_live_shot, profile_dir
 from linkit_all.apply.email_send import (
     NoCredentials,
@@ -91,6 +91,7 @@ from linkit_all.core.search import (
 from linkit_all.core.state import InvalidTransition, can_transition, transition
 from linkit_all.core.tools import soffice_path, tectonic_path
 from linkit_all.matching.reasons import FilterEvent, job_reason
+from linkit_all.matching.trash import UNKNOWN, not_trash, visible
 from linkit_all.pipeline import STAGES, PipelineError, ai_settings
 from linkit_all.reports import build_report, export_csv, export_pdf
 from linkit_all.sources import registry
@@ -154,7 +155,9 @@ def status(request: Request) -> dict[str, Any]:
     cfg = load_search(db)
     vault = _vault(request)
     with db() as s:
-        states = dict(s.execute(select(Job.state, func.count()).group_by(Job.state)).all())
+        states = dict(
+            s.execute(select(Job.state, func.count()).where(not_trash()).group_by(Job.state)).all()
+        )
         practiced = s.scalar(
             select(func.count()).where(Job.data["dry_run_at"].as_string().is_not(None))
         )
@@ -188,6 +191,7 @@ def status(request: Request) -> dict[str, Any]:
         "vault": {"initialized": vault.initialized(), "unlocked": vault.unlocked()},
         "states": {str(k): v for k, v in states.items()},
         "actions_open": _open_actions(db),
+        "google_check": _google_check(request, cfg),
         "apply_live": bool(cfg and cfg.apply.live),
         "ready_to_apply": ready,
         "practiced": practiced or 0,
@@ -199,6 +203,14 @@ def status(request: Request) -> dict[str, Any]:
         "live_shot": (p.stat().st_mtime if (p := fresh_live_shot(_settings(request))) else None),
         "next_run": next((t.isoformat() for t in next_runs(request.app.state.scheduler, 1)), None),
     }
+
+
+def _google_check(request: Request, cfg: SearchConfig | None) -> bool:
+    """LinkedIn hiring posts stopped on a Google check the user has to solve (a Needs you card)."""
+    from linkit_all.sources.linkedin_posts.source import check_flag
+
+    on = cfg is not None and "linkedin_posts" in cfg.sources.enabled
+    return on and check_flag(_settings(request).data_dir).exists()
 
 
 def _open_actions(db: sessionmaker[Session]) -> int:
@@ -797,7 +809,7 @@ def list_jobs(
     source: str | None = None,
     q: str | None = None,
 ) -> list[dict[str, Any]]:
-    query = select(Job)
+    query = select(Job).where(visible())
     if state:
         query = query.where(Job.state == state)
     if tier:
@@ -846,7 +858,7 @@ def job_detail(request: Request, job_id: int) -> dict[str, Any]:
         history = [
             {"id": e.id, "at": e.at.isoformat(), "from": e.from_state, "to": e.to_state,
              "message": e.message, "code": e.code, "params": e.params,
-             "screenshots": len(e.artifacts)}
+             "screenshots": len(_shots(e.artifacts))}
             for e in events
         ]  # fmt: skip
         tailored = s.scalars(
@@ -881,13 +893,19 @@ def tailored_pdf(request: Request, job_id: int) -> FileResponse:
     return _data_file(request, path, "application/pdf")
 
 
+def _shots(artifacts: list[str]) -> list[str]:
+    """The pictures among an event's artifacts (a tailoring event also lists the CV files)."""
+    return [a for a in artifacts if a.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))]
+
+
 @router.get("/jobs/{job_id}/events/{event_id}/screenshot/{n}")
 def event_screenshot(request: Request, job_id: int, event_id: int, n: int) -> FileResponse:
     with _db(request)() as s:
         event = s.get(JobEvent, event_id)
-        if event is None or event.job_id != job_id or not 0 <= n < len(event.artifacts):
+        shots = _shots(event.artifacts) if event is not None else []
+        if event is None or event.job_id != job_id or not 0 <= n < len(shots):
             raise HTTPException(404)
-        path = Path(event.artifacts[n])
+        path = Path(shots[n])
     return _data_file(request, path)
 
 
@@ -952,7 +970,9 @@ def job_trust(request: Request, job_id: int, body: TrustAction) -> dict[str, Any
                            "you marked this company as not a scam: checked again",
                            code="trust_restored")  # fmt: skip
         else:
-            _add_company(cfg.filters.company_blacklist, job.company)
+            job.data = {**job.data, "trash": "reported"}
+            if norm_company(job.company) != UNKNOWN:  # "Unknown" is many companies
+                _add_company(cfg.filters.company_blacklist, job.company)
             if job.state in (JobState.discovered, JobState.enriched):
                 target = JobState.filtered_out
             elif job.state in (JobState.applying, JobState.applied):
@@ -1006,6 +1026,7 @@ def list_runs(request: Request) -> dict[str, Any]:
 class RunRequest(BaseModel):
     stages: list[str] = list(STAGES)
     new: bool = False
+    skip_earlier: bool = False  # a step's play button: earlier unfinished steps count as done
 
 
 @router.post("/runs", status_code=202)
@@ -1013,7 +1034,7 @@ async def start_run(request: Request, body: RunRequest) -> dict[str, Any]:
     if _user_browser(request).is_open:  # same Chrome profile: close the window first
         raise HTTPException(409, "Close the app browser window before starting a run")
     try:
-        return _runner(request).start(body.stages, body.new).as_dict()
+        return _runner(request).start(body.stages, body.new, body.skip_earlier).as_dict()
     except RunBusy as e:
         raise HTTPException(409, str(e)) from e
     except RunBlocked as e:  # e.g. needs_libreoffice: the UI offers the install or the choice
@@ -1183,18 +1204,40 @@ async def open_google_check(request: Request) -> dict[str, Any]:
     from linkit_all.sources.linkedin_posts.google import search_url
     from linkit_all.sources.linkedin_posts.source import profile_path
 
+    cfg = load_search(_db(request)) or SearchConfig()
+    words = next(iter(cfg.search.queries), "hiring")
+    url = search_url(words, "week")
+    return await _open_profile(request, profile_path(_settings(request).data_dir), url)
+
+
+@router.post("/google/sign-in", status_code=201)
+async def open_google_sign_in(request: Request) -> dict[str, Any]:
+    """Open Google in the app browser, on the profile the form agent uses, so the user signs in
+    by hand once. Nothing is typed by the app and the password never reaches it."""
+    return await _open_profile(
+        request, profile_dir(_settings(request), None), "https://accounts.google.com/"
+    )
+
+
+async def _open_profile(request: Request, profile: Path, url: str) -> dict[str, Any]:
     browser = _user_browser(request)
     if _runner(request).state.running:  # a run may be using the profile
         raise HTTPException(409, "A run is in progress: wait for it, or cancel it")
     if browser.is_open:
         raise HTTPException(409, "The app browser is already open: close its window first")
-    cfg = load_search(_db(request)) or SearchConfig()
-    words = next(iter(cfg.sources.linkedin_keywords or cfg.search.queries), "hiring")
     try:
-        await browser.open(profile_path(_settings(request).data_dir), search_url(words, "week"), 0)
+        await browser.open(profile, url, 0)
     except Exception as e:
         raise HTTPException(503, f"Could not open Chrome: {str(e).splitlines()[0][:200]}") from e
     return {"open": True, "item_id": 0}
+
+
+@router.delete("/linkedin/google-check", status_code=204)
+def google_check_solved(request: Request) -> None:
+    """The user solved the check: take the card off Needs you. The next run tries Google again."""
+    from linkit_all.sources.linkedin_posts.source import check_flag
+
+    check_flag(_settings(request).data_dir).unlink(missing_ok=True)
 
 
 def _entry(e: AnswerEntry) -> dict[str, Any]:
@@ -1204,6 +1247,8 @@ def _entry(e: AnswerEntry) -> dict[str, Any]:
         "answer": e.answer,
         "source": e.source,
         "sensitive": e.sensitive,
+        "scope": e.scope,
+        "scope_name": e.scope_name,
         "uses": e.uses,
         "updated_at": e.updated_at.isoformat(),
     }
@@ -1277,7 +1322,7 @@ class ActionAnswers(BaseModel):
 
 
 class ActionDecision(BaseModel):
-    decision: Literal["answer", "confirm", "retry", "applied_by_hand", "skip"]
+    decision: Literal["answer", "confirm", "retry", "applied_by_hand", "skip", "closed"]
     answers: dict[str, Any] = {}
     remember: dict[str, Any] = {}  # profile answers to keep ("Always"); see REMEMBER_KEYS
 
@@ -1345,6 +1390,10 @@ def _close_item(s: Session, item: ActionItem, job: Job, decision: str) -> None:
         job.data = {**job.data, "submit_confirmed": True}
     if decision == "skip":
         transition(s, job, JobState.skipped, "you skipped it in the Action Center", code="skipped")
+    elif decision == "closed":
+        transition(
+            s, job, JobState.skipped, "you marked it as closed or expired", code="marked_closed"
+        )
     elif decision == "applied_by_hand":
         transition(s, job, JobState.applying, "you applied by hand", code="applied_by_hand")
         transition(s, job, JobState.applied, "you applied by hand", code="applied_by_hand")
@@ -1353,7 +1402,9 @@ def _close_item(s: Session, item: ActionItem, job: Job, decision: str) -> None:
             s, job, JobState.queued_apply, f"Action Center: {decision}",
             code=f"decision_{decision}",
         )  # fmt: skip
-    item.status = ActionStatus.dismissed if decision == "skip" else ActionStatus.resolved
+    item.status = (
+        ActionStatus.dismissed if decision in ("skip", "closed") else ActionStatus.resolved
+    )
     item.resolved_at = utcnow()
 
 
@@ -1446,6 +1497,7 @@ def answer_group(request: Request, body: GroupAnswer) -> dict[str, int]:
     label_sensitive = _is_sensitive({"label": body.label})
     resolved = still_open = skipped = 0
     sensitive = False
+    answered: list[Job] = []
     with _db(request).begin() as s:
         for item_id in dict.fromkeys(body.item_ids):
             item = s.get(ActionItem, item_id)
@@ -1466,15 +1518,18 @@ def answer_group(request: Request, body: GroupAnswer) -> dict[str, int]:
                 continue
             item.answers = {**item.answers, **{q["label"]: body.value for q in hits}}
             sensitive = sensitive or any(_is_sensitive(q) for q in hits)
+            answered.append(job)
             if any(q.get("required") for q in _unanswered(item)):
                 still_open += 1
             else:
                 _close_item(s, item, job, "answer")
                 resolved += 1
         if resolved + still_open:
-            AnswerBank(_db(request)).save(
-                body.label.strip(), body.value, "user", sensitive, session=s
-            )
+            label = body.label.strip()
+            for scope in {  # one answer given for many companies is saved for each
+                GENERAL if sensitive else scope_of(label, j.title, j.company) for j in answered
+            }:
+                AnswerBank(_db(request)).save(label, body.value, "user", sensitive, s, scope)
             _save_remembered(s, remembered)
     return {"resolved": resolved, "still_open": still_open, "skipped": skipped}
 
@@ -1522,7 +1577,8 @@ def edit_email_draft(request: Request, item_id: int, body: EmailDraftEdit) -> di
 @router.post("/actions/{item_id}")
 def resolve_action(request: Request, item_id: int, body: ActionDecision) -> dict[str, Any]:
     """answer: save to the answer bank and requeue; confirm: submit on the next apply run;
-    retry: requeue as is; applied_by_hand: you submitted it yourself; skip: drop the job."""
+    retry: requeue as is; applied_by_hand: you submitted it yourself; skip: drop the job;
+    closed: drop it because the posting is closed or expired."""
     db = _db(request)
     remembered = _remembered(body.remember) if body.decision == "answer" else {}
     with db.begin() as s:  # one transaction: a refused request writes nothing
@@ -1544,7 +1600,9 @@ def resolve_action(request: Request, item_id: int, body: ActionDecision) -> dict
                 raise HTTPException(422, f"Please answer: {missing[0]}")
             bank = AnswerBank(db)
             for label, value in given.items():
-                bank.save(label, value, "user", bool(questions[label].get("sensitive")), s)
+                secret = bool(questions[label].get("sensitive"))
+                where = GENERAL if secret else scope_of(label, job.title, job.company)
+                bank.save(label, value, "user", secret, s, where)
             item.answers = have
             _save_remembered(s, remembered)
         _close_item(s, item, job, body.decision)

@@ -26,9 +26,12 @@ from linkit_all.core.models import (
     Job,
     JobEvent,
     JobState,
+    Run,
+    RunStatus,
     TailoredCV,
     Tier,
 )
+from linkit_all.core.runs import current_run
 from linkit_all.core.state import transition
 
 BASE = "http://127.0.0.1:8765"
@@ -99,7 +102,7 @@ def test_linkedin_search_fields_default_and_round_trip(client: TestClient) -> No
 
     old = SearchConfig.model_validate({"sources": {"enabled": ["telegram"]}}).sources
     assert (old.linkedin_keywords, old.linkedin_window) == ([], "week")
-    assert (old.linkedin_max_posts, old.linkedin_headless) == (30, True)
+    assert (old.linkedin_max_posts, old.linkedin_headless) == (50, True)
     fields = {"linkedin_keywords": ["python dev", "مهندس"], "linkedin_window": "day",
               "linkedin_max_posts": 25, "linkedin_headless": False}  # fmt: skip
     body = {"sources": {"enabled": ["linkedin_posts"], **fields}}
@@ -291,7 +294,8 @@ def test_answer_bank_list_edit_delete(client: TestClient) -> None:
                                sensitive=True, uses=2)])  # fmt: skip
     rows = client.get("/api/answers").json()
     assert {r["question"] for r in rows} == {"Years of Python?", "Willing to relocate?"}
-    assert set(rows[0]) == {"id", "question", "answer", "source", "sensitive", "uses", "updated_at"}
+    assert set(rows[0]) == {"id", "question", "answer", "source", "sensitive", "scope",
+                            "scope_name", "uses", "updated_at"}  # fmt: skip
     py = next(r for r in rows if r["question"].startswith("Years"))
 
     r = client.put(f"/api/answers/{py['id']}", json={"answer": "6"}, headers=SAME_ORIGIN)
@@ -334,7 +338,8 @@ def test_job_detail_filled_and_event_screenshots(client: TestClient, tmp_path: P
     with db.begin() as s:
         job = s.get_one(Job, job_id)
         job.data = {**job.data, "filled": filled}
-        transition(s, job, JobState.tailored, "tailored", [str(inside), str(outside)])
+        cv = str(inside.with_name("cv.docx"))  # not a picture: neither counted nor served
+        transition(s, job, JobState.tailored, "tailored", [cv, str(inside), str(outside)])
 
     detail = client.get(f"/api/jobs/{job_id}").json()
     assert detail["filled"] == filled
@@ -774,6 +779,50 @@ def test_cancel_ends_the_run_row_and_the_next_start_resumes_it(
     client.post("/api/runs/cancel", headers=SAME_ORIGIN)
 
 
+def test_step_buttons_skip_a_stopped_step_and_a_new_search_discards_the_run(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def slow_stage(stage: str, *args: Any) -> dict[str, Any]:
+        await asyncio.sleep(30)
+        return {}
+
+    def stop() -> None:
+        client.post("/api/runs/cancel", headers=SAME_ORIGIN)
+        for _ in range(100):
+            if not client.get("/api/status").json()["run"]["running"]:
+                return
+            time.sleep(0.05)
+
+    def start(**body: Any) -> Any:
+        return client.post("/api/runs", json=body, headers=SAME_ORIGIN).json()
+
+    monkeypatch.setattr(runner_module, "run_stage", slow_stage)
+    run_id = start(stages=["discover", "enrich", "rank"])["run_id"]
+    stop()
+
+    # resuming the stopped step itself marks nothing
+    assert start(stages=["discover", "enrich", "rank"], skip_earlier=True)["run_id"] == run_id
+    stop()
+    assert client.get("/api/runs").json()["recent"][0]["stats"] == {}
+
+    # play on the next step: the stopped one counts as done, later ones still have to run
+    resumed = start(stages=["enrich", "rank"], skip_earlier=True)
+    assert (resumed["run_id"], resumed["stages"]) == (run_id, ["enrich", "rank"])
+    stop()
+    row = client.get("/api/runs").json()["recent"][0]
+    assert row["stats"] == {"discover": {"stopped_early": True}}
+    assert row["stages"] == ["discover", "enrich", "rank"]
+
+    # a new search leaves the stopped run behind, and it never resumes once a newer one ended
+    fresh = start(stages=["discover"], new=True)["run_id"]
+    assert fresh != run_id
+    stop()
+    db = client.app.state.db  # type: ignore[attr-defined]
+    with db.begin() as s:
+        s.get_one(Run, fresh).status = RunStatus.done
+    assert current_run(db) not in (run_id, fresh)
+
+
 def test_live_screenshot_idle_fresh_and_stale(client: TestClient) -> None:
     assert client.get("/api/live/screenshot").status_code == 404
     assert client.get("/api/status").json()["live_shot"] is None
@@ -936,3 +985,17 @@ def test_email_test_send(client: TestClient, monkeypatch: pytest.MonkeyPatch) ->
     bad = post("/api/email/test-send").json()
     assert bad["ok"] is False and "app password" in bad["error"]
     assert "app-secret-pw" not in str(bad)
+
+
+def test_index_html_is_revalidated(
+    client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A rebuilt UI shows up on reload: index.html says no-cache, hashed chunks don't."""
+    from linkit_all.api import app as app_module
+
+    (tmp_path / "index.html").write_text("<html></html>")
+    (tmp_path / "main-ABC.js").write_text("")
+    monkeypatch.setattr(app_module, "STATIC", tmp_path)
+    for path in ("/settings", "/", "/index.html"):
+        assert client.get(path).headers["cache-control"] == "no-cache"
+    assert "cache-control" not in client.get("/main-ABC.js").headers

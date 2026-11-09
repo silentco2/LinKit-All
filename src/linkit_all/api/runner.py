@@ -13,7 +13,14 @@ from linkit_all.apply.vault import Vault
 from linkit_all.core import fx
 from linkit_all.core.config import Settings
 from linkit_all.core.models import Profile, utcnow
-from linkit_all.core.runs import add_stage, cancel_run, current_run, note_failure, pause_of
+from linkit_all.core.runs import (
+    add_stage,
+    cancel_run,
+    current_run,
+    note_failure,
+    pause_of,
+    skip_unfinished,
+)
 from linkit_all.core.search import load_search
 from linkit_all.pipeline import STAGES, PipelineError, PipelinePause, finish_run, run_stage
 from linkit_all.tailor.pipeline import cv_plan
@@ -61,7 +68,7 @@ class PipelineRunner:
         self._task: asyncio.Task[None] | None = None
         self._fx_task: asyncio.Task[bool] | None = None  # kept so it is not collected mid-flight
 
-    def start(self, stages: list[str], new: bool = False) -> RunState:
+    def start(self, stages: list[str], new: bool = False, skip_earlier: bool = False) -> RunState:
         if self.state.running:
             raise RunBusy("a run is already in progress")
         unknown = set(stages) - set(STAGES)
@@ -73,6 +80,8 @@ class PipelineRunner:
         run_id = current_run(self.db, new)
         for stage in ordered:  # known up front, so the run is titled by what it does
             add_stage(self.db, run_id, stage)
+        if skip_earlier:
+            skip_unfinished(self.db, run_id, ordered[0])
         self.state = RunState(running=True, run_id=run_id, stages=ordered,
                               started_at=utcnow().isoformat(timespec="seconds") + "Z")  # fmt: skip
         self.bus.publish({"type": "run", "status": "started", **self.state.as_dict()})
