@@ -68,6 +68,8 @@ export interface Status {
   vault: { initialized: boolean; unlocked: boolean };
   states: Record<string, number>;
   actions_open: number;
+  /** LinkedIn hiring posts stopped on a Google check (a Needs you card; absent on older servers). */
+  google_check?: boolean;
   apply_live: boolean;
   /** Jobs the next apply stage would pick; practised jobs are excluded in practice mode. */
   ready_to_apply: number;
@@ -107,6 +109,8 @@ export interface Profile {
   address: string;
   postal_code: string;
   home_city: string;
+  /** State, governorate or province. */
+  home_state: string;
   /** ISO2 */
   home_country: string;
   skills: string[];
@@ -209,6 +213,7 @@ export interface ScheduleSection {
 
 export interface ApplySection {
   live: boolean;
+  google_signin: boolean;
   submit_without_asking: boolean;
   max_per_run: number;
   daily_cap_per_site: number;
@@ -224,8 +229,7 @@ export interface ApplySection {
 
 /** Null / empty means "ask me in the Action Center" for the sensitive fields. */
 export interface ApplicationAnswers {
-  first_name: string;
-  last_name: string;
+  name_other: string;
   city: string;
   country: string;
   current_company: string;
@@ -350,25 +354,15 @@ export interface LiveShot {
 }
 
 /** "a\nb" <-> ["a", "b"] for one-per-line list fields. */
-/** First and last name for forms; a particle (Abdel, El, Bin, عبد ...) joins the token after it. Mirrors `split_name` on the server. */
-const PARTICLES = new Set(['abd', 'abdel', 'abdul', 'abdal', 'abu', 'el', 'al', 'bin', 'ibn', 'عبد', 'أبو', 'ابو', 'بن', 'ابن', 'ال']);
-export function splitName(full: string): { first: string; last: string } {
-  const units: string[] = [];
-  let pending: string[] = [];
-  for (const tok of full.split(/\s+/).filter(Boolean)) {
-    pending.push(tok);
-    if (!PARTICLES.has(tok.toLowerCase().replace(/^\.+|\.+$/g, ''))) { units.push(pending.join(' ')); pending = []; }
-  }
-  units.push(...pending);
-  return units.length < 2 ? { first: units[0] ?? '', last: '' } : { first: units[0], last: units[units.length - 1] };
-}
-
 export const lines = (text: string): string[] => text.split('\n').map((l) => l.trim()).filter(Boolean);
 export const unlines = (list: string[]): string => list.join('\n');
 
-export type ActionKind = 'unknown_question' | 'confirm_submit' | 'confirm_email' | 'captcha' | 'validation_error' | 'login_issue' | 'two_factor';
-export type ActionDecision = 'answer' | 'confirm' | 'retry' | 'applied_by_hand' | 'skip';
+export type ActionKind = 'unknown_question' | 'confirm_submit' | 'confirm_email' | 'captcha' | 'validation_error' | 'login_issue' | 'two_factor'
+  | 'apply_by_hand' | 'apply_in_browser';
+export type ActionDecision = 'answer' | 'confirm' | 'retry' | 'applied_by_hand' | 'skip' | 'closed';
 export type AnswerValue = string | boolean | string[];
+
+export type AnswerScope = 'general' | 'role' | 'company';
 
 export interface AnswerEntry {
   id: number;
@@ -376,6 +370,8 @@ export interface AnswerEntry {
   answer: AnswerValue;
   source: 'user' | 'ai';
   sensitive: boolean;
+  scope: AnswerScope;
+  scope_name: string;
   uses: number;
   updated_at: string;
 }

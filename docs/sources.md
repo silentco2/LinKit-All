@@ -47,9 +47,9 @@ the page itself. It goes in this order and stops at the first that works:
 
 1. **JSON-LD.** Many career pages describe each job in structured data (`JobPosting`).
 2. **Job-like links.** It follows links that look like job pages (for example `/jobs/...`),
-   and reads each one. For pages without structured data it reads the page's heading and
-   a plainly labelled location. When that is not enough, it sends the page text to your AI,
-   10 pages per call. It skips the AI whenever the free steps are enough.
+   and reads each one. For pages without structured data it reads the page's heading, its
+   text and a plainly labelled location. This step uses no AI. A job page that is already
+   stored is not read again.
 3. **Browser fallback.** Many career pages draw their job list with JavaScript, so the
    plain page has no jobs in it. When steps 1 and 2 find nothing and you have an AI
    connected, LinKit All opens the page once in headless Chrome, waits for the page to settle (at most about 20 seconds), and collects:
@@ -185,16 +185,20 @@ telegram_channels = ["hrlunapark", "@job_python", "https://t.me/zrabota"]
   diacritics are ignored) or links to a known job board. This costs no AI.
 - **Posts that link to a board** (Greenhouse, Lever, Workable and the others) become jobs
   that apply through that link. No AI is needed.
-- **Other posts** are read by your chosen AI, 10 posts per call, about 1,500 characters each.
-  A post may hold several jobs or none. The post text is sent to your AI provider, as with your
-  CV; nothing else leaves your computer. The AI never invents a job: it only reports what the
-  post says, and the post itself is kept as the description. With no AI connected, these
-  posts are skipped.
+- **Posts that give an email address** become email applications: the AI writes only the
+  message, when the job is applied to, and your CV is attached as uploaded. Reading the post
+  costs no AI.
+- **Posts with any other link** send that link to the careers-page reader (one page, no AI). If
+  the page has job data, it fills in the job. If not, the post's own first line is the title.
+  A post is stored once, and its link is read only if the post can pass your title and place
+  filters.
+- **Posts with neither** (a Telegram contact only, or no contact) are dropped, and so are posts
+  from people looking for work. One post gives one job, even if it lists several roles.
 - **Age.** Posts older than 45 days are not stored. Each run reads up to 5 preview pages (about
   100 posts) per channel.
 - **Politeness.** One channel at a time, at least 2 seconds between requests.
 - **Job address.** A job's address is its post (`https://t.me/<channel>/<id>`), which is what
-  stops it being stored twice. A second job found in the same post ends in `?job=2`.
+  stops it being stored twice.
 
 ## Politeness: rate limits and Crawl-delay
 

@@ -2,7 +2,7 @@
 
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 import numpy as np
 from loguru import logger
@@ -25,10 +25,77 @@ from linkit_all.apply.answers import (
 from linkit_all.core.models import AnswerEntry
 from linkit_all.matching.rank import Embed
 from linkit_all.providers.base import LLMProvider, UsageLimitError, render
+from linkit_all.sources.text import norm, norm_company
 from linkit_all.tailor.patches import has_arabic
 
 MATCH = 0.93  # paraphrase similarity needed to reuse a saved answer
 MATCH_SENSITIVE = 0.97  # sensitive questions: near-identical wording, the user's own answers only
+
+
+class Scope(NamedTuple):
+    kind: str  # general | role | company
+    name: str = ""  # the job title or company it belongs to
+
+
+GENERAL = Scope("general")
+_COMPANY_Q = re.compile(
+    r"why (do|would) you (want|like|wish) to (work|join)(?!.*\b(role|position|job)\b)|"
+    r"why (us|here)\b|"
+    r"\bour (company|team|mission|values|products?|culture|organi[sz]ation|business)\b|"
+    r"this (company|organi[sz]ation|employer)|about (us|the company)\b|"
+    r"(worked|employed|applied|interviewed) (at|for|with|to) (us|here|this|our)|"
+    r"previously (worked|employed|applied)|"
+    r"(know|relatives?|friends?|family)\b.*\b(work|works|working|employed)\b.*\b(here|at|for|with)\b|"
+    r"شركتنا|هذه الشركة|العمل لدينا|الانضمام إلينا",
+    re.IGNORECASE,
+)
+_ROLE_Q = re.compile(
+    r"\b(this|the|that) (role|position|job|opening|vacancy)\b|\b(good|right|best|strong) fit\b|"
+    r"why should we hire|what makes you|relevant (experience|background|skills)|"
+    r"describe your (experience|background)|about your (experience|background)|motivat|"
+    r"هذا الدور|هذه الوظيفة|هذا المنصب|الوظيفة المتقدم",
+    re.IGNORECASE,
+)
+_LEVEL = re.compile(
+    r"\b(senior|sr|junior|jr|lead|principal|staff|mid|level|intern|i{1,3}|iv|[1-5])\b"
+)
+_NO_COMPANY = norm_company("Unknown")
+
+
+def role_key(title: str) -> str:
+    """A job title without its level, so "Senior Backend Engineer" shares "Backend Engineer"."""
+    return " ".join(_LEVEL.sub(" ", norm(re.sub(r"\(.*?\)", " ", title))).split())
+
+
+def scope_of(question: str, title: str, company: str) -> Scope:
+    """Who a question's answer is good for: read from its wording, no AI. A question naming the
+    company, or asking about it, gets an answer for that company alone; one about the role is
+    shared by jobs with the same title; anything else is the same everywhere."""
+    key = norm_company(company)
+    named = key and key != _NO_COMPANY and f" {key} " in f" {norm(question)} "
+    if named or _COMPANY_Q.search(question):
+        return Scope("company", company.strip())
+    if _ROLE_Q.search(question):
+        return Scope("role", title.strip())
+    return GENERAL
+
+
+def _same_scope(entry: AnswerEntry, scope: Scope) -> bool:
+    if entry.scope != scope.kind:
+        return False
+    if scope.kind == "company":
+        key = norm_company(scope.name)
+        return bool(key) and key != _NO_COMPANY and norm_company(entry.scope_name) == key
+    return scope.kind == "general" or (
+        bool(role_key(scope.name)) and role_key(entry.scope_name) == role_key(scope.name)
+    )
+
+
+def keepable(scope: Scope) -> bool:
+    """False for an answer tied to a role or company with no name: it could never be reused."""
+    if scope.kind == "company":
+        return norm_company(scope.name) not in ("", _NO_COMPANY)
+    return scope.kind != "role" or bool(role_key(scope.name))
 
 
 class AnswerBank:
@@ -46,7 +113,7 @@ class AnswerBank:
             self._vecs = self.embed([e.question for e in self._entries]) if self._entries else None
         return self._entries
 
-    def lookup(self, q: Question, sensitive: bool = False) -> Any:
+    def lookup(self, q: Question, sensitive: bool = False, scope: Scope = GENERAL) -> Any:
         entries = self._load()
         if not entries or self._vecs is None:
             return None
@@ -56,7 +123,7 @@ class AnswerBank:
             if sims[i] < (MATCH_SENSITIVE if sensitive else MATCH):
                 break
             entry = entries[i]
-            if sensitive and entry.source != "user":
+            if (sensitive and entry.source != "user") or not _same_scope(entry, scope):
                 continue
             if (value := _fit(q, entry.answer)) is not None:
                 with self.db.begin() as s:
@@ -71,24 +138,34 @@ class AnswerBank:
         source: str,
         sensitive: bool = False,
         session: Session | None = None,
+        scope: Scope = GENERAL,
     ) -> None:
         """Save in `session` when given (the caller commits), else in a transaction of its own."""
+        if not keepable(scope):
+            return
         key = " ".join(question.lower().split())
         if session is None:
             with self.db.begin() as s:
-                self.save(question, answer, source, sensitive, s)
+                self.save(question, answer, source, sensitive, s, scope)
             return
         existing = next(
             (
                 e
                 for e in session.scalars(select(AnswerEntry))
-                if " ".join(e.question.lower().split()) == key
+                if " ".join(e.question.lower().split()) == key and _same_scope(e, scope)
             ),
             None,
         )
         if existing is None:
             session.add(
-                AnswerEntry(question=question, answer=answer, source=source, sensitive=sensitive)
+                AnswerEntry(
+                    question=question,
+                    answer=answer,
+                    source=source,
+                    sensitive=sensitive,
+                    scope=scope.kind,
+                    scope_name=scope.name,
+                )
             )
         elif source == "user" or existing.source == "ai":  # never overwrite the user's words
             existing.answer, existing.source = answer, source
@@ -189,8 +266,12 @@ async def answer_questions(
     profile: str,
     job: dict[str, str],
     out_dir: Path,
+    *,
+    ai_optional: bool = True,
 ) -> Resolution:
-    """Full resolution; anything required and still unanswered ends in `missing`."""
+    """Full resolution; anything required and still unanswered ends in `missing`. `ai_optional`
+    False: the AI is asked only for required questions and open text boxes (when nothing has
+    told the fields of a page apart, an optional box may be anything)."""
     letter, letter_arabic = "", False
     if provider is not None and any(is_cover_letter(q) for q in questions):
         try:
@@ -214,15 +295,18 @@ async def answer_questions(
     r.missing = still_missing
 
     for_ai = []
+    scopes = {
+        q.key: scope_of(q.label, job.get("title", ""), job.get("company", "")) for q in r.pending
+    }
     for q in r.pending:
         if is_cover_letter(q) and q.kind == "textarea" and letter:
             r.answers[q.key], r.sources[q.key] = letter, "ai"
-        elif (value := bank.lookup(q)) is not None:
+        elif (value := bank.lookup(q, scope=scopes[q.key])) is not None:
             r.answers[q.key], r.sources[q.key] = value, "bank"
         elif letter_arabic and is_cover_letter(q):
             if q.required:
                 r.missing.append(Missing(q, ARABIC_LETTER))
-        else:
+        elif ai_optional or q.required or q.kind == "textarea":
             for_ai.append(q)
     if provider is not None and for_ai:
         try:
@@ -237,7 +321,7 @@ async def answer_questions(
         for q in for_ai:
             if q.key in drafted:
                 r.answers[q.key], r.sources[q.key] = drafted[q.key], "ai"
-                bank.save(q.label, drafted[q.key], "ai")
+                bank.save(q.label, drafted[q.key], "ai", scope=scopes[q.key])
             elif q.required:
                 r.missing.append(Missing(q, "not answerable from your CV or profile"))
     else:

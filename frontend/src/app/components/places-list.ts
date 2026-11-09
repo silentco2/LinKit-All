@@ -28,7 +28,7 @@ import { PlacePick, PlacePicker } from './place-picker';
               } @else {
                 <span class="order-3 w-full text-sm text-slate-600 sm:order-2 sm:w-auto dark:text-slate-400">{{ 'places.same' | t: { country: countryName(p) } }}</span>
               }
-              <button type="button" class="order-2 rounded-full px-2 text-slate-500 max-sm:min-h-10 max-sm:min-w-10 sm:order-3 hover:bg-slate-100 dark:hover:bg-slate-800" [attr.aria-label]="'settings.jobs.remove' | t: { name: shown(p) }" (click)="remove(p)"><span aria-hidden="true">×</span></button>
+              <button type="button" class="order-2 rounded-md px-2 text-slate-500 max-sm:min-h-10 max-sm:min-w-10 sm:order-3 hover:bg-slate-100 dark:hover:bg-slate-800" [attr.aria-label]="'settings.jobs.remove' | t: { name: shown(p) }" (click)="remove(p)"><span aria-hidden="true">×</span></button>
               @if (isFirst(p) && workOf(p) === 'ask') { <p class="order-4 w-full text-xs text-slate-600 dark:text-slate-400">{{ 'places.ask' | t }}</p> }
             </li>
           }

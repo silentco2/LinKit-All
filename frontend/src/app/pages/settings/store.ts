@@ -17,7 +17,7 @@ const URLS: Record<Obj, string> = { search: '/search', profile: '/profile', answ
 // what the server works out from the places (and work modes) when the search config is saved
 const DERIVED = ['search.locations', 'search.remote', 'filters.locations', 'sources.jobspy_country'];
 const DERIVED_ANSWERS = ['authorized_countries', 'visa_countries', 'willing_to_relocate'] as const;
-const PROFILE_FIELDS = ['full_name', 'email', 'phone', 'location', 'address', 'postal_code', 'home_city', 'home_country', 'skills'] as const;
+const PROFILE_FIELDS = ['full_name', 'email', 'phone', 'location', 'address', 'postal_code', 'home_city', 'home_state', 'home_country', 'skills'] as const;
 
 /**
  * One in-memory copy each of the search config, the profile and the answers, saved as the user edits.

@@ -1,8 +1,7 @@
 """Any company careers page that no ATS plugin covers.
 
 Order: JSON-LD JobPosting on the page -> links that look like job pages (each read through
-JSON-LD, else an <h1> plus a plainly labelled location, else page text sent to the AI in
-batches of AI_BATCH pages per call when a provider is available, else the page title) ->
+JSON-LD, else its <h1> or title, a plainly labelled location and the page text; no AI) ->
 "unsupported". robots.txt is not enforced; its Crawl-delay still slows the host (Http.allowed).
 A page with no jobs in its HTML is then opened in Chrome when a provider is available
 (browser_extract: the AI picks JSON-LD, a background JSON response or CSS selectors, our code
@@ -14,17 +13,15 @@ pages: the board goes to that ATS plugin (its JSON API) and replaces those gener
 import re
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from pathlib import Path
-from typing import Literal
 from urllib.parse import urljoin, urlsplit
 
 import httpx
 from playwright.async_api import Request, Route
-from pydantic import BaseModel
 from selectolax.lexbor import LexborHTMLParser
 
-from linkit_all.providers.base import LLMProvider, ProviderError, UsageLimitError, render
+from linkit_all.providers.base import LLMProvider
 from linkit_all.sources.ats_detector import detect
-from linkit_all.sources.base import JobStub, Source, Task, from_iso, remote_from_text
+from linkit_all.sources.base import JobStub, Source, Task, remote_from_text
 from linkit_all.sources.browser_extract import (
     BrowserError,
     BrowserExtractor,
@@ -38,8 +35,6 @@ from linkit_all.sources.text import html_to_text, normalize_url
 
 PAGE = 10  # job pages per checkpoint
 MAX_LIST_PAGES = 4  # the careers page plus at most 3 "next" pages
-AI_BATCH = 10  # job pages per AI call; PAGE == AI_BATCH so one checkpoint costs at most one call
-EXCERPT = 1500  # characters of each page's text sent to the model
 MAX_LOCATION = 80  # a longer "Location:" value is prose, not a location
 MIN_TEXT = 200  # a listing with less text and no job links is almost surely JS-rendered
 
@@ -62,19 +57,6 @@ CHALLENGE_MESSAGE = "the site answered with a bot challenge; it is not bypassed"
 
 class Unsupported(Exception):
     """This careers page cannot be read here; the message is shown to the user."""
-
-
-class ExtractedJob(BaseModel):
-    id: int  # our page number in the batch; replies with other ids are ignored
-    title: str = ""
-    location: str = ""
-    remote: Literal["remote", "hybrid", "onsite"] | None = None
-    employment_type: str = ""
-    posted_date: str | None = None
-
-
-class ExtractedBatch(BaseModel):
-    jobs: list[ExtractedJob]
 
 
 def _looks_like_job(url: str, text: str) -> bool:
@@ -288,81 +270,39 @@ class Careers(Source):
                 break
         return list(links.values())[:limit]
 
-    async def _page(
-        self, http: Http, url: str, company: str
-    ) -> JobStub | tuple[str, str, str, str] | None:
-        """A finished stub, or (url, h1/title, text, location) for a page that needs the AI."""
+    async def read_job(
+        self, http: Http, url: str, company: str = "Unknown"
+    ) -> tuple[JobStub, bool] | None:
+        """One job page, without AI: (stub, True) from its JSON-LD, or (stub, False) from its
+        heading and text. None for a dead link."""
         try:
             html = await self._fetch(http, url)
         except (httpx.HTTPError, RetryableStatus):  # a dead link must not sink the page
             return None
         if postings := job_postings(html):
-            return _with_company(to_stub(postings[0], self.name, url, None), company)
+            return _with_company(to_stub(postings[0], self.name, url, None), company), True
         tree = LexborHTMLParser(html)
-        h1, location = tree.css_first("h1"), _location(tree)
+        location = _location(tree)
         title, text = _title(tree), _main_text(html)
-        if h1 and h1.text().strip() and location:  # title + location: no AI needed
-            return self._stub(url, company, title, text, None, location)
-        return url, title, text, location
-
-    def _stub(
-        self,
-        url: str,
-        company: str,
-        title: str,
-        text: str,
-        found: ExtractedJob | None,
-        location: str = "",
-    ) -> JobStub:
-        location = (found.location if found else "") or location
-        posted = None
-        if found and found.posted_date:
-            try:
-                posted = from_iso(found.posted_date)
-            except ValueError:
-                posted = None
-        return JobStub(
-            source=self.name,
-            url=url,
-            title=(found.title if found and found.title else title) or url,
-            company=company,
-            location=location,
-            description=text,
-            posted_at=posted,
-            apply_url=url,
-            remote=(found.remote if found else None) or remote_from_text(title, location),
-            extra={"employment": found.employment_type} if found else {},
+        return (
+            JobStub(
+                source=self.name,
+                url=url,
+                title=title or url,
+                company=company,
+                location=location,
+                description=text,
+                apply_url=url,
+                remote=remote_from_text(title, location),
+            ),
+            False,
         )
 
     async def _jobs(self, http: Http, links: list[str], company: str) -> list[JobStub]:
         done: list[JobStub] = []
-        pending: list[tuple[str, str, str, str]] = []
         for link in links:
-            page = await self._page(http, link, company)
-            if isinstance(page, JobStub):
-                done.append(page)
-            elif page:
-                pending.append(page)
-        found = await self._extract([text for _, _, text, _ in pending])
-        for n, (url, title, text, location) in enumerate(pending):
-            done.append(self._stub(url, company, title, text, found.get(n), location))
+            if self.is_known(link):  # stored already: no need to read it again, just sight it
+                done.append(JobStub(source=self.name, url=link, title=link, company=company))
+            elif read := await self.read_job(http, link, company):
+                done.append(read[0])
         return done
-
-    async def _extract(self, texts: list[str]) -> dict[int, ExtractedJob]:
-        """One AI call for a batch of pages; ids are ours, any other id in the reply is dropped."""
-        if self.provider is None or not texts:
-            return {}
-        pages = [{"id": n, "text": t[:EXCERPT]} for n, t in enumerate(texts)]
-        try:
-            result = await self.provider.complete(
-                render("extract_job.j2", pages=pages), ExtractedBatch
-            )
-        except UsageLimitError:
-            raise  # pause the run cleanly instead of silently degrading
-        except ProviderError:
-            return {}
-        out: dict[int, ExtractedJob] = {}
-        for job in result.jobs:
-            if 0 <= job.id < len(texts):
-                out.setdefault(job.id, job)
-        return out

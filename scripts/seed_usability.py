@@ -372,8 +372,6 @@ def seed(data_dir: Path, lang: str = "en") -> dict[str, int]:
         ),
     )
     answers = ApplicationAnswers(
-        first_name=name.split()[0],
-        last_name=name.split()[-1],
         city="Cairo",
         country="Egypt",
         current_title="Backend Developer",

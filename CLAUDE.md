@@ -71,15 +71,15 @@ Tailoring happens just before applying, never for jobs that will not be applied 
   `sources/ats|aggregators|boards|companies` (auto-registry; helpers in `sources/common.py`, `parsing.py`,
   `tasks.py`). Aggregators/boards/companies/Telegram are opt-in.
 - Priority: public ATS JSON APIs (Greenhouse, Lever, Ashby, Workday cxs, 100+ more) > python-jobspy (LinkedIn, Indeed, Glassdoor, ZipRecruiter,
-  Google, Bayt) > aggregators and per-site plugins (Wuzzuf, Forasna) > generic extractor (JSON-LD -> CSS -> AI extraction).
-- Also: Telegram channels (t.me/s preview), discovered boards (Common Crawl, `linkit discover-boards`), aggregator API keys from the vault.
+  Google, Bayt) > aggregators and per-site plugins (Wuzzuf, Forasna) > generic extractor (JSON-LD -> heading + page text; JS pages: AI picks a recipe once per site).
+- Also: Telegram channels (t.me/s preview; post rules as for LinkedIn posts), discovered boards (Common Crawl, `linkit discover-boards`), aggregator API keys from the vault.
 - All browser automation runs real installed Chrome launched without automation flags (stealth-browser-mcp approach, maintainer 2026-10-26); never
-  solve CAPTCHAs/challenges, automate login, use rotating proxies, TLS or fingerprint spoofing (exception 2026-10-29: headless gets a fitted screen +
+  solve CAPTCHAs/challenges, automate login (exceptions, §5.5: 2026-11-06 a site's Sign in with Google; 2026-11-07 board accounts the app made), use rotating proxies, TLS or fingerprint spoofing (exception 2026-10-29: headless gets a fitted screen +
   real Chrome UA/client hints). OK: what the site's own pages send (Referer, XHR header, CSRF key). robots.txt not enforced.
 - ATS detector routes any pasted URL (or careers-page HTML) to the right plugin.
-- LinkedIn hiring posts (`sources/linkedin_posts/`): opt-in, off by default (ToS risk noted, no acknowledgement checkbox), no LinkedIn account (maintainer 2026-10-31); keywords default to the search queries. Google
-  `site:linkedin.com/posts` in Chrome on a `google` profile (≤5 keywords × ≤5 pages, paced); a Google check -> stop the source, flag it, user solves it
-  in the app browser. Post text = public page JSON-LD only (never comments). ATS links -> that ATS; others -> batched AI; no email/link -> dropped.
+- LinkedIn hiring posts (`sources/linkedin_posts/`): opt-in, off by default (ToS risk noted, no acknowledgement checkbox), no LinkedIn account (maintainer 2026-10-31); a row in the Sources list, keywords = the job titles (maintainer 2026-11-05). Google
+  `site:linkedin.com/posts` in Chrome on a `google` profile (≤5 keywords × ≤5 pages, paced); a Google check -> stop the source, flag it, a Needs you
+  card opens it in the app browser. Post text = public page JSON-LD only (never comments). ATS links -> that ATS; else by script, no AI (`sources/posts.py`, maintainer 2026-11-08): email -> mailto job, other link -> careers scraper, neither -> dropped.
 - Per-domain rate limits, page checkpoints, dedupe by normalized URL + hash(title, company, location) + rapidfuzz.
 
 ### 5.3 Matching (`matching/`)
@@ -90,7 +90,7 @@ Tailoring happens just before applying, never for jobs that will not be applied 
 3. Trust check (offline, no AI): scam score (fees, off-platform contact, mule/crypto/ID requests,
    domain mismatch; EN+AR, evasion-proof) and ghost score (age, repeat sightings across runs,
    vague/evergreen text). Scam >= 65 -> filtered_out; ghost >= 50 -> tier low (or filtered out
-   if the user opts in).
+   if the user opts in). Trash (`matching/trash.py`, maintainer 2026-11-09): applied, reported, blacklisted-company and off-title jobs never reach a list; rows stay for dedupe.
 4. AI score only jobs that survive 1–3 (dropped ones become `low`), batched 10–20 short summaries
    per call: `{score 1-10, reasons, missing_skills, red_flags, legit, trust_flags}`; AI can raise, never clear.
 
@@ -109,22 +109,26 @@ Tailoring happens just before applying, never for jobs that will not be applied 
 ### 5.5 Apply (`apply/`)
 - Order: per-ATS handler -> generic AI form agent (accessibility-tree snapshot -> field map JSON -> fill -> validate -> next) -> Action Center.
   Handlers today: Greenhouse, Lever, Ashby; every other site (Workday, iCIMS, Taleo, ...) falls back to the generic agent.
+  On a job ad (board listing) the agent presses Apply (<= 3 hops) and hands Greenhouse/Lever/Ashby links to their handler.
 - Headed Chrome by default (`apply.headless` is the one window setting, LinkedIn search included), persistent profile per site, human pacing, per-site daily caps, 1–3 parallel
   browsers. Jobs closed on Greenhouse/Lever/Ashby are skipped before tailoring.
 - Account gate: generate unique password (`secrets`, honoring site rules), save to vault BEFORE submitting
   signup, then verify via IMAP (code/link by regex, AI fallback). Dry run never touches sign-up; live mode
-  creates accounts when needed; the application still waits for confirmation unless 'submit without asking'.
-- Screening questions: answer bank (embedding match) -> AI draft from profile -> Action Center. Sensitive
+  creates accounts when needed; the application still waits for confirmation unless 'submit without asking'. Sign in with Google (`apply/google_signin.py`, `apply.google_signin`, opt-in, live only, maintainer 2026-11-06): the user signs in to Google by hand once on the `generic` profile; the agent presses the site's button, the account and Continue, never typing Google's password or solving its checks (those park, `google_needed`).
+  Sites without a handler (job boards, maintainer 2026-11-07): same gate in the agent, vault account `web:<host>`, sign-up via field map + answer engine.
+- Screening questions: answer bank (embedding match; general/per-role/per-company by wording, `assist.scope_of`) -> AI draft from profile (saved) -> Action Center. LinkIt Fill reads labels itself (no form-map AI); what the user types or corrects there joins the bank (never sensitive, secrets, ticks, dates). Sensitive
   categories (section 2) never go to the AI; military status, nationality, date of birth and marital status
   come from the profile only (an age question is always asked). Sponsorship/work authorization left on "Ask me":
   job country in `authorized_countries` -> no sponsorship/authorized, in `visa_countries` -> sponsorship needed/not authorized, else Action Center.
 - Missing setup parks the job with `needs_vault`, `vault_locked` or `needs_email`; it continues once done (`retry-code`).
-- LinkedIn Easy Apply and Indeed Apply break those sites' ToS: off by default, explicit opt-in with a ban-risk
-  warning, low daily caps. No CAPTCHA solving: CAPTCHAs park for the user.
+- Ban-risk sites (`apply.assisted_hosts`: LinkedIn, Indeed, Glassdoor; maintainer 2026-11-07) are never driven and get no
+  account: the job parks `apply_in_browser`. The user opens it in their own browser, where the LinkIt Fill extension
+  (`src/linkit_all/extension/`, MV3, pairing token, `api/assist.py`) fills each step, or any page by right-click "Fill with LinkIt" (AI for optional fields too; page -> job by site job id, address, or title + company, never a guess; the job follows its Apply into the employer's tab; LinkedIn's public page shows offsite vs Easy Apply, not where); the user presses Next/Submit.
+  Dead ends park `apply_by_hand` (link, CV, answers so far). No CAPTCHA solving: CAPTCHAs park for the user.
 - Email applications (`mailto:`, `apply/email_apply.py`): Gmail/Yahoo SMTP or Outlook Graph; short cover
-  email (greeting/signature in code, body from the model, CV/profile only) + tailored CV PDF. Dry run writes an
+  email (greeting/signature in code, body from the model, CV/profile only), subject = job title, the CV as uploaded (never tailored). Dry run writes an
   .eml only; live follows "submit without asking" (else `confirm_email`). 15/day, never the same address twice.
-- Cover letter only if the form has a field. All AI-written prose is English only, never Arabic (copying stays verbatim). Screenshot before submit and on confirmation; trace on failure.
+- Names (`core/names.py`, maintainer 2026-11-09): split on spaces; other script from the bundled arabnamer list, no AI. Cover letter only if the form has a field. All AI-written prose is English only, never Arabic (copying stays verbatim). Screenshot before submit and on confirmation; trace on failure.
 - Success = confirmation page text and/or email, else failed with reason, never assumed. A sent email = applied
   (by email); the sent message is the proof.
 
@@ -134,7 +138,7 @@ approve/reject); <5 or dropped by prefilter = `low` -> hidden, but the user may 
 
 ### 5.7 Action Center (UI: "Needs you", tabs Approve jobs = review, Finish applications)
 Parked: unknown_question, confirm_submit, confirm_email, captcha, validation_error, login_issue,
-two_factor. Reopen via "Open in app browser" (same Chrome profile), then Retry. Notify via
+two_factor, apply_by_hand, apply_in_browser ("Open in my browser", "I applied"). Reopen via "Open in app browser" (same Chrome profile), then Retry. Notify via
 WebSocket + optional desktop notification. Open questions are grouped and answered once for many; sensitive
 ones group only on exact wording. One-time "always" choices (agreements, notice period, relocation,
 demographics) are saved to the profile.
@@ -156,11 +160,12 @@ Derived by rules. AI gap-fill must be verbatim from the CV (checked). On CV uplo
 - Profile, preferences, locked facts, answer bank stored in DB; JSON/YAML import/export.
 
 ## 7. UI screens
-First run `/welcome` (CV, AI, check what we found, what jobs) · Home (next best action, funnel, schedule, tasks,
-go-live) · Jobs (virtualized) · Needs you · Activity (Now = event stream + 3-second read-only screenshot view;
-History = runs + reports) · Settings (Profile & CV, Jobs & places, Sources, Answers, Applying, Accounts & email,
+First run `/welcome` (CV, AI, check what we found, what jobs) · Home (next best action, funnel, go-live, run view = step cards (pause stops; play resumes, or on the next step counts the stopped one as done; Find new jobs discards it) +
+event log + 3-second read-only screenshot view, report charts + folded tables, schedule; no Activity page, maintainer
+2026-11-05) · Jobs (virtualized) · Needs you · Settings (Profile & CV, Jobs & places, Sources, Answers, Applying, Accounts & email,
 AI, Advanced; everything autosaves).
 UI words: Practice mode, Applying for real, Strong/Possible/Weak match, Needs you, Search. Code names unchanged.
+Look (maintainer 2026-11-08): the application desk. Paper sheets on a desk, folder tabs for counts and trays, a rubber stamp for outcomes only. Tokens in `frontend/src/styles.css` (Tailwind slate/brand scales remapped there); IBM Plex Sans + Arabic bundled, never web fonts.
 
 ## 8. Repository layout
 ```
@@ -171,9 +176,10 @@ src/linkit_all/
   sources/    discovery plugins + ats_detector
   matching/   rules, embeddings, scoring
   tailor/     docx/, latex/, odt/, pdf_in/, render/, verify/
-  apply/      handlers/<ats>.py, agent/, accounts/, vault/, email_verify/, answers/
-  reports/ · cli.py  `linkit` (serve), `linkit doctor`, `linkit run <stage>`
-frontend/     Angular 21 app (pages: welcome, home, jobs, needs-you, activity, settings/) -> src/linkit_all/static (Angular 22 needs Node >= 24.15)
+  apply/      handlers/<ats>.py, agent/, accounts/, vault/, email_verify/, answers/, probe.py
+  extension/  LinkIt Fill browser extension (MV3, plain JS; snapshot.js mirrors apply/agent/snapshot.js)
+  reports/ · cli.py  `linkit` (serve), `linkit doctor`, `linkit run <stage>`, `linkit apply-probe`
+frontend/     Angular 21 app (pages: welcome, home, jobs, needs-you, settings/) -> src/linkit_all/static (Angular 22 needs Node >= 24.15)
 tests/        unit, fixtures/<ats>/*.html, e2e (dry-run only) · docs/
 ```
 
@@ -184,17 +190,11 @@ tests/        unit, fixtures/<ats>/*.html, e2e (dry-run only) · docs/
 - Update this file when a decision in it changes (max 200 lines). Unsure? Ask; don't guess.
 
 ## 10. Build order
-Phases 1-12 are built; blocked items: handoff.md.
-1. Core: models, SQLite, state machine, providers (Claude/Codex CLI, API keys), DOCX tailoring.
-2. Discovery + matching: ATS APIs, jobspy, Wuzzuf, Forasna, careers pages, dedupe, AI tiering.
-3. UI v1: setup wizard, jobs, review queue, live run, report.
-4. Apply v1: Greenhouse, Lever, Ashby (no accounts), answer bank, Action Center.
-5. Apply v2: vault, IMAP, account gate built; Workday/iCIMS/Taleo/SuccessFactors blocked (need pages); LinkedIn/Indeed apply not built.
-6. Generic careers extractor and AI form agent: built. Naukrigulf blocked.
-7. Local models, LaTeX/ODT/PDF CVs, scheduler, reports, Arabic UI, docs, Outlook OAuth: built. Pending: macOS/Linux LO bundles, release.
-8. freehire (MIT) ports: ATS feeds, aggregators, boards, companies, Telegram, discovery: built.
-9. Debt (D1-D7), 10. Trust filter, 11. LinkedIn hiring posts (Google search, no LinkedIn login): built.
-12. UX for V1 (ux-plan.md): built. UX7, the usability round with 5 people, is pending with the maintainer.
+Phases 1-13 are built; blocked items: handoff.md. 1 core, models, providers, DOCX tailoring · 2 discovery + matching
+· 3 UI v1 · 4 apply v1 (Greenhouse, Lever, Ashby, answer bank, Action Center) · 5 vault, IMAP, account gate
+(Workday/iCIMS/Taleo/SuccessFactors blocked: need pages) · 6 careers extractor, AI form agent (Naukrigulf blocked)
+· 7 local models, LaTeX/ODT/PDF CVs, scheduler, reports, Arabic UI, Outlook OAuth (pending: macOS/Linux LO bundles,
+release) · 8 freehire ports · 9 debt · 10 trust filter · 11 LinkedIn hiring posts · 12 UX for V1 (UX7 usability round pending) · 13 autonomous apply: Apply-button hops, board accounts, assisted sites + LinkIt Fill, apply-probe.
 
 ## 11. License
 AGPL-3.0-or-later (code reused from ApplyPilot/AIHawk). Reused files keep original headers, listed in NOTICE.

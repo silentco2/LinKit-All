@@ -68,15 +68,15 @@ const SRC_TEXT: Record<string, string> = {
     <div class="mx-auto max-w-3xl">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <div class="text-lg font-bold text-slate-900 dark:text-white">LinKit <span class="text-brand-600">All</span></div>
+          <div class="wordmark">LinKit All</div>
           @if (status(); as st) {
-            <span class="badge" [class]="st.apply_live ? 'tier-mid' : 'tier-low'" [title]="(st.apply_live ? 'shell.liveTitle' : 'shell.dryTitle') | t">{{ (st.apply_live ? 'shell.live' : 'welcome.practicePill') | t }}</span>
+            <span class="text-sm" [class]="st.apply_live ? 'font-medium text-rose-600 dark:text-rose-400' : 'text-slate-500'" [title]="(st.apply_live ? 'shell.liveTitle' : 'shell.dryTitle') | t">{{ (st.apply_live ? 'shell.live' : 'welcome.practicePill') | t }}</span>
           }
         </div>
         <div class="flex items-center gap-2">
-          <div class="flex items-center gap-1" role="group" [attr.aria-label]="'shell.language' | t">
-            <button type="button" class="btn !px-2 !py-1 text-xs" lang="en" dir="ltr" [class.btn-primary]="i18n.lang() === 'en'" [attr.aria-pressed]="i18n.lang() === 'en'" (click)="setLang('en')">English</button>
-            <button type="button" class="btn !px-2 !py-1 text-xs" lang="ar" dir="rtl" [class.btn-primary]="i18n.lang() === 'ar'" [attr.aria-pressed]="i18n.lang() === 'ar'" (click)="setLang('ar')">العربية</button>
+          <div class="flex items-center gap-3" role="group" [attr.aria-label]="'shell.language' | t">
+            <button type="button" class="lang-btn text-xs" lang="en" dir="ltr" [attr.aria-pressed]="i18n.lang() === 'en'" (click)="setLang('en')">English</button>
+            <button type="button" class="lang-btn text-xs" lang="ar" dir="rtl" [attr.aria-pressed]="i18n.lang() === 'ar'" (click)="setLang('ar')">العربية</button>
           </div>
         </div>
       </div>
@@ -90,7 +90,7 @@ const SRC_TEXT: Record<string, string> = {
           <span>{{ 'welcome.step' | t: { n: step() } }}</span>
           <ol class="flex gap-1" aria-hidden="true">
             @for (n of steps; track n) {
-              <li class="h-1.5 w-10 rounded-full" [class]="n <= step() ? 'bg-brand-600' : 'bg-slate-200 dark:bg-slate-700'"></li>
+              <li class="h-1 w-10" [class]="n <= step() ? 'bg-slate-700 dark:bg-slate-300' : 'bg-slate-300 dark:bg-slate-700'"></li>
             }
           </ol>
         </div>
@@ -100,14 +100,14 @@ const SRC_TEXT: Record<string, string> = {
 
           @switch (step()) {
             @case (1) {
-              <div class="rounded-xl border-2 border-dashed p-8 text-center transition-colors"
+              <div class="rounded-md border-2 border-dashed p-8 text-center transition-colors"
                    [class]="dragging() ? 'border-brand-500 bg-brand-50 dark:bg-slate-800' : 'border-slate-300 dark:border-slate-700'"
                    (dragover)="dragOver($event)" (dragleave)="dragging.set(false)" (drop)="dropped($event)">
                 @if (cvBusy()) {
                   <p class="text-sm text-slate-500" role="status">{{ 'welcome.cv.reading' | t }}</p>
                 } @else {
                   <p class="text-sm text-slate-600 dark:text-slate-400">{{ (dragging() ? 'welcome.cv.dropNow' : cv()?.approved ? 'welcome.cv.ready' : 'welcome.cv.drop') | t }}</p>
-                  <label class="btn mt-3 cursor-pointer focus-within:ring-2 focus-within:ring-brand-500">
+                  <label class="btn mt-3 cursor-pointer focus-within:outline-2 focus-within:outline-brand-500">
                     {{ (cv() ? 'welcome.cv.replace' : 'welcome.cv.choose') | t }}
                     <input type="file" accept=".docx,.odt,.pdf,.tex,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.oasis.opendocument.text,application/pdf,application/x-tex,text/x-tex" class="sr-only" (change)="picked($event)">
                   </label>
@@ -458,7 +458,7 @@ export class WelcomePage implements OnInit {
   private async loadSaved(profile: Profile): Promise<void> {
     const ans = await this.api.get<Record<string, unknown>>('/profile/answers');
     const all: Record<string, unknown> = {};
-    for (const k of ['full_name', 'email', 'phone', 'home_city', 'home_country', 'skills'] as const) all[`profile.${k}`] = profile[k];
+    for (const k of ['full_name', 'email', 'phone', 'home_city', 'home_state', 'home_country', 'skills'] as const) all[`profile.${k}`] = profile[k];
     for (const [k, v] of Object.entries(ans)) all[`answers.${k}`] = v;
     all['filters.seniority'] = this.cfg?.filters.seniority;
     all['filters.title_exclude'] = this.cfg?.filters.title_exclude;
@@ -589,14 +589,8 @@ export class WelcomePage implements OnInit {
     if (!this.trackSet) this.track.set(next['track'] === 'tech' ? 'tech' : 'general');
   }
 
-  /** First/last name and city follow the full name and home city unless the CV gave them. */
+  /** The city follows the home city unless the CV gave one. */
   private derive(v: Record<string, unknown>, force = false): void {
-    const name = String(v['profile.full_name'] ?? '').trim();
-    if (name && (force || !v['answers.first_name'])) {
-      const [first, ...rest] = name.split(/\s+/);
-      v['answers.first_name'] = first;
-      v['answers.last_name'] = rest.join(' ');
-    }
     const city = String(v['profile.home_city'] ?? '').trim();
     if (city && (force || !v['answers.city'])) v['answers.city'] = city;
   }
@@ -635,6 +629,7 @@ export class WelcomePage implements OnInit {
     const iso = p.label ? p.country || this.text('profile.home_country') : '';
     this.set('profile.home_country', iso);
     this.set('profile.home_city', p.city);
+    this.set('profile.home_state', p.state ?? ''); // only text typed in parts has one
     const c = this.countries.byIso(iso);
     if (c) this.set('answers.country', c.name);
   }
@@ -645,9 +640,9 @@ export class WelcomePage implements OnInit {
   protected homeText(): string {
     const iso = this.text('profile.home_country');
     const c = this.countries.byIso(iso);
-    const city = this.text('profile.home_city');
     const ar = this.i18n.lang() === 'ar';
-    return [(ar && this.arCity()[`${city}|${iso}`]) || city, c ? this.countries.name(c) : iso].filter(Boolean).join(ar ? '، ' : ', ');
+    const named = (name: string) => (ar && this.arCity()[`${name}|${iso}`]) || name;
+    return [named(this.text('profile.home_city')), named(this.text('profile.home_state')), c ? this.countries.name(c) : iso].filter(Boolean).join(ar ? '، ' : ', ');
   }
 
   /** The Arabic name of an English city ("Alexandria" -> "الإسكندرية"), looked up once; a city already written in Arabic needs none. */
@@ -663,9 +658,9 @@ export class WelcomePage implements OnInit {
 
   constructor() {
     effect(() => {
-      const city = this.text('profile.home_city');
+      const names = [this.text('profile.home_city'), this.text('profile.home_state')];
       const iso = this.text('profile.home_country');
-      if (this.i18n.lang() === 'ar' && city && iso) untracked(() => void this.loadArCity(city, iso));
+      if (this.i18n.lang() === 'ar' && iso) for (const name of names) if (name) untracked(() => void this.loadArCity(name, iso));
     });
   }
 

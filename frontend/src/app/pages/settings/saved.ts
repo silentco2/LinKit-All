@@ -12,7 +12,7 @@ import { FieldState, SettingsStore } from './store';
     <span aria-live="polite" role="status">
       @switch (state()?.state) {
         @case ('saving') { <span class="text-slate-500 dark:text-slate-400">{{ 'settings.saving' | t }}</span> }
-        @case ('saved') { <span class="text-emerald-700 dark:text-emerald-400"><span aria-hidden="true">✓ </span>{{ 'settings.saved' | t }}</span> }
+        @case ('saved') { <span class="text-emerald-700 dark:text-emerald-400"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13l4 4L19 7" /></svg> {{ 'settings.saved' | t }}</span> }
         @case ('error') { <span class="text-rose-700 dark:text-rose-400">{{ 'settings.notSaved' | t }}</span> }
       }
     </span>

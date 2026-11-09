@@ -1,14 +1,15 @@
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { Api, ApiError } from '../api';
 import { GoLiveCard } from '../components/golive';
-import { Hint } from '../components/hint';
 import { LibreOfficeCard } from '../components/libreoffice-card';
 import { I18n, TPipe } from '../i18n';
 import { Live } from '../live';
-import { DtPipe, fmtNum, localeOf } from '../locale';
+import { fmtNum, localeOf } from '../locale';
 import { Shell } from '../shell';
-import { APPLY_STAGES, GoLive, JobRow, Report, ScheduleSection, SEARCH_STAGES, SearchConfig, setupDone, Stage } from '../types';
+import { ActionItem, APPLY_STAGES, GoLive, JobRow, Report, SEARCH_STAGES, setupDone, Stage } from '../types';
+import { LivePage, SearchesCard } from './live';
+import { ReportPage } from './report';
 
 /** The one thing Home asks the user to do next (ux-plan 8.1). `link` = go there; no link = start a run. */
 interface Smart {
@@ -20,133 +21,110 @@ interface Smart {
   stages?: Stage[];
 }
 
-/** A line in the Tasks list. */
-interface HomeTask {
-  id: string;
+/** The sheet on top of the pile next to the lead sentence: the real next item. */
+interface TopSheet {
   title: string;
-  /** The LibreOffice offer: the card is the whole row. */
-  card?: boolean;
-}
-
-const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
-const DEFAULT_TIME = '09:00';
-const GOLIVE_SEEN_KEY = 'linkit.golive.seen'; // the "New" badge on the go-live offer: a per-viewer convenience
-
-function goLiveSeen(): boolean {
-  try {
-    return localStorage.getItem(GOLIVE_SEEN_KEY) === '1';
-  } catch {
-    return false; // storage blocked: the badge just shows again
-  }
+  sub: string;
+  label: string;
+  detail: string;
+  stamp: string;
+  tone: string;
+  pile: number;
 }
 
 @Component({
   selector: 'app-home',
-  imports: [DtPipe, GoLiveCard, Hint, LibreOfficeCard, RouterLink, TPipe],
+  imports: [GoLiveCard, LibreOfficeCard, LivePage, ReportPage, RouterLink, SearchesCard, TPipe],
   template: `
-    <h1>{{ 'home.title' | t }}</h1>
-    <app-hint id="home">{{ 'hint.home' | t }}</app-hint>
-
     @if (shell.status(); as s) {
       @if (smart(); as sm) {
-        <section class="card mt-6" aria-labelledby="home-next">
-          <h2 id="home-next" class="text-sm font-medium tracking-wide text-slate-500 uppercase rtl:tracking-normal dark:text-slate-400">{{ 'home.next' | t }}</h2>
-          <p class="mt-2 text-lg text-slate-900 dark:text-white">{{ sm.message }}</p>
-          <div class="mt-4 flex flex-wrap items-center gap-3">
-            @if (sm.link) {
-              <a class="btn btn-primary no-underline hover:no-underline" [routerLink]="sm.link" [queryParams]="sm.query">{{ sm.label }}</a>
-            } @else {
-              <button type="button" class="btn btn-primary" (click)="go(sm)" [disabled]="busy()">{{ busy() ? ('home.working' | t) : sm.label }}</button>
-            }
-            @if (sm.kind === 'running') {
-              <button type="button" class="btn btn-danger" (click)="stop()" [disabled]="busy() || stopping()">{{ (stopping() ? 'live.stopping' : 'live.stop') | t }}</button>
-            }
-          </div>
-          @for (r of extras(); track r.id) {
-            <div class="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
-              @switch (r.id) {
-                @case ('golive') {
-                  <div class="flex flex-wrap items-center gap-3">
-                    <button type="button" class="btn max-sm:min-h-11" [attr.aria-expanded]="goLiveOpen()" aria-controls="home-golive" (click)="toggleGoLive()">{{ 'golive.offer' | t }}</button>
-                    @if (!goLiveSeen()) { <span class="badge tier-high">{{ 'golive.new' | t }}</span> }
-                  </div>
-                  @if (goLiveOpen()) {
-                    <div id="home-golive" class="mt-3 rounded-lg border border-slate-200 p-4 dark:border-slate-700">
-                      <app-golive (enabled)="justOn.set(true)" (cancel)="goLiveOpen.set(false)" />
-                    </div>
+        <section class="mt-2 grid items-center gap-x-14 gap-y-10" [class]="top() || setupRows().length ? 'md:grid-cols-2' : ''">
+          <div class="min-w-0">
+            <h1>{{ sm.message }}</h1>
+            @if (sm.kind === 'finish' || sm.kind === 'review') { <p class="mt-3 max-w-[34em] text-[15px] text-slate-600 dark:text-slate-400">{{ 'home.lead.' + sm.kind | t }}</p> }
+            <div class="mt-5 flex flex-wrap items-center gap-2">
+              @if (sm.kind === 'running') {
+                <span class="text-base font-medium text-brand-700 dark:text-brand-300" role="status">{{ sm.label }}</span>
+                <button type="button" class="btn btn-danger" (click)="stop()" [disabled]="busy() || stopping()">{{ (stopping() ? 'live.stopping' : 'live.stop') | t }}</button>
+              } @else if (sm.link) {
+                <a class="btn btn-primary no-underline hover:no-underline" [routerLink]="sm.link" [queryParams]="sm.query">{{ sm.label }}</a>
+              } @else {
+                <button type="button" class="btn btn-primary" (click)="go(sm)" [disabled]="busy()">{{ busy() ? ('home.working' | t) : sm.label }}</button>
+              }
+              @for (r of extras(); track r.id) {
+                @if (r.smart; as x) {
+                  @if (x.link) {
+                    <a class="btn no-underline hover:no-underline" [routerLink]="x.link" [queryParams]="x.query" [title]="x.message">{{ x.label }}</a>
+                  } @else {
+                    <button type="button" class="btn" (click)="go(x)" [disabled]="busy()" [title]="x.message">{{ busy() ? ('home.working' | t) : x.label }}</button>
                   }
-                }
-                @default {
-                  @if (r.smart; as x) {
-                    @if (x.link) {
-                      <a class="btn no-underline hover:no-underline" [routerLink]="x.link" [queryParams]="x.query">{{ x.label }}</a>
-                    } @else {
-                      <button type="button" class="btn" (click)="go(x)" [disabled]="busy()">{{ busy() ? ('home.working' | t) : x.label }}</button>
-                    }
-                    <p class="hint">{{ x.message }}</p>
-                  }
+                } @else {
+                  <button type="button" class="btn" [attr.aria-expanded]="goLiveOpen()" aria-controls="home-golive" (click)="toggleGoLive()">{{ 'golive.offer' | t }}</button>
                 }
               }
             </div>
-          }
-          @if (error()) { <div class="alert alert-error mt-3" role="alert" dir="auto">{{ error() }}</div> }
-          @if (needsLibreOffice()) { <div class="mt-3"><app-libreoffice-card /></div> }
-        </section>
-      }
-
-      @if (tasks().length) {
-        <section class="card mt-6" aria-labelledby="home-tasks">
-          <h2 id="home-tasks">{{ 'home.tasks.title' | t }}</h2>
-          <ul class="mt-3 space-y-3 text-sm">
-            @for (task of tasks(); track task.id) {
-              <li>
-                @if (task.card) {
-                  <app-libreoffice-card />
-                } @else {
-                  <div class="font-medium">{{ task.title }}</div>
-                }
-              </li>
-            }
-          </ul>
-        </section>
-      }
-
-      <section class="card mt-6" aria-labelledby="home-funnel">
-        <h2 id="home-funnel">{{ 'home.funnel.title' | t }}</h2>
-        <ol class="mt-3 flex flex-wrap items-center gap-x-2 gap-y-2 text-sm">
-          @for (f of funnel(); track f.id; let last = $last) {
-            <li class="flex items-center gap-2">
-              <a [routerLink]="f.link" [queryParams]="f.query" class="rounded-lg border border-slate-200 px-3 py-1.5 no-underline hover:bg-slate-50 hover:no-underline dark:border-slate-700 dark:hover:bg-slate-800">
-                <strong class="text-base text-slate-900 dark:text-white">{{ num(f.n) }}</strong> {{ f.label | t }}
-              </a>
-              @if (!last) { <span aria-hidden="true" class="inline-block text-slate-400 rtl:rotate-180">{{ f.sep }}</span> }
-            </li>
-          }
-        </ol>
-        <p class="hint">{{ 'home.funnel.hint' | t }}</p>
-      </section>
-
-      <section class="card mt-6 space-y-3" aria-labelledby="home-sched">
-        <h2 id="home-sched">{{ 'home.search.title' | t }}</h2>
-        <p class="text-sm text-slate-600 dark:text-slate-400">
-          {{ 'home.last' | t }}
-          @if (lastSearch(); as at) { <bdi>{{ at | dt: 'when' }}</bdi> } @else { {{ 'home.never' | t }} }
-          @if (s.next_run; as next) { · {{ 'home.next.run' | t }} <bdi>{{ next | dt: 'when' }}</bdi> }
-        </p>
-        @if (schedule(); as sc) {
-          <div class="flex flex-wrap items-center gap-3 text-sm">
-            <label class="flex items-center gap-2 font-medium">
-              <input type="checkbox" role="switch" [checked]="sc.enabled" [disabled]="saving()" (change)="setEnabled(!sc.enabled)">
-              {{ (custom() ? 'home.sched.custom' : 'home.sched.every') | t }}
-            </label>
-            @if (!custom()) {
-              <input type="time" class="input w-32" dir="ltr" [value]="time()" [attr.aria-label]="'home.sched.time' | t" [disabled]="saving()" (change)="setTime($event)">
-            }
-            <a routerLink="/activity" fragment="schedule">{{ 'home.sched.more' | t }}</a>
+            @if (applyHint(); as hint) { <p class="hint mt-2">{{ hint }}</p> }
+            @if (error()) { <div class="alert alert-error mt-3" role="alert" dir="auto">{{ error() }}</div> }
+            @if (needsLibreOffice()) { <div class="mt-3"><app-libreoffice-card /></div> }
           </div>
-          @if (scheduleError()) { <div class="alert alert-error" role="alert" dir="auto">{{ scheduleError() }}</div> }
+
+          @if (top(); as t) {
+            <div class="sheets">
+              @if (t.pile > 2) { <div class="under"></div> }
+              @if (t.pile > 1) { <div class="under"></div> }
+              <article class="card">
+                <h2 class="!text-xl" dir="auto">{{ t.title }}</h2>
+                <div class="text-sm text-slate-600 dark:text-slate-400" dir="auto">{{ t.sub }}</div>
+                <div class="mt-4 border-t border-slate-200 pt-3 pe-24 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-400">
+                  {{ t.label }}
+                  @if (t.detail) { <div class="mt-1 line-clamp-2 text-base text-slate-900 dark:text-white" dir="auto">{{ t.detail }}</div> }
+                </div>
+                <span [class]="'stamp ' + t.tone">{{ t.stamp }}</span>
+              </article>
+            </div>
+          } @else if (setupRows().length) {
+            <div class="sheets">
+              <article class="card">
+                <h2 class="!text-xl">{{ 'shell.setupChip' | t: { n: setupCount(), total: 4 } }}</h2>
+                <ol class="mt-3 text-sm">
+                  @for (row of setupRows(); track row.label) {
+                    <li class="flex min-h-10 items-center gap-2.5 border-b border-slate-200 dark:border-slate-800" [class]="row.done ? 'text-slate-500' : 'font-medium'">
+                      <svg class="icon" [class.invisible]="!row.done" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13l4 4L19 7" /></svg>
+                      {{ row.label | t }}
+                    </li>
+                  }
+                </ol>
+              </article>
+            </div>
+          }
+        </section>
+
+        @if (goLiveOpen()) {
+          <div id="home-golive" class="card mt-8"><app-golive (enabled)="justOn.set(true)" (cancel)="goLiveOpen.set(false)" /></div>
         }
+      }
+
+      @if (!s.libreoffice) { <div class="mt-8 max-w-2xl"><app-libreoffice-card /></div> }
+
+      <section class="mt-12" aria-labelledby="home-funnel">
+        <h2 id="home-funnel" class="sr-only">{{ 'home.funnel.title' | t }}</h2>
+        <nav class="folder-tabs" [attr.aria-labelledby]="'home-funnel'">
+          @for (f of funnel(); track f.id) {
+            @if (f.link) {
+              <a class="folder-tab" [routerLink]="f.link" [queryParams]="f.query"><strong>{{ num(f.n) }}</strong>{{ f.label | t }}</a>
+            } @else {
+              <div class="folder-tab"><strong>{{ num(f.n) }}</strong>{{ f.label | t }}</div>
+            }
+          }
+        </nav>
+        <div class="card !rounded-t-none">
+          <app-live />
+          <p class="hint">{{ 'home.funnel.hint' | t }}</p>
+        </div>
       </section>
+
+      <div class="mt-10"><app-report /></div>
+      <div class="mt-6"><app-searches /></div>
 
     } @else {
       <p class="mt-6 text-sm text-slate-500">{{ 'common.loading' | t }}</p>
@@ -158,7 +136,6 @@ export class HomePage {
   private readonly api = inject(Api);
   private readonly live = inject(Live);
   protected readonly stopping = computed(() => !!this.live.run()?.stopping);
-  private readonly router = inject(Router);
   private readonly i18n = inject(I18n);
   protected readonly loc = computed(() => localeOf(this.i18n.lang()));
   protected readonly busy = signal(false);
@@ -168,22 +145,14 @@ export class HomePage {
   /** How many of the ready jobs are strong matches (the rest were approved by the user); null until known. */
   private readonly readyMix = signal<number | null>(null);
   private readonly report = signal<Report | null>(null);
-  protected readonly lastSearch = signal<string | null>(null);
-  protected readonly schedule = signal<ScheduleSection | null>(null);
-  protected readonly saving = signal(false);
-  protected readonly scheduleError = signal('');
   private readonly golive = signal<GoLive | null>(null);
   protected readonly goLiveOpen = signal(false);
   /** Real applications were turned on from the card: the card stays, showing its "now on" message. */
   protected readonly justOn = signal(false);
-  protected readonly goLiveSeen = signal(goLiveSeen());
-
-  /** A schedule made on Activity (some days, or several times) is shown as such, not flattened to one daily time. */
-  protected readonly custom = computed(() => {
-    const sc = this.schedule();
-    return !!sc && sc.enabled && (sc.days.length < ALL_DAYS.length || sc.times.length > 1);
-  });
-  protected readonly time = computed(() => this.schedule()?.times[0] ?? DEFAULT_TIME);
+  private readonly firstAction = signal<ActionItem | null>(null);
+  private readonly firstReview = signal<JobRow | null>(null);
+  private readonly firstReady = signal<JobRow | null>(null);
+  private readonly openCount = computed(() => this.shell.status()?.actions_open ?? 0);
 
   private readonly count = (state: string): number => this.shell.status()?.states[state] ?? 0;
 
@@ -202,7 +171,7 @@ export class HomePage {
       const applying = run.stage === 'apply';
       const key = applying ? 'smart.applying' : 'smart.searching';
       const label = run.stopping ? t('live.stopping') : Number.isFinite(found) && !applying ? this.i18n.t('smart.searchingN', { n: this.num(found) }) : t(key);
-      return { kind: 'running', message: t('smart.running.msg'), label, link: '/activity' };
+      return { kind: 'running', message: t('smart.running.msg'), label };
     }
     if (s.actions_open > 0) {
       return { kind: 'finish', message: plural('smart.finish.msg', s.actions_open), label: plural('smart.finish', s.actions_open), link: '/needs-you', query: { tab: 'finish' } };
@@ -245,7 +214,7 @@ export class HomePage {
     return { kind: 'review', message: this.i18n.plural('smart.review.msg', n), label: this.i18n.plural('smart.review', n), link: '/needs-you', query: { tab: 'approve' } };
   });
 
-  /** Rows under the main button, most important first, at most two (the card never grows past three rows). */
+  /** Buttons next to the main one, most important first, at most two. */
   protected readonly extras = computed<{ id: 'review' | 'apply' | 'golive'; smart?: Smart }[]>(() => {
     const rows: { id: 'review' | 'apply' | 'golive'; smart?: Smart }[] = [];
     const review = this.reviewToo();
@@ -259,6 +228,44 @@ export class HomePage {
     return keep;
   });
 
+  /** Where the jobs behind the secondary "Apply to N jobs" button come from. */
+  protected readonly applyHint = computed(() => this.extras().find((r) => r.id === 'apply')?.smart?.message ?? '');
+
+  /** What sits on top of the pile: the next item the main button leads to. */
+  protected readonly top = computed<TopSheet | null>(() => {
+    const kind = this.smart()?.kind;
+    const place = (j: { company: string; location: string }) => [j.company, j.location].filter(Boolean).join(this.i18n.t('home.sheet.sep'));
+    const a = this.firstAction();
+    if (kind === 'finish' && a) {
+      const sensitive = a.questions.find((q) => q.label)?.label ?? '';
+      return { title: a.job.title, sub: place(a.job), label: this.i18n.t('actions.kind.' + a.kind), detail: sensitive, stamp: this.i18n.t('shell.nav.needsYou'), tone: 'stamp-stop', pile: this.openCount() };
+    }
+    const r = this.firstReview();
+    if (kind === 'review' && r) {
+      const label = r.score ? this.i18n.t('actions.score', { n: this.num(r.score), out: this.num(10) }) : '';
+      return { title: r.title, sub: place(r), label, detail: r.ai?.reasons[0] ?? '', stamp: this.i18n.t('common.tier.mid'), tone: '', pile: this.shell.reviewCount() };
+    }
+    const q = this.firstReady();
+    if (kind === 'apply' && q) {
+      const label = q.score ? this.i18n.t('actions.score', { n: this.num(q.score), out: this.num(10) }) : '';
+      return { title: q.title, sub: place(q), label, detail: q.ai?.reasons[0] ?? '', stamp: this.i18n.t('common.tier.' + (q.tier ?? 'high')), tone: q.tier === 'high' ? 'stamp-go' : '', pile: this.shell.status()?.ready_to_apply ?? 1 };
+    }
+    return null;
+  });
+
+  /** First-run checklist on the sheet, while setup is unfinished. */
+  protected readonly setupRows = computed(() => {
+    const s = this.shell.status();
+    if (!s || s.setup.required_done) return [];
+    return [
+      { label: 'welcome.cv.title', done: s.setup.cv },
+      { label: 'welcome.ai.title', done: s.setup.ai },
+      { label: 'welcome.found.title', done: s.setup.profile },
+      { label: 'welcome.jobs.title', done: s.setup.roles && s.setup.where },
+    ];
+  });
+  protected readonly setupCount = computed(() => this.setupRows().filter((r) => r.done).length);
+
   protected readonly funnel = computed(() => {
     const s = this.shell.status();
     if (!s) return [];
@@ -267,24 +274,15 @@ export class HomePage {
     // "passed filters" = ranked or later; the Jobs page knows it as the state group `passed`
     const passed = found - ['discovered', 'enriched', 'filtered_out'].reduce((a, k) => a + this.count(k), 0);
     return [
-      { id: 'found', n: found, label: 'home.funnel.found', link: '/jobs', query: {}, sep: '→' },
-      { id: 'passed', n: passed, label: 'home.funnel.passed', link: '/jobs', query: { state: 'passed' }, sep: '→' },
-      { id: 'strong', n: tiers['high'] ?? 0, label: 'home.funnel.strong', link: '/jobs', query: { tier: 'high' }, sep: '·' },
-      { id: 'possible', n: tiers['mid'] ?? 0, label: 'home.funnel.possible', link: '/jobs', query: { tier: 'mid' }, sep: '→' },
-      // practice mode sends nothing, so "applied" would read 0: show how many forms were practised, linking to the history
+      { id: 'found', n: found, label: 'home.funnel.found', link: '/jobs', query: {} },
+      { id: 'passed', n: passed, label: 'home.funnel.passed', link: '/jobs', query: { state: 'passed' } },
+      { id: 'strong', n: tiers['high'] ?? 0, label: 'home.funnel.strong', link: '/jobs', query: { tier: 'high' } },
+      { id: 'possible', n: tiers['mid'] ?? 0, label: 'home.funnel.possible', link: '/jobs', query: { tier: 'mid' } },
+      // practice mode sends nothing, so "applied" would read 0: show how many forms were practised (the report below has them)
       s.apply_live
-        ? { id: 'applied', n: this.count('applied'), label: 'home.funnel.applied', link: '/jobs', query: { state: 'applied' }, sep: '' }
-        : { id: 'applied', n: s.practiced, label: 'home.funnel.practiced', link: '/activity', query: { tab: 'history' }, sep: '' },
+        ? { id: 'applied', n: this.count('applied'), label: 'home.funnel.applied', link: '', query: {} }
+        : { id: 'applied', n: s.practiced, label: 'home.funnel.practiced', link: '', query: {} },
     ];
-  });
-
-  /** Things to do outside the main flow. */
-  protected readonly tasks = computed<HomeTask[]>(() => {
-    const s = this.shell.status();
-    if (!s) return [];
-    const list: HomeTask[] = [];
-    if (!s.libreoffice) list.push({ id: 'libreoffice', title: '', card: true });
-    return list;
   });
 
   constructor() {
@@ -297,12 +295,17 @@ export class HomePage {
       this.live.changed(); // a stage ending can change who is ready
       untracked(() => void this.loadMix(ready));
     });
-    void this.loadSchedule();
+    effect(() => {
+      const open = this.openCount();
+      const review = this.shell.reviewCount();
+      this.live.changed();
+      untracked(() => void this.loadFront(open, review));
+    });
   }
 
   protected num = (n: number): string => fmtNum(this.loc(), n);
 
-  /** "Ready to apply for real?" in the Next card once a practice run filled a form (ux-plan 8.2); the card opens under it. */
+  /** "Ready to apply for real?" next to the main button once a practice run filled a form (ux-plan 8.2); the card opens under it. */
   protected readonly goLiveOffer = computed(() => {
     const s = this.shell.status();
     return !!s && (this.justOn() || (!s.apply_live && (s.practiced > 0 || !!this.golive()?.eligible)));
@@ -310,62 +313,58 @@ export class HomePage {
 
   /** How many of the jobs ready to apply to are strong matches; the rest were approved by the user. */
   private async loadMix(ready: number): Promise<void> {
-    if (ready <= 0) return this.readyMix.set(null);
+    if (ready <= 0) {
+      this.firstReady.set(null);
+      return this.readyMix.set(null);
+    }
     try {
       const lists = await Promise.all(['queued_apply', 'tailored'].map((state) => this.api.get<JobRow[]>(`/jobs?state=${state}`)));
-      this.readyMix.set(lists.flat().filter((j) => j.tier === 'high').length);
+      const rows = lists.flat();
+      this.readyMix.set(rows.filter((j) => j.tier === 'high').length);
+      this.firstReady.set(rows[0] ?? null);
     } catch {
       this.readyMix.set(null); // the plain "N jobs are ready" shows instead
+    }
+  }
+
+  /** The items behind the top sheet; on failure the lead sentence simply stands alone. */
+  private async loadFront(open: number, review: number): Promise<void> {
+    try {
+      const [actions, jobs] = await Promise.all([
+        open > 0 ? this.api.get<ActionItem[]>('/actions?status=open') : Promise.resolve([]),
+        review > 0 ? this.api.get<JobRow[]>('/jobs?state=awaiting_review') : Promise.resolve([]),
+      ]);
+      this.firstAction.set(actions[0] ?? null);
+      this.firstReview.set(jobs[0] ?? null);
+    } catch {
+      this.firstAction.set(null);
+      this.firstReview.set(null);
     }
   }
 
   /** Opening the guided card scrolls it into view: it can be taller than the screen. */
   protected toggleGoLive(): void {
     this.goLiveOpen.set(!this.goLiveOpen());
-    if (!this.goLiveSeen()) {
-      this.goLiveSeen.set(true);
-      try {
-        localStorage.setItem(GOLIVE_SEEN_KEY, '1');
-      } catch {
-        // the badge shows again next visit
-      }
-    }
     if (this.goLiveOpen()) setTimeout(() => document.getElementById('home-golive')?.scrollIntoView({ block: 'start' }));
   }
 
   private async loadNumbers(): Promise<void> {
     try {
-      const [report, runs, golive] = await Promise.all([
-        this.api.get<Report>('/report'),
-        this.api.get<{ recent: { started_at: string; finished_at: string | null }[] }>('/runs'),
-        this.api.get<GoLive>('/golive'),
-      ]);
+      const [report, golive] = await Promise.all([this.api.get<Report>('/report'), this.api.get<GoLive>('/golive')]);
       this.report.set(report);
       this.golive.set(golive);
-
-      const last = runs.recent[0];
-      this.lastSearch.set(last ? (last.finished_at ?? last.started_at) + 'Z' : null); // the server sends UTC without a zone
     } catch {
       // the numbers stay as they were; the live socket triggers another load
     }
   }
 
-  private async loadSchedule(): Promise<void> {
-    try {
-      this.schedule.set((await this.api.get<SearchConfig>('/search')).schedule);
-    } catch (e) {
-      this.scheduleError.set((e as Error).message);
-    }
-  }
-
-  /** Start the search or the apply stages; a paused or unfinished run resumes on its own (`new` stays false). */
+  /** Start the apply stages (an unfinished run goes on) or a new search, which discards an unfinished one: its steps' play buttons resume it. */
   protected async go(sm: Smart): Promise<void> {
     this.busy.set(true);
     this.error.set('');
     this.needsLibreOffice.set(false);
     try {
-      await this.api.post('/runs', { stages: sm.stages, new: false });
-      await this.router.navigate(['/activity']);
+      await this.api.post('/runs', { stages: sm.stages, new: sm.kind === 'find' }); // its progress shows further down this page
     } catch (e) {
       if (e instanceof ApiError && e.code === 'needs_libreoffice') this.needsLibreOffice.set(true);
       else this.error.set(e instanceof ApiError && e.code === 'needs_tectonic' ? this.i18n.t('run.reason.needs_tectonic') : (e as Error).message);
@@ -383,35 +382,6 @@ export class HomePage {
       this.error.set((e as Error).message);
     } finally {
       this.busy.set(false);
-    }
-  }
-
-  protected setEnabled(enabled: boolean): void {
-    // turning it on from Home means "every day at one time"; a custom schedule from Activity is kept as it is
-    const sc = this.schedule();
-    if (!sc) return;
-    void this.saveSchedule(enabled && !this.custom() ? { ...sc, enabled, days: ALL_DAYS, times: [sc.times[0] ?? DEFAULT_TIME] } : { ...sc, enabled });
-  }
-
-  protected setTime(e: Event): void {
-    const value = (e.target as HTMLInputElement).value;
-    const sc = this.schedule();
-    if (value && sc) void this.saveSchedule({ ...sc, times: [value] });
-  }
-
-  private async saveSchedule(schedule: ScheduleSection): Promise<void> {
-    this.saving.set(true);
-    this.scheduleError.set('');
-    try {
-      // the whole config is one document: read it fresh so other pages' edits are not overwritten
-      const cfg = await this.api.get<SearchConfig>('/search');
-      this.schedule.set((await this.api.put<SearchConfig>('/search', { ...cfg, schedule })).schedule);
-      await this.shell.refresh(); // the "next search" time
-    } catch (e) {
-      this.scheduleError.set((e as Error).message);
-      await this.loadSchedule(); // show what is really saved
-    } finally {
-      this.saving.set(false);
     }
   }
 }

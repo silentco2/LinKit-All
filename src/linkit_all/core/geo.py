@@ -104,19 +104,166 @@ def _places() -> tuple[_Place, ...]:
     return tuple(out)
 
 
+@lru_cache(maxsize=1024)
+def arabic_name(name: str) -> str:
+    """The (normalized) Arabic name of a city or country given in English; '' when unknown."""
+    key = _norm(name)
+    return next((p.ar for p in _places() if p.en == key and p.ar), "")
+
+
 def _tier(names: Sequence[str], q: str) -> int | None:
     """0 exact, 1 prefix, 2 substring: the best any of the names reaches."""
     tiers = [0 if n == q else 1 if n.startswith(q) else 2 for n in names if n and q in n]
     return min(tiers, default=None)
 
 
+def _city(name: str, iso2: str = "") -> _Place | None:
+    """The biggest city called `name`, in that country when one is given."""
+    key = _norm(name)
+    if not key:
+        return None
+    return next(
+        (
+            p
+            for p in _places()
+            if p.kind == "city" and key in (p.en, p.ar) and (not iso2 or p.country.iso2 == iso2)
+        ),
+        None,
+    )
+
+
+_SEPARATOR = re.compile(r"[,،/–—]|\s-+|-+\s")  # noqa: RUF001
+_US_STATES = frozenset(
+    [
+        "AL",
+        "AK",
+        "AZ",
+        "AR",
+        "CA",
+        "CO",
+        "CT",
+        "DE",
+        "DC",
+        "FL",
+        "GA",
+        "HI",
+        "ID",
+        "IL",
+        "IN",
+        "IA",
+        "KS",
+        "KY",
+        "LA",
+        "ME",
+        "MD",
+        "MA",
+        "MI",
+        "MN",
+        "MS",
+        "MO",
+        "MT",
+        "NE",
+        "NV",
+        "NH",
+        "NJ",
+        "NM",
+        "NY",
+        "NC",
+        "ND",
+        "OH",
+        "OK",
+        "OR",
+        "PA",
+        "RI",
+        "SC",
+        "SD",
+        "TN",
+        "TX",
+        "UT",
+        "VT",
+        "VA",
+        "WA",
+        "WV",
+        "WI",
+        "WY",
+    ]
+)
+
+
+def _hyphen_parts(part: str) -> list[str]:
+    """ "Cairo-Egypt" is two places; "Winston-Salem" and "Al-Mansoura" are one."""
+    tail_parts: list[str] = []
+    while "-" in part and not _city(part):
+        head, _, tail = part.rpartition("-")
+        if len(head.strip()) < 3 or not (_city(tail) or _norm(tail) in _by_key()):
+            break
+        tail_parts.insert(0, tail.strip())
+        part = head.strip()
+    return [part, *tail_parts]
+
+
+def _country_part(part: str, others: list[str]) -> Country | None:
+    found = _by_key().get(_norm(part))
+    if found and part.upper() in _US_STATES and not any(_city(o, found.iso2) for o in others):
+        return None  # "Denver, CO" is Colorado; "Bogota, CO" is Colombia
+    return found
+
+
+def typed_place(text: str) -> dict[str, str] | None:
+    """A place typed in parts: "City, State, Country", in that order or country first, the
+    parts separated by a comma, slash or dash. A row like `search_places`' with the city and
+    state in English where the bundled list knows them; other names stay as typed. None when
+    the text is a single name. A country left out is taken from the city or state."""
+    parts = [
+        p for raw in _SEPARATOR.split(text) if (x := raw.strip(" -")) for p in _hyphen_parts(x)
+    ]
+    if len(parts) < 2:
+        return None
+    place = _country_part(parts[-1], parts[:-1])
+    if place is None and (place := _country_part(parts[0], parts[1:])):
+        parts.reverse()
+    if place is None:  # still being typed: "Cairo, Eg"
+        near = next((c.country for x in reversed(parts[:-1]) if (c := _city(x))), None)
+        typed = _norm(parts[-1])
+        if (
+            near
+            and typed
+            and (_norm(near.name).startswith(typed) or _norm(near.name_ar).startswith(typed))
+        ):
+            place = near
+    rest = parts[:-1] if place else parts
+    city, state = rest[-2:] if len(rest) > 1 else (rest[0], "")
+    if place is None and state.upper() in _US_STATES:
+        place = country("US")
+    if place is None and (known := _city(state) or _city(city)):
+        place = known.country
+    iso2 = place.iso2 if place else ""
+    found = _city(city, iso2), _city(state, iso2)
+    en = [p.city if p else x for p, x in zip(found, (city, state), strict=True)]
+    ar = [(p.city_ar or p.city) if p else x for p, x in zip(found, (city, state), strict=True)]
+    return {
+        "label": ", ".join(x for x in (*en, place.name if place else "") if x),
+        "label_ar": "، ".join(
+            x for x in (*ar, (place.name_ar or place.name) if place else "") if x
+        ),
+        "city": en[0],
+        "state": en[1],
+        "country": place.name if place else "",
+        "iso2": iso2,
+        "kind": "typed",
+    }
+
+
 def search_places(q: str, lang: str = "en", limit: int = 10) -> list[dict[str, str]]:
     """Cities and countries for `q`, matched on English and Arabic names alike: exact, then
     prefix, then substring; within a tier countries first, then by population. Both labels
-    come back; `lang` only says which one the caller shows, so it does not change matching."""
+    come back; `lang` only says which one the caller shows, so it does not change matching.
+    Text in several parts ("Maadi / Cairo / Egypt") comes back as that one place."""
     nq = _norm(q)
     if not nq:
         return []
+    if (typed := typed_place(q)) is not None:
+        return [typed]
     hits = []
     for p in _places():
         if (tier := _tier((p.en, p.ar), nq)) is not None:

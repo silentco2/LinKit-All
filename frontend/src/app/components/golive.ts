@@ -79,13 +79,13 @@ interface Row {
               <li class="flex flex-wrap items-center gap-x-2">
                 @switch (r.state) {
                   @case ('ok') {
-                    <span class="font-bold text-emerald-600 dark:text-emerald-400" aria-hidden="true">✓</span><span class="sr-only">{{ 'golive.done' | t }}:</span>
+                    <span class="font-bold text-emerald-600 dark:text-emerald-400" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13l4 4L19 7" /></svg></span><span class="sr-only">{{ 'golive.done' | t }}:</span>
                   }
                   @case ('undecided') {
                     <span class="font-bold text-amber-600 dark:text-amber-400" aria-hidden="true">?</span><span class="sr-only">{{ 'golive.undecided' | t }}:</span>
                   }
                   @default {
-                    <span class="font-bold text-rose-600 dark:text-rose-400" aria-hidden="true">✗</span><span class="sr-only">{{ 'golive.todo' | t }}:</span>
+                    <span class="font-bold text-rose-600 dark:text-rose-400" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></span><span class="sr-only">{{ 'golive.todo' | t }}:</span>
                   }
                 }
                 <span>{{ r.label }}</span>

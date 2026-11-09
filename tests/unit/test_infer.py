@@ -13,7 +13,6 @@ from linkit_all.core.infer import (
     cv_links,
     infer,
     read_cv,
-    split_name,
     years_experience,
 )
 
@@ -83,21 +82,9 @@ def test_arabic_cv_facts() -> None:
     assert f.education == ["بكالوريوس هندسة الحاسبات", "جامعة القاهرة"]
     assert {"بايثون", "SQL", "التواصل"} <= set(f.skills)
     out = infer(f, TODAY)
-    assert split_name(f.full_name) == ("عبد الرحمن", "أحمد")
-    assert out["answers.first_name"].value == "عبد الرحمن"
     assert out["answers.country"].value == "Egypt"
     assert out["answers.city"].value == "القاهرة"
     assert out["track"].value == "tech"
-
-
-def test_split_name() -> None:
-    assert split_name("Sara Ahmed") == ("Sara", "Ahmed")
-    assert split_name("Abdel Rahman Mohamed") == ("Abdel Rahman", "Mohamed")
-    assert split_name("Mohamed Abdel Rahman") == ("Mohamed", "Abdel Rahman")
-    assert split_name("Ahmed El Sayed") == ("Ahmed", "El Sayed")
-    assert split_name("Sara Mohamed Ahmed") == ("Sara", "Ahmed")
-    assert split_name("Madonna") == ("Madonna", "")
-    assert split_name("") == ("", "")
 
 
 def _exp(start: date, end: date | None, **kw: bool) -> Experience:
@@ -139,7 +126,6 @@ def test_en_infer_values_and_levels() -> None:
         "Software Developer",
     ]  # no intern title
     assert out["search.queries"].level == "suggest"
-    assert out["answers.first_name"].value == "Sara" and out["answers.last_name"].value == "Ahmed"
     assert out["answers.city"].value == "Cairo" and out["answers.country"].value == "Egypt"
     locked = out["profile.locked_facts"].value
     assert {"Acme Corp", "Globex", "Initech", "Backend Engineer", "Cairo University"} <= set(locked)
@@ -248,8 +234,6 @@ def test_missing_data_omits_keys() -> None:
     assert set(out) == {
         "profile.full_name",
         "profile.email",
-        "answers.first_name",
-        "answers.last_name",
     }
     assert read_cv([]) == CvFacts()
 

@@ -17,7 +17,8 @@ CAPTCHA = (
     'iframe[title*="challenge" i]'
 )
 
-ERRORS = "[role=alert], [class*=error i], [class*=invalid i], .application-error"
+# .ng-invalid is Angular's state class on whole forms, not a message
+ERRORS = "[role=alert], [class*=error i], [class*=invalid i]:not(.ng-invalid), .application-error"
 
 # Confirmation wording of sites without a handler (the generic form agent).
 GENERIC_CONFIRMATION = re.compile(
@@ -38,6 +39,16 @@ async def wait_for_text(page: Page, pattern: re.Pattern[str], timeout_ms: int = 
     except Exception:
         return False
     return True
+
+
+def posting_form(job: "JobInfo", host: str, suffix: str) -> str:
+    """The form page of an ATS posting: the apply link, else the posting link, on the ATS's own
+    host, without tracking parameters (`?utm_source=...` from the board that linked it)."""
+    for link in (job.apply_url, job.url):
+        base = (link or "").split("#")[0].split("?")[0].rstrip("/")
+        if host in base:
+            return base if base.endswith(suffix) else base + suffix
+    return f"{job.url.rstrip('/')}{suffix}"
 
 
 @dataclass

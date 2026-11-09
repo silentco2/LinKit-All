@@ -58,7 +58,7 @@ def test_welcome_local_model_pick(ui: UI, tmp_path: Path, fake_local_ai: None) -
     assert not ui.console_errors
 
 
-@pytest.mark.parametrize("path", ["/home", "/jobs", "/needs-you", "/activity", "/settings/profile"])
+@pytest.mark.parametrize("path", ["/home", "/jobs", "/needs-you", "/settings/profile"])
 def test_pages_render_without_console_errors(ui: UI, path: str) -> None:
     ui.page.goto(path)
     ui.page.locator("h1").first.wait_for()

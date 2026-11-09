@@ -12,6 +12,9 @@ import { fmtNum, labelOr, localeOf } from '../locale';
 import { Shell } from '../shell';
 import { ActionDecision, ActionGroup, ActionItem, ActionKind, ActionQuestion, AnswerValue, Remember, Status } from '../types';
 
+/** Kinds the user finishes in their own browser: the app opens the page, the user applies there. */
+const OWN_BROWSER_KINDS: ActionKind[] = ['apply_by_hand', 'apply_in_browser'];
+
 /** Kinds where signing in / solving it by hand in a real Chrome window can unblock the job. */
 const BROWSER_KINDS: ActionKind[] = ['captcha', 'login_issue', 'two_factor', 'validation_error', 'unknown_question'];
 
@@ -61,7 +64,7 @@ const SOURCES: Record<string, string> = {
     <!-- One answer control, drawn for a single item or for a group; k is the key of its typed answer in the draft. -->
     <ng-template #ctl let-k="k" let-q="q" let-i="i">
       <label class="label" [attr.for]="'q' + k + '-' + i" dir="auto">
-        {{ q.label }} @if (q.required) { <span class="text-rose-600" [title]="'actions.required' | t">*</span> }
+        {{ q.label }} @if (q.required) { <span class="text-rose-600 dark:text-rose-400" [title]="'actions.required' | t">*</span> }
       </label>
       @switch (widget(q)) {
         @case ('textarea') {
@@ -137,6 +140,18 @@ const SOURCES: Record<string, string> = {
     </ng-template>
 
     <div class="mt-5 max-w-4xl space-y-5">
+      @if (googleCheck()) {
+        <section class="card" aria-labelledby="fin-google">
+          <h2 id="fin-google">{{ 'fin.google.title' | t }}</h2>
+          <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">{{ 'fin.google.why' | t }}</p>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <button type="button" class="btn btn-primary" [disabled]="busy()" (click)="openGoogle()">{{ 'fin.google.open' | t }}</button>
+            <button type="button" class="btn" [disabled]="busy()" (click)="googleDone()">{{ 'fin.google.done' | t }}</button>
+          </div>
+          <p class="hint mt-2">{{ 'fin.google.hint' | t }}</p>
+        </section>
+      }
+
       @if (vaultItems().length) {
         <section class="card" aria-labelledby="fin-vault">
           <h2 id="fin-vault">{{ plural('fin.vault', vaultItems().length) }}</h2>
@@ -195,11 +210,11 @@ const SOURCES: Record<string, string> = {
           <header class="flex items-start justify-between gap-3">
             <div class="min-w-0">
               <div class="truncate text-lg font-semibold text-slate-900 dark:text-white" dir="auto">{{ a.job.title }}</div>
-              <div class="truncate text-sm text-slate-500" dir="auto"><bdi>{{ a.job.company }}</bdi> · <bdi>{{ a.job.location }}</bdi></div>
+              <div class="truncate text-sm text-slate-500" dir="auto"><bdi>{{ a.job.company }}</bdi> <span class="gap-dot"></span><bdi>{{ a.job.location }}</bdi></div>
             </div>
             <div class="flex shrink-0 flex-col items-end gap-1">
               @if (a.job.score) { <span class="text-xs text-slate-500"><bdi>{{ 'actions.score' | t: { n: a.job.score, out: 10 } }}</bdi></span> }
-              <span class="text-xs text-slate-400">{{ when(a.created_at) }}</span>
+              <span class="text-xs text-slate-500">{{ when(a.created_at) }}</span>
             </div>
           </header>
 
@@ -220,7 +235,7 @@ const SOURCES: Record<string, string> = {
             </div>
           }
 
-          @if (a.kind === 'confirm_submit') {
+          @if (a.kind === 'confirm_submit' || (ownBrowser(a.kind) && entries(a).length)) {
             <h4 class="mt-5 font-semibold">{{ 'actions.filled.title' | t }}</h4>
             <div class="overflow-x-auto">
               <table class="mt-2 w-full text-sm">
@@ -272,8 +287,11 @@ const SOURCES: Record<string, string> = {
               <button type="button" class="btn" [disabled]="busy()" (click)="send(a, 'answer')">{{ 'fin.ack.ask' | t }}</button>
             }
             @if (primary(a); as p) {
-              <button type="button" [class]="p.go ? 'btn !border-emerald-700 !bg-emerald-600 !font-semibold !text-white hover:!bg-emerald-700' : 'btn btn-primary'"
+              <button type="button" [class]="p.go ? 'btn btn-go' : 'btn btn-primary'"
                       [disabled]="busy() || browserBusy() || !p.ok" (click)="p.run()">{{ p.label }}</button>
+            }
+            @if (ownBrowser(a.kind)) {
+              <button type="button" class="btn" [disabled]="busy()" (click)="send(a, 'applied_by_hand')">{{ 'actions.applied' | t }}</button>
             }
             @if (browser().open && browser().item_id === a.id) { <span class="badge tier-high">{{ 'actions.browser.open' | t }}</span> }
             <app-more-menu class="ms-auto" [items]="moreItems()[a.id]" [context]="a.job.title" (picked)="more(a, $event)" />
@@ -285,7 +303,7 @@ const SOURCES: Record<string, string> = {
         </section>
       }
 
-      @if (loaded() && !items().length) {
+      @if (loaded() && !items().length && !googleCheck()) {
         <app-all-clear />
       } @else if (!loaded()) {
         <div class="card text-center text-sm text-slate-500">{{ 'common.loading' | t }}</div>
@@ -322,6 +340,8 @@ export class ActionsPage {
   protected readonly toast = signal('');
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
 
+  /** LinkedIn hiring posts stopped on a Google check: one card the user solves in the app browser. */
+  protected readonly googleCheck = computed(() => !!this.shell.status()?.google_check);
   protected readonly vaultItems = computed(() => this.items().filter((a) => VAULT_CODES.includes(a.code ?? '')));
   protected readonly emailItems = computed(() => this.items().filter((a) => EMAIL_CODES.includes(a.code ?? '')));
   /** The cards listed one by one: setup items only when asked for. */
@@ -385,6 +405,31 @@ export class ActionsPage {
   }
   protected toggleShown(which: 'vault' | 'email'): void {
     this.shown.update((s) => ({ ...s, [which]: !s[which] }));
+  }
+
+  /** Google opens on the searches' own Chrome profile; the user answers the check there. Nothing is typed for them. */
+  protected async openGoogle(): Promise<void> {
+    this.busy.set(true);
+    try {
+      await this.api.post('/linkedin/google-check');
+      this.showToast(this.i18n.t('fin.google.opened'));
+    } catch (e) {
+      this.showToast((e as Error).message);
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async googleDone(): Promise<void> {
+    this.busy.set(true);
+    try {
+      await this.api.delete('/linkedin/google-check');
+      await this.shell.refresh();
+    } catch (e) {
+      this.showToast((e as Error).message);
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   protected showToast(text: string): void {
@@ -563,6 +608,7 @@ export class ActionsPage {
   /** Email applications have no page to open: the job's apply_url is a mailto: link. */
   hasPage = (a: ActionItem): boolean => a.kind !== 'confirm_email' && !a.job.apply_url.toLowerCase().startsWith('mailto:');
   browserKind = (k: ActionKind): boolean => BROWSER_KINDS.includes(k);
+  ownBrowser = (k: ActionKind): boolean => OWN_BROWSER_KINDS.includes(k);
   hasHelp = (k: ActionKind): boolean => k !== 'unknown_question' && k !== 'confirm_submit';
   /** This card's Chrome window is open now. */
   windowOpenFor = (a: ActionItem): boolean => this.browser().open && this.browser().item_id === a.id;
@@ -587,6 +633,10 @@ export class ActionsPage {
         return { label: t('actions.submit'), run: () => void this.send(a, 'confirm'), ok: true, go: true };
       case 'confirm_email':
         return { label: t('actions.email.send'), run: () => void this.confirmEmail(a), ok: this.emailValid(a), go: true };
+      case 'apply_by_hand':
+      case 'apply_in_browser':
+        // a plain new tab: it opens in the user's own browser, where they are signed in (and the extension runs)
+        return { label: t('actions.openMine'), run: () => void window.open(a.job.apply_url || a.job.url, '_blank', 'noopener'), ok: true, go: true };
       default:
         if (this.windowOpenFor(a)) return { label: t('actions.doneRetry'), run: () => void this.doneRetry(a), ok: true };
         return { label: t(a.kind === 'validation_error' ? 'actions.fixInPage' : 'actions.openPage'), run: () => void this.openBrowser(a), ok: !this.browser().open };
@@ -601,11 +651,13 @@ export class ActionsPage {
       const list: MenuItem[] = [];
       if (a.kind === 'confirm_email' && a.email_draft) list.push({ id: 'saveDraft', label: t('actions.email.save'), disabled: !this.emailDirty(a) || !this.emailValid(a) });
       if (!this.isSetup(a)) list.push({ id: 'retry', label: t('actions.retry') });
-      if (this.hasPage(a) && !this.primaryOpensBrowser(a)) list.push({ id: 'page', label: t('actions.openPage'), href: a.job.apply_url });
+      if (this.hasPage(a) && !this.primaryOpensBrowser(a) && !this.ownBrowser(a.kind)) list.push({ id: 'page', label: t('actions.openPage'), href: a.job.apply_url });
       if (this.windowOpenFor(a)) list.push({ id: 'closeBrowser', label: t('actions.browser.close') });
       else if (this.browserKind(a.kind) && !this.primaryOpensBrowser(a) && !this.isSetup(a)) list.push({ id: 'browser', label: t('actions.browser.openBtn'), disabled: this.browser().open });
       for (const n of this.range(a.screenshots)) list.push({ id: `shot${n}`, label: t('actions.viewShot', { n: n + 1 }), href: this.shot(a.id, n) });
-      list.push({ id: 'byHand', label: t('actions.byHand') }, { id: 'skip', label: t('actions.skip'), danger: true });
+      if (!this.ownBrowser(a.kind)) list.push({ id: 'byHand', label: t('actions.byHand') });
+      list.push({ id: 'closed', label: t('actions.markClosed') });
+      list.push({ id: 'skip', label: t('actions.skip'), danger: true });
       out[a.id] = list;
     }
     return out;
@@ -617,6 +669,7 @@ export class ActionsPage {
     else if (id === 'browser') void this.openBrowser(a);
     else if (id === 'closeBrowser') void this.closeBrowser(a);
     else if (id === 'byHand') void this.send(a, 'applied_by_hand');
+    else if (id === 'closed') void this.send(a, 'closed');
     else if (id === 'skip') void this.send(a, 'skip');
   }
 

@@ -17,6 +17,7 @@ from linkit_all.sources.careers import Unsupported
 from linkit_all.sources.discovery import board_tasks, note_crawl, upsert_boards
 from linkit_all.sources.http import Http
 from linkit_all.sources.store import Deduper, mark_task, route_ats, store_page
+from linkit_all.sources.text import normalize_url
 
 
 @dataclass
@@ -85,6 +86,8 @@ async def discover(
             c.key: (c.next_page, c.done)
             for c in s.scalars(select(SourceCheckpoint).filter_by(run_id=run_id))
         }
+    for src in registry.values():
+        src.seen_url = lambda url: normalize_url(url) in deduper.urls
     # Sources run side by side, each limited to its own `parallel`; the overall cap only bounds
     # threads and memory. A task takes its source slot first, so it never holds an overall slot
     # while waiting on its own source.

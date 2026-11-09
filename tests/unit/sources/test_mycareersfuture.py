@@ -57,7 +57,10 @@ def test_pages_until_a_short_page_or_the_limit(search_pages, load_fixture):
             200, json=_full_page(row, page * PAGE) if page < 2 else {"results": [row]}
         )
 
-    pages = search_pages(MyCareersFuture(), handler, query="x", limit=1000, calls=calls)
+    # a wide window: the fixture's dates must not age out and end the walk early
+    pages = search_pages(
+        MyCareersFuture(), handler, query="x", limit=1000, calls=calls, posted_within_days=36500
+    )
     assert [len(p) for p in pages] == [PAGE, PAGE, 1] and len(calls) == 3
     calls.clear()
     assert len(search_pages(MyCareersFuture(), handler, query="x", limit=PAGE, calls=calls)) == 1

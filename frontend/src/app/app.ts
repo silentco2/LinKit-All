@@ -13,74 +13,61 @@ const FRESH_MS = 60_000; // a run that ended longer ago than this is replayed hi
   selector: 'app-root',
   imports: [RouterOutlet, RouterLink, RouterLinkActive, TPipe],
   template: `
-    <div class="flex min-h-screen flex-col md:flex-row">
+    <div class="flex min-h-screen flex-col">
       @if (!welcome()) {
-      <header class="sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-2 md:hidden dark:border-slate-800 dark:bg-slate-900">
-        <div class="text-lg font-bold whitespace-nowrap text-slate-900 dark:text-white">LinKit <span class="text-brand-600">All</span></div>
-        <div class="flex min-w-0 items-center gap-2">
+      <header class="desk-top">
+        <a routerLink="/home" class="wordmark">LinKit All</a>
+        <nav id="main-nav" class="order-last w-full flex-col gap-1 md:order-none md:flex md:w-auto md:flex-row md:gap-5"
+             [class.hidden]="!menuOpen()" [class.flex]="menuOpen()" [attr.aria-label]="'shell.navLabel' | t">
+          @for (item of nav; track item.path) {
+            <a [routerLink]="item.path" (click)="menuOpen.set(false)" routerLinkActive="is-active" ariaCurrentWhenActive="page" class="nav-link max-md:min-h-10">
+              {{ item.label | t }}
+              @if (item.path === 'needs-you' && shell.needsCount() > 0) {
+                <span class="text-rose-600 dark:text-rose-400">{{ num(shell.needsCount()) }}</span>
+              }
+              @if (item.path === 'home' && live.run()?.running) {
+                <span class="size-1.5 animate-pulse rounded-full bg-emerald-500" role="img" [attr.aria-label]="'shell.running' | t"></span>
+              }
+              @if (item.path === 'settings' && setupLeft(); as n) {
+                <span class="font-normal text-slate-500">{{ 'shell.setupChip' | t: { n: n.done, total: 4 } }}</span>
+              }
+            </a>
+          }
+        </nav>
+        <div class="ms-auto flex min-w-0 items-center gap-3 text-sm">
+          @if (!live.connected()) { <span class="text-rose-600 dark:text-rose-400" role="status">{{ 'shell.reconnecting' | t }}</span> }
           @if (shell.status(); as s) {
-            <span class="badge whitespace-nowrap" [class]="s.apply_live ? 'tier-mid' : 'tier-low'" [title]="(s.apply_live ? 'shell.liveTitle' : 'shell.dryTitle') | t">
+            <span class="whitespace-nowrap" [class]="s.apply_live ? 'font-medium text-rose-600 dark:text-rose-400' : 'text-slate-500'" [title]="(s.apply_live ? 'shell.liveTitle' : 'shell.dryTitle') | t">
               {{ (s.apply_live ? 'shell.live' : 'shell.dry') | t }}
             </span>
           }
           @if (shell.needsCount() > 0) {
-            <a routerLink="/needs-you" class="badge tier-mid min-h-10 min-w-10 justify-center no-underline hover:no-underline" [attr.aria-label]="('shell.nav.needsYou' | t) + ': ' + num(shell.needsCount())">{{ num(shell.needsCount()) }}</a>
+            <a routerLink="/needs-you" class="flex min-h-10 min-w-10 items-center justify-center font-medium text-rose-600 hover:no-underline md:hidden dark:text-rose-400" [attr.aria-label]="('shell.nav.needsYou' | t) + ': ' + num(shell.needsCount())">{{ num(shell.needsCount()) }}</a>
           }
-          <button type="button" class="btn min-h-10" (click)="menuOpen.set(!menuOpen())" [attr.aria-expanded]="menuOpen()" aria-controls="main-nav">
+          <button type="button" class="btn min-h-10 md:hidden" (click)="menuOpen.set(!menuOpen())" [attr.aria-expanded]="menuOpen()" aria-controls="main-nav">
             {{ 'shell.menu' | t }}
           </button>
         </div>
       </header>
       }
-      @if (!welcome()) {
-      <nav id="main-nav" class="flex-col gap-1 border-b border-slate-200 bg-white p-4 md:sticky md:top-0 md:flex md:h-screen md:w-56 md:shrink-0 md:border-e md:border-b-0 dark:border-slate-800 dark:bg-slate-900"
-           [class.hidden]="!menuOpen()" [class.flex]="menuOpen()" [attr.aria-label]="'shell.navLabel' | t">
-        <div class="mb-4 px-2 md:mb-6">
-          <div class="text-lg font-bold text-slate-900 dark:text-white">LinKit <span class="text-brand-600">All</span></div>
-          <div class="text-xs text-slate-500">{{ 'shell.tagline' | t }}</div>
-          @if (shell.status(); as s) {
-            <span class="badge mt-2" [class]="s.apply_live ? 'tier-mid' : 'tier-low'"
-                  [title]="(s.apply_live ? 'shell.liveTitle' : 'shell.dryTitle') | t">
-              {{ (s.apply_live ? 'shell.live' : 'shell.dry') | t }}
-            </span>
-          }
-        </div>
-        @for (item of nav; track item.path) {
-          <a [routerLink]="item.path" (click)="menuOpen.set(false)" routerLinkActive="!bg-brand-50 !text-brand-700 dark:!bg-slate-800 dark:!text-white" ariaCurrentWhenActive="page"
-             class="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-slate-600 no-underline hover:bg-slate-100 hover:no-underline dark:text-slate-300 dark:hover:bg-slate-800">
-            {{ item.label | t }}
-            @if (item.path === 'needs-you' && shell.needsCount() > 0) {
-              <span class="badge tier-mid">{{ num(shell.needsCount()) }}</span>
-            }
-            @if (item.path === 'activity' && live.run()?.running) {
-              <span class="size-2 animate-pulse rounded-full bg-emerald-500" role="img" [attr.aria-label]="'shell.running' | t"></span>
-            }
-            @if (item.path === 'settings' && setupLeft(); as n) {
-              <span class="badge tier-mid">{{ 'shell.setupChip' | t: { n: n.done, total: 4 } }}</span>
-            }
-          </a>
-        }
-        <div class="mt-4 space-y-2 px-2 text-xs text-slate-400 md:mt-auto">
-          <div class="flex items-center gap-1" role="group" [attr.aria-label]="'shell.language' | t">
-            <button type="button" class="btn !px-2 !py-1 text-xs max-sm:!min-h-10 max-sm:!px-4" lang="en" dir="ltr" [class.btn-primary]="i18n.lang() === 'en'" [attr.aria-pressed]="i18n.lang() === 'en'" (click)="setLang('en')">English</button>
-            <button type="button" class="btn !px-2 !py-1 text-xs max-sm:!min-h-10 max-sm:!px-4" lang="ar" dir="rtl" [class.btn-primary]="i18n.lang() === 'ar'" [attr.aria-pressed]="i18n.lang() === 'ar'" (click)="setLang('ar')">العربية</button>
-          </div>
-          @if (shell.notifySupported) {
-            <label class="flex items-center gap-2" [title]="'shell.notifyTitle' | t">
-              <input type="checkbox" [checked]="shell.notify()" (change)="shell.toggleNotify()"> {{ 'shell.notify' | t }}
-            </label>
-            @if (shell.notifyHint()) { <p class="text-amber-600">{{ shell.notifyHint() }}</p> }
-          }
-          <div>
-          <span class="me-1 inline-block size-2 rounded-full" [class]="live.connected() ? 'bg-emerald-500' : 'bg-rose-500'"></span>
-          {{ (live.connected() ? 'shell.connected' : 'shell.reconnecting') | t }}
-          </div>
-        </div>
-      </nav>
-      }
-      <main class="min-w-0 flex-1 overflow-x-auto p-4 md:p-8">
+      <main class="mx-auto w-full max-w-[76rem] min-w-0 flex-1 overflow-x-auto px-4 pt-4 pb-12 md:px-8" [class.pt-8]="welcome()">
         <router-outlet />
       </main>
+      @if (!welcome()) {
+      <footer class="mx-auto flex w-full max-w-[76rem] flex-wrap items-center gap-x-6 gap-y-1 px-4 pb-6 text-xs text-slate-500 md:px-8">
+        <div class="flex items-center gap-3" role="group" [attr.aria-label]="'shell.language' | t">
+          <button type="button" class="lang-btn" lang="en" dir="ltr" [attr.aria-pressed]="i18n.lang() === 'en'" (click)="setLang('en')">English</button>
+          <button type="button" class="lang-btn" lang="ar" dir="rtl" [attr.aria-pressed]="i18n.lang() === 'ar'" (click)="setLang('ar')">العربية</button>
+        </div>
+        @if (shell.notifySupported) {
+          <label class="flex items-center gap-2" [title]="'shell.notifyTitle' | t">
+            <input type="checkbox" [checked]="shell.notify()" (change)="shell.toggleNotify()"> {{ 'shell.notify' | t }}
+          </label>
+          @if (shell.notifyHint()) { <p class="text-amber-700 dark:text-amber-400">{{ shell.notifyHint() }}</p> }
+        }
+        @if (live.connected()) { <span>{{ 'shell.connected' | t }}</span> }
+      </footer>
+      }
     </div>
   `,
 })
@@ -106,7 +93,6 @@ export class App {
     { path: 'home', label: 'shell.nav.home' },
     { path: 'jobs', label: 'shell.nav.jobs' },
     { path: 'needs-you', label: 'shell.nav.needsYou' },
-    { path: 'activity', label: 'shell.nav.activity' },
     { path: 'settings', label: 'shell.nav.settings' },
   ];
 
@@ -138,7 +124,7 @@ export class App {
 
   private async runEnded(end: LiveEvent): Promise<void> {
     if (!this.shell.notify()) return;
-    const alert = (title: string, body: string) => this.shell.alert(title, body, 'run', '/activity');
+    const alert = (title: string, body: string) => this.shell.alert(title, body, 'run', '/home');
     if (end.error) {
       // a run that stopped for a known reason is said in words; anything else is "Something went wrong." (never the raw text)
       const known = end.reason_code && end.reason_code !== 'pipeline_error' && this.i18n.has('run.reason.' + end.reason_code);

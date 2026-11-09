@@ -2,7 +2,7 @@
 
 import re
 
-from linkit_all.apply.handlers.base import Handler, JobInfo
+from linkit_all.apply.handlers.base import Handler, JobInfo, posting_form
 
 
 class Ashby(Handler):
@@ -20,8 +20,4 @@ class Ashby(Handler):
     )
 
     def form_url(self, job: JobInfo) -> str:
-        return (
-            job.apply_url
-            if job.apply_url.endswith("/application")
-            else f"{job.url.rstrip('/')}/application"
-        )
+        return posting_form(job, "ashbyhq.com", "/application")

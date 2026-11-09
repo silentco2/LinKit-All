@@ -341,3 +341,40 @@ def run_apply() -> None:
     """Tailor and fill applications: a dry run unless Live applying is on in settings."""
     counts = _run_stage("apply")[1]
     typer.echo(", ".join(f"{k} {v}" for k, v in counts.items()))
+
+
+@app.command("apply-probe")
+def apply_probe(
+    per_source: Annotated[int, typer.Option(help="Jobs to try per source.")] = 1,
+    job: Annotated[list[int] | None, typer.Option(help="Exact job ids (repeat).")] = None,
+    limit: Annotated[int, typer.Option(help="At most this many jobs in all.")] = 60,
+    restore: Annotated[
+        bool, typer.Option("--restore", help="Only put back jobs an earlier test borrowed.")
+    ] = False,
+) -> None:
+    """Practice-mode apply of one job per source, then a report of where each one got to.
+    Nothing is submitted; the CV is sent as uploaded."""
+    from linkit_all.apply.probe import give_back_all, pick, probe, report
+    from linkit_all.core.search import load_search
+    from linkit_all.pipeline import _get_embedder, ai_settings
+
+    db = _stage_db()
+    if restore:
+        typer.echo(f"Put back {give_back_all(db)} jobs.")
+        return
+    settings = get_settings()
+    cfg = load_search(db)
+    if cfg is None:
+        typer.echo("No search saved yet: finish setup first.", err=True)
+        raise typer.Exit(1)
+    ids = pick(db, per_source, job)[:limit]
+    typer.echo(f"Trying {len(ids)} jobs in Practice mode...")
+
+    async def go() -> list[Any]:
+        provider = get_provider(ai_settings(settings, cfg), cache=db)
+        return await probe(db, settings, cfg, provider, await _get_embedder(settings), ids)
+
+    rows = asyncio.run(go())
+    for r in rows:
+        typer.echo(f"{r.job_id:>6} {r.source:<16} {r.status:<10} {r.code:<20} {r.host}")
+    typer.echo(f"Report: {report(rows, settings.data_dir / 'applications')}")

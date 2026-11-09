@@ -6,7 +6,7 @@ import { Countries } from '../../components/countries';
 import { PlacePicker } from '../../components/place-picker';
 import { I18n, TPipe } from '../../i18n';
 import { fmtNum, localeOf } from '../../locale';
-import { AnswerEntry, AnswerValue, ApplicationAnswers, lines, unlines } from '../../types';
+import { AnswerEntry, AnswerScope, AnswerValue, ApplicationAnswers, lines, unlines } from '../../types';
 import { Field } from './saved';
 import { SettingsStore } from './store';
 
@@ -117,6 +117,11 @@ type Choice = { v: boolean | null; label: string };
             <button type="button" class="btn" [class.btn-primary]="filter() === f.id" [attr.aria-pressed]="filter() === f.id" (click)="filter.set(f.id)">{{ f.label | t }} ({{ num(count(f.id)) }})</button>
           }
         </div>
+        <div class="flex flex-wrap gap-2" role="group" [attr.aria-label]="'answers.scope.label' | t">
+          @for (c of scopes; track c.id) {
+            <button type="button" class="btn" [class.btn-primary]="scope() === c.id" [attr.aria-pressed]="scope() === c.id" (click)="scope.set(c.id)">{{ c.label | t }} ({{ num(scopeCount(c.id)) }})</button>
+          }
+        </div>
         @if (error(); as err) { <div class="alert alert-error" role="alert" dir="auto">{{ err }}</div> }
 
         <div class="space-y-3">
@@ -145,11 +150,13 @@ type Choice = { v: boolean | null; label: string };
                   <div class="min-w-0 font-semibold text-slate-900 dark:text-white" dir="auto">{{ e.question }}</div>
                   <div class="flex shrink-0 flex-wrap justify-end gap-1">
                     <span class="badge" [class]="e.source === 'user' ? 'tier-high' : 'alert-info'">{{ (e.source === 'user' ? 'answers.badge.you' : 'answers.badge.ai') | t }}</span>
+                    <span class="badge">{{ 'answers.scope.' + e.scope | t }}</span>
                     @if (e.sensitive) { <span class="badge tier-mid">{{ 'answers.badge.sensitive' | t }}</span> }
                   </div>
                 </header>
                 <p class="mt-2 whitespace-pre-line break-words text-sm text-slate-700 dark:text-slate-300" dir="auto">{{ show(e.answer) }}</p>
                 <footer class="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                  @if (e.scope_name) { <bdi class="font-medium" dir="auto">{{ e.scope_name }}</bdi> }
                   <span>{{ plural('answers.used', e.uses) }}</span>
                   <span>{{ 'answers.updated' | t: { date: when(e.updated_at) } }}</span>
                   <span class="ms-auto flex gap-2">
@@ -219,11 +226,24 @@ export class AnswersSection implements OnInit {
   protected readonly busy = signal(false);
   protected readonly error = signal('');
   protected readonly filter = signal<Filter>('all');
+  protected readonly scope = signal<AnswerScope | 'all'>('all');
+  protected readonly scopes: { id: AnswerScope | 'all'; label: string }[] = [
+    { id: 'all', label: 'answers.filter.all' },
+    { id: 'general', label: 'answers.scope.general' },
+    { id: 'role', label: 'answers.scope.role' },
+    { id: 'company', label: 'answers.scope.company' },
+  ];
   protected readonly editing = signal<number | null>(null);
   protected readonly dq = signal('');
   protected readonly da = signal('');
   protected readonly dbool = signal(true);
-  protected readonly shownEntries = computed(() => this.entries().filter((e) => this.filter() === 'all' || e.source === this.filter()));
+  protected readonly shownEntries = computed(() =>
+    this.entries().filter((e) => (this.filter() === 'all' || e.source === this.filter()) && (this.scope() === 'all' || e.scope === this.scope())),
+  );
+
+  protected scopeCount(id: AnswerScope | 'all'): number {
+    return id === 'all' ? this.entries().length : this.entries().filter((e) => e.scope === id).length;
+  }
 
   ngOnInit(): void {
     const v = this.eeoFields.map((f) => this.store.answers[f.key]);

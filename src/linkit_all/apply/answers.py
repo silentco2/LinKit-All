@@ -12,6 +12,8 @@ from typing import Any, Literal
 from pydantic import BaseModel, field_validator
 from rapidfuzz import fuzz
 
+from linkit_all.core.names import Lang, name_in, name_part
+
 Kind = Literal[
     "text", "textarea", "email", "tel", "number", "url", "date",
     "select", "radio", "combobox", "yesno", "checkbox", "multi", "file",
@@ -33,8 +35,7 @@ class Question:
 class ApplicationAnswers(BaseModel):
     """Answers the user gives once in the setup wizard. Sensitive ones are used only from here."""
 
-    first_name: str = ""
-    last_name: str = ""
+    name_other: str = ""  # your name in the other script; empty = core.names.translate
     city: str = ""
     country: str = ""
     current_company: str = ""
@@ -88,6 +89,7 @@ class Context:
     address: str = ""  # home address, from the profile
     postal_code: str = ""
     home_city: str = ""
+    home_state: str = ""  # state, governorate or province
     home_country: str = ""  # ISO2
     job_location: str = ""
     job_source: str = ""  # where we found the job, for "how did you hear about us"
@@ -289,10 +291,18 @@ def yes_no(q: Question, yes: bool) -> Any:
 _STANDARD: list[tuple[str, re.Pattern[str]]] = [
     (key, re.compile(rx, re.I))
     for key, rx in [
-        ("first_name", r"first[ _-]?name|given name|forename"),
-        ("last_name", r"last[ _-]?name|surname|family name"),
+        ("first_name", r"first[ _-]?name|given name|forename|الاسم الأول|الاسم الاول"),
+        ("middle_names", r"middle[ _-]?names\b"),
+        # not "second name": on UK forms that is the surname
+        ("middle_name", r"middle[ _-]?name|(?<!grand)father'?s?[ _-]?name|الاسم الثاني|اسم الأب|اسم الاب"),
+        ("third_name", r"third[ _-]?name|grandfather'?s?[ _-]?name|الاسم الثالث|اسم الجد"),
+        ("last_name", r"last[ _-]?name|surname|family name|اسم العائلة|الاسم الأخير|الاسم الاخير|اللقب"),
         ("email", r"e-?mail"),
         ("phone", r"phone|mobile"),
+        # whole label only: "State why you want this job" is not a place. Before "address": address_state
+        ("state", r"^(your |home |current )?(state|province|governorate)(\s*[/,]\s*(province|region|governorate|state))?"
+                  r"( of residence)?$|^(state|region)[ _-]?(province|code)?$|address[ _.-]?(state|region)|"
+                  r"^(المحافظة|الولاية)$"),
         ("address", r"^address(?![ _-]?(line[ _-]?)?(2|two|3))|street[ _-]?address|"
                     r"(home|mailing|residential)[ _-]address|address line ?(1|one)|العنوان"),
         ("postal_code", r"\bzip\b|zip[ _-]?code|postal|post[ _-]?code|الرمز البريدي|الكود البريدي"),
@@ -301,7 +311,11 @@ _STANDARD: list[tuple[str, re.Pattern[str]]] = [
         ("portfolio", r"portfolio|personal (web)?site|^website$|urls\[other\]"),
         ("current_company", r"current (company|employer)|^org$"),
         ("current_title", r"current (job )?(title|role|position)"),
-        ("full_name", r"^(full |your |legal )?name$|_systemfield_name"),
+        ("full_name", r"^(full |your |legal )?name$|_systemfield_name|"
+                      r"^(full |your |legal )?name\s*[-:(/]?\s*(in\s+)?(arabic|english)\b|"
+                      r"^(arabic|english)\s+(full\s+)?name$|^(full[ _-])?name[ _-](ar|en)$|"
+                      r"^الاسم( الكامل| بالكامل| الرباعي| الثلاثي)?"
+                      r"( ب(اللغة )?(ال)?(عربية|عربي|إنجليزية|انجليزية|إنجليزي|انجليزي))?$"),
         ("country", r"^country\b"),
         ("city", r"^(city|location|current location|location \(city\))\b"),
         ("heard_about", r"how did you (hear|find|learn)|where did you (hear|find|see)|referral source"),
@@ -323,13 +337,23 @@ def _country_name(iso2: str) -> str:
     return found.name if found else ""
 
 
+_NAME_KEYS = {"first_name", "middle_name", "middle_names", "third_name", "last_name", "full_name"}
+_IN_ARABIC = re.compile(r"arabic|عربي|عربية|[ _-]ar\b|\(ar\)", re.I)
+_IN_ENGLISH = re.compile(r"english|إنجليزي|انجليزي|[ _-]en\b|\(en\)", re.I)
+
+
+def _name_value(key: str, q: Question, ctx: Context) -> str:
+    """The name, or the part `key` asks for, in the language the field names (if it names one)."""
+    text = f"{q.label} {q.name}"
+    lang: Lang | None = (
+        "ar" if _IN_ARABIC.search(text) else "en" if _IN_ENGLISH.search(text) else None
+    )
+    return name_part(name_in(ctx.full_name, lang, ctx.answers.name_other), key)
+
+
 def _standard_value(key: str, ctx: Context) -> Any:
     a = ctx.answers
-    first, _, last = ctx.full_name.strip().partition(" ")
     values: dict[str, Any] = {
-        "first_name": a.first_name or first,
-        "last_name": a.last_name or last,
-        "full_name": ctx.full_name,
         "email": ctx.email,
         "phone": ctx.phone,
         "linkedin": a.linkedin,
@@ -343,6 +367,7 @@ def _standard_value(key: str, ctx: Context) -> Any:
         or a.country
         or (country_of(ctx.location) or "").title(),
         "city": ctx.home_city or a.city or ctx.location,
+        "state": ctx.home_state,
         "heard_about": a.heard_about or _SOURCE_NAMES.get(ctx.job_source, "Company website"),
         "notice_period": a.notice_period,
         "years_experience": "" if a.years_experience is None else str(a.years_experience),
@@ -356,7 +381,7 @@ def standard_answer(q: Question, ctx: Context) -> Any:
     for key, rx in _STANDARD:
         if not (rx.search(q.name) or rx.search(q.label)):
             continue
-        value = _standard_value(key, ctx)
+        value = _name_value(key, q, ctx) if key in _NAME_KEYS else _standard_value(key, ctx)
         if value is None or value == "":
             return None
         if isinstance(value, bool):

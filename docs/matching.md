@@ -48,7 +48,7 @@ Jobs are then ordered by rank. Your CV text never leaves your computer in this s
 
 ## 3. AI score
 
-The best `ai_max_jobs` jobs by rank (default 300) go to your AI. Everything below that line
+The best `ai_max_jobs` jobs by rank (default 100) go to your AI. Everything below that line
 is marked `low` without spending any AI.
 
 - Jobs are sent in **batches** of `batch_size` (default 15) in one call.
@@ -82,7 +82,7 @@ low-tier job: approve it by hand.
 
 ```toml
 [matching]
-ai_max_jobs = 300   # best locally-ranked jobs sent to the AI per run
+ai_max_jobs = 100   # best locally-ranked jobs sent to the AI per run
 tier_high = 8       # score 8-10: auto-apply
 tier_mid = 5        # score 5-7: needs your approval; below: hidden
 batch_size = 15     # jobs per AI call

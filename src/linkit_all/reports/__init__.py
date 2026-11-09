@@ -15,6 +15,7 @@ from sqlalchemy import ColumnElement, Select, func, select
 from sqlalchemy.orm import InstrumentedAttribute, Session
 
 from linkit_all.core.models import Job, JobEvent, JobState, Run, utcnow
+from linkit_all.matching.trash import visible
 
 # Job states at or past each funnel step.
 RANKED = {JobState.ranked, JobState.scored, JobState.below_threshold, JobState.awaiting_review,
@@ -119,7 +120,9 @@ def build_report(
     )
     tiers = dict(
         s.execute(
-            select(Job.tier, func.count()).where(Job.tier.is_not(None), *conds).group_by(Job.tier)
+            select(Job.tier, func.count())
+            .where(Job.tier.is_not(None), visible(), *conds)
+            .group_by(Job.tier)
         ).all()
     )
     scored = s.scalar(select(func.count()).where(Job.score.is_not(None), *conds)) or 0

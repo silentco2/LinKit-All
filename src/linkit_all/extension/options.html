@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>LinkIt Fill</title>
+  <style>
+    body { font: 14px/1.5 system-ui, sans-serif; margin: 16px; min-width: 320px; color: #0f172a; background: #fff; }
+    label { display: block; margin-top: 12px; font-weight: 600; }
+    input { width: 100%; box-sizing: border-box; padding: 6px 8px; margin-top: 4px; border: 1px solid #cbd5e1; border-radius: 6px; font: inherit; }
+    button { margin-top: 14px; padding: 6px 12px; border-radius: 6px; border: 1px solid #047857; background: #059669; color: #fff; font: inherit; cursor: pointer; }
+    p { color: #475569; }
+    @media (prefers-color-scheme: dark) { body { background: #0f172a; color: #e2e8f0; } input { background: #1e293b; color: #e2e8f0; border-color: #334155; } p { color: #94a3b8; } }
+  </style>
+</head>
+<body>
+  <p>Paste the pairing code from LinKit All (Settings, Applying). The extension talks only to LinKit All on this computer.</p>
+  <label for="token">Pairing code</label>
+  <input id="token" autocomplete="off" spellcheck="false">
+  <button id="save" type="button">Save</button>
+  <p id="msg" role="status"></p>
+  <script src="options.js"></script>
+</body>
+</html>

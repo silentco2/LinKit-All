@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "LinkIt Fill",
+  "version": "1.2.0",
+  "description": "Fills job applications in your own browser with the answers LinKit All prepared. You press Next and Submit.",
+  "permissions": ["storage", "contextMenus", "scripting", "activeTab"],
+  "host_permissions": ["http://127.0.0.1/*", "http://localhost/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://*/*", "http://*/*"],
+      "exclude_matches": ["http://127.0.0.1/*", "http://localhost/*"],
+      "js": ["snapshot.js", "content.js"],
+      "run_at": "document_idle",
+      "all_frames": true,
+      "match_origin_as_fallback": true
+    }
+  ],
+  "options_ui": { "page": "options.html", "open_in_tab": false }
+}

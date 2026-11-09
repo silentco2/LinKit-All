@@ -13,6 +13,7 @@ from linkit_all.core.models import (
     ActionStatus,
     AnswerEntry,
     Job,
+    JobEvent,
     JobState,
     Profile,
 )
@@ -255,3 +256,14 @@ def test_action_questions_carry_their_sensitive_category(client: TestClient) -> 
     ])  # fmt: skip
     (item,) = client.get("/api/actions").json()
     assert [x["category"] for x in item["questions"]] == [None, "acknowledge_privacy", "eeo_gender"]
+
+
+def test_marking_a_job_closed_drops_it_and_says_why(client: TestClient) -> None:
+    job, item = park(client, ActionKind.apply_in_browser)
+    assert post(client, f"/api/actions/{item}", {"decision": "closed"}).status_code == 200
+    assert state(client, job) == JobState.skipped
+    assert item_row(client, item).status == ActionStatus.dismissed
+    with client.app.state.db() as s:  # type: ignore[attr-defined]
+        last = s.query(JobEvent).filter_by(job_id=job).order_by(JobEvent.id.desc()).first()
+        assert last is not None and last.code == "marked_closed"
+    assert client.get("/api/actions").json() == []

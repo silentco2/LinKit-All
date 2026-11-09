@@ -13,7 +13,7 @@ import { Shell } from '../shell';
         <label class="inline-flex items-center gap-2" [title]="'shell.notifyTitle' | t">
           <input type="checkbox" [checked]="false" (change)="shell.toggleNotify()"> {{ 'shell.notify' | t }}
         </label>
-        @if (shell.notifyHint()) { <p class="text-amber-600">{{ shell.notifyHint() }}</p> }
+        @if (shell.notifyHint()) { <p class="text-amber-700 dark:text-amber-400">{{ shell.notifyHint() }}</p> }
       }
     </div>
   `,

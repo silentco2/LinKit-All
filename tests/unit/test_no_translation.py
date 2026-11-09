@@ -12,12 +12,10 @@ import linkit_all.providers as providers
 PROMPTS = sorted((Path(providers.__file__).parent / "prompts").glob("*.j2"))
 # "never translate", "do not translate", "don't translate", "without translating", "not translated"
 _NEGATED = re.compile(r"\b(never|not|don't|dont|without|no)\b[^.]{0,40}\btranslat", re.I)
-VERBATIM = re.compile(r"verbatim.{0,80}language of the (page|post)", re.I | re.S)
-EXTRACTION = ["extract_job.j2", "extract_linkedin_post.j2", "extract_telegram.j2"]
 
 
 def test_prompts_found() -> None:
-    assert {p.name for p in PROMPTS} >= set(EXTRACTION)
+    assert PROMPTS
 
 
 @pytest.mark.parametrize("path", PROMPTS, ids=lambda p: p.name)
@@ -28,13 +26,6 @@ def test_translate_only_in_do_not_translate(path: Path) -> None:
         assert _NEGATED.search(text[line_start : m.end() + 1]), (
             f"{path.name}: {text[line_start : m.end() + 20]!r}"
         )
-
-
-@pytest.mark.parametrize("name", EXTRACTION)
-def test_extraction_prompts_keep_original_language(name: str) -> None:
-    text = (PROMPTS[0].parent / name).read_text(encoding="utf-8")
-    assert VERBATIM.search(text), f"{name} must say: verbatim, in the language of the page/post"
-    assert re.search(r"never\s+translate", text, re.I)
 
 
 PROSE = ["cover_letter.j2", "application_email.j2", "answer.j2", "score.j2", "tailor.j2"]

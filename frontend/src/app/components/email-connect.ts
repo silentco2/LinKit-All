@@ -12,7 +12,7 @@ let nextId = 0;
 
 /**
  * Connect Gmail (or Yahoo) with an app password, or Outlook/Hotmail/Live/MSN with "Sign in with Microsoft": how-to
- * steps, the form, the advanced address/server fields and, once connected, the test/disconnect buttons. Used in Settings > Accounts and inline on Needs you.
+ * steps, the form, the address (read-only until its edit button is pressed) and, once connected, the test/disconnect buttons. Used in Settings > Accounts and inline on Needs you.
  * `unlocked`: the password vault is open (the app password or Microsoft sign-in is stored there); when it is not, only a hint shows.
  * After a connect it requeues the applications parked for `needs_email` and emits `connected`.
  */
@@ -31,13 +31,27 @@ let nextId = 0;
         @if (email()?.connected) {
           <div class="alert alert-ok" role="status">{{ 'setup.email.connectedAs' | t }} <bdi dir="ltr">{{ email()!.imap_user }}</bdi>.</div>
         }
-        @if (eUser()) {
-          <p class="text-sm"><span class="text-slate-500">{{ 'setup.email.address' | t }}: </span><bdi dir="ltr" class="font-medium">{{ eUser() }}</bdi></p>
-        }
+        <div class="max-w-sm">
+          <label class="label" [for]="id + '-user'">{{ 'setup.email.address' | t }}</label>
+          <div class="flex items-center gap-2">
+            <input #addr [id]="id + '-user'" type="email" dir="ltr" autocomplete="email"
+              class="input read-only:bg-slate-100 read-only:text-slate-600 dark:read-only:bg-slate-800 dark:read-only:text-slate-300"
+              [value]="eUser()" [readOnly]="!editable()" (change)="setUser(val($event))"
+              (keydown.enter)="saveEdit(addr)" (keydown.escape)="cancelEdit(addr)">
+            @if (eUser()) {
+              <button type="button" class="btn shrink-0" [attr.aria-label]="(editing() ? 'setup.email.editDone' : 'setup.email.edit') | t"
+                [title]="(editing() ? 'setup.email.editDone' : 'setup.email.edit') | t" (click)="editing() ? saveEdit(addr) : startEdit(addr)">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  @if (editing()) { <path d="M20 6 9 17l-5-5" /> } @else { <path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /> }
+                </svg>
+              </button>
+            }
+          </div>
+        </div>
         @if (outlook()) {
           @if (!email()?.microsoft) {
             <div class="alert alert-info" role="status">{{ 'settings.acc.outlook' | t }}</div>
-          } @else if (!email()?.connected) {
+          } @else if (!linked()) {
             <ol class="list-decimal space-y-1 ps-5 text-sm text-slate-700 dark:text-slate-300">
               <li>{{ 'settings.acc.ms.step1' | t }}</li>
               <li>{{ 'settings.acc.ms.step2' | t }}</li>
@@ -47,7 +61,7 @@ let nextId = 0;
             @if (busy()) { <p class="hint" role="status">{{ 'settings.acc.ms.waiting' | t }}</p> }
           }
         } @else {
-          @if (!email()?.connected) {
+          @if (!linked()) {
             <ol class="list-decimal space-y-1 ps-5 text-sm text-slate-700 dark:text-slate-300">
               <li>{{ 'settings.acc.step1' | t }} <a href="https://myaccount.google.com/security" target="_blank" rel="noopener">{{ 'settings.acc.open' | t }}</a></li>
               <li>{{ 'settings.acc.step2' | t }} <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">{{ 'settings.acc.open' | t }}</a></li>
@@ -63,19 +77,6 @@ let nextId = 0;
             </form>
           }
         }
-        <details class="text-sm" [open]="!eUser()">
-          <summary class="cursor-pointer font-medium">{{ 'setup.email.advanced' | t }}</summary>
-          <div class="mt-2 grid gap-4 sm:grid-cols-2">
-            <div>
-              <label class="label" [for]="id + '-user'">{{ 'setup.email.address' | t }}</label>
-              <input [id]="id + '-user'" type="email" dir="ltr" class="input" autocomplete="email" [value]="eUser()" (change)="setUser(val($event))">
-            </div>
-            <div>
-              <label class="label" [for]="id + '-host'">{{ 'setup.email.imap' | t }}</label>
-              <input [id]="id + '-host'" dir="ltr" class="input" autocomplete="off" [value]="eHost()" (change)="eHost.set(val($event).trim())">
-            </div>
-          </div>
-        </details>
         @if (email()?.connected) {
           <div class="flex flex-wrap gap-3">
             <button type="button" class="btn" (click)="test()" [disabled]="busy()">{{ 'setup.email.testAgain' | t }}</button>
@@ -100,6 +101,11 @@ export class EmailConnect {
   protected readonly eUser = signal('');
   protected readonly eHost = signal('imap.gmail.com');
   protected readonly ePass = signal('');
+  protected readonly editing = signal(false);
+  /** With no address yet there is nothing to protect, so the box starts open. */
+  protected readonly editable = computed(() => this.editing() || !this.eUser());
+  /** The address in the box is the connected one; a changed address needs connecting first. */
+  protected readonly linked = computed(() => !!this.email()?.connected && this.eUser().toLowerCase() === this.email()!.imap_user.toLowerCase());
   private readonly domain = computed(() => (this.eUser().split('@')[1] ?? '').trim().toLowerCase());
   protected readonly outlook = computed(() => /^(outlook|hotmail|live|msn)\./.test(this.domain()));
   protected readonly yahoo = computed(() => /^(yahoo\.|ymail\.com$)/.test(this.domain()));
@@ -134,6 +140,7 @@ export class EmailConnect {
 
   private setEmail(e: EmailState): void {
     this.email.set(e);
+    this.editing.set(false);
     this.eUser.set(e.imap_user);
     this.eHost.set(this.hostFor(e.imap_user, e.imap_host));
   }
@@ -141,6 +148,22 @@ export class EmailConnect {
   protected setUser(v: string): void {
     this.eUser.set(v.trim());
     this.eHost.set(this.hostFor(v, this.eHost()));
+  }
+
+  protected startEdit(box: HTMLInputElement): void {
+    this.editing.set(true);
+    box.focus();
+    box.select();
+  }
+
+  protected saveEdit(box: HTMLInputElement): void {
+    this.setUser(box.value);
+    this.editing.set(false);
+  }
+
+  protected cancelEdit(box: HTMLInputElement): void {
+    box.value = this.eUser();
+    this.editing.set(false);
   }
 
   /** Run an action; it returns the (already translated) text to show. */

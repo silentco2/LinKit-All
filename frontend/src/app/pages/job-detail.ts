@@ -30,8 +30,8 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
         <header>
           <h2 class="text-xl" dir="auto">{{ j.title }}</h2>
           <p class="text-sm text-slate-600 dark:text-slate-400">
-            <bdi>{{ j.company }}</bdi> · @if (j.location) { <bdi>{{ j.location }}</bdi> } @else { {{ 'detail.noLocation' | t }} }
-            @if (j.remote) { · <bdi>{{ j.remote }}</bdi> }
+            <bdi>{{ j.company }}</bdi> <span class="gap-dot"></span>@if (j.location) { <bdi>{{ j.location }}</bdi> } @else { {{ 'detail.noLocation' | t }} }
+            @if (j.remote) { <span class="gap-dot"></span><bdi>{{ j.remote }}</bdi> }
           </p>
           <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
             @if (j.tier) { <span class="badge tier-{{ j.tier }}">{{ 'detail.tier.' + j.tier | t }}</span> }
@@ -107,13 +107,13 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
                 <div>
                   <p class="flex flex-wrap items-center gap-2 text-sm">
                     <span class="font-medium">{{ 'trust.' + kind | t }}</span>
-                    <span class="badge {{ bandClass(v.band) }}"><bdi dir="ltr">{{ num(v.score) }}/{{ num(100) }}</bdi> · {{ 'trust.band.' + v.band | t }}</span>
+                    <span class="badge {{ bandClass(v.band) }}"><bdi dir="ltr">{{ num(v.score) }}/{{ num(100) }}</bdi> <span class="gap-dot"></span>{{ 'trust.band.' + v.band | t }}</span>
                   </p>
                   <ul class="mt-1 space-y-1 text-sm">
                     @for (sg of v.signals; track sg.code) {
                       <li>
                         <span class="font-medium">{{ signalLabel(sg.code) }}</span>
-                        <span class="text-xs text-slate-500"> · {{ 'trust.weight' | t: { w: sgn(sg.weight) } }}</span>
+                        <span class="text-xs text-slate-500"> <span class="gap-dot"></span>{{ 'trust.weight' | t: { w: sgn(sg.weight) } }}</span>
                         @if (sg.evidence) { <span class="block text-xs break-words text-slate-500" dir="auto">{{ sg.evidence }}</span> }
                       </li>
                     } @empty {
@@ -179,7 +179,7 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
                 <span class="font-medium">{{ (v.ok ? 'detail.tailor.verify.ok' : 'detail.tailor.verify.bad') | t }}</span>
                 {{ 'detail.tailor.verify.pages' | t: { from: num(v.pages[0]), to: num(v.pages[1]) } }} ·
                 {{ 'detail.tailor.verify.similarity' | t: { pct: num(v.min_ssim, { style: 'percent', maximumFractionDigits: 1 }) } }}
-                @if (v.reason) { · <span dir="auto">{{ v.reason }}</span> }
+                @if (v.reason) { <span class="gap-dot"></span><span dir="auto">{{ v.reason }}</span> }
               </p>
             }
             @if (t.status === 'tailored') {
@@ -213,7 +213,7 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
           <ol class="mt-2 space-y-2 border-s border-slate-200 ps-4 text-xs sm:space-y-1 dark:border-slate-700">
             @for (e of j.events; track $index) {
               <li class="flex flex-col gap-0.5 sm:flex-row sm:gap-3"><bdi class="shrink-0 text-slate-500 sm:w-36">{{ e.at | dt: 'stamp' }}</bdi>
-                <span class="min-w-0"><span class="inline-block rtl:rotate-180">→</span> <span class="font-medium">{{ 'common.state.' + e.to | t }}</span> <span dir="auto">{{ e | msg }}</span>
+                <span class="min-w-0"><svg class="icon me-1 rtl:rotate-180" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg><span class="me-1.5 font-medium">{{ 'common.state.' + e.to | t }}</span><span dir="auto">{{ e | msg }}</span>
                 @if (e.screenshots) {
                   <span class="ms-1">
                     @for (n of range(e.screenshots); track n) {

@@ -133,8 +133,8 @@ async def _run_stage(
             if stage == "discover":
                 from linkit_all.providers import get_provider
 
-                # Only the generic careers-page source uses the model, for pages without
-                # JSON-LD; it falls back to the page title when the provider is unusable.
+                # Only the careers source uses the model: once per JS-rendered site, to pick
+                # how to read it (browser_extract). Everything else in discovery is script.
                 provider = get_provider(ai_settings(settings, cfg, ai_override), cache=db)
                 sources = registry(provider, settings.data_dir, keys)
                 stats = asdict(await discover(db, cfg, run_id, Http(client), sources))

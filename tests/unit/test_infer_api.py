@@ -142,7 +142,7 @@ def test_apply_writes_only_given_keys(client: TestClient, tmp_path: Path) -> Non
     assert profile["phone"] == "+201001234567"
     assert {k: profile[k] for k in keep} == keep  # untouched
     answers = client.get("/api/profile/answers").json()
-    assert answers["city"] == "Cairo" and answers["first_name"] == "Sara"  # first_name: the upload
+    assert answers["city"] == "Cairo"  # the upload
     assert answers["authorized_countries"] == []  # never written unless given
     cfg = client.get("/api/search").json()
     assert cfg["search"]["queries"] == ["Backend Engineer"]

@@ -300,26 +300,6 @@ def _find_name(lines: list[str]) -> tuple[str, bool]:
     return (cands[0], len(cands) > 1) if cands else ("", False)
 
 
-_PARTICLES = {"abd", "abdel", "abdul", "abdal", "abu", "el", "al", "bin", "ibn", "عبد", "أبو",
-              "ابو", "بن", "ابن", "ال"}  # fmt: skip
-
-
-def split_name(full_name: str) -> tuple[str, str]:
-    """(first, last). A particle (Abdel, El, Bin, عبد ...) joins the token after it."""
-    units: list[str] = []
-    pending: list[str] = []
-    for tok in full_name.split():
-        pending.append(tok)
-        if tok.lower().strip(".") not in _PARTICLES:
-            units.append(" ".join(pending))
-            pending = []
-    if pending:  # trailing particle with nothing after it: keep it as a normal token
-        units += pending
-    if len(units) < 2:
-        return (units[0], "") if units else ("", "")
-    return units[0], units[-1]
-
-
 _LOC_LABEL = re.compile(
     r"^(?:location|address|city|based in|العنوان|الموقع|المدينة)\s*[:：]\s*", re.I
 )
@@ -688,9 +668,8 @@ def infer(facts: CvFacts, today: date) -> dict[str, InferredValue]:
     put("profile.home_country", iso, check=from_phone)
     if parts and (len(parts) > 1 or parts[0].lower() not in _COUNTRY_NAMES):
         put("profile.home_city", parts[0])
-    first, last = split_name(facts.full_name)
-    put("answers.first_name", first)
-    put("answers.last_name", last)
+        if len(parts) > 2:
+            put("profile.home_state", parts[-2])
     if parts:
         put("answers.city", parts[0])
         if country:

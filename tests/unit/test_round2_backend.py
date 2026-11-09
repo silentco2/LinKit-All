@@ -432,9 +432,9 @@ def test_linkedin_uses_the_one_headless_setting_and_search_queries(tmp_path: Pat
     base.apply.headless = True
     src.tasks(base)
     assert src._headless is True  # type: ignore[attr-defined]
-    own = linkedin_cfg(linkedin_keywords=["mine"])
-    own.search.queries = ["ignored"]
-    assert [t.query for t in src.tasks(own)] == ["mine"]
+    old = linkedin_cfg(linkedin_keywords=["mine"])  # saved by older versions: ignored
+    old.search.queries = ["python dev"]
+    assert [t.query for t in src.tasks(old)] == ["python dev"]
 
 
 # --- adding a source -------------------------------------------------------------------
@@ -491,7 +491,7 @@ def test_upload_fills_empty_non_sensitive_fields(client: TestClient, tmp_path: P
     assert p["phone"] == "+201001234567" and "Python" in p["skills"]
     assert {"Acme Corp", "Backend Engineer"} <= set(p["locked_facts"])  # silent protection
     a = client.get("/api/profile/answers").json()
-    assert (a["first_name"], a["current_company"]) == ("Sara", "Acme Corp")
+    assert a["current_company"] == "Acme Corp"
     assert a["linkedin"].endswith("sara-ahmed") and a["years_experience"] >= 5
     for sensitive in (
         "authorized_countries",

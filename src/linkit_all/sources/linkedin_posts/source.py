@@ -1,10 +1,10 @@
 """LinkedIn hiring posts as a discovery source: Google finds the posts, their public pages give
 the text, `extract` turns hiring posts into job stubs. No LinkedIn account is used.
 
-One task per keyword (at most MAX_KEYWORDS). Posts older than the window are dropped by the date
+One task per job title (at most MAX_KEYWORDS). Posts older than the window are dropped by the date
 in their id before any page is fetched, and by the page's own date after. When Google shows a
-check, the source stops for the run and leaves a flag file (`check_flag`) that Settings shows
-until a later search gets through.
+check, the source stops for the run and leaves a flag file (`check_flag`) that Needs you shows
+until the user marks it solved or a later search gets through.
 """
 
 from collections.abc import AsyncIterator
@@ -16,9 +16,8 @@ from loguru import logger
 
 from linkit_all.core.models import utcnow
 from linkit_all.core.search import SearchConfig
-from linkit_all.providers.base import LLMProvider
 from linkit_all.sources.base import JobStub, Source, Task
-from linkit_all.sources.careers import Unsupported
+from linkit_all.sources.careers import Careers, Unsupported
 from linkit_all.sources.http import Http
 from linkit_all.sources.linkedin_posts.extract import SOURCE, posts_to_stubs
 from linkit_all.sources.linkedin_posts.google import (
@@ -29,14 +28,14 @@ from linkit_all.sources.linkedin_posts.google import (
     posted_from_id,
 )
 from linkit_all.sources.linkedin_posts.post import RawPost, read_post
+from linkit_all.sources.posts import PostRules
 
 MAX_KEYWORDS = 5  # each keyword is up to MAX_PAGES Google searches
 WINDOW_DAYS = {"day": 1, "week": 7}
 BLOCKED = {
-    "check": "Google asked for a check. Open Settings > Sources > LinkedIn hiring posts and press "
-    "'Solve Google check', then run again",
-    "consent": "Google asks you to choose cookie settings. Open Settings > Sources > LinkedIn "
-    "hiring posts and press 'Solve Google check', then run again",
+    "check": "Google asked for a check. Open Needs you and solve the Google check, then run again",
+    "consent": "Google asks you to choose cookie settings. Open Needs you and solve the Google "
+    "check, then run again",
 }
 
 
@@ -54,8 +53,10 @@ class LinkedInPosts(Source):
     priority = 5  # the same job from its ATS or a job board has better data
     parallel = 1  # one Google search at a time
 
-    def __init__(self, provider: LLMProvider | None = None, data_dir: Path | None = None) -> None:
-        self.provider, self.data_dir = provider, data_dir
+    def __init__(self, data_dir: Path | None = None) -> None:
+        self.data_dir = data_dir
+        self._rules = PostRules()
+        self._reader = Careers()  # no provider: one page at a time, no AI
         self._google: GoogleSearch | None = None
         self._stopped: str | None = None  # why later keywords of this run are skipped
         self._seen: set[str] = set()  # post ids already read this run
@@ -63,6 +64,7 @@ class LinkedInPosts(Source):
 
     def tasks(self, cfg: SearchConfig) -> list[Task]:
         src = cfg.sources
+        self._rules = PostRules.of(cfg)
         self._headless = cfg.apply.headless  # one window setting; linkedin_headless is ignored
         return [
             Task(
@@ -72,9 +74,7 @@ class LinkedInPosts(Source):
                 limit=src.linkedin_max_posts,
                 posted_within_days=WINDOW_DAYS[src.linkedin_window],
             )
-            for kw in dict.fromkeys(
-                k.strip() for k in (src.linkedin_keywords or cfg.search.queries) if k.strip()
-            )
+            for kw in dict.fromkeys(k.strip() for k in cfg.search.queries if k.strip())
         ][:MAX_KEYWORDS]
 
     async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:
@@ -96,7 +96,8 @@ class LinkedInPosts(Source):
             logger.warning("LinkedIn posts stopped: {}", self._stopped)
             raise Unsupported(self._stopped) from None
         check_flag(self.data_dir).unlink(missing_ok=True)
-        yield await posts_to_stubs(await self._read(http, urls, task), self.provider)
+        posts = await self._read(http, urls, task)
+        yield await posts_to_stubs(posts, http, self._reader, self._rules, self.is_known)
 
     async def _read(self, http: Http, urls: list[str], task: Task) -> list[RawPost]:
         now = utcnow()

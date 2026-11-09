@@ -95,7 +95,7 @@ const clean = (msg: string): string => msg.replace(/https?:\/\/\S+/g, '').replac
           <div class="alert alert-ok" role="status">
             <p><strong>{{ 'welcome.ai.ok' | t }}</strong></p>
             <p class="mt-1" dir="auto" [attr.title]="ai().version ? ('ai.version' | t: { v: ai().version ?? '' }) : null">
-              {{ 'ai.connected' | t: { provider: ai().label ?? '' } }}@if (ai().model) { · <bdi dir="ltr">{{ ai().model }}</bdi> }
+              {{ 'ai.connected' | t: { provider: ai().label ?? '' } }}@if (ai().model) { <span class="gap-dot"></span><bdi dir="ltr">{{ ai().model }}</bdi> }
             </p>
           </div>
         }

@@ -151,6 +151,7 @@ class Profile(Base):
     address: Mapped[str] = mapped_column(Text, default="")
     postal_code: Mapped[str] = mapped_column(Text, default="")
     home_city: Mapped[str] = mapped_column(Text, default="")
+    home_state: Mapped[str] = mapped_column(Text, default="")  # state, governorate or province
     home_country: Mapped[str] = mapped_column(Text, default="")  # ISO2
     skills: Mapped[list[str]] = mapped_column(default=list)  # the only skills tailoring may add
     cv_path: Mapped[str] = mapped_column(Text)  # base DOCX copied into the data dir
@@ -236,6 +237,9 @@ class AnswerEntry(Base):
     answer: Mapped[Any] = mapped_column(JSON)  # str, list[str] or bool
     source: Mapped[str] = mapped_column(String(8))  # "user" or "ai"
     sensitive: Mapped[bool] = mapped_column(default=False)
+    # "general", or only for one "role" / "company" (named in scope_name)
+    scope: Mapped[str] = mapped_column(String(8), default="general", server_default="general")
+    scope_name: Mapped[str] = mapped_column(Text, default="", server_default="")
     uses: Mapped[int] = mapped_column(default=0)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)
@@ -249,6 +253,8 @@ class ActionKind(StrEnum):
     validation_error = "validation_error"
     login_issue = "login_issue"
     two_factor = "two_factor"
+    apply_by_hand = "apply_by_hand"  # the app got stuck: the user finishes it in their browser
+    apply_in_browser = "apply_in_browser"  # ban-risk site: the extension fills, the user submits
 
 
 class ActionStatus(StrEnum):

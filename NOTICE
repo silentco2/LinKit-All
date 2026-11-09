@@ -126,6 +126,9 @@ Bundled data (src/linkit_all/data/, built by scripts/build_datasets.py):
     under the CC BY 4.0 license. O*NET(R) is a trademark of USDOL/ETA. LinKit All has modified
     all or some of this information (titles were merged, deduplicated and trimmed). USDOL/ETA
     has not approved, endorsed, or tested these modifications.
+  - Arabic and English personal names (name_pairs.json): "Uses arabnamer's Arabic name dictionary
+    (Yousef, E., 2026). https://github.com/sayedyousef/arabnamer. Licensed under CC-BY-4.0."
+    (https://creativecommons.org/licenses/by/4.0/). Copied unchanged from arabnamer 0.1.3.
   - Exchange rates (fx.json, refreshed at the start of each search from
     https://open.er-api.com/v6/latest/USD): Rates By Exchange Rate API
     (https://www.exchangerate-api.com).

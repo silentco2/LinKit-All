@@ -8,7 +8,6 @@ import { Api } from '../api';
 import { I18n, SourcePipe, TPipe } from '../i18n';
 import { Live } from '../live';
 import { fmtNum, localeOf } from '../locale';
-import { Hint } from '../components/hint';
 import { GHOST_HIGH, GHOST_MEDIUM, JobRow, reasonSetting, reasonText, SCAM_HIGH, SCAM_MEDIUM } from '../types';
 
 interface Risk { key: string; cls: string }
@@ -36,19 +35,19 @@ const GROUPS: Record<string, Set<string>> = {
   processing: new Set(['discovered', 'enriched', 'ranked', 'scored', 'tailored']),
 };
 /** The state filter in plain words: where a job is for the user. The internal steps are one "Being processed" line. */
-const STATES = ['filtered_out', 'below_threshold', 'awaiting_review', 'queued_apply', 'applying', 'needs_user', 'applied', 'failed', 'skipped'];
+/** Outcomes get a rubber stamp in the list; everything else is plain text. */
+const STAMP: Record<string, string> = { applied: 'stamp', needs_user: 'stamp stamp-stop', failed: 'stamp stamp-stop' };
+const STATES = ['filtered_out', 'below_threshold', 'awaiting_review', 'queued_apply', 'applying', 'needs_user', 'failed', 'skipped'];
 
 @Component({
   selector: 'app-jobs',
   host: { '(document:keydown.escape)': 'select(null)' },
-  imports: [ScrollingModule, FormsModule, Hint, NgTemplateOutlet, RouterLink, JobDetailPanel, SourcePipe, TPipe],
+  imports: [ScrollingModule, FormsModule, NgTemplateOutlet, RouterLink, JobDetailPanel, SourcePipe, TPipe],
   template: `
     <div class="flex items-baseline justify-between">
       <h1>{{ 'jobs.title' | t }}</h1>
       <span class="text-sm text-slate-500">{{ 'jobs.shown' | t: { n: num(rows().length) } }}</span>
     </div>
-
-    <app-hint id="jobs">{{ 'hint.jobs' | t }}</app-hint>
 
     <div class="mt-4 flex flex-wrap gap-3" role="search">
       <input class="input max-w-xs" type="search" [placeholder]="'jobs.searchPh' | t" [attr.aria-label]="'jobs.searchLabel' | t"
@@ -76,7 +75,7 @@ const STATES = ['filtered_out', 'below_threshold', 'awaiting_review', 'queued_ap
 
     <div class="mt-4" [class]="selected() !== null ? 'xl:pe-[36rem]' : ''">
       <div class="card p-0">
-        <div [class]="compact() ? 'grid-cols-[2.5rem_minmax(0,1fr)]' : 'grid-cols-[3rem_minmax(0,1fr)_7rem_5rem]'" class="grid gap-3 border-b border-slate-200 px-4 py-2 text-xs font-medium tracking-wide text-slate-500 uppercase rtl:tracking-normal dark:border-slate-800">
+        <div [class]="compact() ? 'grid-cols-[2.5rem_minmax(0,1fr)]' : 'grid-cols-[3rem_minmax(0,1fr)_7rem_5rem]'" class="grid gap-3 border-b border-slate-200 px-4 py-2.5 text-xs font-medium text-slate-500 dark:border-slate-800">
           <span>{{ 'jobs.col.score' | t }}</span><span>{{ 'jobs.col.job' | t }}</span>@if (!compact()) { <span>{{ 'jobs.col.state' | t }}</span><span class="text-end">{{ 'jobs.col.match' | t }}</span> }
         </div>
         @if (rows().length) {
@@ -85,19 +84,19 @@ const STATES = ['filtered_out', 'below_threshold', 'awaiting_review', 'queued_ap
                     [style.height.px]="rowHeight()"
                     [class]="compact() ? 'grid-cols-[2.5rem_minmax(0,1fr)]' : 'grid-cols-[3rem_minmax(0,1fr)_7rem_5rem]'"
                     class="grid w-full cursor-pointer items-center gap-3 border-b border-slate-100 px-4 text-start hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
-                    [class.bg-brand-50]="selected() === j.id" [attr.aria-pressed]="selected() === j.id">
+                    [class.is-picked]="selected() === j.id" [attr.aria-pressed]="selected() === j.id">
               <span>
-                @if (j.score) { <span class="badge tier-{{ j.tier }}">{{ num(j.score) }}</span> } @else { <span class="text-slate-400">–</span> }
+                @if (j.score) { <span class="badge tier-{{ j.tier }}">{{ num(j.score) }}</span> } @else { <span class="text-slate-500">–</span> }
               </span>
               <span class="min-w-0">
                 <span [class]="compact() ? 'line-clamp-2' : 'block truncate'" class="text-sm font-medium break-words" dir="auto">{{ j.title }}</span>
                 @if (!wide() && reasonOf(j); as why) {
                   <span class="mt-0.5 block"><ng-container *ngTemplateOutlet="chip; context: { $implicit: j, why: why, wrap: true }" /></span>
                 }
-                <span class="block truncate text-xs text-slate-500" dir="auto">@if (wide() && reasonOf(j); as why) { <ng-container *ngTemplateOutlet="chip; context: { $implicit: j, why: why, wrap: false }" /> }@if (risk(j); as r) { <span class="badge me-1.5 px-1.5 py-0 text-[11px] leading-4 {{ r.cls }}">{{ 'trust.badge.' + r.key | t }}</span> }@if (compact()) { <span>{{ 'common.state.' + j.state | t }} · </span> }<bdi>{{ j.company }}</bdi> · <bdi>{{ j.location }}</bdi> · <bdi>{{ j.source | src }}</bdi></span>
+                <span class="block truncate text-xs text-slate-500" dir="auto">@if (wide() && reasonOf(j); as why) { <ng-container *ngTemplateOutlet="chip; context: { $implicit: j, why: why, wrap: false }" /> }@if (risk(j); as r) { <span class="badge me-1.5 px-1.5 py-0 text-[11px] leading-4 {{ r.cls }}">{{ 'trust.badge.' + r.key | t }}</span> }@if (compact()) { <span>{{ 'common.state.' + j.state | t }}<span class="gap-dot"></span></span> }<bdi>{{ j.company }}</bdi><span class="gap-dot"></span><bdi>{{ j.location }}</bdi><span class="gap-dot"></span><bdi>{{ j.source | src }}</bdi></span>
               </span>
               @if (!compact()) {
-                <span class="truncate text-xs text-slate-600 dark:text-slate-400">{{ 'common.state.' + j.state | t }}</span>
+                <span class="min-w-0 text-xs text-slate-600 dark:text-slate-400">@if (stampOf[j.state]; as cls) { <span [class]="cls">{{ 'common.state.' + j.state | t }}</span> } @else { <span class="block truncate">{{ 'common.state.' + j.state | t }}</span> }</span>
                 <span class="text-end text-xs text-slate-500">{{ j.rank === null ? '' : num(j.rank, { style: 'percent', maximumFractionDigits: 0 }) }}</span>
               }
             </div>
@@ -110,7 +109,7 @@ const STATES = ['filtered_out', 'below_threshold', 'awaiting_review', 'queued_ap
       @if (selected(); as id) {
         <button type="button" tabindex="-1" aria-hidden="true" class="fixed inset-0 z-10 cursor-default bg-slate-900/30 xl:hidden" (click)="select(null)"></button>
         <aside class="fixed inset-y-0 end-0 z-20 w-full max-w-xl overflow-auto border-s border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900" [attr.aria-label]="'common.drawer.label' | t">
-          <button type="button" class="btn float-end ms-3 px-2 py-1" [attr.aria-label]="'common.drawer.close' | t" (click)="select(null)">✕</button>
+          <button type="button" class="btn float-end ms-3 px-2 py-1" [attr.aria-label]="'common.drawer.close' | t" (click)="select(null)"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
           <app-job-detail [jobId]="id" (changed)="load()" />
         </aside>
       }
@@ -137,6 +136,7 @@ export class JobsPage {
   private readonly params = toSignal(inject(ActivatedRoute).queryParamMap);
   private readonly loc = computed(() => localeOf(this.i18n.lang()));
   protected readonly states = STATES;
+  protected readonly stampOf = STAMP;
   private readonly all = signal<JobRow[]>([]);
   protected readonly hideRisky = signal(false);
   /** "Hide likely ghost/scam" drops the high bands only (a medium band is a hint, not a verdict). */

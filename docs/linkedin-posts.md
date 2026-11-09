@@ -17,7 +17,8 @@ or bypasses a check, and never comments, messages or reacts to anything.
 
 ## How posts are found
 
-1. For each keyword, Google is searched for `site:linkedin.com/posts <keyword>`, limited to the
+1. For each job title (the first 5 in **Jobs like**), Google is searched for
+   `site:linkedin.com/posts <title>`, limited to the
    last day or week. This runs in a real Chrome window with its own profile (named `google`,
    kept apart from the profiles used for applying), at a reading pace.
 2. Each result is opened only as far as Google's redirect, to learn the post's address. The
@@ -29,31 +30,31 @@ or bypasses a check, and never comments, messages or reacts to anything.
 
 If Google shows its "unusual traffic" check (a reCAPTCHA) or asks you to choose cookie
 settings, LinKit All **stops this source for the run**. The other sources carry on. The run log
-says why, and **Settings > Sources > LinkedIn hiring posts** shows a red note.
+says why, and **Needs you > Finish applications** shows a **Google check** card.
 
-1. Press **Solve Google check**. Chrome opens Google with the same profile the searches use.
+1. Press **Open Google**. Chrome opens Google with the same profile the searches use.
 2. Answer what Google shows yourself, then close the window.
-3. Run again.
+3. Press **Done**. The next run searches again.
 
-LinKit All never solves the check for you. If checks come often, use fewer keywords, run less
-often, or turn off **Run headless**.
+LinKit All never solves the check for you. If checks come often, use fewer job titles, run less
+often, or show the browser window (**Settings > Applying**).
 
 ## Settings
 
 | Setting | Meaning |
 |---|---|
-| **Search LinkedIn hiring posts** | The on/off switch (adds `linkedin_posts` to the enabled sources). |
-| **Keywords** | One per line, English or Arabic, for example `python developer hiring` or `مطلوب مهندس`. Each keyword is one Google search of up to 5 result pages. Only the first 5 keywords are used. |
-| **Posted within** | Last 24 hours or last week. Google is asked for this window, and posts older than it are dropped. |
-| **Max posts per keyword** | How many posts are read per keyword (default 30; Google gives at most 50). |
-| **Run headless** | On by default: no browser window during runs. Turn it off to watch the browser, or if Google asks for checks often. |
+| **LinkedIn hiring posts** | The switch in **Settings > Sources**, under Job sites (adds `linkedin_posts` to the enabled sources). The search words are your job titles from **Jobs like**. |
+| **LinkedIn posts within** | **Settings > Advanced**. Last 24 hours or last week (default). Google is asked for this window, and posts older than it are dropped. |
+| **LinkedIn posts per job title** | **Settings > Advanced**. How many posts are read per job title (default 50; Google gives at most 50). |
+| **Browser window** | **Settings > Applying**, the one window setting for applying and these searches. |
 
 ## What happens to a post
 
 - A post that points to a known applicant tracking system (Greenhouse, Lever, Ashby and so on) is
   sent straight to that system's plugin, like any pasted company link. No AI is used.
-- Other posts are read by your AI provider in batches of about ten. For each it extracts the
-  role, company, location, how to apply (email, form or link), the email and the link.
+- Other posts are read by the program, with no AI: an email address makes it an email
+  application, and any other link goes to the careers-page reader. The title comes from the
+  post's labelled or first line. One post gives one job, even if it lists several roles.
 - Posts from job seekers ("open to work") and posts without an email address or link
   ("DM me", "comment below") are dropped. The scam and ghost checks of the
   [trust filter](trust.md) apply to these jobs as well.
@@ -69,7 +70,7 @@ how to apply.
   vault (the one you saved for [email verification](setup.md)). The vault must be unlocked.
 - The message is short. The greeting and signature are written by the program, and the AI writes
   only the body, from your CV and profile. It cannot invent anything you did not provide.
-- Your tailored CV is attached as a PDF.
+- The subject is the job title, and your CV is attached as you uploaded it (not tailored).
 - **Dry run** (the default) sends nothing. It writes an `.eml` file you can open in a mail
   program, and shows the message in the job's panel.
 - **Live, confirm each** parks the job in the [Action Center](action-center.md) as a

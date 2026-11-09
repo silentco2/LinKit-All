@@ -29,10 +29,10 @@ export const routes: Routes = [
   { path: 'jobs', title: 'Jobs · LinKit All', loadComponent: () => import('./pages/jobs').then((m) => m.JobsPage) },
   { path: 'home', title: 'Home · LinKit All', loadComponent: () => import('./pages/home').then((m) => m.HomePage) },
   { path: 'needs-you', title: 'Needs you · LinKit All', loadComponent: () => import('./pages/needs-you').then((m) => m.NeedsYouPage) },
-  { path: 'activity', title: 'Activity · LinKit All', loadComponent: () => import('./pages/activity').then((m) => m.ActivityPage) },
   { path: 'review', redirectTo: tab('/needs-you', 'approve') },
   { path: 'actions', redirectTo: tab('/needs-you', 'finish') },
-  { path: 'live', redirectTo: tab('/activity') },
-  { path: 'report', redirectTo: tab('/activity', 'history') },
+  { path: 'activity', redirectTo: 'home' }, // its run view, schedule and report are on Home now
+  { path: 'live', redirectTo: 'home' },
+  { path: 'report', redirectTo: 'home' },
   { path: '**', redirectTo: 'home' },
 ];

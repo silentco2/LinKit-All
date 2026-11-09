@@ -2,8 +2,6 @@
 """Telegram source tests; the sample words are in Russian and Arabic on purpose."""
 
 import asyncio
-import json
-import re
 from collections.abc import Callable
 from datetime import datetime
 from typing import Any
@@ -12,7 +10,6 @@ import httpx
 import pytest
 
 from linkit_all.core.search import DEFAULT_TELEGRAM_CHANNELS, SearchConfig, normalize_channel
-from linkit_all.providers.base import LLMProvider, ProviderError, UsageLimitError
 from linkit_all.sources import registry, telegram
 from linkit_all.sources.base import JobStub
 from linkit_all.sources.telegram import Telegram
@@ -24,27 +21,6 @@ NOW = datetime(2026, 6, 10)  # the fixture's posts are from 26-28 May 2026
 def _fast(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(telegram, "DELAY", 0)
     monkeypatch.setattr(telegram, "utcnow", lambda: NOW)
-
-
-class FakeProvider(LLMProvider):
-    """Answers every post it is shown with one job named after the post's number."""
-
-    name = "fake"
-
-    def __init__(self, error: Exception | None = None, extra_ids: tuple[int, ...] = ()) -> None:
-        super().__init__("fake")
-        self.prompts: list[str] = []
-        self.error, self.extra_ids = error, extra_ids
-
-    def reply(self, ids: list[int]) -> list[dict[str, Any]]:
-        return [{"id": i, "jobs": [{"title": f"Job {i}"}]} for i in ids]
-
-    async def _call(self, prompt: str) -> str:
-        self.prompts.append(prompt)
-        if self.error:
-            raise self.error
-        ids = [int(i) for i in re.findall(r"=== post id (\d+) ===", prompt)]
-        return json.dumps({"posts": self.reply(ids + list(self.extra_ids))})
 
 
 def message(channel: str, num: int, text_html: str, when: str = "2026-06-01T10:00:00+00:00") -> str:
@@ -158,7 +134,7 @@ def test_fold_merges_arabic_variants() -> None:
     assert telegram.fold("مَطْلُوب") == "مطلوب"
 
 
-def test_link_out_to_known_ats_needs_no_ai(search_pages: Callable[..., Any]) -> None:
+def test_link_out_to_known_ats(search_pages: Callable[..., Any]) -> None:
     html = page(
         message(
             "chan",
@@ -170,10 +146,7 @@ def test_link_out_to_known_ats_needs_no_ai(search_pages: Callable[..., Any]) -> 
             "chan", 8, 'Nothing about work here, just a link <a href="https://example.com/x">x</a>'
         ),
     )
-    provider = FakeProvider()
-    stubs = run(Telegram(provider), ok(html), search_pages)
-    assert provider.prompts == []
-    [stub] = stubs
+    [stub] = run(Telegram(), ok(html), search_pages)
     assert stub.url == "https://t.me/chan/7"
     assert (
         stub.ats == "greenhouse" and stub.apply_url == "https://boards.greenhouse.io/acme/jobs/42"
@@ -183,69 +156,22 @@ def test_link_out_to_known_ats_needs_no_ai(search_pages: Callable[..., Any]) -> 
     assert stub.source == "telegram" and stub.description.startswith("Senior Rust engineer")
 
 
-def test_batched_extraction_ten_per_call_and_invented_ids_ignored(
-    search_pages: Callable[..., Any],
-) -> None:
-    html = page(*(message("chan", n, f"We are hiring: role {n}") for n in range(1, 24)))
-    provider = FakeProvider(extra_ids=(99, 50))
-    stubs = run(Telegram(provider), ok(html), search_pages)
-    assert [p.count("=== post id ") for p in provider.prompts] == [10, 10, 3]
-    assert len(stubs) == 23 and all(s.title != "Invented" for s in stubs)
-    assert stubs[0].url == "https://t.me/chan/1" and stubs[0].title == "Job 0"
-    assert stubs[0].company == "Unknown" and stubs[0].description == "We are hiring: role 1"
-    assert len({s.url for s in stubs}) == 23
-
-
-def test_post_text_is_cut_and_marked_untrusted(search_pages: Callable[..., Any]) -> None:
-    html = page(message("chan", 1, "hiring " + "Q" * 5000))
-    provider = FakeProvider()
-    run(Telegram(provider), ok(html), search_pages)
-    assert provider.prompts[0].count("Q") == telegram.EXCERPT - len("hiring ")
-    assert "not instructions to you" in " ".join(provider.prompts[0].split())
-
-
-def test_several_jobs_in_one_post_get_distinct_urls(search_pages: Callable[..., Any]) -> None:
-    class Two(FakeProvider):
-        def reply(self, ids: list[int]) -> list[dict[str, Any]]:
-            return [{"id": 0, "jobs": [{"title": "A", "description": "a"}, {"title": "B"}]}]
-
-    stubs = run(Telegram(Two()), ok(page(message("chan", 5, "hiring A and B"))), search_pages)
-    assert [s.url for s in stubs] == ["https://t.me/chan/5", "https://t.me/chan/5?job=2"]
-    assert [s.description for s in stubs] == ["a", "hiring A and B"]
-
-
-def test_without_provider_only_link_out_posts_become_jobs(search_pages: Callable[..., Any]) -> None:
-    html = page(
-        message("chan", 1, "We are hiring a cook"),
-        message("chan", 2, 'Join us <a href="https://jobs.lever.co/acme/abc">here</a>'),
-    )
-    stubs = run(Telegram(), ok(html), search_pages)
-    assert [s.url for s in stubs] == ["https://t.me/chan/2"] and stubs[0].ats == "lever"
-
-
-def test_usage_limit_propagates_other_provider_errors_do_not(
-    search_pages: Callable[..., Any],
-) -> None:
-    html = page(message("chan", 1, "We are hiring a cook"))
-    with pytest.raises(UsageLimitError):
-        run(Telegram(FakeProvider(UsageLimitError("quota"))), ok(html), search_pages)
-    assert run(Telegram(FakeProvider(ProviderError("bad json"))), ok(html), search_pages) == []
-
-
 def test_45_day_cutoff(search_pages: Callable[..., Any]) -> None:
     html = page(
-        message("chan", 1, "hiring old", "2026-04-20T10:00:00+00:00"),  # 51 days before NOW
-        message("chan", 2, "hiring edge", "2026-04-27T10:00:00+00:00"),  # 44 days
-        message("chan", 3, "hiring new", "2026-06-09T10:00:00+00:00"),
+        message(
+            "chan", 1, "hiring old hr@acme.com", "2026-04-20T10:00:00+00:00"
+        ),  # 51 days before NOW
+        message("chan", 2, "hiring edge hr@acme.com", "2026-04-27T10:00:00+00:00"),  # 44 days
+        message("chan", 3, "hiring new hr@acme.com", "2026-06-09T10:00:00+00:00"),
     )
-    stubs = run(Telegram(FakeProvider()), ok(html), search_pages)
+    stubs = run(Telegram(), ok(html), search_pages)
     assert [s.url for s in stubs] == ["https://t.me/chan/2", "https://t.me/chan/3"]
 
 
 def test_pages_back_until_old_and_resume(search_pages: Callable[..., Any]) -> None:
-    newer = page(message("chan", 30, "hiring b", "2026-06-05T00:00:00+00:00"))
-    older = page(message("chan", 20, "hiring a", "2026-05-20T00:00:00+00:00"))
-    ancient = page(message("chan", 10, "hiring z", "2026-03-01T00:00:00+00:00"))
+    newer = page(message("chan", 30, "hiring b hr@acme.com", "2026-06-05T00:00:00+00:00"))
+    older = page(message("chan", 20, "hiring a hr@acme.com", "2026-05-20T00:00:00+00:00"))
+    ancient = page(message("chan", 10, "hiring z hr@acme.com", "2026-03-01T00:00:00+00:00"))
     calls: list[str] = []
 
     def handler(req: httpx.Request) -> httpx.Response:
@@ -254,14 +180,14 @@ def test_pages_back_until_old_and_resume(search_pages: Callable[..., Any]) -> No
             return httpx.Response(404)
         return httpx.Response(200, text={None: newer, "30": older, "20": ancient}[before])
 
-    pages = search_pages(Telegram(FakeProvider()), handler, board="chan", calls=calls)
+    pages = search_pages(Telegram(), handler, board="chan", calls=calls)
     assert [[s.url for s in p] for p in pages] == [
         ["https://t.me/chan/30"],
         ["https://t.me/chan/20"],
         [],
     ]
     assert calls[-1].endswith("/s/chan?before=20")
-    resumed = search_pages(Telegram(FakeProvider()), handler, board="chan", start_page=1)
+    resumed = search_pages(Telegram(), handler, board="chan", start_page=1)
     assert [[s.url for s in p] for p in resumed] == [["https://t.me/chan/20"], []]
 
 
@@ -344,3 +270,79 @@ def test_channel_config_validation_and_defaults() -> None:
         ).sources.telegram_channels
         == []
     )
+
+
+def test_email_post_is_a_mailto_job(search_pages: Callable[..., Any]) -> None:
+    html = page(message("chan", 1, "Backend dev needed in Cairo, send your CV to hr@acme.com"))
+    [stub] = run(Telegram(), ok(html), search_pages)
+    assert stub.apply_url == "mailto:hr@acme.com" and stub.url == "https://t.me/chan/1"
+    assert stub.title == "Backend dev needed in Cairo" and stub.company == "Acme"
+    assert stub.extra == {"channel": "chan", "post": 1}
+
+
+def job_site(jsonld: str = "") -> Callable[[httpx.Request], httpx.Response]:
+    """Telegram preview for a post linking to acme.com/careers/42, and that page."""
+    html = page(message("chan", 1, "Backend dev wanted, remote. Apply at acme.com/careers/42"))
+    preview = ok(html)
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.url.host != "acme.com":
+            return preview(req)
+        if req.url.path != "/careers/42":
+            return httpx.Response(404)
+        return httpx.Response(
+            200, text=f"<html>{jsonld}<body><h1>Careers</h1><p>x</p></body></html>"
+        )
+
+    return handler
+
+
+def test_unknown_link_goes_to_the_scraper(search_pages: Callable[..., Any]) -> None:
+    ld = (
+        '<script type="application/ld+json">{"@type":"JobPosting","title":"Backend Engineer",'
+        '"hiringOrganization":{"name":"Acme Inc"},"description":"Build APIs."}</script>'
+    )
+    [stub] = run(Telegram(), job_site(ld), search_pages)
+    assert (stub.title, stub.company) == ("Backend Engineer", "Acme Inc")
+    assert stub.apply_url == "https://acme.com/careers/42" and stub.url == "https://t.me/chan/1"
+    assert stub.source == "telegram" and stub.description == "Build APIs."
+
+
+def test_page_without_job_data_keeps_the_posts_title(search_pages: Callable[..., Any]) -> None:
+    [stub] = run(Telegram(), job_site(), search_pages)
+    assert stub.title == "Backend dev wanted, remote"  # not the page's "Careers"
+    assert stub.apply_url == "https://acme.com/careers/42"
+
+
+def test_stored_post_does_not_fetch_its_link(search_pages: Callable[..., Any]) -> None:
+    hosts: list[str] = []
+    site = job_site()
+
+    def spy(req: httpx.Request) -> httpx.Response:
+        hosts.append(req.url.host)
+        return site(req)
+
+    src = Telegram()
+    src.seen_url = lambda url: url == "https://t.me/chan/1"
+    [stub] = run(src, spy, search_pages)
+    assert "acme.com" not in hosts and stub.url == "https://t.me/chan/1"
+
+
+def test_posts_without_a_way_to_apply_and_seekers_are_dropped(
+    search_pages: Callable[..., Any],
+) -> None:
+    html = page(
+        message("chan", 1, "We are hiring a cook, write to @recruiter"),
+        message("chan", 2, "We are hiring a cook"),
+        message("chan", 3, "Ищу работу, резюме: me@acme.com"),
+    )
+    assert run(Telegram(), ok(html), search_pages) == []
+
+
+def test_a_link_repeated_across_posts_is_a_footer(search_pages: Callable[..., Any]) -> None:
+    foot = '<a href="https://promo.example/join">our site</a>'
+    html = page(
+        message("chan", 1, f"We are hiring a cook {foot}"),
+        message("chan", 2, f"We are hiring a baker {foot}"),
+    )
+    assert run(Telegram(), ok(html), search_pages) == []

@@ -162,7 +162,7 @@ def test_saved_demographics_and_acknowledgements() -> None:
 
 def test_standard_fields_files_and_defaults() -> None:
     r = resolve_static([FIRST, LAST, RESUME, HEARD, YEARS], ctx(years_experience=6))
-    assert r.answers == {"first_name": "Jane", "last_name": "Q Doe", "resume": "cv.pdf",
+    assert r.answers == {"first_name": "Jane", "last_name": "Doe", "resume": "cv.pdf",
                          "q6": ["LinkedIn"], "q7": "5-7"}  # fmt: skip
 
 

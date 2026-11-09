@@ -1,9 +1,10 @@
-import { Component, computed, effect, ElementRef, inject, OnDestroy, signal } from '@angular/core';
+import { Component, computed, effect, ElementRef, inject, OnDestroy, signal, WritableSignal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Api, ApiError } from '../api';
 import { AllClear } from '../components/all-clear';
 import { Toast } from '../components/toast';
-import { I18n, TPipe } from '../i18n';
+import { I18n, SourcePipe, TPipe } from '../i18n';
 import { Live } from '../live';
 import { fmtNum, localeOf } from '../locale';
 import { Shell } from '../shell';
@@ -47,15 +48,27 @@ const SHORTCUTS: [string, string][] = [
     '(document:keydown)': 'onKey($event)',
     '(window:beforeunload)': 'flushAll(true)',
   },
-  imports: [AllClear, JobDetailPanel, Toast, TPipe],
+  imports: [AllClear, FormsModule, JobDetailPanel, SourcePipe, Toast, TPipe],
   template: `
-    <p class="text-sm text-slate-500">{{ 'review.intro' | t }} <button type="button" class="text-brand-600 hover:underline max-sm:min-h-10" (click)="help.set(true)">{{ 'review.keys.link' | t }}</button></p>
+    <p class="text-sm text-slate-500">{{ 'review.intro' | t }} <button type="button" class="text-brand-600 dark:text-brand-300 hover:underline max-sm:min-h-10" (click)="help.set(true)">{{ 'review.keys.link' | t }}</button></p>
 
     <div class="mt-5 flex flex-wrap gap-2" role="tablist">
       @for (t of tabs; track t.id) {
         <button type="button" role="tab" class="btn" [class.btn-primary]="tab() === t.id" [attr.aria-selected]="tab() === t.id"
-                (click)="tab.set(t.id); load()">{{ t.label | t }}</button>
+                (click)="tab.set(t.id); clearFilters(); load()">{{ t.label | t }}</button>
       }
+    </div>
+
+    <div class="mt-4 flex flex-wrap gap-3" role="search">
+      <input class="input max-w-xs" type="search" [placeholder]="'jobs.searchPh' | t" [attr.aria-label]="'jobs.searchLabel' | t" [ngModel]="q()" (ngModelChange)="setFilter(q, $event)">
+      <select class="input w-40" [attr.aria-label]="'jobs.filter.source' | t" [ngModel]="source()" (ngModelChange)="setFilter(source, $event)">
+        <option value="">{{ 'jobs.filter.allSources' | t }}</option>
+        @for (s of sources(); track s) { <option [value]="s">{{ s | src }}</option> }
+      </select>
+      <select class="input w-40" [attr.aria-label]="'review.filter.allModes' | t" [ngModel]="mode()" (ngModelChange)="setFilter(mode, $event)">
+        <option value="">{{ 'review.filter.allModes' | t }}</option>
+        @for (m of modes; track m) { <option [value]="m">{{ 'mode.' + m | t }}</option> }
+      </select>
     </div>
 
     <div class="sr-only" aria-live="polite" role="status">{{ announce() }}</div>
@@ -85,7 +98,7 @@ const SHORTCUTS: [string, string][] = [
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
                   <div class="truncate font-medium" dir="auto">{{ j.title }}</div>
-                  <div class="truncate text-sm text-slate-500" dir="auto"><bdi>{{ j.company }}</bdi> · <bdi>{{ j.location }}</bdi></div>
+                  <div class="truncate text-sm text-slate-500" dir="auto"><bdi>{{ j.company }}</bdi> <span class="gap-dot"></span><bdi>{{ j.location }}</bdi></div>
                 </div>
                 <div class="flex shrink-0 flex-wrap items-center justify-end gap-2 max-sm:max-w-[45%]">
                   @if (j.reason) { <span class="badge tier-low text-start whitespace-normal" dir="auto">{{ why(j) }}</span> }
@@ -102,20 +115,21 @@ const SHORTCUTS: [string, string][] = [
               <div class="mt-2 flex flex-wrap items-center gap-3">
                 <button type="button" class="btn px-3 py-1 max-sm:min-h-10" (click)="queue('approve', [j.id])">{{ 'review.approveBtn' | t }}</button>
                 <button type="button" class="btn btn-danger px-3 py-1 max-sm:min-h-10" (click)="queue('reject', [j.id])">{{ 'review.skipBtn' | t }}</button>
-                <button type="button" class="text-sm text-brand-600 hover:underline max-sm:min-h-10 max-sm:px-2" (click)="open.set(j.id)">{{ 'review.details' | t }}</button>
+                <button type="button" class="text-sm text-brand-600 dark:text-brand-300 hover:underline max-sm:min-h-10 max-sm:px-2" (click)="open.set(j.id)">{{ 'review.details' | t }}</button>
               </div>
             </div>
           </li>
         } @empty {
           <li>
-            @if (tab() === 'awaiting_review') { <app-all-clear /> }
+            @if (filtering()) { <div class="card text-center text-sm text-slate-500">{{ 'review.noMatch' | t }}</div> }
+            @else if (tab() === 'awaiting_review') { <app-all-clear /> }
             @else { <div class="card text-center text-sm text-slate-500">{{ 'review.empty.low' | t }}</div> }
           </li>
         }
       </ul>
       @if (open(); as id) {
         <aside class="fixed inset-y-0 end-0 z-20 w-full max-w-xl overflow-auto border-s border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900" [attr.aria-label]="'common.drawer.label' | t">
-          <button type="button" class="btn float-end ms-3 px-2 py-1" [attr.aria-label]="'common.drawer.close' | t" (click)="open.set(null)">✕</button>
+          <button type="button" class="btn float-end ms-3 px-2 py-1" [attr.aria-label]="'common.drawer.close' | t" (click)="open.set(null)"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
           <app-job-detail [jobId]="id" (changed)="load()" />
         </aside>
       }
@@ -126,7 +140,7 @@ const SHORTCUTS: [string, string][] = [
         <div class="card w-full max-w-sm" role="dialog" aria-modal="true" aria-labelledby="review-keys" (click)="$event.stopPropagation()">
           <div class="flex items-center justify-between gap-3">
             <h2 id="review-keys">{{ 'review.keys.title' | t }}</h2>
-            <button type="button" class="btn px-2 py-1" [attr.aria-label]="'common.drawer.close' | t" (click)="help.set(false)">✕</button>
+            <button type="button" class="btn px-2 py-1" [attr.aria-label]="'common.drawer.close' | t" (click)="help.set(false)"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
           </div>
           <dl class="mt-4 grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 text-sm">
             @for (s of shortcuts; track s[0]) {
@@ -160,7 +174,20 @@ export class ReviewPage implements OnDestroy {
   protected readonly jobs = signal<JobRow[]>([]);
   /** Jobs approved or skipped a moment ago: gone from the list, still waiting to be sent. */
   private readonly hidden = signal(new Set<number>());
-  protected readonly shown = computed(() => this.jobs().filter((j) => !this.hidden().has(j.id)));
+  protected readonly q = signal('');
+  protected readonly source = signal('');
+  protected readonly mode = signal('');
+  protected readonly modes = ['remote', 'hybrid', 'onsite'];
+  protected readonly filtering = computed(() => !!(this.q().trim() || this.source() || this.mode()));
+  protected readonly sources = computed(() => [...new Set(this.jobs().map((j) => j.source))].sort());
+  /** What the filters leave: "select all", the shortcuts and the counts all work on this list. */
+  protected readonly shown = computed(() => {
+    const q = this.q().trim().toLowerCase();
+    return this.jobs().filter((j) => !this.hidden().has(j.id)
+      && (!this.source() || j.source === this.source())
+      && (!this.mode() || j.remote === this.mode())
+      && (!q || `${j.title} ${j.company} ${j.location}`.toLowerCase().includes(q)));
+  });
   protected readonly picked = signal(new Set<number>());
   protected readonly open = signal<number | null>(null);
   protected readonly focus = signal<number | null>(null);
@@ -196,6 +223,16 @@ export class ReviewPage implements OnDestroy {
     this.jobs.set(await this.api.get<JobRow[]>(`/jobs?state=${this.tab()}`));
     const f = this.focus();
     if (f !== null && !this.shown().some((j) => j.id === f)) this.focus.set(null);
+  }
+
+  /** A changed filter drops the ticks, so a bulk action never touches a job out of view. */
+  protected setFilter(filter: WritableSignal<string>, value: string): void {
+    filter.set(value);
+    this.picked.set(new Set());
+  }
+
+  protected clearFilters(): void {
+    for (const filter of [this.q, this.source, this.mode]) filter.set('');
   }
 
   toggle(id: number): void {
@@ -295,14 +332,14 @@ export class ReviewPage implements OnDestroy {
     }, 15_000);
   }
 
-  /** Send what is still in the Undo window, then start the apply stage and show it on Activity. */
+  /** Send what is still in the Undo window, then start the apply stage and show it on Home. */
   protected async applyNow(): Promise<void> {
     this.error.set('');
     try {
       await Promise.all([...this.pending].map((b) => this.send(b, false)));
       this.toast.set('');
       await this.api.post('/runs', { stages: APPLY_STAGES, new: false });
-      await this.router.navigate(['/activity']);
+      await this.router.navigate(['/home']);
     } catch (e) {
       // a missing tool (409 + code): Home has the offer to install it or to use the CV as it is
       if (e instanceof ApiError && e.code) await this.router.navigate(['/']);

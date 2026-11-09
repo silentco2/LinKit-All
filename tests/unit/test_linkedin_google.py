@@ -190,8 +190,10 @@ class FakeHttp:
 
 
 def cfg(**sources: Any) -> SearchConfig:
-    base = {"enabled": ["linkedin_posts"], "linkedin_keywords": ["python", "data"]}
-    return SearchConfig.model_validate({"sources": base | sources})
+    base = {"enabled": ["linkedin_posts"]}
+    return SearchConfig.model_validate(
+        {"sources": base | sources, "search": {"queries": ["python", "data"]}}
+    )
 
 
 async def collect(src: LinkedInPosts, http: FakeHttp, task: Any) -> list[Any]:
@@ -201,8 +203,9 @@ async def collect(src: LinkedInPosts, http: FakeHttp, task: Any) -> list[Any]:
 def test_source_is_registered_and_opt_in(tmp_path: Path) -> None:
     src = registry(data_dir=tmp_path)["linkedin_posts"]
     assert not src.is_enabled(cfg(enabled=[])) and src.is_enabled(cfg())
-    keys = ["a", "A ", "b", "c", "d", "e", "f"]
-    tasks = src.tasks(cfg(linkedin_keywords=keys, linkedin_window="day"))
+    c = cfg(linkedin_window="day")
+    c.search.queries = ["a", "A ", "b", "c", "d", "e", "f"]
+    tasks = src.tasks(c)
     assert [t.query for t in tasks] == ["a", "A", "b", "c", "d"]  # deduped, at most 5
     assert {t.posted_within_days for t in tasks} == {1}
 
@@ -213,7 +216,7 @@ def test_source_reads_posts_and_skips_old_ones(
     monkeypatch.setattr(
         "linkit_all.sources.linkedin_posts.source.utcnow", lambda: datetime(2026, 10, 31)
     )
-    src = LinkedInPosts(None, tmp_path)
+    src = LinkedInPosts(tmp_path)
     old = "https://www.linkedin.com/posts/x-activity-7000000000000000000-ab"  # 2022
     src._google = FakeGoogle([POST, old, POST])  # type: ignore[assignment]
     check_flag(tmp_path).parent.mkdir(parents=True)
@@ -228,11 +231,11 @@ def test_source_reads_posts_and_skips_old_ones(
 
 
 def test_source_stops_for_the_run_on_a_check(tmp_path: Path) -> None:
-    src = LinkedInPosts(None, tmp_path)
+    src = LinkedInPosts(tmp_path)
     fake = FakeGoogle(g.GoogleBlocked("check"))
     src._google = fake  # type: ignore[assignment]
     tasks = src.tasks(cfg())
-    with pytest.raises(Unsupported, match="Solve Google check"):
+    with pytest.raises(Unsupported, match="Needs you"):
         asyncio.run(collect(src, FakeHttp(), tasks[0]))
     assert check_flag(tmp_path).exists()
     with pytest.raises(Unsupported):
@@ -263,10 +266,32 @@ def test_google_check_endpoints(client: TestClient, monkeypatch: pytest.MonkeyPa
         client.app.state.user_browser._opening = True  # type: ignore[attr-defined]
 
     monkeypatch.setattr("linkit_all.apply.browser.UserBrowser.open", fake_open)
-    body = {"sources": {"linkedin_keywords": ["python hiring"]}}
+    body = {"search": {"queries": ["python hiring"]}}
     assert client.put("/api/search", json=body, headers={"origin": BASE}).status_code == 200
     assert client.post("/api/linkedin/google-check").status_code == 201
     assert opened[0][0] == data / "browser" / "google"
     assert parse_qs(urlsplit(opened[0][1]).query)["q"] == ["site:linkedin.com/posts python hiring"]
     assert client.post("/api/linkedin/google-check").status_code == 409  # one window at a time
     client.app.state.user_browser._opening = False  # type: ignore[attr-defined]
+
+    status = lambda: client.get("/api/status").json()["google_check"]  # noqa: E731
+    assert status() is False  # the source is off: no card
+    on = {"sources": {"enabled": ["linkedin_posts"]}}
+    assert client.put("/api/search", json=on, headers={"origin": BASE}).status_code == 200
+    assert status() is True
+    assert client.delete("/api/linkedin/google-check", headers={"origin": BASE}).status_code == 204
+    assert status() is False and not check_flag(data).exists()
+
+
+def test_google_sign_in_opens_the_form_agents_profile(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    data = client.app.state.settings.data_dir  # type: ignore[attr-defined]
+    opened: list[tuple[Path, str]] = []
+
+    async def fake_open(self: object, profile: Path, url: str, item_id: int) -> None:
+        opened.append((profile, url))
+
+    monkeypatch.setattr("linkit_all.apply.browser.UserBrowser.open", fake_open)
+    assert client.post("/api/google/sign-in", headers={"origin": BASE}).status_code == 201
+    assert opened == [(data / "browser" / "generic", "https://accounts.google.com/")]
