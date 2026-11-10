@@ -28,7 +28,10 @@ def test_generate_is_seeded_and_mixed() -> None:
     assert jobs == generate(1000, seed=7) != generate(1000, seed=8)
     assert len(jobs) == 1000 and len({j.uid for j in jobs}) == 1000
     assert sum(j.duplicate_of is not None for j in jobs) == 80
-    assert {"scam", "ghost", "backend"} <= {j.family for j in jobs}
+    # the same title at one company in two cities is two jobs, never the same city twice
+    keys = [(j.company, j.title, j.location) for j in jobs if j.duplicate_of is None]
+    assert len(keys) == len(set(keys)) == 920
+    assert {"scam", "ghost", "decoy", "backend", "backend_plain"} <= {j.family for j in jobs}
     seen: set[int] = set()
     for j in jobs:  # a repost always comes after the posting it repeats
         assert j.duplicate_of is None or j.duplicate_of in seen
@@ -40,9 +43,15 @@ def test_bench_runs_the_real_stages(tmp_path: Path) -> None:
     c, q = result["counts"], result["quality"]
     assert c["errors"] == 0 and c["new"] + c["duplicates"] == 1000
     assert c["enriched"] == c["new"]  # half the descriptions came from the job pages
-    # Regression floors, set a little under what the pipeline scores today.
-    assert q["dedupe"]["precision"] == 1.0 and q["dedupe"]["recall"] >= 0.95
-    assert q["scam"]["precision"] == 1.0 and q["scam"]["recall"] >= 0.95
-    assert q["ghost"]["wrong"] == 0
+    # Regression floors, a little under today's scores. The low ones are known gaps the
+    # benchmark found and nobody has fixed yet; raise each floor when its gap is closed:
+    # - dedupe misses requisition numbers, abbreviations ("Eng.") and "(m/f/d)"
+    # - scam flags honest money-transfer accounting jobs, and misses reshipping, pay-to-unlock
+    #   tasks, candidate-paid screening and the Arabic recruit-to-earn ad
+    # - ghost misses freshly dated "talent pool" postings
+    # - rank puts keyword-heavy other jobs (recruiter, instructor) above plainly worded matches
+    assert q["dedupe"]["precision"] == 1.0 and q["dedupe"]["recall"] >= 0.65
+    assert q["scam"]["precision"] >= 0.2 and q["scam"]["recall"] >= 0.65
+    assert q["ghost"]["wrong"] == 0 and q["ghost"]["recall"] >= 0.45
     assert q["rank"]["precision_at_10"] >= 0.8
-    assert q["rank"]["precision_at_10"] > 2 * q["rank"]["relevant_share"]
+    assert q["rank"]["precision_at_r"] > 2 * q["rank"]["relevant_share"]

@@ -373,7 +373,8 @@ def bench(
     r = q["rank"]
     typer.echo(
         f"rank    top 10: {r['precision_at_10']:.0%}  top 50: {r['precision_at_50']:.0%} "
-        f"relevant ({r['relevant_share']:.0%} by chance)"
+        f"relevant ({r['relevant_share']:.0%} by chance), "
+        f"all {r['relevant']} relevant on top: {r['precision_at_r']:.0%}"
     )
     typer.echo(f"Numbers: {out}")
 

@@ -6,6 +6,7 @@ ponytail: score, tailor and apply are not benchmarked yet; add them with the fak
 """
 
 import time
+from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -38,18 +39,32 @@ def _pr(tp: int, fp: int, fn: int) -> dict[str, float | int]:
     }
 
 
+def _top(titles: list[str], n: int = 8) -> dict[str, int]:
+    """The most common titles: enough to see which kind of case went wrong."""
+    return dict(Counter(titles).most_common(n))
+
+
 def quality(jobs: list[FakeJob], stored: dict[int, Job]) -> dict[str, Any]:
     """Compare what the pipeline did (`stored`: fake uid -> Job row) with the ground truth."""
+    by_uid = {j.uid: j for j in jobs}
     dropped = [j for j in jobs if j.uid not in stored]
-    dedupe = _pr(
+    kept_dups = [j for j in jobs if j.duplicate_of is not None and j.uid in stored]
+    dedupe: dict[str, Any] = _pr(
         sum(j.duplicate_of is not None for j in dropped),
         sum(j.duplicate_of is None for j in dropped),
-        sum(j.duplicate_of is not None and j.uid in stored for j in jobs),
+        len(kept_dups),
     )
+    dedupe["missed_examples"] = [f"{j.title} | {j.location}" for j in kept_dups[:8]]
+    dedupe["wrong_examples"] = [
+        f"{j.title} | {j.location}" for j in dropped if j.duplicate_of is None
+    ][:8]
 
-    def trust(family: str, flagged: set[int]) -> dict[str, float | int]:
+    def trust(family: str, flagged: set[int]) -> dict[str, Any]:
         truth = {j.uid for j in jobs if j.family == family and j.uid in stored}
-        return _pr(len(truth & flagged), len(flagged - truth), len(truth - flagged))
+        out: dict[str, Any] = _pr(len(truth & flagged), len(flagged - truth), len(truth - flagged))
+        out["missed_titles"] = _top([by_uid[u].title for u in sorted(truth - flagged)])
+        out["wrong_titles"] = _top([by_uid[u].title for u in sorted(flagged - truth)])
+        return out
 
     scam = {u for u, j in stored.items() if j.data.get("trust_filter") == "scam"}
     ghost = {
@@ -57,15 +72,18 @@ def quality(jobs: list[FakeJob], stored: dict[int, Job]) -> dict[str, Any]:
         for u, j in stored.items()
         if j.data.get("trust_filter") == "ghost" or j.data.get("trust", {}).get("ghost_demoted")
     }
-    relevant = {j.uid for j in jobs if j.relevant}
-    ranked = sorted(
-        ((u, j) for u, j in stored.items() if j.state == JobState.ranked),
-        key=lambda t: (-t[1].data["rank"], t[0]),
-    )
-    hits = [u in relevant for u, _ in ranked]
+    ranked = [
+        u
+        for u, j in sorted(
+            ((u, j) for u, j in stored.items() if j.state == JobState.ranked),
+            key=lambda t: (-t[1].data["rank"], t[0]),
+        )
+    ]
+    hits = [by_uid[u].relevant for u in ranked]
+    r = sum(hits)  # with a perfect ranking, the top `r` are exactly the relevant jobs
 
     def at(k: int) -> float:
-        return round(sum(hits[:k]) / min(k, len(hits)), 4) if hits else 0.0
+        return round(sum(hits[:k]) / min(k, len(hits)), 4) if hits and k else 0.0
 
     return {
         "dedupe": dedupe,
@@ -73,9 +91,16 @@ def quality(jobs: list[FakeJob], stored: dict[int, Job]) -> dict[str, Any]:
         "ghost": trust("ghost", ghost),
         "rank": {
             "ranked": len(hits),
-            "relevant_share": round(sum(hits) / len(hits), 4) if hits else 0.0,  # the baseline
+            "relevant": r,
+            "relevant_share": round(r / len(hits), 4) if hits else 0.0,  # the baseline
             "precision_at_10": at(10),
             "precision_at_50": at(50),
+            "precision_at_r": at(r),
+            # what sits in the top r that should not, and what was pushed out of it
+            "intruders": dict(
+                Counter(by_uid[u].family for u in ranked[:r] if not by_uid[u].relevant)
+            ),
+            "pushed_out": dict(Counter(by_uid[u].family for u in ranked[r:] if by_uid[u].relevant)),
         },
     }
 
