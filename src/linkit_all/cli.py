@@ -348,9 +348,14 @@ def bench(
     jobs: Annotated[int, typer.Option(min=10, help="Fake jobs to generate.")] = 10000,
     seed: Annotated[int, typer.Option(help="Same seed, same jobs.")] = 1,
     out: Annotated[Path, typer.Option(help="Where to write the numbers.")] = Path("bench.json"),
+    apply: Annotated[
+        int,
+        typer.Option(min=0, help="Also fill this many fake application forms (needs a browser)."),
+    ] = 0,
 ) -> None:
-    """Measure finding and ranking on a built-in fake job board. Touches none of your data
-    and no real site; uses no AI."""
+    """Measure finding and ranking on a built-in fake job board, and with --apply the form
+    filling too (practice mode: nothing is submitted). Touches none of your data and no real
+    site; the AI is a scripted stand-in."""
     import json
     import tempfile
 
@@ -362,7 +367,7 @@ def bench(
     embed = Embedder(settings.embedding_model, settings.data_dir / "models")
     # ignore_cleanup_errors: Windows may still hold the SQLite file when the folder goes
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
-        result = asyncio.run(run_bench(jobs, seed, embed, Path(tmp)))
+        result = asyncio.run(run_bench(jobs, seed, embed, Path(tmp), apply))
     out.write_text(json.dumps(result, indent=2), encoding="utf-8")
     q, t = result["quality"], result["timing"]
     typer.echo(f"{jobs} jobs in {t['total_s']} s ({t['jobs_per_minute']} jobs/minute)")
@@ -376,6 +381,12 @@ def bench(
         f"relevant ({r['relevant_share']:.0%} by chance), "
         f"all {r['relevant']} relevant on top: {r['precision_at_r']:.0%}"
     )
+    if a := result.get("apply"):
+        typer.echo(
+            f"apply   {a['right_outcome']}/{a['attempted']} forms ended as they should, "
+            f"fields right {a['fields_right']}, trap fields left empty {a['traps_left_empty']}, "
+            f"sensitive questions sent to the AI: {len(a['sensitive_sent_to_ai'])}"
+        )
     typer.echo(f"Numbers: {out}")
 
 
