@@ -250,6 +250,33 @@ def test_text_only_never_reaches_likely() -> None:
     assert {"vague_description", "evergreen_language", "vague_title"} <= set(codes(v))
 
 
+@pytest.mark.parametrize(
+    ("title", "desc"),
+    [
+        ("Talent Pool", "We are always hiring. Join our talent pool for future opportunities."),
+        ("Expression of Interest", "There is no vacancy right now. Register and we will call."),
+        ("سجل سيرتك الذاتية", "لا توجد وظيفة شاغرة حاليا. سنتواصل معك عند توفر فرص مستقبلية."),
+    ],
+)
+def test_a_posting_that_says_it_is_no_job_is_likely_even_when_fresh(title: str, desc: str) -> None:
+    v = run(desc, title=title, posted=NOW - timedelta(days=2))
+    assert codes(v)["no_opening"] == 20 and v.band == "high"
+
+
+def test_the_statement_alone_under_an_ordinary_title_adds_the_signal_only() -> None:
+    v = run("This is not an application for a specific job. Join us.", title="Engineer")
+    assert codes(v)["no_opening"] == 20 and v.band == "medium"
+
+
+def test_a_real_job_that_mentions_always_hiring_is_not_no_opening() -> None:
+    v = run(f"We are always looking for great people. {SPECIFIC}", posted=NOW - timedelta(days=2))
+    assert "no_opening" not in codes(v) and v.band == "low"
+
+
+def test_building_a_data_pipeline_is_not_evergreen() -> None:
+    assert "evergreen_language" not in codes(run(f"Build a data pipeline in Airflow. {SPECIFIC}"))
+
+
 def test_fresh_specific_job_is_low() -> None:
     fresh = hist(first_seen=NOW - timedelta(days=3), seen_runs=1, urls_seen=1)
     v = run(posted=NOW - timedelta(days=3), history=fresh)

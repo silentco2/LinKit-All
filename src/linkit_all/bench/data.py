@@ -18,6 +18,7 @@ CV_LINES = (
     "Wrote data pipelines and background workers in Python and Go",
 )
 CV_SKILLS = ["Python", "FastAPI", "Django", "PostgreSQL", "Redis", "Docker", "Kubernetes", "Go"]
+CV_QUERIES = ("Backend Engineer", "Python Developer")  # the job titles this person searches
 # "backend_plain" is the same work described without naming the CV's tools.
 RELEVANT = frozenset({"backend", "backend_plain"})
 

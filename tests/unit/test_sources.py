@@ -333,6 +333,11 @@ def test_deduper(tmp_path: Path) -> None:
     assert d.add(stub("URGENT: Frontend Engineer", url="https://z.io/7")) is None
     assert d.add(stub("Backend Engineer (Golang, Payments Team)", url="https://z.io/8"))
     assert d.add(stub("Hiring Manager", url="https://z.io/9"))
+    # requisition numbers, gender tags and abbreviations are not part of the job
+    assert d.add(stub("Backend Engineer - REQ-40112", url="https://z.io/10")) is None
+    assert d.add(stub("Frontend Engineer (m/f/d)", url="https://z.io/11")) is None
+    assert d.add(stub("Backend Eng.", url="https://z.io/12")) is None
+    assert d.add(stub("Backend Engineer II", url="https://z.io/13"))
 
 
 def test_route_ats_sets_ats_for_non_ats_sources_only() -> None:

@@ -114,6 +114,11 @@ _FEE = _Matcher(
     r"(?:you\s+)?(?:for\s+)?(?:any\s+|a\s+|an\s+)?(?:upfront\s+|advance\s+)?(?:payments?|money|fees?|deposits?)(?![a-z])",
     ("charge",),
     r"(?<![a-z])charge\s+(?:you|applicants|candidates)\s+(?:a\s+|any\s+)?(?:fees?|money)(?![a-z])",
+    # Who pays is the tell: "the screening cost is paid by the candidate", "at your own expense".
+    ("candidate", "applicant", "expense"),
+    r"(?<![a-z])(?:fees?|costs?|charges?)\s+(?:(?:is|are|will\s+be|must\s+be|to\s+be)\s+)?"
+    r"(?:paid|borne|covered)\s+by\s+(?:the\s+)?(?:candidate|applicant)s?(?![a-z])"
+    r"|(?<![a-z])at\s+(?:your|the\s+(?:candidate|applicant)(?: ?s)?)\s+own\s+(?:expense|cost)(?![a-z])",
     ("advance", "upfront"),
     _terms(
         "upfront payment", "advance payment", "advance fee", "pay in advance", "payment in advance"
@@ -128,6 +133,8 @@ _FEE = _Matcher(
         + _WORDS
         + r"{0,2}(?:رسوم|مبلغ|مصاريف|عربون|تامين)"
     ),
+    ("اشترك", "اشتراك"),
+    _ar(r"(?:اشترك|اشتراك)\s+ب(?:مبلغ|رسوم|قيم[هة])"),
     ("عربون", "مصاريف", "مبلغ", "دفع"),
     _ar(
         r"عربون|مصاريف\s+(?:اداري[هة]|تسجيل|تدريب|شحن)|مبلغ\s+(?:تامين|مقدم|رمزي|الاشتراك|التسجيل)|دفع\s+مقدم"
@@ -188,17 +195,25 @@ _MULE = _Matcher(
         "payment processing agent",
         "mystery shopper",
         "secret shopper",
-        "western union",
-        "moneygram",
-        "money gram",
         "deposit into your account",
         "keep the difference",
         "evaluate a money transfer",
         "evaluate western union",
         "payment forwarding agent",
     ),
+    # The brand alone is not a sign: banks and finance teams handle these transfers for a living.
+    # It is one when the applicant is the "agent", or is told to send money on that way.
+    ("western", "moneygram", "money gram"),
+    r"(?<![a-z])(?:western\s+union|money\s*gram)\s+(?:transfer\s+|payment\s+)?agents?(?![a-z])"
+    r"|(?<![a-z])agents?\s+(?:\w+\s+){0,3}(?:western\s+union|money\s*gram)"
+    r"|(?<![a-z])(?:send|wire|transfer|forward|remit|return)\s+(?:[\w$-]+\s+){0,6}"
+    r"(?:via|by|through|using|with)\s+(?:western\s+union|money\s*gram)",
     ("package", "parcel"),
     r"(?<![a-z])(?:receive|get)\s+(?:\w+\s+){0,3}(?:packages?|parcels?)\s+(?:\w+\s+){0,4}(?:forward|reship|send)",
+    # Reshipping: goods arrive at the applicant's own home. A warehouse job names no home.
+    ("package", "parcel", "shipment"),
+    r"(?<![a-z])(?:receive|accept|collect|get)\s+(?:[\w-]+\s+){0,3}(?:packages?|parcels?|shipments?)\s+"
+    r"(?:at|to|in)\s+(?:your|their)\s+(?:own\s+)?(?:home|house|address|residence)(?![a-z])",
     ("ويسترن", "جرام", "شيك"),
     _ar(r"ويسترن\s*يونيون|(?:ماني|موني)\s*جرام|ايداع\s+(?:ال)?شيك|صرف\s+(?:ال)?شيك"),
     ("طرود", "شيكات", "حوالات"),
@@ -253,6 +268,11 @@ _BUY = _Matcher(
     r"(?<![a-z])(?:buy|purchase)\s+your\s+own\s+(?:materials?|kit|supplies|inventory|samples?|products?)",
     ("reimburs",),
     r"(?<![a-z])(?:buy|purchase)\s+(?:\w+\s+){0,4}(?:and\s+)?(?:we\s+will\s+|will\s+be\s+)?reimburs",
+    # Pay-to-unlock "task" apps: money goes in before any work or payout comes out.
+    ("top up", "recharge", "deposit", "fund"),
+    r"(?<![a-z])(?:top\s+up|recharge|deposit\s+(?:money\s+)?(?:in|into|to)|fund|add\s+funds\s+to)\s+"
+    r"(?:[\w-]+\s+){0,4}(?:account|balance)\s+(?:[\w-]+\s+){0,3}"
+    r"to\s+(?:unlock|access|activate|continue|upgrade|withdraw|receive|reach)(?![a-z])",
     # The equipment scam: the "vendor" is the scammer. Buying your own kit and being paid back
     # (a normal remote-work stipend) names no seller, so it stays out.
     ("vendor", "supplier"),

@@ -46,6 +46,7 @@ NO_SALARY_WEIGHT = 5
 SURGE_MIN_OPEN, SURGE_FACTOR, SURGE_WEIGHT = 20, 3.0, 10
 VAGUE_MAX = 20  # the 0-30 vagueness sub-score is scaled down to this
 TEXT_CAP = 45  # below HIGH_FROM: wording alone cannot reach "high"
+NO_OPENING_WEIGHT = 20  # the one exception: see where it is added
 MEDIUM_FROM, HIGH_FROM = 35, 50
 _MAX_CHARS = 30_000
 _EVIDENCE_MAX = 80
@@ -357,7 +358,9 @@ _EVERGREEN = _Bi(
     r"\balways\s+(?:looking|hiring|recruiting|accepting)\b|\bwe\s+are\s+always\s+hiring\b"
     r"|\btalent\s+(?:pool|community|network)\b|\bfuture\s+(?:opportunit\w+|openings?|vacanc\w+|roles?)\b"
     r"|\bgeneral\s+application\b|\bexpressions?\s+of\s+interest\b"
-    r"|\b(?:talent|candidate)\s+pipeline\b|\bpipeline\s+of\s+(?:candidates|talent)\b|\b(?:build\w*|join\w*)\s+(?:a|our|the)\s+(?:\w+\s+)?pipeline\b",
+    r"|\b(?:talent|candidate)\s+pipeline\b|\bpipeline\s+of\s+(?:candidates|talent)\b|\b(?:build\w*|join\w*)\s+(?:a|our|the)\s+(?:(?!data|ci|cd|etl|ml|sales|release|delivery|deployment)\w+\s+)?pipeline\b"
+    r"|\bgeneral\s+consideration\b|\bwhen\s+(?:something|a\s+(?:role|position))\s+opens\s+up\b"
+    r"|\bsee\s+a\s+(?:role|position|job)\s+that\s+fits\b",
     r"(?<!\w)(?:"
     + _ar(
         "نبحث دائما",
@@ -379,9 +382,11 @@ _EVERGREEN = _Bi(
 )
 _VAGUE_TITLE = _Bi(
     r"\b(?:various|multiple|several|many)\s+(?:positions?|roles?|openings?|vacanc\w+|jobs?)\b"
-    r"|\bopen\s+application\b|\bgeneral\s+application\b|\btalent\s+(?:pool|community|network)\b|\bfuture\s+opportunit\w+\b",
+    r"|\bopen\s+application\b|\bgeneral\s+application\b|\btalent\s+(?:pool|community|network)\b|\bfuture\s+opportunit\w+\b"
+    r"|\bexpressions?\s+of\s+interest\b",
     r"(?<!\w)(?:"
     + _ar(
+        "سجل سيرتك",
         "وظائف متعددة",
         "وظائف متنوعة",
         "عدة وظائف",
@@ -392,6 +397,21 @@ _VAGUE_TITLE = _Bi(
         "فرص مستقبلية",
     )
     + r")",
+)
+
+
+# A title that names a pool, not a job ("Various Positions" still names jobs, so it is not here).
+_POOL_TITLE = _Bi(
+    r"\b(?:open|general)\s+application\b|\btalent\s+(?:pool|community|network)\b"
+    r"|\bfuture\s+opportunit\w+\b|\bexpressions?\s+of\s+interest\b",
+    r"(?<!\w)(?:" + _ar("طلب عام", "بنك المواهب", "فرص مستقبلية", "سجل سيرتك") + r")",
+)
+# The posting says in so many words that no job is behind it.
+_NO_OPENING = _Bi(
+    r"\bno\s+(?:current\s+|open\s+|specific\s+)?(?:vacanc\w+|openings?|positions?)\s+(?:right\s+now|at\s+the\s+moment|at\s+this\s+time|currently|available)\b"
+    r"|\bnot\s+an?\s+application\s+for\s+(?:a|any)\s+(?:specific|particular)\b"
+    r"|\bkeep\s+(?:it|your\s+(?:cv|resume|details|application))\s+on\s+file\b",
+    r"(?<!\w)(?:" + _ar("لا توجد وظيفة شاغرة", "لا يوجد شاغر", "لا توجد شواغر") + r")",
 )
 
 
@@ -482,6 +502,12 @@ def score_ghost(
         room -= w
         if w > 0:
             signals.append(Signal(s.code, w, s.evidence))
+    # Outside the cap: vague wording is a guess, this is the posting describing itself. Either
+    # it says there is no opening, or a pool title sits on a pool text.
+    if m := _NO_OPENING.search(desc):
+        signals.append(Signal("no_opening", NO_OPENING_WEIGHT, _snip(desc, m.start(), m.end())))
+    elif _POOL_TITLE.search(t) and any(s.code == "evergreen_language" for s in text_sigs):
+        signals.append(Signal("no_opening", NO_OPENING_WEIGHT, "a talent pool, not a job"))
 
     if (
         history.company_open_now >= SURGE_MIN_OPEN

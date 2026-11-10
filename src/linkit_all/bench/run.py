@@ -16,13 +16,14 @@ import httpx
 from sqlalchemy import select
 
 from linkit_all.bench.board import HOST, FakeBoard, make_app
-from linkit_all.bench.data import CV_LINES, CV_SKILLS, FakeJob, generate
+from linkit_all.bench.data import CV_LINES, CV_QUERIES, CV_SKILLS, FakeJob, generate
 from linkit_all.core.db import init_db
 from linkit_all.core.models import Job, JobState
 from linkit_all.core.profile import ProfileIn, import_profile
 from linkit_all.core.runs import current_run
-from linkit_all.core.search import SearchConfig
+from linkit_all.core.search import SearchConfig, TrustSection
 from linkit_all.matching.rank import Embed, rank_jobs
+from linkit_all.matching.trust_stage import score_jobs_trust
 from linkit_all.sources.base import Source
 from linkit_all.sources.http import Http
 from linkit_all.sources.runner import discover, enrich
@@ -44,7 +45,12 @@ def _top(titles: list[str], n: int = 8) -> dict[str, int]:
     return dict(Counter(titles).most_common(n))
 
 
-def quality(jobs: list[FakeJob], stored: dict[int, Job]) -> dict[str, Any]:
+def quality(
+    jobs: list[FakeJob],
+    stored: dict[int, Job],
+    scores: dict[int, tuple[int, int]],  # fake uid -> (scam score, ghost score)
+    limits: TrustSection,
+) -> dict[str, Any]:
     """Compare what the pipeline did (`stored`: fake uid -> Job row) with the ground truth."""
     by_uid = {j.uid: j for j in jobs}
     dropped = [j for j in jobs if j.uid not in stored]
@@ -66,12 +72,11 @@ def quality(jobs: list[FakeJob], stored: dict[int, Job]) -> dict[str, Any]:
         out["wrong_titles"] = _top([by_uid[u].title for u in sorted(flagged - truth)])
         return out
 
-    scam = {u for u, j in stored.items() if j.data.get("trust_filter") == "scam"}
-    ghost = {
-        u
-        for u, j in stored.items()
-        if j.data.get("trust_filter") == "ghost" or j.data.get("trust", {}).get("ghost_demoted")
-    }
+    # Scored here for every stored job, not read back from the run: a scam with an unrelated
+    # title is hidden as off-title before the trust check ever sees it, and that is fine, but
+    # it would leave the trust rules unmeasured.
+    scam = {u for u, (sc, _) in scores.items() if sc >= limits.scam_threshold}
+    ghost = {u for u, (_, gh) in scores.items() if gh >= limits.ghost_threshold}
     ranked = [
         u
         for u, j in sorted(
@@ -80,6 +85,7 @@ def quality(jobs: list[FakeJob], stored: dict[int, Job]) -> dict[str, Any]:
         )
     ]
     hits = [by_uid[u].relevant for u in ranked]
+    off_title = [u for u, j in stored.items() if j.data.get("trash") == "off_title"]
     r = sum(hits)  # with a perfect ranking, the top `r` are exactly the relevant jobs
 
     def at(k: int) -> float:
@@ -101,6 +107,11 @@ def quality(jobs: list[FakeJob], stored: dict[int, Job]) -> dict[str, Any]:
                 Counter(by_uid[u].family for u in ranked[:r] if not by_uid[u].relevant)
             ),
             "pushed_out": dict(Counter(by_uid[u].family for u in ranked[r:] if by_uid[u].relevant)),
+            # hidden for good as "not a job you are looking for": a lost match is the costly error
+            # scams and ghosts that still reached the ranked list, by any route
+            "bad_ranked": sum(by_uid[u].family in ("scam", "ghost") for u in ranked),
+            "relevant_hidden": sum(by_uid[u].relevant for u in off_title),
+            "others_hidden": sum(not by_uid[u].relevant for u in off_title),
         },
     }
 
@@ -124,7 +135,10 @@ async def run_bench(n: int, seed: int, embed: Embed, work: Path) -> dict[str, An
         work / "data",
     )
     # No date filter: ghost jobs are old, and the trust check is what should catch them here.
-    cfg = SearchConfig.model_validate({"search": {"posted_within_hours": None}})
+    # The titles are what a real user types at setup; without them nothing is "off-title".
+    cfg = SearchConfig.model_validate(
+        {"search": {"posted_within_hours": None, "queries": list(CV_QUERIES)}}
+    )
     run_id = current_run(db, True)
     registry: dict[str, Source] = {FakeBoard.name: FakeBoard()}
     app = make_app(jobs, datetime.now(UTC).replace(tzinfo=None))
@@ -142,6 +156,10 @@ async def run_bench(n: int, seed: int, embed: Embed, work: Path) -> dict[str, An
     timing["rank_s"] = time.perf_counter() - t
     with db() as s:
         stored = {int(j.url.rsplit("/", 1)[1]): j for j in s.scalars(select(Job))}
+        trust = score_jobs_trust(s, list(stored.values()))
+    scores = {
+        u: (trust[j.id]["scam"]["score"], trust[j.id]["ghost"]["score"]) for u, j in stored.items()
+    }
     total = sum(timing.values())
     return {
         "jobs": n,
@@ -153,7 +171,7 @@ async def run_bench(n: int, seed: int, embed: Embed, work: Path) -> dict[str, An
             "errors": len(found.errors),
             **counts,
         },
-        "quality": quality(jobs, stored),
+        "quality": quality(jobs, stored, scores, cfg.trust),
         # Timings change from run to run; everything above is the same for the same n and seed.
         "timing": {
             **{k: round(v, 2) for k, v in timing.items()},

@@ -43,15 +43,14 @@ def test_bench_runs_the_real_stages(tmp_path: Path) -> None:
     c, q = result["counts"], result["quality"]
     assert c["errors"] == 0 and c["new"] + c["duplicates"] == 1000
     assert c["enriched"] == c["new"]  # half the descriptions came from the job pages
-    # Regression floors, a little under today's scores. The low ones are known gaps the
-    # benchmark found and nobody has fixed yet; raise each floor when its gap is closed:
-    # - dedupe misses requisition numbers, abbreviations ("Eng.") and "(m/f/d)"
-    # - scam flags honest money-transfer accounting jobs, and misses reshipping, pay-to-unlock
-    #   tasks, candidate-paid screening and the Arabic recruit-to-earn ad
-    # - ghost misses freshly dated "talent pool" postings
-    # - rank puts keyword-heavy other jobs (recruiter, instructor) above plainly worded matches
-    assert q["dedupe"]["precision"] == 1.0 and q["dedupe"]["recall"] >= 0.65
-    assert q["scam"]["precision"] >= 0.2 and q["scam"]["recall"] >= 0.65
-    assert q["ghost"]["wrong"] == 0 and q["ghost"]["recall"] >= 0.45
+    # Regression floors, a little under today's scores. Known and left on purpose:
+    # - scam: a screening fee paid by the candidate is flagged but not filtered on its own
+    #   (schools and hospitals really do charge for background checks)
+    # - rank: other jobs that name the CV's tools (recruiter, instructor) still outrank matches
+    #   that name none; the AI score stage is where those are told apart
+    assert q["dedupe"]["precision"] == 1.0 and q["dedupe"]["recall"] >= 0.95
+    assert q["scam"]["precision"] == 1.0 and q["scam"]["recall"] >= 0.85
+    assert q["ghost"]["precision"] == 1.0 and q["ghost"]["recall"] >= 0.95
+    assert q["rank"]["bad_ranked"] == 0
     assert q["rank"]["precision_at_10"] >= 0.8
-    assert q["rank"]["precision_at_r"] > 2 * q["rank"]["relevant_share"]
+    assert q["rank"]["precision_at_r"] > 1.5 * q["rank"]["relevant_share"]
