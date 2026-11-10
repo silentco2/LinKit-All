@@ -1180,7 +1180,9 @@ async def open_app_browser(request: Request, item_id: int) -> dict[str, Any]:
     try:
         await browser.open(profile_dir(_settings(request), ats), url, item_id)
     except Exception as e:
-        raise HTTPException(503, f"Could not open Chrome: {str(e).splitlines()[0][:200]}") from e
+        raise HTTPException(
+            503, f"Could not open the browser: {str(e).splitlines()[0][:200]}"
+        ) from e
     return {"open": True, "item_id": item_id}
 
 
@@ -1228,7 +1230,9 @@ async def _open_profile(request: Request, profile: Path, url: str) -> dict[str, 
     try:
         await browser.open(profile, url, 0)
     except Exception as e:
-        raise HTTPException(503, f"Could not open Chrome: {str(e).splitlines()[0][:200]}") from e
+        raise HTTPException(
+            503, f"Could not open the browser: {str(e).splitlines()[0][:200]}"
+        ) from e
     return {"open": True, "item_id": 0}
 
 
@@ -1317,10 +1321,6 @@ def delete_answer(request: Request, answer_id: int) -> None:
         s.delete(entry)
 
 
-class ActionAnswers(BaseModel):
-    answers: dict[str, Any]  # question label -> the user's answer
-
-
 class ActionDecision(BaseModel):
     decision: Literal["answer", "confirm", "retry", "applied_by_hand", "skip", "closed"]
     answers: dict[str, Any] = {}
@@ -1333,8 +1333,6 @@ REMEMBER_KEYS = frozenset({
     "eeo_gender", "eeo_race", "eeo_hispanic", "eeo_veteran", "eeo_disability",
     "military_status", "nationality", "marital_status", "date_of_birth",
 })  # fmt: skip
-# Park codes that were renamed: open items with the old code count as the new one.
-CODE_ALIASES = {"needs_email": ("needs_email", "email_not_connected")}
 SAME_QUESTION = 92  # rapidfuzz token_sort_ratio at which two question labels are one question
 
 
@@ -1415,12 +1413,11 @@ class RetryCode(BaseModel):
 @router.post("/actions/retry-code")
 def retry_code(request: Request, body: RetryCode) -> dict[str, int]:
     """Requeue every open item parked with this code (e.g. after the user connected their email)."""
-    codes = CODE_ALIASES.get(body.code, (body.code,))
     count = 0
     with _db(request).begin() as s:
         items = s.scalars(
             select(ActionItem)
-            .where(ActionItem.status == ActionStatus.open, ActionItem.code.in_(codes))
+            .where(ActionItem.status == ActionStatus.open, ActionItem.code == body.code)
             .order_by(ActionItem.id)
         ).all()
         for item in items:

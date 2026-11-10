@@ -61,9 +61,6 @@ class GhostHistory:
     company_open_median: float  # median of that count over earlier runs (0 if no history)
 
 
-NO_HISTORY = GhostHistory(None, 0, 0.0, 0, 0, 0.0)
-
-
 # ---- vagueness (adapted rules) ----------------------------------------------------------------
 
 

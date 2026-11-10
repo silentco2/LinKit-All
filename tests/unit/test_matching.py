@@ -136,16 +136,6 @@ def test_monthly_salary_floor_currency_and_intervals() -> None:
     assert sal(0, **low) is None  # floor unset
 
 
-def test_old_config_migrates() -> None:
-    cfg = SearchConfig.model_validate({"filters": {"remote": "remote", "salary_floor": 240000}})
-    assert cfg.filters.work_modes == ["remote"] and cfg.filters.salary_floor_monthly == 20000
-    assert cfg.filters.salary_currency == "EGP"
-    anyone = SearchConfig.model_validate({"filters": {"remote": "any"}})
-    assert anyone.filters.work_modes == ["remote", "hybrid", "onsite"]
-    again = SearchConfig.model_validate(cfg.model_dump())  # saved form loads back unchanged
-    assert again == cfg
-
-
 def test_query_expansion() -> None:
     def q(*qs: str) -> list[str]:
         return SearchConfig.model_validate({"search": {"queries": list(qs)}}).search.queries

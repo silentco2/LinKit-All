@@ -425,7 +425,7 @@ def test_jobspy_gets_hours_old() -> None:
 
 def test_linkedin_uses_the_one_headless_setting_and_search_queries(tmp_path: Path) -> None:
     src = registry(data_dir=tmp_path)["linkedin_posts"]
-    base = linkedin_cfg(linkedin_keywords=[], linkedin_headless=False)
+    base = linkedin_cfg(linkedin_headless=True)  # saved by older versions: ignored
     base.search.queries = ["python dev", "data analyst"]
     assert [t.query for t in src.tasks(base)] == ["python dev", "data analyst"]
     assert src._headless is False  # type: ignore[attr-defined]  # apply.headless default

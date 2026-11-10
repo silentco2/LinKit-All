@@ -4,7 +4,13 @@
 
 - **Python 3.11 or newer.** [uv](https://docs.astral.sh/uv/) can install it for you.
 - **LibreOffice**, to turn your CV into a PDF. Required for tailoring and applying.
-- **Google Chrome**, to apply to jobs. Not needed for finding and scoring jobs.
+- **[Chromium](https://www.chromium.org/getting-involved/download-chromium/)**, to apply to
+  jobs. Not needed for finding and scoring jobs.
+
+    !!! note "You may already have it"
+        You do not need Chromium if you have Google Chrome, Microsoft Edge or Brave: LinKit
+        All uses whichever it finds first. Edge comes with Windows, so on Windows there is
+        nothing to install.
 - **An AI provider.** See [AI providers](#ai-providers) below.
 - **Tectonic**, only if your CV is a LaTeX file.
 
@@ -28,7 +34,7 @@ with `ok`, `MISSING` or `optional`:
 ```text
 [ok] Python >= 3.11: ...
 [ok] LibreOffice: ...
-[ok] Google Chrome: ...
+[ok] Chromium browser: ...
 [optional] Codex CLI: npm i -g @openai/codex
 [optional] Claude CLI: https://claude.com/claude-code
 [optional] Tectonic: LaTeX CVs only: https://tectonic-typesetting.github.io
@@ -77,11 +83,13 @@ not change. You have two choices.
 
     The bundle is for Windows x64 only. On macOS and Linux, install LibreOffice normally.
 
-## Chrome
+## Browser
 
-LinKit All drives your installed Google Chrome. It does not download a browser. Each job
-site gets its own Chrome profile inside the data folder, so logins and cookies are kept
-between runs and stay separate from your everyday Chrome.
+LinKit All drives a Chromium browser you already have: Google Chrome first, else Microsoft
+Edge, Brave or [Chromium](https://www.chromium.org/getting-involved/download-chromium/). It
+does not download one. Each job site gets its own browser profile inside the
+data folder, so logins and cookies are kept between runs and stay separate from your
+everyday browsing. The LinkIt Fill extension goes in whichever browser you use day to day.
 
 ## Tectonic (LaTeX CVs only)
 

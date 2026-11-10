@@ -222,7 +222,31 @@ def is_pickable(j: Job, generic: bool, live: bool) -> bool:
             or (generic and _web_url(j.data.get("apply_url") or j.url))
         )
         and (live or not j.data.get("dry_run_at"))
+        and not j.data.get("mail_sending")  # LinkIt mail is sending it right now
     )
+
+
+def emails_sent_today(s: Session) -> int:
+    since = utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    return (
+        s.scalar(
+            select(func.count())
+            .select_from(JobEvent)
+            .where(JobEvent.code == "applied_by_email", JobEvent.at >= since)
+        )
+        or 0
+    )
+
+
+def emailed(s: Session, addr: str, but: int | None = None) -> Job | None:
+    """The applied job whose application email went to `addr` (never the same address twice)."""
+    return next(
+        (
+            o for o in s.scalars(select(Job).where(Job.state == JobState.applied, Job.id != but))
+            if (o.data.get("email_sent") or {}).get("to", "").lower() == addr.lower()
+        ),
+        None,
+    )  # fmt: skip
 
 
 async def _settle(page: Page) -> None:
@@ -464,11 +488,7 @@ class Applier:
         live = self.cfg.apply.live
         since = utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         with self.db() as s:
-            emails_today = s.scalar(
-                select(func.count())
-                .select_from(JobEvent)
-                .where(JobEvent.code == "applied_by_email", JobEvent.at >= since)
-            )
+            emails_today = emails_sent_today(s)
             applied_today = dict(
                 s.execute(
                     select(Job.ats, func.count())
@@ -699,12 +719,7 @@ class Applier:
         live waits for the user's confirm (draft editable) unless told not to. Sent = applied."""
         apply_cfg = self.cfg.apply
         with self.db() as s:
-            already = any(
-                (o.data.get("email_sent") or {}).get("to", "").lower() == addr.lower()
-                for o in s.scalars(
-                    select(Job).where(Job.state == JobState.applied, Job.id != job_id)
-                )
-            )
+            already = emailed(s, addr, but=job_id) is not None
         if already:
             with self.db.begin() as s:
                 transition(

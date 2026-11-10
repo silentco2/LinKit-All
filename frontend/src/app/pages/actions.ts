@@ -20,7 +20,7 @@ const BROWSER_KINDS: ActionKind[] = ['captcha', 'login_issue', 'two_factor', 'va
 
 /** Park codes that mean "set something up once": they get one card at the top instead of one card per job. */
 const VAULT_CODES = ['needs_vault', 'vault_locked'];
-const EMAIL_CODES = ['needs_email', 'email_not_connected'];
+const EMAIL_CODES = ['needs_email'];
 const EEO_KEYS = ['eeo_gender', 'eeo_race', 'eeo_hispanic', 'eeo_veteran', 'eeo_disability'];
 const FACT_KEYS = ['military_status', 'nationality', 'marital_status', 'date_of_birth'];
 // what a form option says -> the value the profile stores; null = not recognised, so it is not saved

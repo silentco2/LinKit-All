@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 from playwright.async_api import async_playwright
 
-from linkit_all.core import chrome
+from linkit_all.core import chrome, tools
 
 FORBIDDEN = ("--enable-automation", "--remote-debugging-pipe", "AutomationControlled")
 
@@ -191,8 +191,20 @@ def test_read_hints_navigates_a_blank_tab_to_chrome_version(
 
 def test_launch_without_chrome_says_so(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(chrome, "browser_path", lambda: None)
-    with pytest.raises(chrome.ChromeError, match="not installed"):
+    with pytest.raises(chrome.ChromeError, match=r"No Chromium browser.*chromium\.org"):
         asyncio.run(chrome.launch_chrome(tmp_path, headless=True))
+
+
+def test_browser_path_finds_per_user_brave(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    brave = tmp_path / "BraveSoftware/Brave-Browser/Application/brave.exe"
+    brave.parent.mkdir(parents=True)
+    brave.touch()
+    monkeypatch.setattr(tools, "chrome_path", lambda: None)
+    monkeypatch.setattr("shutil.which", lambda _name: None)  # nothing on PATH
+    for key in ("ProgramFiles", "ProgramFiles(x86)"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    assert tools.browser_path() == str(brave)
 
 
 def _alive(pid: int) -> bool:

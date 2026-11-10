@@ -1,5 +1,5 @@
 """Apply flow on a saved Lever form. Every request is intercepted: nothing reaches Lever, and
-the "live" submission lands on a fake confirmation page. Needs Google Chrome installed."""
+the "live" submission lands on a fake confirmation page. Needs Chrome, Edge or Brave installed."""
 
 import asyncio
 import json
@@ -34,10 +34,10 @@ from linkit_all.core.models import (
 from linkit_all.core.profile import ProfileIn, import_profile
 from linkit_all.core.search import SearchConfig
 from linkit_all.core.state import transition
-from linkit_all.core.tools import chrome_path
+from linkit_all.core.tools import browser_path
 from linkit_all.providers.base import LLMProvider
 
-pytestmark = pytest.mark.skipif(chrome_path() is None, reason="Google Chrome not installed")
+pytestmark = pytest.mark.skipif(browser_path() is None, reason="no Chrome, Edge or Brave installed")
 
 FORM = (Path(__file__).parents[1] / "fixtures/lever/apply_form.html").read_text("utf-8")
 URL = "https://jobs.lever.co/acme/123"

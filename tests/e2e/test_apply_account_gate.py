@@ -1,5 +1,5 @@
 """Account gate on a fake ATS served by request interception: nothing leaves the machine.
-Needs Google Chrome installed."""
+Needs Chrome, Edge or Brave installed."""
 
 import asyncio
 import re
@@ -43,10 +43,10 @@ from linkit_all.core.models import (
 )
 from linkit_all.core.profile import ProfileIn, import_profile
 from linkit_all.core.search import EmailSection, SearchConfig
-from linkit_all.core.tools import chrome_path
+from linkit_all.core.tools import browser_path
 from linkit_all.providers.base import LLMProvider
 
-pytestmark = pytest.mark.skipif(chrome_path() is None, reason="Google Chrome not installed")
+pytestmark = pytest.mark.skipif(browser_path() is None, reason="no Chrome, Edge or Brave installed")
 
 BASE = "https://fake-ats.test"
 EMAIL = "jane@example.com"

@@ -35,7 +35,7 @@ from playwright.async_api import BrowserContext, Playwright
 from websockets.asyncio.client import ClientConnection
 from websockets.asyncio.client import connect as ws_connect
 
-from linkit_all.core.tools import chrome_path, find_tool
+from linkit_all.core.tools import CHROMIUM_HINT, browser_path
 
 READY_TIMEOUT_S = 20.0
 CLOSE_TIMEOUT_S = 8.0
@@ -167,23 +167,6 @@ class RunningChrome:
             with contextlib.suppress(Exception):
                 await mask.close()
         await _terminate(self.process)
-
-
-def browser_path() -> str | None:
-    """Installed Chrome, else Edge or Chromium (all speak the same CDP)."""
-    if found := chrome_path():
-        return found
-    fallbacks = [
-        Path("/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"),
-        Path("/Applications/Chromium.app/Contents/MacOS/Chromium"),
-    ]
-    for key in ("ProgramFiles", "ProgramFiles(x86)"):
-        if base := os.environ.get(key):
-            fallbacks.append(Path(base) / "Microsoft/Edge/Application/msedge.exe")
-    return find_tool(
-        ["microsoft-edge", "microsoft-edge-stable", "msedge", "chromium", "chromium-browser"],
-        fallbacks,
-    )
 
 
 def free_port() -> int:
@@ -362,7 +345,7 @@ async def launch_chrome(
 ) -> RunningChrome:
     exe = browser_path()
     if exe is None:
-        raise ChromeError("Google Chrome is not installed: https://www.google.com/chrome/")
+        raise ChromeError(f"No Chromium browser is installed: {CHROMIUM_HINT}")
     identity = await _headless_identity(exe, timeout) if headless else None
     proc, port, info = await _start(exe, profile_dir, headless=headless, timeout=timeout)
     running = RunningChrome(proc, port, profile_dir, f"http://127.0.0.1:{port}")

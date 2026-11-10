@@ -50,7 +50,7 @@ Start the local web page on `127.0.0.1`.
 
 ## `linkit doctor`
 
-Check Python (3.11 or newer), LibreOffice, Google Chrome, Codex CLI, Claude CLI and Tectonic.
+Check Python (3.11 or newer), LibreOffice, a Chromium browser (Chromium, Chrome, Edge or Brave), Codex CLI, Claude CLI and Tectonic.
 Prints `ok`, `MISSING` or `optional` for each. Exits with code 1 if Python or LibreOffice
 is missing. No options.
 

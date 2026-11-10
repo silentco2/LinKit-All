@@ -47,7 +47,6 @@ _prefixes: WeakKeyDictionary[Frame, str] = WeakKeyDictionary()
 _SUBMIT = re.compile(r"\b(submit|apply|send)\b", re.I)
 _NEXT = re.compile(r"\b(next|continue|proceed|review|forward|save and)\b", re.I)
 _TEXTUAL = {"text", "textarea", "email", "tel", "number", "url", "date"}
-_STRUCTURAL = {"select", "radio", "multi", "checkbox", "yesno", "file", "combobox"}
 
 
 class AgentError(RuntimeError):

@@ -10,7 +10,9 @@ word-level edits, and apply — all from a local web UI. Bring your own AI
 ## Requirements
 - Python 3.11+ and [uv](https://docs.astral.sh/uv/)
 - [LibreOffice](https://www.libreoffice.org/download/) (renders tailored CVs to PDF)
-- Google Chrome (for applying, later phases)
+- [Chromium](https://www.chromium.org/getting-involved/download-chromium/) (for applying).
+  Not needed if you already have Google Chrome, Microsoft Edge or Brave: any of them works,
+  and Edge comes with Windows.
 
 ## Development
 ```bash

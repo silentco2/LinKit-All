@@ -65,7 +65,7 @@ class LinkedInPosts(Source):
     def tasks(self, cfg: SearchConfig) -> list[Task]:
         src = cfg.sources
         self._rules = PostRules.of(cfg)
-        self._headless = cfg.apply.headless  # one window setting; linkedin_headless is ignored
+        self._headless = cfg.apply.headless  # the one window setting
         return [
             Task(
                 self.name,

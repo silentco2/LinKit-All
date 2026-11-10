@@ -13,7 +13,6 @@ from linkit_all.core.db import init_db
 from linkit_all.core.models import Job, JobSighting, Run
 from linkit_all.matching.trust import Verdict
 from linkit_all.matching.trust.ghost import (
-    NO_HISTORY,
     GhostHistory,
     ghost_histories,
     has_pay,
@@ -23,6 +22,7 @@ from linkit_all.matching.trust.ghost import (
 from linkit_all.matching.trust.normalize import light
 
 NOW = datetime(2026, 10, 25, 12, 0)
+NO_HISTORY = GhostHistory(None, 0, 0.0, 0, 0, 0.0)
 
 SPECIFIC = (
     "You will report to the VP of Engineering and lead a team of 6 engineers building the Kafka "

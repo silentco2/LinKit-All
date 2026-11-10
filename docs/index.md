@@ -20,7 +20,7 @@ key, or a local model such as Ollama or LM Studio.
 3. **Scores** the best ones with your AI, in batches, and sorts them into tiers.
 4. **Tailors your CV** for the jobs it will apply to. It changes a few words and leaves the
    layout alone. See [Tailoring](tailoring.md).
-5. **Applies** in a real Chrome window, including sites that need an account. See [Applying](applying.md).
+5. **Applies** in your installed browser (Chrome, Edge or Brave), including sites that need an account. See [Applying](applying.md).
 6. **Asks you** whenever it should not guess. See [Action Center](action-center.md).
 7. **Reports** what happened. See [Scheduling and reports](scheduling-reports.md).
 

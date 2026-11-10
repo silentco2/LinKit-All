@@ -139,9 +139,9 @@ def _clean(line: str) -> str:
     return _EDGES.sub("", " ".join(_CONTACT_TAIL.sub("", line).split()))[:MAX_TITLE]
 
 
-def heading(text: str, words: tuple[str, ...] = ()) -> str:
+def heading(text: str, words: tuple[str, ...] = (), any_line: bool = True) -> str:
     """The job title of a post: a labelled line ("Position: X"), else the first line naming one of
-    the user's title words, else the first line with any words on it."""
+    the user's title words, else (`any_line`) the first line with any words on it."""
     lines = text.splitlines()
     for line in lines:
         if (m := _LABEL.match(line)) and (title := _clean(m.group(1))):
@@ -150,7 +150,7 @@ def heading(text: str, words: tuple[str, ...] = ()) -> str:
     for line in lines:
         if any(w in fold(line) for w in wanted) and (title := _clean(line)):
             return title
-    return next((title for line in lines if (title := _clean(line))), "")
+    return next((title for line in lines if (title := _clean(line))), "") if any_line else ""
 
 
 def contact_email(text: str) -> str:

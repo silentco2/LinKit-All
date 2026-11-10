@@ -21,7 +21,7 @@ from linkit_all.core.models import Job
 from linkit_all.core.profile import ProfileIn, import_profile
 from linkit_all.core.runs import current_run
 from linkit_all.core.search import import_search
-from linkit_all.core.tools import chrome_path, soffice_path, tectonic_path
+from linkit_all.core.tools import CHROMIUM_HINT, browser_path, soffice_path, tectonic_path
 from linkit_all.providers import ProviderError, get_provider
 
 if TYPE_CHECKING:
@@ -53,7 +53,7 @@ def run_checks() -> list[Check]:
     return [
         Check("Python >= 3.11", sys.executable if py_ok else None, True, "uv python install 3.12"),
         Check("LibreOffice", soffice_path(), True, "https://www.libreoffice.org/download/"),
-        Check("Google Chrome", chrome_path(), False, "needed to apply: https://www.google.com/chrome/"),
+        Check("Chromium browser", browser_path(), False, f"needed to apply: {CHROMIUM_HINT}"),
         Check("Codex CLI", shutil.which("codex"), False, "npm i -g @openai/codex"),
         Check("Claude CLI", shutil.which("claude"), False, "https://claude.com/claude-code"),
         Check("Tectonic", tectonic_path(), False, "LaTeX CVs only: https://tectonic-typesetting.github.io"),
