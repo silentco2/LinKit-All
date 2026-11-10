@@ -353,9 +353,9 @@ def bench(
         typer.Option(min=0, help="Also fill this many fake application forms (needs a browser)."),
     ] = 0,
 ) -> None:
-    """Measure finding and ranking on a built-in fake job board, and with --apply the form
-    filling too (practice mode: nothing is submitted). Touches none of your data and no real
-    site; the AI is a scripted stand-in."""
+    """Measure finding, ranking and the CV tailoring guard on built-in fake data, and with
+    --apply the form filling too (practice mode: nothing is submitted). Touches none of your
+    data and no real site; the AI is a scripted stand-in."""
     import json
     import tempfile
 
@@ -380,6 +380,12 @@ def bench(
         f"rank    top 10: {r['precision_at_10']:.0%}  top 50: {r['precision_at_50']:.0%} "
         f"relevant ({r['relevant_share']:.0%} by chance), "
         f"all {r['relevant']} relevant on top: {r['precision_at_r']:.0%}"
+    )
+    tl = result["tailor"]
+    typer.echo(
+        f"tailor  honest edits accepted {tl['honest_accepted']}, invented edits refused "
+        f"{tl['invented_refused']}, layout {'ok' if tl['layout']['ok'] else 'CHANGED'}"
+        + ("" if tl["layout"]["checked"] else " (not checked: no LibreOffice)")
     )
     if a := result.get("apply"):
         typer.echo(

@@ -2,8 +2,8 @@
 
 Finding and ranking read the board in-process (httpx ASGI transport, no port). Applying needs a
 browser, so for that part the same board is also served on a local port.
-ponytail: CV tailoring is not benchmarked (it needs LibreOffice and a model's patches); the
-applications here send the CV as uploaded.
+CV tailoring is measured apart from the jobs (bench/tailor.py): the guard and the layout check
+do not depend on which job the CV is tailored for. The applications send the CV as uploaded.
 """
 
 import contextlib
@@ -29,6 +29,7 @@ from linkit_all.apply.runner import apply_jobs
 from linkit_all.bench.ai import ScriptedAI
 from linkit_all.bench.board import HOST, FakeBoard, form_kind, make_app
 from linkit_all.bench.data import CV_LINES, CV_QUERIES, CV_SKILLS, FakeJob, generate
+from linkit_all.bench.tailor import run_tailor
 from linkit_all.core.config import Settings
 from linkit_all.core.db import init_db
 from linkit_all.core.models import ActionItem, Job, JobState, Profile
@@ -298,6 +299,7 @@ async def run_bench(n: int, seed: int, embed: Embed, work: Path, apply: int = 0)
             **counts,
         },
         "quality": quality(jobs, stored, scores, cfg.trust),
+        "tailor": await run_tailor(work, Settings(data_dir=work / "data")),
         **({"apply": applied} if applied else {}),
         # Timings change from run to run; everything above is the same for the same n and seed.
         "timing": {

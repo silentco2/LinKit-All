@@ -24,12 +24,15 @@ class ScriptedAI(LLMProvider):
         super().__init__("scripted")
         self.calls = 0
         self.asked: list[str] = []  # question labels that reached an answer prompt
+        self.patches: list[dict[str, Any]] = []  # what it proposes when asked to tailor a CV
 
     async def _call(self, prompt: str) -> str:
         self.calls += 1
         if ids := _JOB.findall(prompt):  # score stage: everything it is shown is a strong match
             results = [{"job_id": int(i), "score": 9, "reasons": ["scripted"]} for i in ids]
             return json.dumps({"results": results})
+        if prompt.startswith("You tailor a CV"):
+            return json.dumps({"patches": self.patches})
         if "You help fill in a job application form" in prompt:
             return json.dumps(self._map(prompt))
         if "Write a short cover letter" in prompt:

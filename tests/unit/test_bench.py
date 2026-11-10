@@ -54,3 +54,17 @@ def test_bench_runs_the_real_stages(tmp_path: Path) -> None:
     assert q["rank"]["bad_ranked"] == 0
     assert q["rank"]["precision_at_10"] >= 0.8
     assert q["rank"]["precision_at_r"] > 1.5 * q["rank"]["relevant_share"]
+
+
+def test_tailoring_guard_on_honest_and_invented_patches(tmp_path: Path) -> None:
+    from linkit_all.bench.tailor import run_tailor
+    from linkit_all.core.config import Settings
+
+    t = asyncio.run(run_tailor(tmp_path, Settings(data_dir=tmp_path / "data")))
+    assert t["honest_accepted"] == "6/6" and t["honest_refused"] == []
+    assert t["layout"]["ok"] and t["structure_kept"]
+    # Known gaps the benchmark found; nothing else may get through. When one is closed, take
+    # it off this list.
+    known = {"number written as a word", "unlisted tool in lowercase", "bigger role in plain words"}
+    assert {line.split(":")[0] for line in t["invented_accepted"]} <= known
+    assert "changes locked fact 'Acme'" in t["refusals"].values()
