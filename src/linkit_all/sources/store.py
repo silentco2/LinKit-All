@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from linkit_all.core.models import Job, JobEvent, JobSighting, JobState, SourceCheckpoint
 from linkit_all.sources.ats_detector import detect
 from linkit_all.sources.base import JobStub, Source
-from linkit_all.sources.text import job_hash, norm, norm_company, normalize_url
+from linkit_all.sources.text import job_hash, norm, norm_company, normalize_url, title_key
 
 
 @dataclass
@@ -47,7 +47,7 @@ class Deduper:
             known = Known(r.id, priority(r.source))
             self.urls[r.url] = self.hashes[r.dedupe_hash] = known
             self.by_company[norm_company(r.company)].append(
-                (norm(r.title), norm(r.location), known)
+                (title_key(r.title), norm(r.location), known)
             )
 
     def lookup(self, stub: JobStub) -> Known | None:
@@ -56,7 +56,7 @@ class Deduper:
             return known
         if known := self.hashes.get(job_hash(stub.title, stub.company, stub.location)):
             return known
-        title, loc = norm(stub.title), norm(stub.location)
+        title, loc = title_key(stub.title), norm(stub.location)
         for t, other_loc, known in self.by_company[norm_company(stub.company)]:
             if fuzz.token_sort_ratio(title, t) >= 92 and (
                 not loc or not other_loc or fuzz.token_set_ratio(loc, other_loc) >= 85
@@ -71,7 +71,7 @@ class Deduper:
         known = Known(None, self.priority(stub.source))
         self.urls[url] = self.hashes[h] = known
         self.by_company[norm_company(stub.company)].append(
-            (norm(stub.title), norm(stub.location), known)
+            (title_key(stub.title), norm(stub.location), known)
         )
         return url, h, known
 

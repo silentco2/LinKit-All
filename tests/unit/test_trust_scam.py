@@ -92,6 +92,8 @@ def test_crypto_deposit(text: str) -> None:
         "Applicants will purchase their starter kit from our partner.",
         "Buy gift cards for clients and we will reimburse you.",
         "You must buy the materials yourself.",
+        "You first purchase your home-office equipment from our vendor and we reimburse you.",
+        "Order a laptop from the approved supplier before your first day.",
         "شراء بطاقات هدايا للعملاء",
     ],
 )
@@ -99,6 +101,11 @@ def test_buy_to_work(text: str) -> None:
     v = run(text)
     assert "buy_to_work" in codes(v)
     assert v.score >= 65
+
+
+def test_a_home_office_allowance_is_not_buy_to_work() -> None:
+    v = run("Set up your home office: we cover up to $500 for a desk and a monitor of your choice.")
+    assert "buy_to_work" not in codes(v)
 
 
 @pytest.mark.parametrize(

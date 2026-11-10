@@ -328,6 +328,11 @@ def test_deduper(tmp_path: Path) -> None:
     assert d.add(stub("Engineer, Backend", url="https://z.io/3")) is None  # fuzzy, same company
     assert d.add(stub("Backend Engineer", company="Globex", url="https://z.io/4"))
     assert d.add(stub("Frontend Engineer", url="https://z.io/5"))
+    # a repost with a recruiter's note is the same job; a real qualifier is not
+    assert d.add(stub("Backend Engineer (Urgent Hiring)", url="https://z.io/6")) is None
+    assert d.add(stub("URGENT: Frontend Engineer", url="https://z.io/7")) is None
+    assert d.add(stub("Backend Engineer (Golang, Payments Team)", url="https://z.io/8"))
+    assert d.add(stub("Hiring Manager", url="https://z.io/9"))
 
 
 def test_route_ats_sets_ats_for_non_ats_sources_only() -> None:

@@ -47,6 +47,24 @@ def norm(text: str) -> str:
     return " ".join(re.sub(r"[^\w\s]", " ", text.lower()).split())
 
 
+# A repost often differs only by a note the recruiter added: "(Urgent Hiring)", "URGENT - ...".
+_TITLE_PARTS = re.compile(r"[()\[\]|:!]|\s[-–—]\s")  # noqa: RUF001 - real dashes
+_TITLE_NOISE = frozenset(
+    {
+        "urgent", "urgently", "hiring", "immediate", "immediately", "asap", "now", "start",
+        "joiner", "joiners", "required", "needed", "wanted", "apply", "new", "hot", "opening",
+        "vacancy", "عاجل", "مطلوب", "فورا", "فوري",
+    }
+)  # fmt: skip
+
+
+def title_key(title: str) -> str:
+    """`norm(title)` without parts that are only such a note. For fuzzy matching, never shown."""
+    parts = [norm(p) for p in _TITLE_PARTS.split(title)]
+    kept = [p for p in parts if p and not set(p.split()) <= _TITLE_NOISE]
+    return " ".join(kept) or norm(title)
+
+
 def norm_company(name: str) -> str:
     # A name made only of suffix words ("Group Holdings SE") must not become "".
     return norm(_COMPANY_SUFFIX.sub(" ", name)) or norm(name)

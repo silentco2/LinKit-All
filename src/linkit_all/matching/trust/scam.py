@@ -253,6 +253,11 @@ _BUY = _Matcher(
     r"(?<![a-z])(?:buy|purchase)\s+your\s+own\s+(?:materials?|kit|supplies|inventory|samples?|products?)",
     ("reimburs",),
     r"(?<![a-z])(?:buy|purchase)\s+(?:\w+\s+){0,4}(?:and\s+)?(?:we\s+will\s+|will\s+be\s+)?reimburs",
+    # The equipment scam: the "vendor" is the scammer. Buying your own kit and being paid back
+    # (a normal remote-work stipend) names no seller, so it stays out.
+    ("vendor", "supplier"),
+    r"(?<![a-z])(?:buy|purchase|order)\s+(?:[\w-]+\s+){0,6}from\s+(?:our|the|an?)\s+"
+    r"(?:approved\s+|preferred\s+|designated\s+|certified\s+|authori[sz]ed\s+)?(?:vendor|supplier)",
     ("buy", "purchase", "inventory"),
     _terms("buy equipment first", "purchase the starter", "inventory purchase", "buy inventory"),
     ("شراء", "اشتر"),

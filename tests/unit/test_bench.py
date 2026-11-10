@@ -41,8 +41,8 @@ def test_bench_runs_the_real_stages(tmp_path: Path) -> None:
     assert c["errors"] == 0 and c["new"] + c["duplicates"] == 1000
     assert c["enriched"] == c["new"]  # half the descriptions came from the job pages
     # Regression floors, set a little under what the pipeline scores today.
-    assert q["dedupe"]["precision"] == 1.0 and q["dedupe"]["recall"] >= 0.7
-    assert q["scam"]["precision"] == 1.0 and q["scam"]["recall"] >= 0.7
+    assert q["dedupe"]["precision"] == 1.0 and q["dedupe"]["recall"] >= 0.95
+    assert q["scam"]["precision"] == 1.0 and q["scam"]["recall"] >= 0.95
     assert q["ghost"]["wrong"] == 0
     assert q["rank"]["precision_at_10"] >= 0.8
     assert q["rank"]["precision_at_10"] > 2 * q["rank"]["relevant_share"]
