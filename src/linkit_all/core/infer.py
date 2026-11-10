@@ -458,6 +458,13 @@ _GENERAL = [
 _TECH_SET = {w.lower() for w in _TECH}
 # Words that are also ordinary English: matched case-sensitively.
 _CASE_SENSITIVE = {"Excel", "Rust", "Swift", "Oracle"}
+# One-word tool names, lowercase, without the ones that are also ordinary words (written as
+# names, "REST" or "React", those are caught anyway because they are capitalised). The tailoring
+# guard uses it: such a word may not be added to a CV that does not already have it.
+_ALSO_WORDS = {"rest", "react", "spark", "flask", "bash", "agile", "networking", "ruby"}
+TECH_TERMS = frozenset(
+    w for w in _TECH_SET - {c.lower() for c in _CASE_SENSITIVE} - _ALSO_WORDS if " " not in w
+)
 
 
 def _lexicon_rx(words: list[str], flags: int) -> re.Pattern[str]:

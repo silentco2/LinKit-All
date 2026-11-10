@@ -229,3 +229,33 @@ def test_tailor_job_stores_version_and_transitions(tmp_path: Path) -> None:
         assert event.artifacts == [row.docx_path, row.pdf_path]
     again = asyncio.run(tailor_job(db, job.id, FakeProvider("{}"), settings, render=fake_render))
     assert again.id == row.id  # idempotent: no second AI call result stored
+
+
+# --- facts and claims in plain words --------------------------------------------
+
+
+def _why(old: str, new: str, cv: str = "Mentored four engineers and wrote runbooks") -> str | None:
+    from linkit_all.tailor.patches import Rules, violation, vocabulary
+
+    rules = Rules([], vocabulary(cv, ["Python"]))
+    return violation(cv, cv.replace(old, new), rules)
+
+
+def test_a_number_written_as_a_word_is_a_fact() -> None:
+    assert "number" in (_why("four", "nine") or "")
+    assert "number" in (_why("four engineers", "twenty-five engineers") or "")
+    assert "number" in (_why("Mentored four", "Mentored") or "")  # dropping one counts too
+
+
+def test_role_and_award_words_are_refused_unless_the_cv_has_them() -> None:
+    assert "Managed" in (_why("Mentored", "Managed") or "")
+    assert "led" in (_why("wrote runbooks", "led runbooks") or "")
+    assert _why("wrote", "led", cv="Led the team and wrote runbooks for Python") is None
+
+
+def test_a_known_tool_is_refused_however_it_is_written() -> None:
+    assert "terraform" in (_why("runbooks", "terraform") or "")
+    assert "Terraform" in (_why("runbooks", "Terraform") or "")
+    assert _why("runbooks", "python") is None  # a listed skill
+    # ordinary words that are also tool names stay usable in a rewording
+    assert _why("runbooks", "the rest") is None

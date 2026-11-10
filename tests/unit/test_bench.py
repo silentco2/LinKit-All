@@ -65,6 +65,6 @@ def test_tailoring_guard_on_honest_and_invented_patches(tmp_path: Path) -> None:
     assert t["layout"]["ok"] and t["structure_kept"]
     # Known gaps the benchmark found; nothing else may get through. When one is closed, take
     # it off this list.
-    known = {"number written as a word", "unlisted tool in lowercase", "bigger role in plain words"}
+    known = {"unlisted tool the lexicon does not know", "bigger role in other words"}
     assert {line.split(":")[0] for line in t["invented_accepted"]} <= known
     assert "changes locked fact 'Acme'" in t["refusals"].values()
