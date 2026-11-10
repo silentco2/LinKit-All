@@ -398,9 +398,13 @@ def apply_probe(
     restore: Annotated[
         bool, typer.Option("--restore", help="Only put back jobs an earlier test borrowed.")
     ] = False,
+    scorecard: Annotated[
+        Path | None, typer.Option(help="Also write a per-platform summary to this file.")
+    ] = None,
 ) -> None:
     """Practice-mode apply of one job per source, then a report of where each one got to.
     Nothing is submitted; the CV is sent as uploaded."""
+    from linkit_all.apply import probe as probing
     from linkit_all.apply.probe import give_back_all, pick, probe, report
     from linkit_all.core.search import load_search
     from linkit_all.pipeline import _get_embedder, ai_settings
@@ -425,3 +429,6 @@ def apply_probe(
     for r in rows:
         typer.echo(f"{r.job_id:>6} {r.source:<16} {r.status:<10} {r.code:<20} {r.host}")
     typer.echo(f"Report: {report(rows, settings.data_dir / 'applications')}")
+    if scorecard is not None:
+        scorecard.write_text(probing.scorecard(rows, datetime.now()), encoding="utf-8")
+        typer.echo(f"Scorecard: {scorecard}")
