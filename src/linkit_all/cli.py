@@ -343,6 +343,41 @@ def run_apply() -> None:
     typer.echo(", ".join(f"{k} {v}" for k, v in counts.items()))
 
 
+@app.command()
+def bench(
+    jobs: Annotated[int, typer.Option(min=10, help="Fake jobs to generate.")] = 10000,
+    seed: Annotated[int, typer.Option(help="Same seed, same jobs.")] = 1,
+    out: Annotated[Path, typer.Option(help="Where to write the numbers.")] = Path("bench.json"),
+) -> None:
+    """Measure finding and ranking on a built-in fake job board. Touches none of your data
+    and no real site; uses no AI."""
+    import json
+    import tempfile
+
+    from linkit_all.bench.run import run_bench
+    from linkit_all.matching.rank import Embedder
+
+    settings = get_settings()
+    setup_logging(settings)
+    embed = Embedder(settings.embedding_model, settings.data_dir / "models")
+    # ignore_cleanup_errors: Windows may still hold the SQLite file when the folder goes
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+        result = asyncio.run(run_bench(jobs, seed, embed, Path(tmp)))
+    out.write_text(json.dumps(result, indent=2), encoding="utf-8")
+    q, t = result["quality"], result["timing"]
+    typer.echo(f"{jobs} jobs in {t['total_s']} s ({t['jobs_per_minute']} jobs/minute)")
+    for name in ("dedupe", "scam", "ghost"):
+        typer.echo(
+            f"{name:<7} precision {q[name]['precision']:.0%}  recall {q[name]['recall']:.0%}"
+        )
+    r = q["rank"]
+    typer.echo(
+        f"rank    top 10: {r['precision_at_10']:.0%}  top 50: {r['precision_at_50']:.0%} "
+        f"relevant ({r['relevant_share']:.0%} by chance)"
+    )
+    typer.echo(f"Numbers: {out}")
+
+
 @app.command("apply-probe")
 def apply_probe(
     per_source: Annotated[int, typer.Option(help="Jobs to try per source.")] = 1,
