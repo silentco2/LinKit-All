@@ -65,3 +65,48 @@ def test_pick_button_treats_a_submit_looking_next_as_submit() -> None:
     assert pick_button([nxt], FieldMap()) == ("stop", None)
     saving = Control("a3", "button", "Save and continue", type="submit")
     assert not saving.submit_like and pick_button([saving], FieldMap(next_button="a3"))[0] == "next"
+
+
+# --- sensitive answers never reach the AI (CLAUDE.md section 2) ---------------------------------
+
+
+def test_scrub_whole_words_case_longest_first() -> None:
+    from linkit_all.apply.agent import scrub
+
+    assert scrub("Notice period: No. no!", ["No"]) == "Notice period: [hidden]. [hidden]!"
+    assert scrub("Yes, yesterday", ["yes"]) == "[hidden], yesterday"
+    assert (
+        scrub("I am not a protected veteran", ["I am not a protected veteran", "not"]) == "[hidden]"
+    )
+    assert scrub("abc", ["", "  "]) == "abc"
+    assert scrub("salary 30000 USD", ["30000"]) == "salary [hidden] USD"
+
+
+def test_field_map_scrubs_filled_sensitive_answers_from_the_prompt() -> None:
+    import asyncio
+
+    from linkit_all.apply import agent
+    from linkit_all.apply.answers import ApplicationAnswers, Question
+
+    class Spy:
+        prompt = ""
+
+        async def complete(self, prompt: str, schema: type) -> FieldMap:
+            self.prompt = prompt
+            return FieldMap(page_kind="review")
+
+    q = Question(key="a1", label="Are you a protected veteran?", kind="text")
+    agent.remember_secrets(
+        ApplicationAnswers(nationality="Zorbian"), [q], {"a1": "Not a veteran-xyz"}
+    )
+    spy = Spy()
+    asyncio.run(
+        agent.field_map(
+            spy,  # type: ignore[arg-type]
+            [],
+            "Review",
+            "Summary: Veteran status: not a veteran-xyz. Nationality ZORBIAN. Name Ann",
+        )
+    )
+    assert "veteran-xyz" not in spy.prompt and "zorbian" not in spy.prompt.lower()
+    assert "Name Ann" in spy.prompt
