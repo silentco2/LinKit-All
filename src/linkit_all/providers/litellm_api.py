@@ -5,6 +5,10 @@ from typing import Any
 
 from linkit_all.providers.base import LLMProvider, ProviderError, UsageLimitError, classify
 
+# No network call for LiteLLM's price list (rule: no traffic beyond the chosen provider).
+# Set before any litellm import; this module is the only place that imports it.
+os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
+
 
 class LiteLLMProvider(LLMProvider):
     name = "litellm"
