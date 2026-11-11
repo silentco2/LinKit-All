@@ -29,8 +29,8 @@ treat the folder as private. To remove everything, close the app and delete it.
 
 ## What your AI provider sees
 
-Only the provider you picked ever receives your text. With a local model, nothing leaves your
-computer. These are the cases:
+Only the provider you picked ever receives your text. With a local model, that text stays on
+your computer. These are the cases:
 
 | Task | What is sent |
 |---|---|
@@ -41,18 +41,40 @@ computer. These are the cases:
 | Careers pages without structured data | Short excerpts of job pages, 10 per call |
 | Verification emails | Only when pattern matching finds no code or link: the email text, up to about 4,000 characters |
 
-**Never sent to the AI:** answers to [sensitive questions](action-center.md#sensitive-questions)
-(visa, salary, demographics, legal), your passwords, your email app password, and anything in
-the vault.
+LinKit All never asks the AI to answer [sensitive questions](action-center.md#sensitive-questions)
+(visa, salary, demographics, legal) and never adds your saved answers to a prompt. The form
+agent does send a short piece of the page's own text to the AI, and on a site's review page that
+text can show answers already filled in. Your
+passwords, your email app password, and anything in the vault are never sent to the AI.
 
 With Codex CLI or Claude CLI, the prompt goes through that tool to your own account. LinKit All
 runs them in an empty folder with their own tools off.
 
 ## Other network traffic
 
-LinKit All talks to: the job sources you list, the application sites you apply to, your AI
-provider, your mail server (only if you connect email), and Hugging Face, once, to
-download the ranking model. It also fetches `robots.txt` files, only to read a site's `Crawl-delay`. That is all.
+LinKit All talks to:
+
+- Always: the job sources you list and the application sites you apply to. It also fetches
+  their `robots.txt` files, only to read a site's `Crawl-delay`.
+- Your AI provider (with a local model, your CV and job text stay on your computer).
+- Your mail server, only if you connect email: Gmail or Yahoo IMAP and SMTP, or Microsoft
+  sign-in and Microsoft Graph for Outlook.
+- Hugging Face, once, to download the ranking model.
+- An exchange-rate service, to refresh rates. It sends no personal data.
+- With any model used through the LiteLLM library except `openai/` ones (OpenAI, LM Studio and
+  other OpenAI-compatible servers), `openaipublic.blob.core.windows.net`: the library downloads
+  one public tokenizer file the first time, and again if the file is not kept. It carries none
+  of your data.
+- Only if you turn the feature on: the one-click LibreOffice download from the project's GitHub
+  release, Google search in the app browser for the LinkedIn hiring posts source, Google's
+  sign-in pages for "Sign in with Google", Telegram
+  channel previews (`t.me/s`) for channels you list, and Common Crawl's index when you run
+  `linkit discover-boards`.
+
+Your CV file goes to the sites and employers you apply to, as any application does. LinKit All
+itself contacts nothing else. The browser it drives, the pages that browser loads, the AI
+command-line tool you pick, and Tectonic (which downloads TeX files the first time it compiles
+a LaTeX CV) make their own connections, which the app does not control.
 
 **There is no telemetry, analytics or crash reporting.** These docs use system fonts and no
 trackers either.
