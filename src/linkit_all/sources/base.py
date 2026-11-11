@@ -19,6 +19,8 @@ SourceKind = Literal[
 # Kinds the user switches on by name in `sources.enabled`. The others are driven by something
 # else: the company list (ats, careers) or their own lists `sources.jobspy` / `sources.regional`.
 OPT_IN_KINDS: frozenset[str] = frozenset({"aggregator", "board", "company", "telegram"})
+# Default longest wait for one page. A safety net against a true hang, not a speed limit.
+PAGE_TIMEOUT = 900.0
 
 
 class JobStub(BaseModel):
@@ -75,6 +77,10 @@ class Source(ABC):
         """Should discovery ask this source for tasks? Opt-in kinds need `sources.enabled`;
         the rest decide in `tasks()` from their own config."""
         return self.kind not in OPT_IN_KINDS or self.default_on or self.name in cfg.sources.enabled
+
+    def page_timeout(self, task: Task) -> float:
+        """Seconds discover waits for one page of this task before giving up on it."""
+        return PAGE_TIMEOUT
 
     def tasks(self, cfg: SearchConfig) -> list[Task]:
         """Query-based sources expand the search config into tasks. ATS boards come from

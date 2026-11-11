@@ -443,15 +443,14 @@ def test_discover_resume_and_enrich(tmp_path: Path) -> None:
         assert {j.state for j in s.query(Job)} == {JobState.enriched}
 
 
+def jobspy_fixture_scrape(**kwargs: object) -> list[dict[str, object]]:
+    """Module-level: JobSpySite runs its scraper in a child process, which pickles it."""
+    rows = load("jobspy/python_cairo.json")
+    return [r for r in rows if r["site"] == kwargs["site_name"][0]]  # type: ignore[index, union-attr]
+
+
 def test_jobspy_tasks_mapping_and_linkedin_details(tmp_path: Path) -> None:
     from linkit_all.sources.jobspy_sites import JobSpySite
-
-    rows = load("jobspy/python_cairo.json")
-    seen: list[dict[str, object]] = []
-
-    def fake_scrape(**kwargs: object) -> list[dict[str, object]]:
-        seen.append(kwargs)
-        return [r for r in rows if r["site"] == kwargs["site_name"][0]]  # type: ignore[index, union-attr]
 
     cfg = SearchConfig.model_validate(
         {
@@ -463,10 +462,12 @@ def test_jobspy_tasks_mapping_and_linkedin_details(tmp_path: Path) -> None:
             },
         }
     )
-    indeed, linkedin, bayt = (JobSpySite(s, fake_scrape) for s in ("indeed", "linkedin", "bayt"))
+    indeed, linkedin, bayt = (
+        JobSpySite(s, jobspy_fixture_scrape) for s in ("indeed", "linkedin", "bayt")
+    )
     assert len(indeed.tasks(cfg)) == 4 and len(bayt.tasks(cfg)) == 4  # bayt via regional
     assert linkedin.tasks(cfg) == []
-    glassdoor = JobSpySite("glassdoor", fake_scrape)
+    glassdoor = JobSpySite("glassdoor", jobspy_fixture_scrape)
     assert {t.country for t in glassdoor.tasks(cfg)} == {""}  # Glassdoor gets no country
     assert {t.country for t in indeed.tasks(cfg)} == {"egypt"}
 
@@ -475,9 +476,9 @@ def test_jobspy_tasks_mapping_and_linkedin_details(tmp_path: Path) -> None:
         return [s async for page in src.search(Http(httpx.AsyncClient()), task, 0) for s in page]
 
     stubs = asyncio.run(pages(indeed))
-    assert seen[0]["country_indeed"] == "egypt" and seen[0]["hours_old"] == 14 * 24
-    asyncio.run(pages(glassdoor))
-    assert "country_indeed" not in seen[-1]  # jobspy's own default applies
+    args = indeed.scrape_args(indeed.tasks(cfg)[0])
+    assert args["country_indeed"] == "egypt" and args["hours_old"] == 14 * 24
+    assert "country_indeed" not in glassdoor.scrape_args(glassdoor.tasks(cfg)[0])  # jobspy default
     assert stubs and all(s.source == "indeed" for s in stubs)
     workable = [s for s in stubs if s.apply_url and "workable" in s.apply_url]
     assert workable and workable[0].ats == "workable"  # company ATS from job_url_direct
