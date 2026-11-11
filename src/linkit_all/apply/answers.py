@@ -298,6 +298,9 @@ _STANDARD: list[tuple[str, re.Pattern[str]]] = [
         ("third_name", r"third[ _-]?name|grandfather'?s?[ _-]?name|الاسم الثالث|اسم الجد"),
         ("last_name", r"last[ _-]?name|surname|family name|اسم العائلة|الاسم الأخير|الاسم الاخير|اللقب"),
         ("email", r"e-?mail"),
+        # before "phone": "Phone number country code" wants "+20", not the number
+        ("phone_code", r"(country|dial(l?ing)?|calling|phone|mobile)[ _-]?(number[ _-]?)?"
+                       r"(country[ _-]?)?(code|prefix)\b"),
         ("phone", r"phone|mobile"),
         # whole label only: "State why you want this job" is not a place. Before "address": address_state
         ("state", r"^(your |home |current )?(state|province|governorate)(\s*[/,]\s*(province|region|governorate|state))?"
@@ -318,6 +321,10 @@ _STANDARD: list[tuple[str, re.Pattern[str]]] = [
                       r"( ب(اللغة )?(ال)?(عربية|عربي|إنجليزية|انجليزية|إنجليزي|انجليزي))?$"),
         ("country", r"^country\b"),
         ("city", r"^(city|location|current location|location \(city\))\b"),
+        # asked as a sentence: "Where are you currently located?", "Where do you live?"
+        ("where", r"where are you (currently |presently )?(located|based|living)|"
+                  r"where do you (currently )?(live|reside)|"
+                  r"^(what is )?your current (location|city)"),
         ("heard_about", r"how did you (hear|find|learn)|where did you (hear|find|see)|referral source"),
         ("notice_period", r"notice period"),
         ("years_experience", r"years of (professional |relevant |work )?experience|how many years"),
@@ -351,10 +358,34 @@ def _name_value(key: str, q: Question, ctx: Context) -> str:
     return name_part(name_in(ctx.full_name, lang, ctx.answers.name_other), key)
 
 
+def _dial_code(iso2: str) -> str:
+    """ "EG" -> "+20"; "" when the home country is not set."""
+    from linkit_all.core.geo import country  # late: geo imports this module
+
+    found = country(iso2) if iso2 else None
+    return f"+{found.phone}" if found and found.phone else ""
+
+
+def _pick_dial(options: list[str], code: str, country_name: str) -> str | None:
+    """The option for this calling code: "Egypt (+20)", "+20", "EG +20". Countries that share
+    a code (+1) are told apart by name."""
+    hits = [o for o in options if re.search(rf"\+\s*{re.escape(code[1:])}(?!\d)", o)]
+    named = [o for o in hits if country_name and country_name.lower() in o.lower()]
+    if named or len(hits) == 1:
+        return (named or hits)[0]
+    return pick_option(options, country_name) if country_name else None
+
+
 def _standard_value(key: str, ctx: Context) -> Any:
     a = ctx.answers
+    country = (
+        _country_name(ctx.home_country) or a.country or (country_of(ctx.location) or "").title()
+    )
+    city = ctx.home_city or a.city
     values: dict[str, Any] = {
         "email": ctx.email,
+        "phone_code": _dial_code(ctx.home_country),
+        "where": ", ".join(p for p in (city, country) if p) or ctx.location,
         "phone": ctx.phone,
         "linkedin": a.linkedin,
         "github": a.github,
@@ -363,10 +394,8 @@ def _standard_value(key: str, ctx: Context) -> Any:
         "current_title": a.current_title,
         "address": ctx.address,
         "postal_code": ctx.postal_code,
-        "country": _country_name(ctx.home_country)
-        or a.country
-        or (country_of(ctx.location) or "").title(),
-        "city": ctx.home_city or a.city or ctx.location,
+        "country": country,
+        "city": city or ctx.location,
         "state": ctx.home_state,
         "heard_about": a.heard_about or _SOURCE_NAMES.get(ctx.job_source, "Company website"),
         "notice_period": a.notice_period,
@@ -391,6 +420,11 @@ def standard_answer(q: Question, ctx: Context) -> Any:
         if q.kind in CHOICE_KINDS or q.kind == "multi":
             if key == "years_experience":
                 return _pick_range(q.options, int(value))
+            if key == "phone_code":
+                return _pick_dial(q.options, value, _standard_value("country", ctx))
+            if key == "where":  # a list of cities, or only of countries
+                city, _, country = value.rpartition(", ")
+                return pick_option(q.options, city) or pick_option(q.options, country)
             picked = pick_option(q.options, value)
             return [picked] if picked and q.kind == "multi" else picked
         return value
