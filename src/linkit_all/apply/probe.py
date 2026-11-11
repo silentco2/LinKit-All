@@ -14,12 +14,13 @@ from pathlib import Path
 from statistics import median
 from urllib.parse import urlparse
 
+from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from linkit_all.apply.email_apply import mailto_address
 from linkit_all.apply.handlers import HANDLERS
-from linkit_all.apply.runner import Applier, _web_url
+from linkit_all.apply.runner import Applier, ApplyBlocked, _web_url
 from linkit_all.core.config import Settings
 from linkit_all.core.models import ActionItem, ActionStatus, Job, JobEvent, JobState, utcnow
 from linkit_all.core.search import SearchConfig
@@ -167,7 +168,14 @@ async def probe(
                 outcome = await applier.apply(job_id)
                 took = time.perf_counter() - start
                 rows.append(_row(db, job_id, outcome.status, outcome.message, took))
-            except Exception as e:  # e.g. AI usage limit: report it, keep the rest
+            except ApplyBlocked as e:
+                # The AI is out of quota (or a tool is missing): every job after this one would
+                # end the same way, so stop here. The job waits, untouched; no row for it.
+                if before in _GIVE_BACK:
+                    give_back(db, job_id, before)
+                logger.warning("apply test stopped at job {}: {}", job_id, e)
+                break
+            except Exception as e:  # one broken site must not end the test
                 took = time.perf_counter() - start
                 rows.append(_row(db, job_id, "error", f"{type(e).__name__}: {e}", took))
             if before in _GIVE_BACK:

@@ -1,6 +1,8 @@
 import asyncio
 import json
+import re
 from pathlib import Path
+from typing import Any
 
 import docx
 import pymupdf
@@ -204,7 +206,8 @@ class FakeProvider(LLMProvider):
 
 
 def test_tailor_job_stores_version_and_transitions(tmp_path: Path) -> None:
-    settings = Settings(data_dir=tmp_path / "data")
+    # the claim check has its own tests below; this provider only knows how to propose patches
+    settings = Settings(data_dir=tmp_path / "data", tailor_claim_check=False)
     db = init_db(settings.db_path)
     cv = make_cv(tmp_path / "cv.docx")
     import_profile(
@@ -259,3 +262,74 @@ def test_a_known_tool_is_refused_however_it_is_written() -> None:
     assert _why("runbooks", "python") is None  # a listed skill
     # ordinary words that are also tool names stay usable in a rewording
     assert _why("runbooks", "the rest") is None
+
+
+# --- the claim check: a second opinion on what the rules accept -----------------
+
+
+class _Checker(LLMProvider):
+    """Proposes `patches`; asked to check, flags the items whose AFTER contains `flag`."""
+
+    name = "fake"
+
+    def __init__(self, patches: list[dict[str, Any]], flag: str = "", broken: bool = False) -> None:
+        super().__init__("fake")
+        self.patches, self.flag, self.broken = patches, flag, broken
+        self.checked: list[str] = []
+
+    async def _call(self, prompt: str) -> str:
+        if not prompt.startswith("You check edits to a CV"):
+            return json.dumps({"patches": self.patches})
+        if self.broken:
+            return "not json"
+        items = re.findall(r"^\[(\d+)\]\nBEFORE: .*\nAFTER: (.*)$", prompt, re.M)
+        self.checked = [after for _, after in items]
+        return json.dumps(
+            {"verdicts": [{"index": int(i), "adds": bool(self.flag) and self.flag in after,
+                           "why": "bigger role"} for i, after in items]}
+        )  # fmt: skip
+
+
+def _tailor_with(tmp_path: Path, ai: LLMProvider, **settings: Any) -> Any:
+    from linkit_all.core.config import Settings
+    from linkit_all.core.models import Profile
+    from linkit_all.tailor.pipeline import tailor_for
+
+    cv = make_cv(tmp_path / "cv.docx")
+    profile = Profile(id=1, full_name="J", email="j@x.io", cv_path=str(cv), skills=["Python"])
+    conf = Settings(data_dir=tmp_path / "data", **settings)
+    return asyncio.run(
+        tailor_for(
+            profile, [], "Engineer", "Acme", "Python", ai, conf, tmp_path / "out", fake_render
+        )
+    )
+
+
+def _two_patches(tmp_path: Path) -> list[dict[str, Any]]:
+    cv = make_cv(tmp_path / "probe.docx")
+    return [
+        {"segment_id": seg_id(cv, "Mentored"), "old_text": "Mentored", "new_text": "Coached"},
+        {"segment_id": seg_id(cv, "Improved"), "old_text": "Improved", "new_text": "Reduced"},
+    ]
+
+
+def test_claim_check_refuses_what_the_reader_flags_and_keeps_the_rest(tmp_path: Path) -> None:
+    ai = _Checker(_two_patches(tmp_path), flag="Coached")
+    result = _tailor_with(tmp_path, ai)
+    assert [p.new_text for p in result.applied] == ["Reduced"]
+    assert [(p.new_text, why) for p, why in result.rejected] == [
+        ("Coached", "says more than your CV does: bigger role")
+    ]
+    assert len(ai.checked) == 2  # only patches the rules accept are sent to the reader
+
+
+def test_claim_check_that_cannot_be_read_refuses_every_patch(tmp_path: Path) -> None:
+    result = _tailor_with(tmp_path, _Checker(_two_patches(tmp_path), broken=True))
+    assert result.applied == []
+    assert {why for _, why in result.rejected} == {"could not be checked for new claims"}
+
+
+def test_claim_check_can_be_switched_off(tmp_path: Path) -> None:
+    ai = _Checker(_two_patches(tmp_path), flag="Coached")
+    result = _tailor_with(tmp_path, ai, tailor_claim_check=False)
+    assert len(result.applied) == 2 and ai.checked == []

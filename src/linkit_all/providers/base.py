@@ -89,7 +89,11 @@ class UsageLimitError(ProviderError):
         super().__init__(self.message)
 
 
-_LIMIT = re.compile(r"(?i)usage.?limit|rate.?limit|quota|limit reached|too many requests|\b429\b")
+# Claude Code also says "You've hit your session limit · resets 5:30am" (or weekly, or Opus).
+_LIMIT = re.compile(
+    r"(?i)usage.?limit|rate.?limit|session.?limit|weekly.?limit|hit your (?:[\w-]+ ){0,2}limit"
+    r"|quota|limit reached|too many requests|\b429\b"
+)
 _FENCE = re.compile(r"```(?:json)?\s*(.*?)```", re.S)
 
 

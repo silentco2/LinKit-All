@@ -352,6 +352,8 @@ def bench(
         int,
         typer.Option(min=0, help="Also fill this many fake application forms (needs a browser)."),
     ] = 0,
+    provider: ProviderOpt = None,
+    model: ModelOpt = None,
 ) -> None:
     """Measure finding, ranking and the CV tailoring guard on built-in fake data, and with
     --apply the form filling too (practice mode: nothing is submitted). Touches none of your
@@ -367,7 +369,9 @@ def bench(
     embed = Embedder(settings.embedding_model, settings.data_dir / "models")
     # ignore_cleanup_errors: Windows may still hold the SQLite file when the folder goes
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
-        result = asyncio.run(run_bench(jobs, seed, embed, Path(tmp), apply))
+        # only the CV claim check uses it: the one judgement the scripted AI cannot fake
+        checker = get_provider(_settings(provider, model)) if provider else None
+        result = asyncio.run(run_bench(jobs, seed, embed, Path(tmp), apply, checker))
     out.write_text(json.dumps(result, indent=2), encoding="utf-8")
     q, t = result["quality"], result["timing"]
     typer.echo(f"{jobs} jobs in {t['total_s']} s ({t['jobs_per_minute']} jobs/minute)")
@@ -386,6 +390,7 @@ def bench(
         f"tailor  honest edits accepted {tl['honest_accepted']}, invented edits refused "
         f"{tl['invented_refused']}, layout {'ok' if tl['layout']['ok'] else 'CHANGED'}"
         + ("" if tl["layout"]["checked"] else " (not checked: no LibreOffice)")
+        + f", claim check: {tl['claim_check']}"
     )
     if a := result.get("apply"):
         typer.echo(
@@ -407,6 +412,8 @@ def apply_probe(
     scorecard: Annotated[
         Path | None, typer.Option(help="Also write a per-platform summary to this file.")
     ] = None,
+    provider: ProviderOpt = None,
+    model: ModelOpt = None,
 ) -> None:
     """Practice-mode apply of one job per source, then a report of where each one got to.
     Nothing is submitted; the CV is sent as uploaded."""
@@ -428,10 +435,16 @@ def apply_probe(
     typer.echo(f"Trying {len(ids)} jobs in Practice mode...")
 
     async def go() -> list[Any]:
-        provider = get_provider(ai_settings(settings, cfg), cache=db)
-        return await probe(db, settings, cfg, provider, await _get_embedder(settings), ids)
+        override = {k: v for k, v in {"provider": provider, "model": model}.items() if v}
+        ai = get_provider(ai_settings(settings, cfg, override), cache=db)
+        return await probe(db, settings, cfg, ai, await _get_embedder(settings), ids)
 
     rows = asyncio.run(go())
+    if len(rows) < len(ids):
+        typer.secho(
+            f"Stopped after {len(rows)} of {len(ids)} jobs: the AI is not available right now.",
+            fg="yellow",
+        )
     for r in rows:
         typer.echo(f"{r.job_id:>6} {r.source:<16} {r.status:<10} {r.code:<20} {r.host}")
     typer.echo(f"Report: {report(rows, settings.data_dir / 'applications')}")

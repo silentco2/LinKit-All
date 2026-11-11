@@ -23,8 +23,9 @@ from linkit_all.bench.data import CV_SKILLS
 from linkit_all.core.config import Settings
 from linkit_all.core.models import Profile
 from linkit_all.core.tools import soffice_path
+from linkit_all.providers.base import LLMProvider
 from linkit_all.tailor.patches import Patch, Rules, plan_patches, vocabulary
-from linkit_all.tailor.pipeline import cv_segments, tailor_for
+from linkit_all.tailor.pipeline import cv_segments, tailor_for, vet_claims
 
 CONTACT = "jane@example.com | +20 100 000 0000 | Cairo, Egypt"
 SUMMARY = (
@@ -143,7 +144,11 @@ def _stand_in_render(src: Path, out_dir: Path) -> Path:
     return pdf
 
 
-async def run_tailor(work: Path, settings: Settings) -> dict[str, Any]:
+async def run_tailor(
+    work: Path, settings: Settings, checker: LLMProvider | None = None
+) -> dict[str, Any]:
+    """`checker`: a real model for the claim check. Without one the scripted stand-in says
+    "no new claim" to everything, so the result shows what the rules alone catch."""
     cv = make_cv(work / "tailor_cv.docx")
     segments = [s for s in cv_segments(cv) if s.text]
     texts = {seg.id: seg.text for seg in segments}
@@ -154,7 +159,9 @@ async def run_tailor(work: Path, settings: Settings) -> dict[str, Any]:
         settings.tailor_max_word_change,
     )
     ai = ScriptedAI()
+    ai.checker = checker
     verdict: dict[Case, str | None] = {}  # why the guard refuses the patch; None = it accepts
+    made: dict[Case, Patch] = {}
     for c in CASES:
         # a model names the segment it edits; one that names text found nowhere gets segment 0
         home = next((seg.id for seg in segments if c.old in seg.text), segments[0].id)
@@ -164,6 +171,12 @@ async def run_tailor(work: Path, settings: Settings) -> dict[str, Any]:
         plan = plan_patches(texts, [patch], rules)
         verdict[c] = plan.rejected[0][1] if plan.rejected else None
         ai.patches.append(patch.model_dump())
+        made[c] = patch
+    if checker is not None:  # the patches the rules let through go to the reader
+        passed = [c for c in CASES if verdict[c] is None]
+        refused = await vet_claims(texts, [made[c] for c in passed], rules, ai)
+        for c in passed:
+            verdict[c] = next((why for p, why in refused if p is made[c]), None)
     profile = Profile(
         id=1, full_name="Jane Doe", email="jane@example.com", cv_path=str(cv), skills=CV_SKILLS
     )
@@ -188,6 +201,7 @@ async def run_tailor(work: Path, settings: Settings) -> dict[str, Any]:
         ],
         "refusals": {f"{c.what}: {c.new!r}": verdict[c] for c in invented if verdict[c]},
         "applied_together": len(result.applied),
+        "claim_check": f"{checker.name} {checker.model or ''}".strip() if checker else "rules only",
         "layout": {
             "checked": real,  # False: no LibreOffice, pages drawn by a stand-in
             "ok": bool(v and v.ok),
