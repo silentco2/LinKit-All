@@ -53,12 +53,15 @@ def test_scorecard_counts_per_platform_and_says_why_the_rest_stopped() -> None:
             row(3, "needs_user", "captcha", "greenhouse", 9),
             row(4, "needs_user", "captcha", "form agent", 30),
             row(5, "error", "", "form agent", 2),
+            row(6, "dry_run", "dry_run_signup", "form agent", 4),
         ],
         datetime(2026, 11, 11),
     )
-    assert "2026-11-11: 5 real job postings" in text
-    assert "| greenhouse | 3 | 2 (67%) | 1 | 0 | 0 | 20 s |" in text
-    assert "| form agent | 2 | 0 (0%) | 1 | 1 | 0 | 16 s |" in text
+    assert "2026-11-11: 6 real job postings" in text
+    assert "| greenhouse | 3 | 2 (67%) | 0 | 1 | 0 | 0 | 20 s |" in text
+    # a form behind a sign-up page is not counted as filled
+    assert "| form agent | 3 | 0 (0%) | 1 | 1 | 1 | 0 | 4 s |" in text
+    assert "| form agent | dry_run | dry_run_signup | 1 |" in text
     assert "| greenhouse | needs_user | captcha | 1 |" in text
     assert "| form agent | error | - | 1 |" in text
     assert "secret detail" not in text and "h.io" not in text  # counts only

@@ -38,6 +38,7 @@ _STATES = [
     JobState.below_threshold,
 ]
 AGENT = "form agent"  # every site without its own handler
+SIGNUP = "dry_run_signup"  # reached a sign-up page: as far as practice mode goes
 # picked only for the test: put back afterwards
 _GIVE_BACK = {JobState.awaiting_review, JobState.scored, JobState.below_threshold}
 
@@ -212,18 +213,24 @@ def scorecard(rows: list[ProbeRow], when: datetime) -> str:
         f"Practice mode, {when:%Y-%m-%d}: {len(rows)} real job postings, forms filled and "
         "nothing submitted. The CV was sent as uploaded.",
         "",
-        "| platform | tried | filled to the end | needs you | failed | skipped | median time |",
-        "|---|---|---|---|---|---|---|",
+        "| platform | tried | filled to the end | account needed | needs you | failed "
+        "| skipped | median time |",
+        "|---|---|---|---|---|---|---|---|",
     ]
     for name, group in sorted(by.items(), key=lambda kv: (-len(kv[1]), kv[0])):
         n = Counter(r.status for r in group)
+        # Practice mode never creates an account, so a form behind a sign-up is not filled.
+        signup = sum(r.code == SIGNUP for r in group)
+        filled = n["dry_run"] - signup
         took = median(r.seconds for r in group)
         out.append(
-            f"| {name} | {len(group)} | {n['dry_run']} ({n['dry_run'] / len(group):.0%}) "
+            f"| {name} | {len(group)} | {filled} ({filled / len(group):.0%}) | {signup} "
             f"| {n['needs_user']} | {n['failed'] + n['error']} | {n['skipped']} | {took:.0f} s |"
         )
     stops = Counter(
-        (r.platform or AGENT, r.status, r.code or "-") for r in rows if r.status != "dry_run"
+        (r.platform or AGENT, r.status, r.code or "-")
+        for r in rows
+        if r.status != "dry_run" or r.code == SIGNUP
     )
     if stops:
         out += ["", "## Why the others stopped", "", "| platform | result | reason | jobs |",
