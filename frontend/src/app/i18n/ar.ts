@@ -1267,7 +1267,7 @@ export const ar: Record<string, string> = {
   'lo.size': 'حجم التنزيل 145 ميجابايت، ونحو 440 ميجابايت بعد التثبيت، في مجلد LinKit',
   'lo.installing': 'جارٍ تثبيت LibreOffice… {pct}',
   'lo.get': 'احصل على LibreOffice',
-  'lo.getHint': 'ثبّته ثم عُد واضغط «تحقق مرة أخرى».',
+  'lo.getHint': 'التثبيت بضغطة واحدة متاح على Windows فقط. على Mac أو Linux ثبّته (على Linux من مدير الحزم)، ثم عُد واضغط «تحقق مرة أخرى».',
   'lo.check': 'تحقق مرة أخرى',
   'lo.notFound': 'لم نجد LibreOffice بعد. تأكد من اكتمال التثبيت ثم اضغط «تحقق مرة أخرى».',
   'lo.decline': 'استخدم سيرتي كما هي',

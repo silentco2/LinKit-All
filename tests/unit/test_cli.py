@@ -109,3 +109,11 @@ def test_discover_boards_prints_counts_and_reports_errors(
     result = runner.invoke(cli.app, ["discover-boards"])
     assert result.exit_code == 1 and "Common Crawl is unreachable" in result.output
     get_settings.cache_clear()
+
+
+def test_libreoffice_hint_fits_the_os(monkeypatch: pytest.MonkeyPatch) -> None:
+    from linkit_all import cli
+
+    for platform, word in (("darwin", "brew"), ("linux", "libreoffice-writer"), ("win32", "app")):
+        monkeypatch.setattr(cli.sys, "platform", platform)
+        assert word in cli.lo_hint()

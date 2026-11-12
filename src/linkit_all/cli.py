@@ -48,11 +48,20 @@ class Check(NamedTuple):
     hint: str
 
 
+def lo_hint() -> str:
+    """How to get LibreOffice here: the one-click bundle is Windows only."""
+    if sys.platform == "darwin":
+        return "brew install --cask libreoffice, or https://www.libreoffice.org/download/"
+    if sys.platform.startswith("linux"):
+        return "install your distribution's libreoffice-writer package (apt, dnf, pacman)"
+    return 'https://www.libreoffice.org/download/, or "Install it for me" in the app'
+
+
 def run_checks() -> list[Check]:
     py_ok = sys.version_info >= (3, 11)
     return [
         Check("Python >= 3.11", sys.executable if py_ok else None, True, "uv python install 3.12"),
-        Check("LibreOffice", soffice_path(), True, "https://www.libreoffice.org/download/"),
+        Check("LibreOffice", soffice_path(), True, lo_hint()),
         Check("Chromium browser", browser_path(), False, f"needed to apply: {CHROMIUM_HINT}"),
         Check("Codex CLI", shutil.which("codex"), False, "npm i -g @openai/codex"),
         Check("Claude CLI", shutil.which("claude"), False, "https://claude.com/claude-code"),

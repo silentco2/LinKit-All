@@ -181,6 +181,13 @@ def real_user_agent(headless_ua: str) -> str:
     return headless_ua.replace("HeadlessChrome/", "Chrome/")
 
 
+def has_screen() -> bool:
+    """Linux without X11 or Wayland (a server, SSH, a container) cannot show a window."""
+    if not sys.platform.startswith("linux"):
+        return True
+    return bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
+
+
 def _needs_no_sandbox() -> bool:
     geteuid = getattr(os, "geteuid", None)
     return geteuid is not None and geteuid() == 0  # root or a container: the sandbox cannot start
@@ -346,6 +353,11 @@ async def launch_chrome(
     exe = browser_path()
     if exe is None:
         raise ChromeError(f"No Chromium browser is installed: {CHROMIUM_HINT}")
+    if not headless and not has_screen():
+        raise ChromeError(
+            "No screen to show the browser on: turn off Settings > Applying > "
+            "Show the browser window"
+        )
     identity = await _headless_identity(exe, timeout) if headless else None
     proc, port, info = await _start(exe, profile_dir, headless=headless, timeout=timeout)
     running = RunningChrome(proc, port, profile_dir, f"http://127.0.0.1:{port}")

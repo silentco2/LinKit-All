@@ -1149,7 +1149,7 @@ export const en: Record<string, string> = {
   'lo.size': "A 145 MB download, about 440 MB installed, in LinKit's folder",
   'lo.installing': 'Installing LibreOffice… {pct}',
   'lo.get': 'Get LibreOffice',
-  'lo.getHint': 'Install it, then come back and press "Check again".',
+  'lo.getHint': 'One-click install is for Windows only. On a Mac or Linux, install it (Linux: your package manager), then come back and press "Check again".',
   'lo.check': 'Check again',
   'lo.notFound': 'LibreOffice was not found yet. Make sure the installation finished, then press "Check again".',
   'lo.decline': 'Use my CV as it is',

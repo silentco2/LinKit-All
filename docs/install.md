@@ -28,6 +28,60 @@ linkit doctor
     only after the first release. Until then, run it from a source checkout. See
     [Development](development.md).
 
+### Step by step for your system
+
+=== "Windows"
+
+    ```powershell
+    powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+    uv tool install linkit-all
+    linkit doctor
+    linkit
+    ```
+
+    Edge comes with Windows, so you need no other browser. When LibreOffice is missing, the
+    app offers **Install it for me**.
+
+=== "macOS"
+
+    ```bash
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    brew install --cask libreoffice
+    uv tool install linkit-all
+    linkit doctor
+    linkit
+    ```
+
+    Without Homebrew, get LibreOffice from [libreoffice.org](https://www.libreoffice.org/download/).
+    LinKit All finds Chrome, Edge, Brave, Chromium and LibreOffice in `/Applications` or in
+    your own `~/Applications`. The first time the vault remembers its key, macOS asks you to
+    allow LinKit All to use the Keychain.
+
+=== "Linux (Debian, Ubuntu)"
+
+    ```bash
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    sudo apt install libreoffice-writer
+    uv tool install linkit-all
+    linkit doctor
+    linkit
+    ```
+
+    On Fedora use `sudo dnf install libreoffice-writer`; on Arch, `sudo pacman -S libreoffice-fresh`.
+    For applying, install [Google Chrome](https://www.google.com/chrome/) from its `.deb` or
+    `.rpm` package. Ubuntu's own Chromium is a Snap, and a Snap cannot open the browser profiles
+    LinKit All keeps in its hidden data folder.
+
+    - **No screen** (a server or an SSH session): turn off **Settings > Applying > Show the
+      browser window**, or the browser cannot start.
+    - **No keyring** (no GNOME Keyring or KWallet running): everything works, but the vault
+      cannot remember its key, so it asks for your passphrase again after each restart.
+
+!!! note "What has been tested"
+    Every change runs the unit tests and a 1,000-job benchmark on Windows, macOS and Linux
+    (GitHub Actions). The full path above, from a clean machine to a practice run, has been
+    checked by hand on Windows only so far.
+
 `linkit doctor` checks every outside tool and tells you what is missing. Each line starts
 with `ok`, `MISSING` or `optional`:
 
