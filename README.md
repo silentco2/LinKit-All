@@ -70,7 +70,7 @@ Real sites: `uv run linkit apply-probe` tries real postings in Practice mode. Th
   - only if you turn it on: the one-click LibreOffice download from the project's GitHub release, Google search in the app browser for the LinkedIn hiring posts source, Google's sign-in pages if you turn on "Sign in with Google", Telegram channel previews (`t.me/s`) for channels you list, and Common Crawl's index when you run `linkit discover-boards`.
 - LinKit All itself contacts nothing else. The browser it drives, the pages that browser loads, the AI command-line tool you pick, and Tectonic (which downloads TeX files the first time it compiles a LaTeX CV) make their own connections, which the app does not control.
 - There is no telemetry, analytics or crash reporting.
-- LinKit All never asks the AI to answer sensitive questions and never adds your saved answers to a prompt. The form agent does send a short piece of the page's own text to the AI, and on a site's review page that text can show answers already filled in. Your passwords are never sent to the AI.
+- LinKit All never asks the AI to answer sensitive questions and never adds your saved answers to a prompt. The form agent does send a short piece of the page's own text to the AI, with your sensitive answers removed first. A value shown in a different form can still get through; see [docs/privacy.md](docs/privacy.md). Your passwords are never sent to the AI.
 
 Details: [Privacy and security](docs/privacy.md).
 

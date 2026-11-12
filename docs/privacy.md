@@ -43,8 +43,13 @@ your computer. These are the cases:
 
 LinKit All never asks the AI to answer [sensitive questions](action-center.md#sensitive-questions)
 (visa, salary, demographics, legal) and never adds your saved answers to a prompt. The form
-agent does send a short piece of the page's own text to the AI, and on a site's review page that
-text can show answers already filled in. Your
+agent does send a short piece of the page's own text to the AI. Before page text goes to your AI
+provider, LinKit All removes your sensitive answers as they are stored in your profile or as you
+gave them in the app. A value can still get through when the page shows it in a different form (a
+date written another way, a country name instead of its code, the site's own wording for an
+option), or when you chose it yourself on the site instead of through LinKit All. Very short
+answers such as "Yes" or "No" are removed from page text but not from question labels. If the code
+in a verification email cannot be read automatically, that email's text is sent to the AI. Your
 passwords, your email app password, and anything in the vault are never sent to the AI.
 
 With Codex CLI or Claude CLI, the prompt goes through that tool to your own account. LinKit All
