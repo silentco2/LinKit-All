@@ -25,12 +25,20 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from linkit_all.apply.agent import Control, page_questions
-from linkit_all.apply.answers import is_cover_letter, sensitive_category
+from linkit_all.apply.answers import (
+    ApplicationAnswers,
+    is_cover_letter,
+    remember_secrets,
+    scrub,
+    secrets_seen,
+    sensitive_category,
+)
 from linkit_all.apply.assist import (
     AnswerBank,
     answer_questions,
     keepable,
     profile_summary,
+    remember_bank_secrets,
     role_key,
     scope_of,
 )
@@ -219,12 +227,24 @@ class PlanIn(BaseModel):
     controls: list[ControlIn] = Field(max_length=400)
 
 
+def _seed_secrets(db: sessionmaker[Session]) -> None:
+    """Page words go to the AI only after `scrub` hides the user's sensitive answers (§2): the
+    profile's and the ones typed in the Action Center. Call before using any page text."""
+    with db() as s:
+        profile = s.get(Profile, 1)
+        if profile is not None:
+            remember_secrets(ApplicationAnswers.model_validate(profile.answers))
+    remember_bank_secrets(db)
+
+
 def _page_job(body: PlanIn) -> Job:
     """Stands in for a job on a page that is none of the waiting ones (never saved). No title
-    and no company, so an answer tied to a role or company is not kept for later."""
+    and no company, so an answer tied to a role or company is not kept for later. The single
+    point where the page's text enters a prompt, so it is scrubbed here."""
+    title, text = scrub(body.title, secrets_seen), scrub(body.text, secrets_seen)
     return Job(
         source="page", url="", title="", company="Unknown", location="",
-        description=f"{body.title}\n{body.text}", dedupe_hash="", data={},
+        description=f"{title}\n{text}", dedupe_hash="", data={},
     )  # fmt: skip
 
 
@@ -239,6 +259,7 @@ async def plan(
     from linkit_all.providers import ProviderError, UsageLimitError, get_provider
 
     db, settings = _db(request), _settings(request)
+    _seed_secrets(db)
     with db() as s:
         job = _page_job(body) if body.job_id is None else s.get(Job, body.job_id)
         profile = s.get(Profile, 1)
@@ -396,6 +417,9 @@ def _mail_job(s: Session, cfg: SearchConfig, addr: str, body: MailIn) -> Job:
             page.company if page and page.company != "Unknown" else company_of(body.near, addr)
         )
         text = page.description if page else f"{body.page.title}\n{body.near}"
+        text = scrub(
+            text, secrets_seen
+        )  # the description goes to the AI (§2); title/company are sent as is
         job = Job(
             source="linkit_mail", url=url, title=title, company=company, location="",
             description=text, dedupe_hash=job_hash(title, company, ""),
@@ -438,6 +462,7 @@ async def email(
     if not valid_address(addr):
         raise HTTPException(422, "That is not a single email address")
     db, settings = _db(request), _settings(request)
+    _seed_secrets(db)
     cfg = load_search(db) or SearchConfig()
     if not cfg.apply.live:
         raise HTTPException(

@@ -59,7 +59,12 @@ from linkit_all.apply.answers import (
     Question,
     reason_code,
 )
-from linkit_all.apply.assist import AnswerBank, answer_questions, profile_summary
+from linkit_all.apply.assist import (
+    AnswerBank,
+    answer_questions,
+    profile_summary,
+    remember_bank_secrets,
+)
 from linkit_all.apply.browser import live_frames, live_shot_path, profile_dir
 from linkit_all.apply.email_apply import (
     attachment_copy,
@@ -1241,8 +1246,9 @@ class Applier:
             controls = await snapshot(page)
             if not controls:
                 return False
+            remember_bank_secrets(self.db)
             fmap = await field_map(
-                self.provider, controls, await page.title(), await page_text(page)
+                self.provider, controls, await page.title(), await page_text(page, 2000)
             )
         except Exception:
             return False

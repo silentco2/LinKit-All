@@ -5,6 +5,7 @@ Order per question: standard profile fields -> sensitive rules (profile only, ne
 """
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any, Literal
@@ -578,3 +579,57 @@ def valid_for(q: Question, value: Any) -> bool:
     if q.kind == "checkbox":
         return isinstance(value, bool)
     return isinstance(value, str)
+
+
+# --- sensitive answers never reach the AI (CLAUDE.md section 2) ---------------------------------
+# A page repeats them (a review page, a pre-filled form), so every prompt that carries page words
+# is scrubbed with the values below: the form agent, LinkIt Fill (`api/assist.py`) and LinkIt mail.
+# ponytail: module-level, never cleared (a few short strings); make it per-application if needed.
+secrets_seen: set[str] = set()
+_SECRET_FIELDS = (
+    "salary_expectation", "eeo_gender", "eeo_race", "eeo_hispanic", "eeo_veteran",
+    "eeo_disability", "military_status", "nationality", "date_of_birth", "marital_status",
+)  # fmt: skip
+# ponytail: dates are matched as typed (2000-01-31); "31/01/2000" or "Jan 31, 2000" are not.
+_GROUP_SEPS = (",", ".", " ", "'")  # a space also matches a no-break space
+
+
+def _variants(v: str) -> set[str]:
+    v = " ".join(v.split())
+    out = {v}
+    if v.isdigit() and len(v) > 3 and v[0] != "0":  # a salary: also with thousands separators
+        out |= {f"{int(v):,}".replace(",", sep) for sep in _GROUP_SEPS}
+    return out
+
+
+def scrub(text: str, secrets: Iterable[str], min_len: int = 0) -> str:
+    """`text` with each secret replaced by [hidden]: any case, longest first, any whitespace run
+    between its words, whole words only on a side where the secret ends in a word character.
+    `min_len`: ignore shorter secrets ("No", "M" would eat ordinary words in a question)."""
+    found = {
+        w
+        for s in secrets
+        if isinstance(s, str) and len(" ".join(s.split())) >= max(min_len, 1)
+        for w in _variants(s)
+    }
+    for v in sorted(found, key=len, reverse=True):
+        left = r"(?<!\w)" if re.match(r"\w", v[0]) else ""
+        right = r"(?!\w)" if re.match(r"\w", v[-1]) else ""
+        body = re.escape(v).replace(r"\ ", r"\s+")
+        text = re.sub(f"{left}{body}{right}", "[hidden]", text, flags=re.I)
+    return text
+
+
+def remember_secrets(
+    answers: ApplicationAnswers,
+    questions: list[Question] | None = None,
+    filled: dict[str, Any] | None = None,
+) -> None:
+    """Note the profile's sensitive values and the values just filled for sensitive questions."""
+    secrets_seen.update(
+        str(v) for f in _SECRET_FIELDS if isinstance(v := getattr(answers, f), str) and v
+    )
+    for q in questions or []:
+        v = (filled or {}).get(q.key)
+        if sensitive_category(q) and v is not None and not isinstance(v, bool):
+            secrets_seen.update(v if isinstance(v, list) else [str(v)])

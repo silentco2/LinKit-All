@@ -16,6 +16,7 @@ import linkit_all.pipeline
 import linkit_all.providers
 from linkit_all.api.app import create_app
 from linkit_all.apply import runner
+from linkit_all.apply.answers import secrets_seen
 from linkit_all.apply.vault import Vault
 from linkit_all.core.config import Settings
 from linkit_all.core.models import Job, JobState, Profile
@@ -91,6 +92,18 @@ def test_no_title_found_and_the_daily_cap(client: TestClient, smtp: type[FakeSMT
     save_search(db, SearchConfig.model_validate({"apply": {"live": True, "email_daily_cap": 1}}))
     capped = mail(client, "hr@other.com")
     assert capped.status_code == 429 and len(smtp.instances) == 1
+
+
+def test_title_is_raw_and_description_is_scrubbed(client: TestClient, smtp: type[FakeSMTP]) -> None:
+    secrets_seen.add("no")
+    try:
+        r = mail(client, near="Position: No-code Developer\nSend your CV to hr@acme.com")
+    finally:
+        secrets_seen.clear()
+    assert r.status_code == 200
+    row = job(client, "hr@acme.com")
+    assert row.title == "No-code Developer" and "No-code" not in row.description
+    assert "[hidden]-code" in row.description
 
 
 def test_practice_mode_sends_nothing(client: TestClient, smtp: type[FakeSMTP]) -> None:

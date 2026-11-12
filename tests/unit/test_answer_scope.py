@@ -360,3 +360,18 @@ def test_a_job_with_no_tailored_cv_sends_the_users_own(env: Any) -> None:
     assert plan(c, ids["Acme"], upload)["fill"] == {"f": "cv"}
     assert c.get(f"/api/assist/cv/{ids['Acme']}", headers=h).status_code == 200
     assert c.get("/api/assist/cv/0", headers=h).status_code == 200
+
+
+def test_a_sensitive_bank_answer_in_the_page_text_never_reaches_the_ai(env: Any) -> None:
+    from linkit_all.apply.answers import secrets_seen
+
+    c, ai, _ = env
+    secrets_seen.clear()
+    try:
+        with c.app.state.db.begin() as s:
+            s.add(AnswerEntry(question="Pay?", answer="Zorbian-77", source="user", sensitive=True))
+        got = page_plan(c, WHY, text="You said Zorbian-77 earlier", title="Hi Zorbian-77")
+        assert got["fill"] == {"c": "Drafted"} and ai.prompts
+        assert not any("Zorbian-77" in p for p in ai.prompts)
+    finally:
+        secrets_seen.clear()

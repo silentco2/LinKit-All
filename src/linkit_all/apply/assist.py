@@ -1,6 +1,7 @@
 """Answer bank lookups, AI drafts (non-sensitive only) and cover letters."""
 
 import re
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, NamedTuple
 
@@ -20,6 +21,8 @@ from linkit_all.apply.answers import (
     pick_canonical,
     pick_option,
     resolve_static,
+    scrub,
+    secrets_seen,
     valid_for,
 )  # fmt: skip
 from linkit_all.core.models import AnswerEntry
@@ -172,6 +175,14 @@ class AnswerBank:
         self._entries = None
 
 
+def remember_bank_secrets(db: sessionmaker[Session]) -> None:
+    """Note the sensitive answers the user typed (a site may pre-fill or show them back)."""
+    with db() as s:
+        for a in s.scalars(select(AnswerEntry.answer).where(AnswerEntry.sensitive.is_(True))):
+            if a is not None and not isinstance(a, bool):
+                secrets_seen.update(a if isinstance(a, list) else [str(a)])
+
+
 def _fit(q: Question, answer: Any) -> Any:
     """A saved answer reshaped for this form's options, or None if it does not fit."""
     if valid_for(q, answer):
@@ -206,8 +217,18 @@ async def ai_drafts(
 ) -> dict[str, Any]:
     if not questions:
         return {}
+    # Only the prompt text is scrubbed (§2): a secret in a label must not leak, but the keys, the
+    # bank and `sensitive_category` (already run on these questions) keep the real words.
+    shown = [
+        replace(
+            q,
+            label=scrub(q.label, secrets_seen, 4),
+            description=scrub(q.description, secrets_seen, 4),
+        )
+        for q in questions
+    ]
     prompt = render(
-        "answer.j2", questions=questions, cv=cv[:6000], profile=profile, job=_job_brief(job)
+        "answer.j2", questions=shown, cv=cv[:6000], profile=profile, job=_job_brief(job)
     )
     result = await provider.complete(prompt, Drafts)
     by_key = {q.key: q for q in questions}

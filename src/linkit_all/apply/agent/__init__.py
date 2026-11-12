@@ -18,7 +18,6 @@ import asyncio
 import contextlib
 import re
 import time
-from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Literal, cast, get_args
@@ -30,14 +29,15 @@ from playwright.async_api import TimeoutError as PlaywrightTimeout
 from pydantic import BaseModel
 
 from linkit_all.apply.answers import (
-    ApplicationAnswers,
     Context,
     Kind,
     Missing,
     Question,
-    sensitive_category,
+    remember_secrets,
+    scrub,
+    secrets_seen,
 )
-from linkit_all.apply.assist import AnswerBank, answer_questions
+from linkit_all.apply.assist import AnswerBank, answer_questions, remember_bank_secrets
 from linkit_all.apply.form import FillError, fill_in, lost_values
 from linkit_all.apply.handlers.base import CAPTCHA, ERRORS
 from linkit_all.providers.base import LLMProvider, render
@@ -233,51 +233,19 @@ def clean_map(fmap: FieldMap, controls: list[Control]) -> FieldMap:
     )
 
 
-# Answers to sensitive questions (CLAUDE.md section 2) must never reach the AI, and a review page
-# repeats them. This is the one place page words enter a prompt (`field_map`), so it scrubs there.
-# ponytail: module-level, never cleared (a few short strings); make it per-application if needed.
-_secrets: set[str] = set()
-_SECRET_FIELDS = (
-    "salary_expectation", "eeo_gender", "eeo_race", "eeo_hispanic", "eeo_veteran",
-    "eeo_disability", "military_status", "nationality", "date_of_birth", "marital_status",
-)  # fmt: skip
-
-
-def scrub(text: str, secrets: Iterable[str]) -> str:
-    """`text` with each secret replaced by [hidden]: whole words, any case, longest first."""
-    for v in sorted(
-        {s.strip() for s in secrets if isinstance(s, str) and s.strip()}, key=len, reverse=True
-    ):
-        text = re.sub(rf"(?<!\w){re.escape(v)}(?!\w)", "[hidden]", text, flags=re.I)
-    return text
-
-
-def remember_secrets(
-    answers: ApplicationAnswers,
-    questions: list[Question] | None = None,
-    filled: dict[str, Any] | None = None,
-) -> None:
-    """Note the profile's sensitive values and the values just filled for sensitive questions."""
-    _secrets.update(
-        str(v) for f in _SECRET_FIELDS if isinstance(v := getattr(answers, f), str) and v
-    )
-    for q in questions or []:
-        v = (filled or {}).get(q.key)
-        if sensitive_category(q) and v is not None and not isinstance(v, bool):
-            _secrets.update(v if isinstance(v, list) else [str(v)])
-
-
 async def field_map(
     provider: LLMProvider, controls: list[Control], page_title: str, page_text: str = ""
 ) -> FieldMap:
+    """Ask the model to map the page. The page's words are scrubbed of the user's sensitive
+    answers first, then cut: callers pass a longer text so a secret is not cut in half."""
     shown = [
-        replace(c, name=scrub(c.name, _secrets)) for c in controls if c.kind != "password"
+        replace(c, name=scrub(c.name, secrets_seen, 4)) for c in controls if c.kind != "password"
     ]  # password boxes are filled by our code, never mapped
     prompt = render(
         "form_map.j2",
         controls=shown,
-        title=scrub(page_title, _secrets),
-        page_text=scrub(page_text, _secrets),
+        title=scrub(page_title, secrets_seen),
+        page_text=scrub(page_text, secrets_seen)[:800],
     )
     return clean_map(await provider.complete(prompt, FieldMap), controls)
 
@@ -497,7 +465,8 @@ async def step(
             "login", "stop", reason="sign-in or sign-up page: needs the account flow", code="login"
         )
     remember_secrets(ctx.answers)
-    fmap = await field_map(provider, controls, await page.title(), await page_text(page))
+    remember_bank_secrets(bank.db)
+    fmap = await field_map(provider, controls, await page.title(), await page_text(page, 2000))
     by_id = {c.id: c for c in controls}
     if fmap.page_kind in ("listing", "other"):
         opener = by_id.get(fmap.apply_button or "") or _apply_control(controls)
