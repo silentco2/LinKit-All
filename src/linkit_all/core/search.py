@@ -224,12 +224,11 @@ class SourcesSection(BaseModel):
     use_discovered_boards: bool = False  # also crawl stored boards (`linkit discover-boards`)
     boards_per_run: int = Field(300, ge=0, le=20000)  # stored boards crawled per run, oldest first
     # LinkedIn hiring posts; read when "linkedin_posts" is in `enabled`. The keywords are the job
-    # titles (`search.queries`).
-    linkedin_keywords: list[str] = []  # deprecated and ignored: the job titles are the keywords
+    # titles (`search.queries`); the window follows `apply.headless`. Older configs may still carry
+    # linkedin_keywords / linkedin_headless: unknown keys are ignored on load.
     linkedin_window: Literal["day", "week"] = "week"
     # posts read per keyword; Google gives at most 50 (linkedin_posts.google.MAX_PAGES)
     linkedin_max_posts: int = Field(50, ge=1, le=200)
-    linkedin_headless: bool = True  # deprecated and ignored: `apply.headless` is the one setting
 
 
 class FiltersSection(BaseModel):
@@ -245,22 +244,6 @@ class FiltersSection(BaseModel):
     skip_below_expectation: bool = False  # no floor set: use the salary you expect (Answers)
     company_blacklist: list[str] = []
     one_per_company: bool = True
-
-    @model_validator(mode="before")
-    @classmethod
-    def _migrate(cls, data: Any) -> Any:
-        """Configs saved before monthly pay / multi work mode: salary_floor (yearly), remote."""
-        if not isinstance(data, dict):
-            return data
-        data = dict(data)
-        if "salary_floor" in data:
-            old = data.pop("salary_floor")
-            if isinstance(old, int | float):
-                data.setdefault("salary_floor_monthly", round(old / 12))
-        if "remote" in data:
-            old = data.pop("remote")
-            data.setdefault("work_modes", list(WORK_MODES) if old == "any" else [old])
-        return data
 
     @field_validator("work_modes")
     @classmethod

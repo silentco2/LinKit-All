@@ -21,7 +21,7 @@ from linkit_all.core.models import Job
 from linkit_all.core.profile import ProfileIn, import_profile
 from linkit_all.core.runs import current_run
 from linkit_all.core.search import import_search
-from linkit_all.core.tools import chrome_path, soffice_path, tectonic_path
+from linkit_all.core.tools import CHROMIUM_HINT, browser_path, soffice_path, tectonic_path
 from linkit_all.providers import ProviderError, get_provider
 
 if TYPE_CHECKING:
@@ -48,12 +48,21 @@ class Check(NamedTuple):
     hint: str
 
 
+def lo_hint() -> str:
+    """How to get LibreOffice here: the one-click bundle is Windows only."""
+    if sys.platform == "darwin":
+        return "brew install --cask libreoffice, or https://www.libreoffice.org/download/"
+    if sys.platform.startswith("linux"):
+        return "install your distribution's libreoffice-writer package (apt, dnf, pacman)"
+    return 'https://www.libreoffice.org/download/, or "Install it for me" in the app'
+
+
 def run_checks() -> list[Check]:
     py_ok = sys.version_info >= (3, 11)
     return [
         Check("Python >= 3.11", sys.executable if py_ok else None, True, "uv python install 3.12"),
-        Check("LibreOffice", soffice_path(), True, "https://www.libreoffice.org/download/"),
-        Check("Google Chrome", chrome_path(), False, "needed to apply: https://www.google.com/chrome/"),
+        Check("LibreOffice", soffice_path(), True, lo_hint()),
+        Check("Chromium browser", browser_path(), False, f"needed to apply: {CHROMIUM_HINT}"),
         Check("Codex CLI", shutil.which("codex"), False, "npm i -g @openai/codex"),
         Check("Claude CLI", shutil.which("claude"), False, "https://claude.com/claude-code"),
         Check("Tectonic", tectonic_path(), False, "LaTeX CVs only: https://tectonic-typesetting.github.io"),
@@ -343,6 +352,64 @@ def run_apply() -> None:
     typer.echo(", ".join(f"{k} {v}" for k, v in counts.items()))
 
 
+@app.command()
+def bench(
+    jobs: Annotated[int, typer.Option(min=10, help="Fake jobs to generate.")] = 10000,
+    seed: Annotated[int, typer.Option(help="Same seed, same jobs.")] = 1,
+    out: Annotated[Path, typer.Option(help="Where to write the numbers.")] = Path("bench.json"),
+    apply: Annotated[
+        int,
+        typer.Option(min=0, help="Also fill this many fake application forms (needs a browser)."),
+    ] = 0,
+    provider: ProviderOpt = None,
+    model: ModelOpt = None,
+) -> None:
+    """Measure finding, ranking and the CV tailoring guard on built-in fake data, and with
+    --apply the form filling too (practice mode: nothing is submitted). Touches none of your
+    data and no real site; the AI is a scripted stand-in."""
+    import json
+    import tempfile
+
+    from linkit_all.bench.run import run_bench
+    from linkit_all.matching.rank import Embedder
+
+    settings = get_settings()
+    setup_logging(settings)
+    embed = Embedder(settings.embedding_model, settings.data_dir / "models")
+    # ignore_cleanup_errors: Windows may still hold the SQLite file when the folder goes
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+        # only the CV claim check uses it: the one judgement the scripted AI cannot fake
+        checker = get_provider(_settings(provider, model)) if provider else None
+        result = asyncio.run(run_bench(jobs, seed, embed, Path(tmp), apply, checker))
+    out.write_text(json.dumps(result, indent=2), encoding="utf-8")
+    q, t = result["quality"], result["timing"]
+    typer.echo(f"{jobs} jobs in {t['total_s']} s ({t['jobs_per_minute']} jobs/minute)")
+    for name in ("dedupe", "scam", "ghost"):
+        typer.echo(
+            f"{name:<7} precision {q[name]['precision']:.0%}  recall {q[name]['recall']:.0%}"
+        )
+    r = q["rank"]
+    typer.echo(
+        f"rank    top 10: {r['precision_at_10']:.0%}  top 50: {r['precision_at_50']:.0%} "
+        f"relevant ({r['relevant_share']:.0%} by chance), "
+        f"all {r['relevant']} relevant on top: {r['precision_at_r']:.0%}"
+    )
+    tl = result["tailor"]
+    typer.echo(
+        f"tailor  honest edits accepted {tl['honest_accepted']}, invented edits refused "
+        f"{tl['invented_refused']}, layout {'ok' if tl['layout']['ok'] else 'CHANGED'}"
+        + ("" if tl["layout"]["checked"] else " (not checked: no LibreOffice)")
+        + f", claim check: {tl['claim_check']}"
+    )
+    if a := result.get("apply"):
+        typer.echo(
+            f"apply   {a['right_outcome']}/{a['attempted']} forms ended as they should, "
+            f"fields right {a['fields_right']}, trap fields left empty {a['traps_left_empty']}, "
+            f"sensitive questions sent to the AI: {len(a['sensitive_sent_to_ai'])}"
+        )
+    typer.echo(f"Numbers: {out}")
+
+
 @app.command("apply-probe")
 def apply_probe(
     per_source: Annotated[int, typer.Option(help="Jobs to try per source.")] = 1,
@@ -351,9 +418,15 @@ def apply_probe(
     restore: Annotated[
         bool, typer.Option("--restore", help="Only put back jobs an earlier test borrowed.")
     ] = False,
+    scorecard: Annotated[
+        Path | None, typer.Option(help="Also write a per-platform summary to this file.")
+    ] = None,
+    provider: ProviderOpt = None,
+    model: ModelOpt = None,
 ) -> None:
     """Practice-mode apply of one job per source, then a report of where each one got to.
     Nothing is submitted; the CV is sent as uploaded."""
+    from linkit_all.apply import probe as probing
     from linkit_all.apply.probe import give_back_all, pick, probe, report
     from linkit_all.core.search import load_search
     from linkit_all.pipeline import _get_embedder, ai_settings
@@ -371,10 +444,19 @@ def apply_probe(
     typer.echo(f"Trying {len(ids)} jobs in Practice mode...")
 
     async def go() -> list[Any]:
-        provider = get_provider(ai_settings(settings, cfg), cache=db)
-        return await probe(db, settings, cfg, provider, await _get_embedder(settings), ids)
+        override = {k: v for k, v in {"provider": provider, "model": model}.items() if v}
+        ai = get_provider(ai_settings(settings, cfg, override), cache=db)
+        return await probe(db, settings, cfg, ai, await _get_embedder(settings), ids)
 
     rows = asyncio.run(go())
+    if len(rows) < len(ids):
+        typer.secho(
+            f"Stopped after {len(rows)} of {len(ids)} jobs: the AI is not available right now.",
+            fg="yellow",
+        )
     for r in rows:
         typer.echo(f"{r.job_id:>6} {r.source:<16} {r.status:<10} {r.code:<20} {r.host}")
     typer.echo(f"Report: {report(rows, settings.data_dir / 'applications')}")
+    if scorecard is not None:
+        scorecard.write_text(probing.scorecard(rows, datetime.now()), encoding="utf-8")
+        typer.echo(f"Scorecard: {scorecard}")

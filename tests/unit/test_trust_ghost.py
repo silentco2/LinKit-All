@@ -13,7 +13,6 @@ from linkit_all.core.db import init_db
 from linkit_all.core.models import Job, JobSighting, Run
 from linkit_all.matching.trust import Verdict
 from linkit_all.matching.trust.ghost import (
-    NO_HISTORY,
     GhostHistory,
     ghost_histories,
     has_pay,
@@ -23,6 +22,7 @@ from linkit_all.matching.trust.ghost import (
 from linkit_all.matching.trust.normalize import light
 
 NOW = datetime(2026, 10, 25, 12, 0)
+NO_HISTORY = GhostHistory(None, 0, 0.0, 0, 0, 0.0)
 
 SPECIFIC = (
     "You will report to the VP of Engineering and lead a team of 6 engineers building the Kafka "
@@ -248,6 +248,33 @@ def test_text_only_never_reaches_likely() -> None:
     assert v.score == 45
     assert v.band == "medium"
     assert {"vague_description", "evergreen_language", "vague_title"} <= set(codes(v))
+
+
+@pytest.mark.parametrize(
+    ("title", "desc"),
+    [
+        ("Talent Pool", "We are always hiring. Join our talent pool for future opportunities."),
+        ("Expression of Interest", "There is no vacancy right now. Register and we will call."),
+        ("سجل سيرتك الذاتية", "لا توجد وظيفة شاغرة حاليا. سنتواصل معك عند توفر فرص مستقبلية."),
+    ],
+)
+def test_a_posting_that_says_it_is_no_job_is_likely_even_when_fresh(title: str, desc: str) -> None:
+    v = run(desc, title=title, posted=NOW - timedelta(days=2))
+    assert codes(v)["no_opening"] == 20 and v.band == "high"
+
+
+def test_the_statement_alone_under_an_ordinary_title_adds_the_signal_only() -> None:
+    v = run("This is not an application for a specific job. Join us.", title="Engineer")
+    assert codes(v)["no_opening"] == 20 and v.band == "medium"
+
+
+def test_a_real_job_that_mentions_always_hiring_is_not_no_opening() -> None:
+    v = run(f"We are always looking for great people. {SPECIFIC}", posted=NOW - timedelta(days=2))
+    assert "no_opening" not in codes(v) and v.band == "low"
+
+
+def test_building_a_data_pipeline_is_not_evergreen() -> None:
+    assert "evergreen_language" not in codes(run(f"Build a data pipeline in Airflow. {SPECIFIC}"))
 
 
 def test_fresh_specific_job_is_low() -> None:

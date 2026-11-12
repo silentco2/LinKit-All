@@ -36,10 +36,10 @@ from linkit_all.core.models import (
 from linkit_all.core.profile import ProfileIn, import_profile
 from linkit_all.core.search import SearchConfig
 from linkit_all.core.state import transition
-from linkit_all.core.tools import chrome_path
+from linkit_all.core.tools import browser_path
 from linkit_all.providers.base import LLMProvider
 
-pytestmark = pytest.mark.skipif(chrome_path() is None, reason="Google Chrome not installed")
+pytestmark = pytest.mark.skipif(browser_path() is None, reason="no Chrome, Edge or Brave installed")
 
 URL = "https://careers.acme.test/apply"
 FIXTURE = Path(__file__).parents[1] / "fixtures/agent/synthetic_two_page.html"

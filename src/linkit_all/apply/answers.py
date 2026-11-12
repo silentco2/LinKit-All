@@ -5,6 +5,7 @@ Order per question: standard profile fields -> sensitive rules (profile only, ne
 """
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any, Literal
@@ -298,6 +299,9 @@ _STANDARD: list[tuple[str, re.Pattern[str]]] = [
         ("third_name", r"third[ _-]?name|grandfather'?s?[ _-]?name|الاسم الثالث|اسم الجد"),
         ("last_name", r"last[ _-]?name|surname|family name|اسم العائلة|الاسم الأخير|الاسم الاخير|اللقب"),
         ("email", r"e-?mail"),
+        # before "phone": "Phone number country code" wants "+20", not the number
+        ("phone_code", r"(country|dial(l?ing)?|calling|phone|mobile)[ _-]?(number[ _-]?)?"
+                       r"(country[ _-]?)?(code|prefix)\b"),
         ("phone", r"phone|mobile"),
         # whole label only: "State why you want this job" is not a place. Before "address": address_state
         ("state", r"^(your |home |current )?(state|province|governorate)(\s*[/,]\s*(province|region|governorate|state))?"
@@ -318,6 +322,10 @@ _STANDARD: list[tuple[str, re.Pattern[str]]] = [
                       r"( ب(اللغة )?(ال)?(عربية|عربي|إنجليزية|انجليزية|إنجليزي|انجليزي))?$"),
         ("country", r"^country\b"),
         ("city", r"^(city|location|current location|location \(city\))\b"),
+        # asked as a sentence: "Where are you currently located?", "Where do you live?"
+        ("where", r"where are you (currently |presently )?(located|based|living)|"
+                  r"where do you (currently )?(live|reside)|"
+                  r"^(what is )?your current (location|city)"),
         ("heard_about", r"how did you (hear|find|learn)|where did you (hear|find|see)|referral source"),
         ("notice_period", r"notice period"),
         ("years_experience", r"years of (professional |relevant |work )?experience|how many years"),
@@ -351,10 +359,34 @@ def _name_value(key: str, q: Question, ctx: Context) -> str:
     return name_part(name_in(ctx.full_name, lang, ctx.answers.name_other), key)
 
 
+def _dial_code(iso2: str) -> str:
+    """ "EG" -> "+20"; "" when the home country is not set."""
+    from linkit_all.core.geo import country  # late: geo imports this module
+
+    found = country(iso2) if iso2 else None
+    return f"+{found.phone}" if found and found.phone else ""
+
+
+def _pick_dial(options: list[str], code: str, country_name: str) -> str | None:
+    """The option for this calling code: "Egypt (+20)", "+20", "EG +20". Countries that share
+    a code (+1) are told apart by name."""
+    hits = [o for o in options if re.search(rf"\+\s*{re.escape(code[1:])}(?!\d)", o)]
+    named = [o for o in hits if country_name and country_name.lower() in o.lower()]
+    if named or len(hits) == 1:
+        return (named or hits)[0]
+    return pick_option(options, country_name) if country_name else None
+
+
 def _standard_value(key: str, ctx: Context) -> Any:
     a = ctx.answers
+    country = (
+        _country_name(ctx.home_country) or a.country or (country_of(ctx.location) or "").title()
+    )
+    city = ctx.home_city or a.city
     values: dict[str, Any] = {
         "email": ctx.email,
+        "phone_code": _dial_code(ctx.home_country),
+        "where": ", ".join(p for p in (city, country) if p) or ctx.location,
         "phone": ctx.phone,
         "linkedin": a.linkedin,
         "github": a.github,
@@ -363,10 +395,8 @@ def _standard_value(key: str, ctx: Context) -> Any:
         "current_title": a.current_title,
         "address": ctx.address,
         "postal_code": ctx.postal_code,
-        "country": _country_name(ctx.home_country)
-        or a.country
-        or (country_of(ctx.location) or "").title(),
-        "city": ctx.home_city or a.city or ctx.location,
+        "country": country,
+        "city": city or ctx.location,
         "state": ctx.home_state,
         "heard_about": a.heard_about or _SOURCE_NAMES.get(ctx.job_source, "Company website"),
         "notice_period": a.notice_period,
@@ -391,6 +421,11 @@ def standard_answer(q: Question, ctx: Context) -> Any:
         if q.kind in CHOICE_KINDS or q.kind == "multi":
             if key == "years_experience":
                 return _pick_range(q.options, int(value))
+            if key == "phone_code":
+                return _pick_dial(q.options, value, _standard_value("country", ctx))
+            if key == "where":  # a list of cities, or only of countries
+                city, _, country = value.rpartition(", ")
+                return pick_option(q.options, city) or pick_option(q.options, country)
             picked = pick_option(q.options, value)
             return [picked] if picked and q.kind == "multi" else picked
         return value
@@ -544,3 +579,57 @@ def valid_for(q: Question, value: Any) -> bool:
     if q.kind == "checkbox":
         return isinstance(value, bool)
     return isinstance(value, str)
+
+
+# --- sensitive answers never reach the AI (CLAUDE.md section 2) ---------------------------------
+# A page repeats them (a review page, a pre-filled form), so every prompt that carries page words
+# is scrubbed with the values below: the form agent, LinkIt Fill (`api/assist.py`) and LinkIt mail.
+# ponytail: module-level, never cleared (a few short strings); make it per-application if needed.
+secrets_seen: set[str] = set()
+_SECRET_FIELDS = (
+    "salary_expectation", "eeo_gender", "eeo_race", "eeo_hispanic", "eeo_veteran",
+    "eeo_disability", "military_status", "nationality", "date_of_birth", "marital_status",
+)  # fmt: skip
+# ponytail: dates are matched as typed (2000-01-31); "31/01/2000" or "Jan 31, 2000" are not.
+_GROUP_SEPS = (",", ".", " ", "'")  # a space also matches a no-break space
+
+
+def _variants(v: str) -> set[str]:
+    v = " ".join(v.split())
+    out = {v}
+    if v.isdigit() and len(v) > 3 and v[0] != "0":  # a salary: also with thousands separators
+        out |= {f"{int(v):,}".replace(",", sep) for sep in _GROUP_SEPS}
+    return out
+
+
+def scrub(text: str, secrets: Iterable[str], min_len: int = 0) -> str:
+    """`text` with each secret replaced by [hidden]: any case, longest first, any whitespace run
+    between its words, whole words only on a side where the secret ends in a word character.
+    `min_len`: ignore shorter secrets ("No", "M" would eat ordinary words in a question)."""
+    found = {
+        w
+        for s in secrets
+        if isinstance(s, str) and len(" ".join(s.split())) >= max(min_len, 1)
+        for w in _variants(s)
+    }
+    for v in sorted(found, key=len, reverse=True):
+        left = r"(?<!\w)" if re.match(r"\w", v[0]) else ""
+        right = r"(?!\w)" if re.match(r"\w", v[-1]) else ""
+        body = re.escape(v).replace(r"\ ", r"\s+")
+        text = re.sub(f"{left}{body}{right}", "[hidden]", text, flags=re.I)
+    return text
+
+
+def remember_secrets(
+    answers: ApplicationAnswers,
+    questions: list[Question] | None = None,
+    filled: dict[str, Any] | None = None,
+) -> None:
+    """Note the profile's sensitive values and the values just filled for sensitive questions."""
+    secrets_seen.update(
+        str(v) for f in _SECRET_FIELDS if isinstance(v := getattr(answers, f), str) and v
+    )
+    for q in questions or []:
+        v = (filled or {}).get(q.key)
+        if sensitive_category(q) and v is not None and not isinstance(v, bool):
+            secrets_seen.update(v if isinstance(v, list) else [str(v)])

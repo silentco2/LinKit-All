@@ -66,6 +66,13 @@ def test_claude_parse_output() -> None:
     limited = json.dumps({"is_error": True, "result": "Claude AI usage limit reached|1760000000"})
     with pytest.raises(UsageLimitError):
         claude_cli.parse_output(1, limited, "")
+    for text in (
+        "You've hit your session limit · resets 5:30am (Africa/Cairo)",
+        "You've hit your weekly limit · resets Nov 14",
+    ):
+        said = json.dumps({"is_error": True, "result": text})
+        with pytest.raises(UsageLimitError):
+            claude_cli.parse_output(1, said, "")
     with pytest.raises(ProviderError):
         claude_cli.parse_output(1, "", "Invalid API key · Please run /login")
 

@@ -6,17 +6,21 @@ matches) go back to where they were afterwards, with no card left in Needs you; 
 approved, or that failed before, keep the result like any other run.
 """
 
-from collections import defaultdict
+import time
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from statistics import median
 from urllib.parse import urlparse
 
+from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from linkit_all.apply.email_apply import mailto_address
-from linkit_all.apply.runner import Applier, _web_url
+from linkit_all.apply.handlers import HANDLERS
+from linkit_all.apply.runner import Applier, ApplyBlocked, _web_url
 from linkit_all.core.config import Settings
 from linkit_all.core.models import ActionItem, ActionStatus, Job, JobEvent, JobState, utcnow
 from linkit_all.core.search import SearchConfig
@@ -33,6 +37,8 @@ _STATES = [
     JobState.scored,
     JobState.below_threshold,
 ]
+AGENT = "form agent"  # every site without its own handler
+SIGNUP = "dry_run_signup"  # reached a sign-up page: as far as practice mode goes
 # picked only for the test: put back afterwards
 _GIVE_BACK = {JobState.awaiting_review, JobState.scored, JobState.below_threshold}
 
@@ -46,6 +52,8 @@ class ProbeRow:
     detail: str
     code: str
     screenshot: str
+    platform: str = ""  # what filled the form: an ATS handler, "form agent" or "email"
+    seconds: float = 0.0
 
 
 def pick(db: sessionmaker[Session], per_source: int = 1, ids: list[int] | None = None) -> list[int]:
@@ -118,7 +126,9 @@ def give_back_all(db: sessionmaker[Session]) -> int:
     return len(todo)
 
 
-def _row(db: sessionmaker[Session], job_id: int, status: str, detail: str) -> ProbeRow:
+def _row(
+    db: sessionmaker[Session], job_id: int, status: str, detail: str, seconds: float = 0.0
+) -> ProbeRow:
     with db() as s:
         job = s.get_one(Job, job_id)
         item = s.scalars(
@@ -131,7 +141,10 @@ def _row(db: sessionmaker[Session], job_id: int, status: str, detail: str) -> Pr
         shots = (last.artifacts if last else None) or (item.artifacts if item else None) or [""]
         link = job.data.get("apply_url") or job.url
         host = "email" if mailto_address(link) else urlparse(link).netloc
-        return ProbeRow(job_id, job.source, host, status, detail, code or "", shots[-1])
+        platform = "email" if host == "email" else job.ats if job.ats in HANDLERS else AGENT
+        return ProbeRow(
+            job_id, job.source, host, status, detail, code or "", shots[-1], platform, seconds
+        )
 
 
 async def probe(
@@ -151,11 +164,21 @@ async def probe(
     async with Applier(db, settings, test, provider, embed) as applier:
         for job_id in job_ids:
             before = _queue(db, job_id)
+            start = time.perf_counter()
             try:
                 outcome = await applier.apply(job_id)
-                rows.append(_row(db, job_id, outcome.status, outcome.message))
-            except Exception as e:  # e.g. AI usage limit: report it, keep the rest
-                rows.append(_row(db, job_id, "error", f"{type(e).__name__}: {e}"))
+                took = time.perf_counter() - start
+                rows.append(_row(db, job_id, outcome.status, outcome.message, took))
+            except ApplyBlocked as e:
+                # The AI is out of quota (or a tool is missing): every job after this one would
+                # end the same way, so stop here. The job waits, untouched; no row for it.
+                if before in _GIVE_BACK:
+                    give_back(db, job_id, before)
+                logger.warning("apply test stopped at job {}: {}", job_id, e)
+                break
+            except Exception as e:  # one broken site must not end the test
+                took = time.perf_counter() - start
+                rows.append(_row(db, job_id, "error", f"{type(e).__name__}: {e}", took))
             if before in _GIVE_BACK:
                 give_back(db, job_id, before)
     return rows
@@ -176,3 +199,44 @@ def report(rows: list[ProbeRow], out_dir: Path) -> Path:
         )
     path.write_text("# Apply test (Practice mode)\n\n" + "\n".join(lines) + "\n", "utf-8")
     return path
+
+
+def scorecard(rows: list[ProbeRow], when: datetime) -> str:
+    """One Markdown page: per platform, how many practice applications were filled to the last
+    step, how many wait for the user and why, how many failed. Counts only, no job details."""
+    by: dict[str, list[ProbeRow]] = defaultdict(list)
+    for r in rows:
+        by[r.platform or AGENT].append(r)
+    out = [
+        "# Apply scorecard",
+        "",
+        f"Practice mode, {when:%Y-%m-%d}: {len(rows)} real job postings, forms filled and "
+        "nothing submitted. The CV was sent as uploaded.",
+        "",
+        "| platform | tried | filled to the end | account needed | needs you | failed "
+        "| skipped | median time |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    for name, group in sorted(by.items(), key=lambda kv: (-len(kv[1]), kv[0])):
+        n = Counter(r.status for r in group)
+        # Practice mode never creates an account, so a form behind a sign-up is not filled.
+        signup = sum(r.code == SIGNUP for r in group)
+        filled = n["dry_run"] - signup
+        took = median(r.seconds for r in group)
+        out.append(
+            f"| {name} | {len(group)} | {filled} ({filled / len(group):.0%}) | {signup} "
+            f"| {n['needs_user']} | {n['failed'] + n['error']} | {n['skipped']} | {took:.0f} s |"
+        )
+    stops = Counter(
+        (r.platform or AGENT, r.status, r.code or "-")
+        for r in rows
+        if r.status != "dry_run" or r.code == SIGNUP
+    )
+    if stops:
+        out += ["", "## Why the others stopped", "", "| platform | result | reason | jobs |",
+                "|---|---|---|---|"]  # fmt: skip
+        out += [
+            f"| {platform} | {status} | {code} | {count} |"
+            for (platform, status, code), count in sorted(stops.items(), key=lambda kv: -kv[1])
+        ]
+    return "\n".join(out) + "\n"

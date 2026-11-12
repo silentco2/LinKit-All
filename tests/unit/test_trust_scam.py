@@ -48,6 +48,9 @@ def test_apply_domain_mismatch_skips_mailto_and_linkedin_posts() -> None:
         "Training charge payable upfront.",
         "رسوم تسجيل 50 دولار",
         "يجب دفع رسوم الاشتراك",
+        "The $35 screening cost is paid by the candidate.",
+        "You travel to the assessment centre at your own expense.",
+        "اشترك بمبلغ 200 جنيه واربح عمولة",
         "عربون لتفعيل الحساب",
     ],
 )
@@ -62,6 +65,8 @@ def test_upfront_fee(text: str) -> None:
     [
         "Deposit the check we send you and wire the balance to our vendor.",
         "Receive packages at home and forward them to our warehouse.",
+        "Receive parcels at your home address, repack them and post them abroad.",
+        "Keep your pay and send the rest by MoneyGram to the next evaluator.",
         "You will be a payment processing agent using Western Union.",
         "ويسترن يونيون وتحويل المبلغ",
     ],
@@ -92,6 +97,9 @@ def test_crypto_deposit(text: str) -> None:
         "Applicants will purchase their starter kit from our partner.",
         "Buy gift cards for clients and we will reimburse you.",
         "You must buy the materials yourself.",
+        "Top up your account balance to unlock the higher-paying task levels.",
+        "You first purchase your home-office equipment from our vendor and we reimburse you.",
+        "Order a laptop from the approved supplier before your first day.",
         "شراء بطاقات هدايا للعملاء",
     ],
 )
@@ -99,6 +107,24 @@ def test_buy_to_work(text: str) -> None:
     v = run(text)
     assert "buy_to_work" in codes(v)
     assert v.score >= 65
+
+
+def test_a_home_office_allowance_is_not_buy_to_work() -> None:
+    v = run("Set up your home office: we cover up to $500 for a desk and a monitor of your choice.")
+    assert "buy_to_work" not in codes(v)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Process wire transfers and Western Union payouts for our retail clients.",
+        "Receive parcels in the warehouse, check the contents and ship them to customers.",
+        "Background check costs are covered by the employer.",
+        "Top up your skills with our training budget to unlock a promotion.",
+    ],
+)
+def test_honest_jobs_that_use_scam_words_stay_clean(text: str) -> None:
+    assert not codes(run(text)) & {"money_mule", "upfront_fee", "buy_to_work"}
 
 
 @pytest.mark.parametrize(

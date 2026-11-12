@@ -132,3 +132,8 @@ Bundled data (src/linkit_all/data/, built by scripts/build_datasets.py):
   - Exchange rates (fx.json, refreshed at the start of each search from
     https://open.er-api.com/v6/latest/USD): Rates By Exchange Rate API
     (https://www.exchangerate-api.com).
+
+Tokenizer vocabulary (src/linkit_all/providers/tiktoken_cache/): OpenAI's cl100k_base.tiktoken
+from https://openaipublic.blob.core.windows.net/encodings/cl100k_base.tiktoken, as used by
+tiktoken (https://github.com/openai/tiktoken, MIT License) and bundled by LiteLLM (MIT); copied
+unchanged so tiktoken never downloads it.

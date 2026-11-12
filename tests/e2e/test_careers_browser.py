@@ -1,6 +1,6 @@
 """Careers pages that draw their jobs with JavaScript, read in real Chrome. Every browser request
 is answered by a route handler and the plain-HTTP side by httpx's MockTransport: nothing leaves
-the machine. Needs Google Chrome installed."""
+the machine. Needs Chrome, Edge or Brave installed."""
 
 import asyncio
 import json
@@ -15,13 +15,13 @@ from playwright.async_api import Request, Route
 sys.path.insert(0, str(Path(__file__).parents[1] / "unit"))
 from test_careers import site as fake_site
 
-from linkit_all.core.tools import chrome_path
+from linkit_all.core.tools import browser_path
 from linkit_all.providers.base import LLMProvider
 from linkit_all.sources.base import JobStub, Task
 from linkit_all.sources.careers import Careers, Unsupported
 from linkit_all.sources.http import Http
 
-pytestmark = pytest.mark.skipif(chrome_path() is None, reason="Google Chrome not installed")
+pytestmark = pytest.mark.skipif(browser_path() is None, reason="no Chrome, Edge or Brave installed")
 
 URL = "https://acme.test/careers"
 SHELL = "<html><head><title>Careers</title></head><body><div id='root'></div></body></html>"

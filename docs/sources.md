@@ -1,3 +1,8 @@
+---
+title: "Job sources: ATS APIs, job boards and career pages"
+description: "Where LinKit All finds jobs: Greenhouse, Lever, Ashby, Workday and 100+ ATS APIs, LinkedIn and Indeed via JobSpy, Wuzzuf, Bayt and any careers page."
+---
+
 # Sources
 
 LinKit All reads jobs from several kinds of place. You choose them in the wizard's **Search**

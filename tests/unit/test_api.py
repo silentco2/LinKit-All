@@ -101,10 +101,8 @@ def test_linkedin_search_fields_default_and_round_trip(client: TestClient) -> No
     from linkit_all.core.search import SearchConfig
 
     old = SearchConfig.model_validate({"sources": {"enabled": ["telegram"]}}).sources
-    assert (old.linkedin_keywords, old.linkedin_window) == ([], "week")
-    assert (old.linkedin_max_posts, old.linkedin_headless) == (50, True)
-    fields = {"linkedin_keywords": ["python dev", "مهندس"], "linkedin_window": "day",
-              "linkedin_max_posts": 25, "linkedin_headless": False}  # fmt: skip
+    assert (old.linkedin_window, old.linkedin_max_posts) == ("week", 50)
+    fields = {"linkedin_window": "day", "linkedin_max_posts": 25}
     body = {"sources": {"enabled": ["linkedin_posts"], **fields}}
     assert client.put("/api/search", json=body, headers=SAME_ORIGIN).status_code == 200
     got = client.get("/api/search").json()["sources"]
@@ -696,7 +694,7 @@ def test_app_browser_generic_profile_and_launch_failure(
     monkeypatch.setattr(browser_module, "open_context", boom)
     r = client.post(url, headers=SAME_ORIGIN)
     assert r.status_code == 503
-    assert r.json()["detail"] == "Could not open Chrome: Chrome is not installed"
+    assert r.json()["detail"] == "Could not open the browser: Chrome is not installed"
     assert client.get("/api/status").json()["app_browser"]["open"] is False
 
 

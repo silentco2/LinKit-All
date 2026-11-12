@@ -1,3 +1,8 @@
+---
+title: "Troubleshooting LinKit All"
+description: "Fixes for common LinKit All problems: browser will not start, LibreOffice missing, AI limits and pauses, email codes not arriving, jobs stuck waiting."
+---
+
 # Troubleshooting
 
 Start with:
@@ -24,10 +29,11 @@ Tailoring and applying need LibreOffice to make the PDF. `linkit doctor` shows `
 - When LibreOffice is missing, the Apply stage stops early with a message. Your jobs keep their
   state. Fix it and run Apply again.
 
-## Chrome and the browser profile
+## The browser and its profile
 
-- Applying needs Google Chrome (`linkit doctor` shows it as optional until you apply). LinKit All
-  does not download a browser.
+- Applying needs [Chromium](https://www.chromium.org/getting-involved/download-chromium/),
+  or Chrome, Edge or Brave instead (`linkit doctor` shows it as optional until you apply).
+  Edge comes with Windows. LinKit All does not download a browser.
 - Each job site has its own profile in `browser/<site>` inside the data folder. If a site
   behaves strangely (stuck login, odd cookies), close LinKit All and delete that site's folder.
   You lose its saved login only.

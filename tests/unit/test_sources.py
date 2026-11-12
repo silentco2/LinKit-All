@@ -328,6 +328,16 @@ def test_deduper(tmp_path: Path) -> None:
     assert d.add(stub("Engineer, Backend", url="https://z.io/3")) is None  # fuzzy, same company
     assert d.add(stub("Backend Engineer", company="Globex", url="https://z.io/4"))
     assert d.add(stub("Frontend Engineer", url="https://z.io/5"))
+    # a repost with a recruiter's note is the same job; a real qualifier is not
+    assert d.add(stub("Backend Engineer (Urgent Hiring)", url="https://z.io/6")) is None
+    assert d.add(stub("URGENT: Frontend Engineer", url="https://z.io/7")) is None
+    assert d.add(stub("Backend Engineer (Golang, Payments Team)", url="https://z.io/8"))
+    assert d.add(stub("Hiring Manager", url="https://z.io/9"))
+    # requisition numbers, gender tags and abbreviations are not part of the job
+    assert d.add(stub("Backend Engineer - REQ-40112", url="https://z.io/10")) is None
+    assert d.add(stub("Frontend Engineer (m/f/d)", url="https://z.io/11")) is None
+    assert d.add(stub("Backend Eng.", url="https://z.io/12")) is None
+    assert d.add(stub("Backend Engineer II", url="https://z.io/13"))
 
 
 def test_route_ats_sets_ats_for_non_ats_sources_only() -> None:
@@ -433,15 +443,14 @@ def test_discover_resume_and_enrich(tmp_path: Path) -> None:
         assert {j.state for j in s.query(Job)} == {JobState.enriched}
 
 
+def jobspy_fixture_scrape(**kwargs: object) -> list[dict[str, object]]:
+    """Module-level: JobSpySite runs its scraper in a child process, which pickles it."""
+    rows = load("jobspy/python_cairo.json")
+    return [r for r in rows if r["site"] == kwargs["site_name"][0]]  # type: ignore[index, union-attr]
+
+
 def test_jobspy_tasks_mapping_and_linkedin_details(tmp_path: Path) -> None:
     from linkit_all.sources.jobspy_sites import JobSpySite
-
-    rows = load("jobspy/python_cairo.json")
-    seen: list[dict[str, object]] = []
-
-    def fake_scrape(**kwargs: object) -> list[dict[str, object]]:
-        seen.append(kwargs)
-        return [r for r in rows if r["site"] == kwargs["site_name"][0]]  # type: ignore[index, union-attr]
 
     cfg = SearchConfig.model_validate(
         {
@@ -453,10 +462,12 @@ def test_jobspy_tasks_mapping_and_linkedin_details(tmp_path: Path) -> None:
             },
         }
     )
-    indeed, linkedin, bayt = (JobSpySite(s, fake_scrape) for s in ("indeed", "linkedin", "bayt"))
+    indeed, linkedin, bayt = (
+        JobSpySite(s, jobspy_fixture_scrape) for s in ("indeed", "linkedin", "bayt")
+    )
     assert len(indeed.tasks(cfg)) == 4 and len(bayt.tasks(cfg)) == 4  # bayt via regional
     assert linkedin.tasks(cfg) == []
-    glassdoor = JobSpySite("glassdoor", fake_scrape)
+    glassdoor = JobSpySite("glassdoor", jobspy_fixture_scrape)
     assert {t.country for t in glassdoor.tasks(cfg)} == {""}  # Glassdoor gets no country
     assert {t.country for t in indeed.tasks(cfg)} == {"egypt"}
 
@@ -465,9 +476,9 @@ def test_jobspy_tasks_mapping_and_linkedin_details(tmp_path: Path) -> None:
         return [s async for page in src.search(Http(httpx.AsyncClient()), task, 0) for s in page]
 
     stubs = asyncio.run(pages(indeed))
-    assert seen[0]["country_indeed"] == "egypt" and seen[0]["hours_old"] == 14 * 24
-    asyncio.run(pages(glassdoor))
-    assert "country_indeed" not in seen[-1]  # jobspy's own default applies
+    args = indeed.scrape_args(indeed.tasks(cfg)[0])
+    assert args["country_indeed"] == "egypt" and args["hours_old"] == 14 * 24
+    assert "country_indeed" not in glassdoor.scrape_args(glassdoor.tasks(cfg)[0])  # jobspy default
     assert stubs and all(s.source == "indeed" for s in stubs)
     workable = [s for s in stubs if s.apply_url and "workable" in s.apply_url]
     assert workable and workable[0].ats == "workable"  # company ATS from job_url_direct

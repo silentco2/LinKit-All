@@ -20,6 +20,10 @@ from linkit_all.sources.store import Deduper, mark_task, route_ats, store_page
 from linkit_all.sources.text import normalize_url
 
 
+class _PageTimeout(Exception):
+    """A source gave no page within its page_timeout (not a TimeoutError the source raised)."""
+
+
 @dataclass
 class DiscoverStats:
     new: int = 0
@@ -96,16 +100,36 @@ async def discover(
         name: asyncio.Semaphore(registry[name].parallel) for name in {t.source for t in tasks}
     }
 
+    timed_out: set[str] = set()  # sources that stalled once in this run
+
     async def run(task: Task) -> None:
         start, done = checkpoints.get(task.key, (0, False))
         if done:
             return
         async with per_source[task.source], running:
+            if task.source in timed_out:
+                # A stalled site would otherwise cost its full limit once per task. Left undone,
+                # so the next run or a resume tries it again.
+                stats.errors[task.key] = f"skipped: {task.source} timed out earlier in this run"
+                if task.key in board_keys:
+                    note_crawl(db, task.source, task.board, 0, False)
+                return
             page = start
             seen = 0
             ok = True
             try:
-                async for stubs in registry[task.source].search(http, task, start):
+                pages = registry[task.source].search(http, task, start)
+                limit = registry[task.source].page_timeout(task)
+                while True:
+                    try:
+                        async with asyncio.timeout(limit) as clock:
+                            stubs = await anext(pages)
+                    except StopAsyncIteration:
+                        break
+                    except TimeoutError:
+                        if clock.expired():
+                            raise _PageTimeout(f"timed out: no page within {limit:.0f}s") from None
+                        raise  # the source's own TimeoutError: reported like any other error
                     seen += len(stubs)
                     new = store_page(
                         db, run_id, task.key, page, route_ats(stubs, registry), deduper
@@ -124,6 +148,11 @@ async def discover(
                 ok = False
                 stats.errors[task.key] = str(e)
                 mark_task(db, run_id, task.key, str(e))
+            except _PageTimeout as e:  # stuck source: leave undone so a resume retries it
+                ok = False
+                timed_out.add(task.source)
+                stats.errors[task.key] = str(e)
+                logger.warning("{} {}", task.key, stats.errors[task.key])
             except Exception as e:  # network, parsing: leave undone so a resume retries
                 ok = False
                 stats.errors[task.key] = f"{type(e).__name__}: {e}"

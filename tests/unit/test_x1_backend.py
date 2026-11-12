@@ -5,6 +5,7 @@ import asyncio
 import hashlib
 import io
 import json
+import os
 import platform
 import shutil
 import sys
@@ -595,3 +596,15 @@ def test_question_hints_have_codes() -> None:
     assert reason_code("salary expectation needed")[0] == "not_in_profile"
     assert reason_code("no saved answer")[0] == "no_saved_answer"
     assert reason_code("something new") == ("other", {})
+
+
+def test_litellm_price_list_fetch_is_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    import importlib
+
+    from linkit_all.providers import litellm_api
+
+    monkeypatch.delenv("LITELLM_LOCAL_MODEL_COST_MAP", raising=False)
+    monkeypatch.delenv("LITELLM_LOCAL_ANTHROPIC_BETA_HEADERS", raising=False)
+    importlib.reload(litellm_api)
+    assert os.environ["LITELLM_LOCAL_MODEL_COST_MAP"] == "True"
+    assert os.environ["LITELLM_LOCAL_ANTHROPIC_BETA_HEADERS"] == "True"

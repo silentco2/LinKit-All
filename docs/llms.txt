@@ -1,0 +1,18 @@
+# LinKit All
+
+> Open-source (AGPL-3.0-or-later) AI job search and auto-apply tool that runs on the user's own computer (Windows, macOS, Linux). It finds jobs, ranks them against the user's CV with a local model, tailors the CV with small word-level edits that never invent facts, and fills in application forms in the user's own browser. The user brings their own AI: a ChatGPT plan (Codex CLI), a Claude plan (Claude Code), an API key, or a local model (Ollama, LM Studio). No telemetry. English and Arabic.
+
+Install: `uv tool install linkit-all`, then `linkit`. Source: https://github.com/silentco2/LinKit-All
+
+## Docs
+
+- [Install](https://silentco2.github.io/LinKit-All/install/): Windows, macOS and Linux steps, AI providers, settings
+- [Setup](https://silentco2.github.io/LinKit-All/setup/): the first-run page
+- [Sources](https://silentco2.github.io/LinKit-All/sources/): where jobs are found
+- [Matching](https://silentco2.github.io/LinKit-All/matching/): rules, local ranking, AI scoring
+- [Job trust check](https://silentco2.github.io/LinKit-All/trust/): offline scam and ghost-job scores
+- [Tailoring](https://silentco2.github.io/LinKit-All/tailoring/): how CV edits are limited and checked
+- [Applying](https://silentco2.github.io/LinKit-All/applying/): form handlers, the AI form agent, accounts, Practice mode
+- [Privacy and security](https://silentco2.github.io/LinKit-All/privacy/): what stays local and what is sent where
+- [Apply scorecard](https://silentco2.github.io/LinKit-All/scorecard/): measured results on real postings
+- [Compared with AIHawk and ApplyPilot](https://silentco2.github.io/LinKit-All/compare/)

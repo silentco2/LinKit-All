@@ -1,7 +1,6 @@
 """UX round 2 backend: home address, new sensitive answers, places, posted-within hours, one
 browser setting, LinkedIn keywords, adding a source, and CV values filling empty fields."""
 
-import asyncio
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -393,15 +392,7 @@ def test_too_old_reason_has_hours() -> None:
 
 
 def test_jobspy_gets_hours_old() -> None:
-    seen: list[dict[str, Any]] = []
-
-    def fake(**kw: Any) -> list[dict[str, Any]]:
-        seen.append(kw)
-        return []
-
-    class _Http: ...
-
-    site = JobSpySite("indeed", fake)
+    site = JobSpySite("indeed")
     for hours, want in ((6, 6), (None, None)):
         cfg = SearchConfig.model_validate(
             {
@@ -411,13 +402,7 @@ def test_jobspy_gets_hours_old() -> None:
         )
         task = site.tasks(cfg)[0]
         assert isinstance(task, Task)
-
-        async def run(t: Task = task) -> None:
-            async for _ in site.search(_Http(), t, 0):  # type: ignore[arg-type]
-                pass
-
-        asyncio.run(run())
-        assert seen[-1]["hours_old"] == want
+        assert site.scrape_args(task)["hours_old"] == want
 
 
 # --- browser window, LinkedIn keywords --------------------------------------------------
@@ -425,7 +410,7 @@ def test_jobspy_gets_hours_old() -> None:
 
 def test_linkedin_uses_the_one_headless_setting_and_search_queries(tmp_path: Path) -> None:
     src = registry(data_dir=tmp_path)["linkedin_posts"]
-    base = linkedin_cfg(linkedin_keywords=[], linkedin_headless=False)
+    base = linkedin_cfg(linkedin_headless=True)  # saved by older versions: ignored
     base.search.queries = ["python dev", "data analyst"]
     assert [t.query for t in src.tasks(base)] == ["python dev", "data analyst"]
     assert src._headless is False  # type: ignore[attr-defined]  # apply.headless default

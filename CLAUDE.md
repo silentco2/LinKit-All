@@ -14,7 +14,7 @@ A local, open-source app that:
 
 Users bring their own AI: ChatGPT plan via Codex CLI, API keys, and later local models.
 ## 2. Hard constraints (never violate)
-- NO fabricated CV content: never add skills, employers, titles, dates, degrees or metrics
+- NO fabricated CV content: never add employers, titles, dates, degrees or metrics
   the user did not provide. Locked facts are immutable.
 - NO AI-guessed answers for legal/sensitive questions: work authorization, visa,
   sponsorship, salary, EEO/demographics, disability, veteran status, criminal record,
@@ -33,7 +33,7 @@ Users bring their own AI: ChatGPT plan via Codex CLI, API keys, and later local 
 - Scraping: httpx (async), python-jobspy, Playwright, selectolax, extruct, trafilatura, rapidfuzz, lingua-py. Embeddings: fastembed.
 - CV: python-docx + lxml, pylatexenc/TexSoup + Tectonic, pdf2docx, LibreOffice headless
   (DOCX->PDF, ODT<->DOCX), PyMuPDF, pdfplumber, Pillow/scikit-image (layout diff).
-- Apply: Playwright (real installed Chrome launched without automation flags, attached over CDP, persistent profile per site), imap-tools, msal (Outlook sign-in), vault via cryptography
+- Apply: Playwright (an installed Chromium browser — Chrome, else Edge, Brave or Chromium; core/tools.py browser_path() launched without automation flags, attached over CDP, persistent profile per site), imap-tools, msal (Outlook sign-in), vault via cryptography
   (AES-GCM) + argon2-cffi + keyring.
 - Frontend: Angular + TypeScript + Tailwind, Chart.js, ngx-fast-diff; built into the wheel.
 - Tooling: ruff, mypy, pre-commit, pytest (+ HTML fixtures), GitHub Actions, MkDocs Material.
@@ -73,24 +73,24 @@ Tailoring happens just before applying, never for jobs that will not be applied 
 - Priority: public ATS JSON APIs (Greenhouse, Lever, Ashby, Workday cxs, 100+ more) > python-jobspy (LinkedIn, Indeed, Glassdoor, ZipRecruiter,
   Google, Bayt) > aggregators and per-site plugins (Wuzzuf, Forasna) > generic extractor (JSON-LD -> heading + page text; JS pages: AI picks a recipe once per site).
 - Also: Telegram channels (t.me/s preview; post rules as for LinkedIn posts), discovered boards (Common Crawl, `linkit discover-boards`), aggregator API keys from the vault.
-- All browser automation runs real installed Chrome launched without automation flags (stealth-browser-mcp approach, maintainer 2026-10-26); never
-  solve CAPTCHAs/challenges, automate login (exceptions, §5.5: 2026-11-06 a site's Sign in with Google; 2026-11-07 board accounts the app made), use rotating proxies, TLS or fingerprint spoofing (exception 2026-10-29: headless gets a fitted screen +
-  real Chrome UA/client hints). OK: what the site's own pages send (Referer, XHR header, CSRF key). robots.txt not enforced.
+- All browser automation runs launched without automation flags (stealth-browser-mcp approach, maintainer); never
+  solve CAPTCHAs/challenges, use rotating proxies, TLS or fingerprint spoofing (exception: headless gets a fitted screen +
+  the browser's own real UA/client hints). OK: what the site's own pages send (Referer, XHR header, CSRF key). robots.txt not enforced.
 - ATS detector routes any pasted URL (or careers-page HTML) to the right plugin.
 - LinkedIn hiring posts (`sources/linkedin_posts/`): opt-in, off by default (ToS risk noted, no acknowledgement checkbox), no LinkedIn account (maintainer 2026-10-31); a row in the Sources list, keywords = the job titles (maintainer 2026-11-05). Google
-  `site:linkedin.com/posts` in Chrome on a `google` profile (≤5 keywords × ≤5 pages, paced); a Google check -> stop the source, flag it, a Needs you
+  `site:linkedin.com/posts` in the app browser on a `google` profile (≤5 keywords × ≤5 pages, paced); a Google check -> stop the source, flag it, a Needs you
   card opens it in the app browser. Post text = public page JSON-LD only (never comments). ATS links -> that ATS; else by script, no AI (`sources/posts.py`, maintainer 2026-11-08): email -> mailto job, other link -> careers scraper, neither -> dropped.
 - Per-domain rate limits, page checkpoints, dedupe by normalized URL + hash(title, company, location) + rapidfuzz.
 
 ### 5.3 Matching (`matching/`)
-1. Hard rules: titles include/exclude, location, remote mode, seniority, posted date,
+1. Hard rules: titles include/exclude, location (if not remote), remote mode, seniority, posted date,
    salary floor, company blacklist, one application per company (default on).
 2. Local rank: 0.8 cosine(CV, JD) + 0.2 skills overlap; fastembed multilingual MiniLM-L12
    (Arabic + English, chunked). Free, no AI calls.
 3. Trust check (offline, no AI): scam score (fees, off-platform contact, mule/crypto/ID requests,
    domain mismatch; EN+AR, evasion-proof) and ghost score (age, repeat sightings across runs,
    vague/evergreen text). Scam >= 65 -> filtered_out; ghost >= 50 -> tier low (or filtered out
-   if the user opts in). Trash (`matching/trash.py`, maintainer 2026-11-09): applied, reported, blacklisted-company and off-title jobs never reach a list; rows stay for dedupe.
+   if the user opts in). Trash (`matching/trash.py`, maintainer): applied, reported, blacklisted-company and off-title jobs never reach a list; rows stay for dedupe.
 4. AI score only jobs that survive 1–3 (dropped ones become `low`), batched 10–20 short summaries
    per call: `{score 1-10, reasons, missing_skills, red_flags, legit, trust_flags}`; AI can raise, never clear.
 
@@ -110,12 +110,12 @@ Tailoring happens just before applying, never for jobs that will not be applied 
 - Order: per-ATS handler -> generic AI form agent (accessibility-tree snapshot -> field map JSON -> fill -> validate -> next) -> Action Center.
   Handlers today: Greenhouse, Lever, Ashby; every other site (Workday, iCIMS, Taleo, ...) falls back to the generic agent.
   On a job ad (board listing) the agent presses Apply (<= 3 hops) and hands Greenhouse/Lever/Ashby links to their handler.
-- Headed Chrome by default (`apply.headless` is the one window setting, LinkedIn search included), persistent profile per site, human pacing, per-site daily caps, 1–3 parallel
+- Headedless browser (apply.headless), persistent profile per site, human pacing, per-site daily caps, 1–3 parallel
   browsers. Jobs closed on Greenhouse/Lever/Ashby are skipped before tailoring.
 - Account gate: generate unique password (`secrets`, honoring site rules), save to vault BEFORE submitting
   signup, then verify via IMAP (code/link by regex, AI fallback). Dry run never touches sign-up; live mode
-  creates accounts when needed; the application still waits for confirmation unless 'submit without asking'. Sign in with Google (`apply/google_signin.py`, `apply.google_signin`, opt-in, live only, maintainer 2026-11-06): the user signs in to Google by hand once on the `generic` profile; the agent presses the site's button, the account and Continue, never typing Google's password or solving its checks (those park, `google_needed`).
-  Sites without a handler (job boards, maintainer 2026-11-07): same gate in the agent, vault account `web:<host>`, sign-up via field map + answer engine.
+  creates accounts when needed; the application still waits for confirmation unless 'submit without asking'. Sign in with Google (`apply/google_signin.py`, `apply.google_signin`, opt-in, live only, maintainer): the user signs in to Google by hand once on the `generic` profile; the agent presses the site's button, the account and Continue, never typing Google's password or solving its checks (those park, `google_needed`).
+  Sites without a handler (job boards, maintainer): same gate in the agent, vault account `web:<host>`, sign-up via field map + answer engine.
 - Screening questions: answer bank (embedding match; general/per-role/per-company by wording, `assist.scope_of`) -> AI draft from profile (saved) -> Action Center. LinkIt Fill reads labels itself (no form-map AI); what the user types or corrects there joins the bank (never sensitive, secrets, ticks, dates). Sensitive
   categories (section 2) never go to the AI; military status, nationality, date of birth and marital status
   come from the profile only (an age question is always asked). Sponsorship/work authorization left on "Ask me":
@@ -127,8 +127,8 @@ Tailoring happens just before applying, never for jobs that will not be applied 
   Dead ends park `apply_by_hand` (link, CV, answers so far). No CAPTCHA solving: CAPTCHAs park for the user.
 - Email applications (`mailto:`, `apply/email_apply.py`): Gmail/Yahoo SMTP or Outlook Graph; short cover
   email (greeting/signature in code, body from the model, CV/profile only), subject = job title, the CV as uploaded (never tailored). Dry run writes an
-  .eml only; live follows "submit without asking" (else `confirm_email`). 15/day, never the same address twice.
-- Names (`core/names.py`, maintainer 2026-11-09): split on spaces; other script from the bundled arabnamer list, no AI. Cover letter only if the form has a field. All AI-written prose is English only, never Arabic (copying stays verbatim). Screenshot before submit and on confirmation; trace on failure.
+  .eml only; live follows "submit without asking" (else `confirm_email`). 15/day, never the same address twice. LinkIt mail: hover an address in a page, the extension offers to email it; the press is the go-ahead, sent at once (live only, `POST /api/assist/email`).
+- Names (`core/names.py`): split on spaces; other script from the bundled arabnamer list, no AI. Cover letter only if the form has a field. All AI-written prose is English only, never Arabic (copying stays verbatim). Screenshot before submit and on confirmation; trace on failure.
 - Success = confirmation page text and/or email, else failed with reason, never assumed. A sent email = applied
   (by email); the sent message is the proof.
 
@@ -138,7 +138,7 @@ approve/reject); <5 or dropped by prefilter = `low` -> hidden, but the user may 
 
 ### 5.7 Action Center (UI: "Needs you", tabs Approve jobs = review, Finish applications)
 Parked: unknown_question, confirm_submit, confirm_email, captcha, validation_error, login_issue,
-two_factor, apply_by_hand, apply_in_browser ("Open in my browser", "I applied"). Reopen via "Open in app browser" (same Chrome profile), then Retry. Notify via
+two_factor, apply_by_hand, apply_in_browser ("Open in my browser", "I applied"). Reopen via "Open in app browser" (same browser profile), then Retry. Notify via
 WebSocket + optional desktop notification. Open questions are grouped and answered once for many; sensitive
 ones group only on exact wording. One-time "always" choices (agreements, notice period, relocation,
 demographics) are saved to the profile.
@@ -153,7 +153,7 @@ Derived by rules. AI gap-fill must be verbatim from the CV (checked). On CV uplo
 - Vault: AES-GCM, key from master passphrase via Argon2id, cached with keyring; export re-asks it.
   Created just in time (first account sign-up or Gmail added), not as a setup step. Crypto unchanged.
 - IMAP/SMTP: app passwords (Gmail, Yahoo). Outlook/Hotmail: msal loopback sign-in (our Azure app id in config; `LINKIT_MS_CLIENT_ID` overrides), token cache in vault, mail via Microsoft Graph (IMAP XOAUTH2 fails server-side for personal accounts).
-- External tools: LibreOffice required (DOCX->PDF), Chrome for applying, Tectonic for LaTeX.
+- External tools: LibreOffice required (DOCX->PDF), Chromium for applying (not needed with Chrome, Edge or Brave), Tectonic for LaTeX.
   `linkit doctor` checks them. End-user install: `uv tool install linkit-all`.
 - LibreOffice: minimal portable bundle (Win 1.6 GB -> 439 MB) from `scripts/bundle_libreoffice.py` (removals kept only if renders stay identical);
   `linkit install-libreoffice <zip>` installs it to the data dir, ahead of any system install. Keep its MPL-2.0 license files. Optional in-app install (`POST /api/tools/libreoffice/install`, Windows x64 only unless env URL/hash are set): downloads `lo_bundle_url` (GitHub release `libreoffice-26.2.6-win-x64` of silentco2/LinKit-All, 145 MB), pinned `lo_bundle_sha256` checked before unpacking, never without a hash; the user may refuse and apply with the original CV.
@@ -187,7 +187,7 @@ tests/        unit, fixtures/<ats>/*.html, e2e (dry-run only) · docs/
 - Small, focused changes; one module per task when possible. Don't refactor unrelated code.
   Type hints everywhere; ruff + mypy clean; tests for every new logic path.
 - New source or ATS handler = plugin + fixture + tests. No live-site calls in CI; E2E apply tests are dry-run only, never submit real applications.
-- Update this file when a decision in it changes (max 200 lines). Unsure? Ask; don't guess.
+- Ask before updating this file when a decision in it changes (max 200 lines). Unsure? Ask; don't guess.
 
 ## 10. Build order
 Phases 1-13 are built; blocked items: handoff.md. 1 core, models, providers, DOCX tailoring · 2 discovery + matching

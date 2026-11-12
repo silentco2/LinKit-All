@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     tailor_max_growth: float = Field(0.10, ge=0, le=1)  # per segment, in characters
     tailor_max_word_change: float = Field(0.15, ge=0, le=1)  # whole CV
     tailor_min_ssim: float = Field(0.85, ge=0, le=1)  # per page vs original PDF
+    # One more AI call per tailored CV: refuses patches that say more than the CV does
+    tailor_claim_check: bool = True
 
     # Multilingual (Arabic + English), 220 MB, downloaded once into data_dir/models.
     embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"

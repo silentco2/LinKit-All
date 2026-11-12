@@ -74,7 +74,7 @@ def save_profile(client: TestClient) -> None:
 
 def test_retry_code_requeues_only_open_items_with_that_code(client: TestClient) -> None:
     j1, i1 = park(client, ActionKind.login_issue, code="needs_email")
-    j2, i2 = park(client, ActionKind.login_issue, code="email_not_connected")  # the old code
+    j2, i2 = park(client, ActionKind.login_issue, code="needs_email")
     j3, i3 = park(client, ActionKind.login_issue, code="needs_vault")
     j4, i4 = park(client, ActionKind.login_issue, code="needs_email")
     assert post(client, f"/api/actions/{i4}", {"decision": "skip"}).status_code == 200

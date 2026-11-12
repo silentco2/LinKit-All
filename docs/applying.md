@@ -1,7 +1,12 @@
+---
+title: "Auto-fill job applications: Greenhouse, Lever, Ashby"
+description: "How LinKit All fills job applications in your own browser: Greenhouse, Lever and Ashby handlers, an AI form agent, accounts, email codes, Practice mode."
+---
+
 # Applying
 
-Applying is the last stage. LinKit All opens each job's application form in a real Google Chrome
-window, tailors your CV, answers the questions and, only if you allow it, submits.
+Applying is the last stage. LinKit All opens each job's application form in your installed browser
+(Chrome, Edge or Brave), tailors your CV, answers the questions and, only if you allow it, submits.
 
 !!! warning "Live applying sends real applications in your name"
     Submitted applications cannot be taken back. Start with a dry run, look at the screenshots,

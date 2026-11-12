@@ -19,6 +19,12 @@ def _program_dirs() -> list[Path]:
     return [Path(v) for k in keys if (v := os.environ.get(k))]
 
 
+def _mac_apps(app: str, exe: str) -> list[Path]:
+    """A macOS app's binary in /Applications and in the user's own ~/Applications."""
+    bases = (Path("/Applications"), Path.home() / "Applications")
+    return [base / f"{app}.app/Contents/MacOS/{exe}" for base in bases]
+
+
 def bundled_libreoffice(data_dir: Path | None = None) -> Path:
     """Where `linkit install-libreoffice` (or the in-app install) puts the minimal portable
     LibreOffice."""
@@ -30,7 +36,7 @@ def soffice_path(data_dir: Path | None = None) -> str | None:
     if bundled.is_file():
         return str(bundled)
     fallbacks = [d / "LibreOffice/program/soffice.exe" for d in _program_dirs()]
-    fallbacks.append(Path("/Applications/LibreOffice.app/Contents/MacOS/soffice"))
+    fallbacks += _mac_apps("LibreOffice", "soffice")
     return find_tool(["soffice", "libreoffice"], fallbacks)
 
 
@@ -41,5 +47,29 @@ def tectonic_path() -> str | None:
 
 def chrome_path() -> str | None:
     fallbacks = [d / "Google/Chrome/Application/chrome.exe" for d in _program_dirs()]
-    fallbacks.append(Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"))
+    fallbacks += _mac_apps("Google Chrome", "Google Chrome")
     return find_tool(["google-chrome", "google-chrome-stable", "chrome"], fallbacks)
+
+
+CHROMIUM_URL = "https://www.chromium.org/getting-involved/download-chromium/"
+CHROMIUM_HINT = f"install Chromium ({CHROMIUM_URL}); not needed if you have Chrome, Edge or Brave"
+
+
+def browser_path() -> str | None:
+    """The browser for finding and applying: Chrome, else Edge, Brave or Chromium (all speak
+    the same CDP). Edge ships with Windows, so most users need nothing extra."""
+    if found := chrome_path():
+        return found
+    fallbacks = [
+        *_mac_apps("Microsoft Edge", "Microsoft Edge"),
+        *_mac_apps("Brave Browser", "Brave Browser"),
+        *_mac_apps("Chromium", "Chromium"),
+    ]
+    for base in _program_dirs():  # Brave's per-user install lives under LOCALAPPDATA
+        fallbacks.append(base / "Microsoft/Edge/Application/msedge.exe")
+        fallbacks.append(base / "BraveSoftware/Brave-Browser/Application/brave.exe")
+    return find_tool(
+        ["microsoft-edge", "microsoft-edge-stable", "msedge", "brave-browser", "brave",
+         "chromium", "chromium-browser"],
+        fallbacks,
+    )  # fmt: skip

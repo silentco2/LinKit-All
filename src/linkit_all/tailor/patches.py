@@ -7,6 +7,8 @@ from difflib import SequenceMatcher
 
 from pydantic import BaseModel
 
+from linkit_all.core.infer import TECH_TERMS
+
 
 class Patch(BaseModel):
     segment_id: int
@@ -58,10 +60,37 @@ def vocabulary(cv_text: str, skills: list[str]) -> set[str]:
     return {t.lower() for t in tokens(cv_text + " " + " ".join(skills))}
 
 
+_NUMBER_WORDS = frozenset(
+    {
+        "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+        "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen",
+        "nineteen", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety",
+        "hundred", "hundreds", "thousand", "thousands", "million", "millions", "billion",
+        "billions", "dozen", "dozens", "half", "double", "doubled", "triple", "tripled", "twice",
+    }
+)  # fmt: skip
+# Words that claim a bigger role or result than the CV states. Plain English, so the "looks like
+# a name" test below lets them through: "Mentored four developers" -> "Managed four developers".
+# ponytail: a word list, so a claim in other words still passes ("ran the team"); the model is
+# also told not to, and the user sees every change in the red-line diff.
+_CLAIMS = frozenset(
+    {
+        "managed", "manager", "managing", "management", "led", "lead", "leading", "leader",
+        "leadership", "headed", "head", "directed", "director", "supervised", "supervisor",
+        "oversaw", "overseeing", "founded", "founder", "cofounded", "co-founded", "owned",
+        "owner", "architected", "architect", "spearheaded", "pioneered", "chief", "principal",
+        "senior", "expert", "award", "awards", "awarded", "won", "promoted", "top", "best",
+        "certified", "published", "patented", "invented",
+    }
+)  # fmt: skip
+
+
 def _is_fact(tok: str) -> bool:
-    """Numbers, dates, metrics, emails, links: never added, removed or changed."""
+    """Numbers (digits or words), dates, metrics, emails, links: never added, removed or
+    changed. "eight years" -> "ten years" changes a fact as surely as "8" -> "10" does."""
     return (
-        any(c.isdigit() for c in tok)
+        any(part in _NUMBER_WORDS for part in tok.lower().split("-"))
+        or any(c.isdigit() for c in tok)
         or any(c in tok for c in "@%$€£")
         or "://" in tok
         or tok.lower().startswith("www.")
@@ -73,8 +102,9 @@ def unlisted_terms(old_seg: str, new_seg: str, allowed: set[str]) -> list[str]:
 
     ponytail: heuristic. Plain lowercase words pass (rephrasing); Capitalized, CamelCase,
     acronyms and symbol words (C#, Node.js) must already be known. A sentence-initial word
-    passes only as a lowercase -ed/-ing verb. Ceiling: lowercase-written tool names
-    ("kubernetes") slip through; add a skills dictionary if that shows up in practice.
+    passes only as a lowercase -ed/-ing verb. Tool names from the skills lexicon
+    (core/infer.py) and role or award words are refused in any spelling. Ceiling: a tool the
+    lexicon does not know, written in lowercase ("pulumi"), still slips through.
     """
     old = {t.lower() for t in tokens(old_seg)}
     words = new_seg.split()
@@ -82,6 +112,9 @@ def unlisted_terms(old_seg: str, new_seg: str, allowed: set[str]) -> list[str]:
     for i, raw in enumerate(words):
         tok = raw.strip(_STRIP)
         if not tok or tok.lower() in old or tok.lower() in allowed:
+            continue
+        if tok.lower() in _CLAIMS or tok.lower() in TECH_TERMS:  # however they are written
+            found.append(tok)
             continue
         initial = i == 0 or words[i - 1].endswith((".", "!", "?", ":"))
         check = tok[0].lower() + tok[1:] if initial else tok

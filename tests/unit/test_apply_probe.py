@@ -38,6 +38,35 @@ def test_report_is_a_markdown_table(tmp_path: Path) -> None:
     assert "| 7 | builtin | builtin.com | needs_user | apply_by_hand | a / b | x.png |" in text
 
 
+def test_scorecard_counts_per_platform_and_says_why_the_rest_stopped() -> None:
+    from datetime import datetime
+
+    from linkit_all.apply.probe import scorecard
+
+    def row(n: int, status: str, code: str, platform: str, seconds: float) -> ProbeRow:
+        return ProbeRow(n, "src", "h.io", status, "secret detail", code, "x.png", platform, seconds)
+
+    text = scorecard(
+        [
+            row(1, "dry_run", "", "greenhouse", 20),
+            row(2, "dry_run", "", "greenhouse", 40),
+            row(3, "needs_user", "captcha", "greenhouse", 9),
+            row(4, "needs_user", "captcha", "form agent", 30),
+            row(5, "error", "", "form agent", 2),
+            row(6, "dry_run", "dry_run_signup", "form agent", 4),
+        ],
+        datetime(2026, 11, 11),
+    )
+    assert "2026-11-11: 6 real job postings" in text
+    assert "| greenhouse | 3 | 2 (67%) | 0 | 1 | 0 | 0 | 20 s |" in text
+    # a form behind a sign-up page is not counted as filled
+    assert "| form agent | 3 | 0 (0%) | 1 | 1 | 1 | 0 | 4 s |" in text
+    assert "| form agent | dry_run | dry_run_signup | 1 |" in text
+    assert "| greenhouse | needs_user | captcha | 1 |" in text
+    assert "| form agent | error | - | 1 |" in text
+    assert "secret detail" not in text and "h.io" not in text  # counts only
+
+
 def test_a_borrowed_job_goes_back_with_its_card_closed(tmp_path: Path) -> None:
     from linkit_all.apply.probe import _queue, give_back
     from linkit_all.core.models import ActionItem, ActionKind, ActionStatus, JobEvent

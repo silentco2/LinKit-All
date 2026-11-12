@@ -63,7 +63,7 @@ window.lkSnapshot = (prefix) => {  // prefix: makes ids unique across the page's
   };
   const optionOf = (e) => {
     const l = labelsOf(e)[0];
-    return clean(l ? visText(l) : (e.getAttribute('role') ? e.innerText : '')) || e.value || '';
+    return clean(l ? visText(l) : (e.getAttribute('role') ? e.innerText : '')) || (e.matches('input[type=radio], input[type=checkbox]') ? e.value : '');  // never a text box's typed value
   };
   const lca = (els) => { let a = els[0]; while (a && !els.every((x) => a.contains(x))) a = parent(a); return a; };
   const reqOf = (els, nameEl, raw) => /[*✱]/.test(raw) || /required/i.test(nameEl?.className || '')

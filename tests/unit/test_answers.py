@@ -17,6 +17,7 @@ from linkit_all.apply.answers import (
     country_of,
     resolve_static,
     sensitive_category,
+    standard_answer,
 )  # fmt: skip
 from linkit_all.apply.assist import AnswerBank, answer_questions
 from linkit_all.core.db import init_db
@@ -202,3 +203,48 @@ def test_answer_questions_bank_then_ai(tmp_path: Path) -> None:
     r = run()
     assert r.sources["q9"] == "bank"  # the AI draft was saved and reused
     assert not any("- key: q9" in p for p in ai.calls)
+
+
+# --- found by the real-site scorecard: asked as a sentence, or for the dialling code --------
+
+
+def _home() -> Context:
+    from dataclasses import replace
+
+    return replace(ctx(), home_city="Cairo", home_country="EG", location="Cairo, Egypt")
+
+
+@pytest.mark.parametrize(
+    "label",
+    ["Where are you currently located?", "Where are you based?", "Where do you currently live?",
+     "Your current location"],
+)  # fmt: skip
+def test_where_are_you_located_is_answered_from_the_profile(label: str) -> None:
+    assert standard_answer(Question("k", label, "text"), _home()) == "Cairo, Egypt"
+
+
+def test_where_are_you_located_picks_from_a_list_of_cities_or_countries() -> None:
+    q = Question("k", "Where are you currently located?", "select", options=["Egypt", "Germany"])
+    assert standard_answer(q, _home()) == "Egypt"
+    q = Question("k", "Where are you currently located?", "select", options=["Alexandria", "Cairo"])
+    assert standard_answer(q, _home()) == "Cairo"
+
+
+def test_phone_country_code_is_the_dialling_code_not_the_number() -> None:
+    assert standard_answer(Question("k", "Phone number country code", "text"), _home()) == "+20"
+    assert standard_answer(Question("k", "Country code", "text"), _home()) == "+20"
+    for options, want in (
+        (["Germany (+49)", "Egypt (+20)", "Finland (+358)"], "Egypt (+20)"),
+        (["+2", "+20", "+200"], "+20"),
+        (["Egypt", "Germany"], "Egypt"),
+    ):
+        q = Question("k", "Phone number country code", "select", options=options)
+        assert standard_answer(q, _home()) == want
+    # the number itself, and codes that are not about phones, are untouched
+    assert standard_answer(Question("k", "Phone number", "text"), _home()) == "+20 100"
+    assert standard_answer(Question("k", "Postal code", "text"), _home()) != "+20"
+    assert standard_answer(Question("k", "Referral code", "text"), _home()) is None
+
+
+def test_phone_country_code_without_a_home_country_is_left_for_the_user() -> None:
+    assert standard_answer(Question("k", "Phone number country code", "text"), ctx()) is None

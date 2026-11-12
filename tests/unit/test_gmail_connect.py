@@ -158,20 +158,17 @@ def test_connect_send_and_disconnect(client: TestClient, gmail: GmailBox, logs: 
 def test_connect_then_retry_requeues_needs_email_jobs(client: TestClient, gmail: GmailBox) -> None:
     vault = unlock_with_profile(client)
     job, item = park(client, ActionKind.login_issue, code="needs_email")
-    old_job, old_item = park(client, ActionKind.login_issue, code="email_not_connected")
     other_job, _ = park(client, ActionKind.login_issue, code="needs_vault")
     assert credentials(_email_cfg(client), vault, USER) is None  # nothing connected yet
 
     assert post(client, "/api/email", {"app_password": APP_PASSWORD}).json()["connected"] is True
     retry = post(client, "/api/actions/retry-code", {"code": "needs_email"})
-    assert retry.json() == {"count": 2}
+    assert retry.json() == {"count": 1}
 
     with client.app.state.db() as s:  # type: ignore[attr-defined]
         assert s.get_one(Job, job).state == JobState.queued_apply
-        assert s.get_one(Job, old_job).state == JobState.queued_apply
         assert s.get_one(Job, other_job).state == JobState.needs_user  # a different problem
         assert s.get_one(ActionItem, item).status == ActionStatus.resolved
-        assert s.get_one(ActionItem, old_item).status == ActionStatus.resolved
 
 
 def _email_cfg(client: TestClient) -> Any:

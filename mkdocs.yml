@@ -1,11 +1,21 @@
 site_name: LinKit All
-site_description: Local, open-source AI job search, CV tailoring and auto-apply.
+site_url: https://silentco2.github.io/LinKit-All/
+site_description: >-
+  Open-source AI job search that runs on your computer: finds jobs, ranks them against your
+  CV, tailors it with small edits and fills in applications. Your data stays local.
+repo_url: https://github.com/silentco2/LinKit-All
+repo_name: silentco2/LinKit-All
+edit_uri: edit/main/docs/
 docs_dir: docs
 site_dir: site
 strict: true
+exclude_docs: |
+  launch/
+  usability/
 
 theme:
   name: material
+  custom_dir: overrides
   font: false # system fonts only: no requests to Google Fonts
   language: en
   features:
@@ -68,4 +78,6 @@ nav:
       - Privacy and security: privacy.md
       - Command line: cli.md
       - Troubleshooting: troubleshooting.md
+      - Apply scorecard: scorecard.md
+      - Compared with AIHawk and ApplyPilot: compare.md
   - Development: development.md

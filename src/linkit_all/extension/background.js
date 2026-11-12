@@ -54,7 +54,10 @@ async function call(path, init = {}) {
   const res = await fetch(app + path, { ...init, headers: { ...(init.headers || {}), 'X-LinKit-Token': token } });
   if (res.status === 404) return null;
   if (res.status === 405) throw new Error('Restart LinKit All: it is older than this extension.');
-  if (!res.ok) throw new Error(`LinKit All answered ${res.status}`);
+  if (!res.ok) {  // the app says why (already emailed, practice mode, ...)
+    const detail = await res.json().then((j) => j.detail).catch(() => '');
+    throw new Error(typeof detail === 'string' && detail ? detail : `LinKit All answered ${res.status}`);
+  }
   return res;
 }
 
@@ -139,6 +142,10 @@ async function handle(msg, sender) {
       let bin = '';
       for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
       return { name, type: res.headers.get('content-type') || 'application/pdf', data: btoa(bin) };
+    }
+    case 'mail': {  // LinkIt mail: the app writes the email and sends it with the CV
+      const res = await call('/api/assist/email', json(msg.body));
+      return res ? res.json() : null;
     }
     case 'done': {
       hostCache.at = 0;

@@ -10,6 +10,7 @@ Every call needs the pairing token shown in Settings > Applying; the extension k
 server only listens on 127.0.0.1, and data goes only to the provider the user chose.
 """
 
+import asyncio
 import hmac
 import re
 import secrets
@@ -24,23 +25,39 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from linkit_all.apply.agent import Control, page_questions
-from linkit_all.apply.answers import is_cover_letter, sensitive_category
+from linkit_all.apply.answers import (
+    ApplicationAnswers,
+    is_cover_letter,
+    remember_secrets,
+    scrub,
+    secrets_seen,
+    sensitive_category,
+)
 from linkit_all.apply.assist import (
     AnswerBank,
     answer_questions,
     keepable,
     profile_summary,
+    remember_bank_secrets,
     role_key,
     scope_of,
 )
+from linkit_all.apply.email_send import valid_address
 from linkit_all.apply.handlers.base import GENERIC_CONFIRMATION
-from linkit_all.apply.runner import job_context
+from linkit_all.apply.runner import (
+    Applier,
+    ApplyBlocked,
+    emailed,
+    emails_sent_today,
+    job_context,
+)
 from linkit_all.core.config import Settings
 from linkit_all.core.models import (
     ActionItem,
     ActionKind,
     ActionStatus,
     Job,
+    JobEvent,
     JobState,
     Profile,
     utcnow,
@@ -49,7 +66,8 @@ from linkit_all.core.search import SearchConfig, load_search
 from linkit_all.core.state import transition
 from linkit_all.matching.rank import cv_text
 from linkit_all.providers.base import LLMProvider
-from linkit_all.sources.text import norm, norm_company
+from linkit_all.sources.posts import company_of, heading
+from linkit_all.sources.text import job_hash, norm, norm_company
 
 router = APIRouter(prefix="/api/assist")
 KINDS = (ActionKind.apply_in_browser, ActionKind.apply_by_hand)
@@ -209,12 +227,24 @@ class PlanIn(BaseModel):
     controls: list[ControlIn] = Field(max_length=400)
 
 
+def _seed_secrets(db: sessionmaker[Session]) -> None:
+    """Page words go to the AI only after `scrub` hides the user's sensitive answers (§2): the
+    profile's and the ones typed in the Action Center. Call before using any page text."""
+    with db() as s:
+        profile = s.get(Profile, 1)
+        if profile is not None:
+            remember_secrets(ApplicationAnswers.model_validate(profile.answers))
+    remember_bank_secrets(db)
+
+
 def _page_job(body: PlanIn) -> Job:
     """Stands in for a job on a page that is none of the waiting ones (never saved). No title
-    and no company, so an answer tied to a role or company is not kept for later."""
+    and no company, so an answer tied to a role or company is not kept for later. The single
+    point where the page's text enters a prompt, so it is scrubbed here."""
+    title, text = scrub(body.title, secrets_seen), scrub(body.text, secrets_seen)
     return Job(
         source="page", url="", title="", company="Unknown", location="",
-        description=f"{body.title}\n{body.text}", dedupe_hash="", data={},
+        description=f"{title}\n{text}", dedupe_hash="", data={},
     )  # fmt: skip
 
 
@@ -229,6 +259,7 @@ async def plan(
     from linkit_all.providers import ProviderError, UsageLimitError, get_provider
 
     db, settings = _db(request), _settings(request)
+    _seed_secrets(db)
     with db() as s:
         job = _page_job(body) if body.job_id is None else s.get(Job, body.job_id)
         profile = s.get(Profile, 1)
@@ -357,3 +388,108 @@ def done(
         ):
             item.status, item.resolved_at = ActionStatus.resolved, utcnow()
     return {"ok": True, "confirmed": confirmed}
+
+
+class MailIn(BaseModel):
+    to: str = Field(max_length=320)
+    page: PageIn
+    near: str = Field("", max_length=4000)  # the text around the address: a post, an ad's block
+
+
+_MAIL_LOCK = asyncio.Lock()  # ponytail: one LinkIt mail at a time; a second click waits its turn
+_SENDABLE = (JobState.queued_apply, JobState.tailored)
+
+
+def _mail_job(s: Session, cfg: SearchConfig, addr: str, body: MailIn) -> Job:
+    """The job this address is for, ready to send. The job title is the waiting job's when this
+    page is one, else the labelled or wanted-title line near the address or in the page heading
+    (no AI); none found = the subject is "Application - <name>"."""
+    url = f"mailto:{addr.lower()}"
+    job = s.scalar(select(Job).where(Job.url == url))
+    if job is None:
+        page = _job_on_page([j for _, j in _open_items(s)], body.page)
+        words = tuple(cfg.filters.title_include)
+        top = "\n".join([*body.page.heading.split(" | "), body.page.title])
+        title = (
+            page.title if page else heading(body.near, words, False) or heading(top, words, False)
+        )
+        company = (
+            page.company if page and page.company != "Unknown" else company_of(body.near, addr)
+        )
+        text = page.description if page else f"{body.page.title}\n{body.near}"
+        text = scrub(
+            text, secrets_seen
+        )  # the description goes to the AI (§2); title/company are sent as is
+        job = Job(
+            source="linkit_mail", url=url, title=title, company=company, location="",
+            description=text, dedupe_hash=job_hash(title, company, ""),
+            state=JobState.queued_apply, data={"page_url": body.page.url},
+        )  # fmt: skip
+        s.add(job)
+        s.flush()
+        s.add(JobEvent(
+            job_id=job.id, to_state=JobState.queued_apply, code="linkit_mail",
+            message=f"you pressed LinkIt mail for {addr}", params={"to": addr},
+        ))  # fmt: skip
+    elif job.state in (JobState.needs_user, JobState.failed):  # pressed again: that is the go-ahead
+        transition(s, job, JobState.queued_apply, f"you pressed LinkIt mail for {addr}",
+                   code="linkit_mail", params={"to": addr})  # fmt: skip
+        for item in s.scalars(
+            select(ActionItem).where(
+                ActionItem.job_id == job.id, ActionItem.status == ActionStatus.open
+            )
+        ):
+            item.status, item.resolved_at = ActionStatus.resolved, utcnow()
+    elif job.state not in _SENDABLE:
+        raise HTTPException(409, f"LinkIt mail for {addr} is {job.state.value}: see Jobs")
+    job.data = {**job.data, "apply_url": url, "submit_confirmed": True, "mail_sending": True}
+    return job
+
+
+@router.post("/email")
+async def email(
+    request: Request, body: MailIn, x_linkit_token: str | None = Header(None)
+) -> dict[str, Any]:
+    """LinkIt mail: the user pressed it on an email address in a page. That press is the go-ahead,
+    so the application is sent now, not drafted: the same path as a `mailto:` job (short cover
+    email from the profile and CV, the CV as uploaded, the job title as subject, never the same
+    address twice, the daily cap). Practice mode sends nothing."""
+    _check(request, x_linkit_token)
+    from linkit_all.pipeline import _get_embedder, ai_settings
+    from linkit_all.providers import ProviderError, get_provider
+
+    addr = body.to.strip()
+    if not valid_address(addr):
+        raise HTTPException(422, "That is not a single email address")
+    db, settings = _db(request), _settings(request)
+    _seed_secrets(db)
+    cfg = load_search(db) or SearchConfig()
+    if not cfg.apply.live:
+        raise HTTPException(
+            409, "Practice mode is on, so nothing is sent: turn on Applying for real in LinKit All"
+        )
+    try:
+        provider = get_provider(ai_settings(settings, cfg), cache=db)
+    except ProviderError as e:
+        raise HTTPException(409, f"Set up your AI in LinKit All first ({e})") from None
+    async with _MAIL_LOCK:
+        with db.begin() as s:
+            if done := emailed(s, addr):
+                sent = str((done.data.get("email_sent") or {}).get("sent_at", ""))[:10]
+                raise HTTPException(409, f"You already emailed {addr} ({sent})")
+            if emails_sent_today(s) >= cfg.apply.email_daily_cap:
+                raise HTTPException(
+                    429, f"{cfg.apply.email_daily_cap} application emails sent today: try tomorrow"
+                )
+            job_id = _mail_job(s, cfg, addr, body).id
+        applier = Applier(db, settings, cfg, provider, await _get_embedder(settings),
+                          request.app.state.vault)  # fmt: skip
+        try:
+            outcome = await applier.apply(job_id)  # an email needs no browser
+        except ApplyBlocked as e:
+            raise HTTPException(409, str(e)) from None
+        finally:
+            with db.begin() as s:
+                row = s.get_one(Job, job_id)
+                row.data = {k: v for k, v in row.data.items() if k != "mail_sending"}
+    return {"status": outcome.status, "message": outcome.message, "job_id": job_id}

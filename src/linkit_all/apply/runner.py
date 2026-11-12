@@ -13,6 +13,7 @@ import shutil
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -59,7 +60,12 @@ from linkit_all.apply.answers import (
     Question,
     reason_code,
 )
-from linkit_all.apply.assist import AnswerBank, answer_questions, profile_summary
+from linkit_all.apply.assist import (
+    AnswerBank,
+    answer_questions,
+    profile_summary,
+    remember_bank_secrets,
+)
 from linkit_all.apply.browser import live_frames, live_shot_path, profile_dir
 from linkit_all.apply.email_apply import (
     attachment_copy,
@@ -222,7 +228,31 @@ def is_pickable(j: Job, generic: bool, live: bool) -> bool:
             or (generic and _web_url(j.data.get("apply_url") or j.url))
         )
         and (live or not j.data.get("dry_run_at"))
+        and not j.data.get("mail_sending")  # LinkIt mail is sending it right now
     )
+
+
+def emails_sent_today(s: Session) -> int:
+    since = utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    return (
+        s.scalar(
+            select(func.count())
+            .select_from(JobEvent)
+            .where(JobEvent.code == "applied_by_email", JobEvent.at >= since)
+        )
+        or 0
+    )
+
+
+def emailed(s: Session, addr: str, but: int | None = None) -> Job | None:
+    """The applied job whose application email went to `addr` (never the same address twice)."""
+    return next(
+        (
+            o for o in s.scalars(select(Job).where(Job.state == JobState.applied, Job.id != but))
+            if (o.data.get("email_sent") or {}).get("to", "").lower() == addr.lower()
+        ),
+        None,
+    )  # fmt: skip
 
 
 async def _settle(page: Page) -> None:
@@ -464,11 +494,7 @@ class Applier:
         live = self.cfg.apply.live
         since = utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         with self.db() as s:
-            emails_today = s.scalar(
-                select(func.count())
-                .select_from(JobEvent)
-                .where(JobEvent.code == "applied_by_email", JobEvent.at >= since)
-            )
+            emails_today = emails_sent_today(s)
             applied_today = dict(
                 s.execute(
                     select(Job.ats, func.count())
@@ -487,18 +513,41 @@ class Applier:
         jobs.sort(key=lambda j: (-(j.score or 0), -(j.data.get("rank") or 0)))
         picked: list[int] = []
         per_site: dict[str, int] = {}
+        held: dict[int, dict[str, Any]] = {}  # job id -> why it waits for tomorrow
         for j in jobs:
             by_email = mailto_address(j.data.get("apply_url")) is not None
             key = "email" if by_email else j.ats or ""
             done = (emails_today or 0) if by_email else applied_today.get(j.ats, 0)
             cap = self.cfg.apply.email_daily_cap if by_email else self.cfg.apply.daily_cap_per_site
             if live and done + per_site.get(key, 0) >= cap:
+                held[j.id] = {"site": "email" if by_email else j.ats or "", "cap": cap}
                 continue
+            if len(picked) >= self.cfg.apply.max_per_run:
+                continue  # over this run's limit, not the day's: no event
             per_site[key] = per_site.get(key, 0) + 1
             picked.append(j.id)
-            if len(picked) >= self.cfg.apply.max_per_run:
-                break
+        if held:
+            self._note_daily_cap(held, since)
         return picked
+
+    def _note_daily_cap(self, held: dict[int, dict[str, Any]], since: datetime) -> None:
+        """One `daily_cap` history line per held job per day, so the job says why it waits."""
+        with self.db.begin() as s:
+            noted = set(
+                s.scalars(
+                    select(JobEvent.job_id).where(
+                        JobEvent.code == "daily_cap",
+                        JobEvent.at >= since,
+                        JobEvent.job_id.in_(held),
+                    )
+                )
+            )
+            for job_id, params in held.items():
+                if job_id in noted:
+                    continue
+                job = s.get_one(Job, job_id)
+                msg = f"Daily limit on {params['site']} ({params['cap']}): waits for tomorrow"
+                _event(s, job, msg, [], code="daily_cap", params=params)
 
     async def _posting_closed(self, job: Job, info: JobInfo) -> bool:
         """Ask the job's ATS plugin whether the posting still exists. Only a clear "gone" counts;
@@ -699,12 +748,7 @@ class Applier:
         live waits for the user's confirm (draft editable) unless told not to. Sent = applied."""
         apply_cfg = self.cfg.apply
         with self.db() as s:
-            already = any(
-                (o.data.get("email_sent") or {}).get("to", "").lower() == addr.lower()
-                for o in s.scalars(
-                    select(Job).where(Job.state == JobState.applied, Job.id != job_id)
-                )
-            )
+            already = emailed(s, addr, but=job_id) is not None
         if already:
             with self.db.begin() as s:
                 transition(
@@ -1226,8 +1270,9 @@ class Applier:
             controls = await snapshot(page)
             if not controls:
                 return False
+            remember_bank_secrets(self.db)
             fmap = await field_map(
-                self.provider, controls, await page.title(), await page_text(page)
+                self.provider, controls, await page.title(), await page_text(page, 2000)
             )
         except Exception:
             return False

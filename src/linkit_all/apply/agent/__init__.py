@@ -18,7 +18,7 @@ import asyncio
 import contextlib
 import re
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Literal, cast, get_args
 from weakref import WeakKeyDictionary
@@ -28,8 +28,16 @@ from playwright.async_api import Frame, Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 from pydantic import BaseModel
 
-from linkit_all.apply.answers import Context, Kind, Missing, Question
-from linkit_all.apply.assist import AnswerBank, answer_questions
+from linkit_all.apply.answers import (
+    Context,
+    Kind,
+    Missing,
+    Question,
+    remember_secrets,
+    scrub,
+    secrets_seen,
+)
+from linkit_all.apply.assist import AnswerBank, answer_questions, remember_bank_secrets
 from linkit_all.apply.form import FillError, fill_in, lost_values
 from linkit_all.apply.handlers.base import CAPTCHA, ERRORS
 from linkit_all.providers.base import LLMProvider, render
@@ -47,7 +55,6 @@ _prefixes: WeakKeyDictionary[Frame, str] = WeakKeyDictionary()
 _SUBMIT = re.compile(r"\b(submit|apply|send)\b", re.I)
 _NEXT = re.compile(r"\b(next|continue|proceed|review|forward|save and)\b", re.I)
 _TEXTUAL = {"text", "textarea", "email", "tel", "number", "url", "date"}
-_STRUCTURAL = {"select", "radio", "multi", "checkbox", "yesno", "file", "combobox"}
 
 
 class AgentError(RuntimeError):
@@ -229,8 +236,17 @@ def clean_map(fmap: FieldMap, controls: list[Control]) -> FieldMap:
 async def field_map(
     provider: LLMProvider, controls: list[Control], page_title: str, page_text: str = ""
 ) -> FieldMap:
-    shown = [c for c in controls if c.kind != "password"]  # filled by our code, never mapped
-    prompt = render("form_map.j2", controls=shown, title=page_title, page_text=page_text)
+    """Ask the model to map the page. The page's words are scrubbed of the user's sensitive
+    answers first, then cut: callers pass a longer text so a secret is not cut in half."""
+    shown = [
+        replace(c, name=scrub(c.name, secrets_seen, 4)) for c in controls if c.kind != "password"
+    ]  # password boxes are filled by our code, never mapped
+    prompt = render(
+        "form_map.j2",
+        controls=shown,
+        title=scrub(page_title, secrets_seen),
+        page_text=scrub(page_text, secrets_seen)[:800],
+    )
     return clean_map(await provider.complete(prompt, FieldMap), controls)
 
 
@@ -448,7 +464,9 @@ async def step(
         return StepResult(
             "login", "stop", reason="sign-in or sign-up page: needs the account flow", code="login"
         )
-    fmap = await field_map(provider, controls, await page.title(), await page_text(page))
+    remember_secrets(ctx.answers)
+    remember_bank_secrets(bank.db)
+    fmap = await field_map(provider, controls, await page.title(), await page_text(page, 2000))
     by_id = {c.id: c for c in controls}
     if fmap.page_kind in ("listing", "other"):
         opener = by_id.get(fmap.apply_button or "") or _apply_control(controls)
@@ -473,6 +491,7 @@ async def step(
 
     questions = to_questions(controls, fmap)
     r = await answer_questions(questions, ctx, bank, provider, cv, profile, job, out_dir)
+    remember_secrets(ctx.answers, questions, r.answers)
     failed = await fill_page(page, questions, r.answers)
     for c in controls:
         if password and c.kind == "password":

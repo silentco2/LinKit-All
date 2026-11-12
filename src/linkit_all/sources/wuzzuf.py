@@ -34,6 +34,13 @@ class Wuzzuf(Source):
         return [Task(self.name, "wuzzuf:sitemap", query="|".join(cfg.search.queries),
                      posted_within_days=cfg.search.posted_within_days)]  # fmt: skip
 
+    def page_timeout(self, task: Task) -> float:
+        # Page 0 reads the sitemap index and every job sitemap before its first job page, each
+        # request paced 10 s apart (SLOW_HOSTS), then fetches 10 job pages: (1 + N + 10) * 10 s
+        # for N sitemaps, which passes 900 s at N = 80 and N is not ours to know. One hour allows
+        # ~350 requests; generous on purpose, it only stops a true hang. Later pages: ~100 s.
+        return 3600.0
+
     async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:
         urls = await self.matching_urls(http, task)
         for page in range(start_page, (len(urls) + PAGE - 1) // PAGE):

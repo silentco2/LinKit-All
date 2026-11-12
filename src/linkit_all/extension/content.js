@@ -270,6 +270,114 @@
     else say(job.carried ? `You came here from this job's Apply button. ${HINT}` : HINT);
   }
 
+  // LinkIt mail: hover an email address (a mailto: link or one in the text) and a button offers to
+  // send that address your application now. Nothing leaves the page until the button is pressed.
+  const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g;
+  const EDITABLE = 'input, textarea, [contenteditable=""], [contenteditable="true"]';
+  let chip = null, chipBtn = null, chipTo = '', chipNear = '', hideTimer = null, sending = false, resultUntil = 0;
+
+  const inside = (r, x, y) => x >= r.left - 2 && x <= r.right + 2 && y >= r.top - 2 && y <= r.bottom + 2;
+
+  function addressAt(e) {
+    const el = e.target instanceof Element ? e.target : null;
+    const a = el && el.closest('a[href^="mailto:" i]');
+    if (a) {
+      const to = decodeURIComponent(a.getAttribute('href').slice(7).split('?')[0]).split(',')[0].trim();
+      return to ? { to, el: a, rect: a.getBoundingClientRect() } : null;
+    }
+    if (!el || el.closest(EDITABLE)) return null;
+    const pos = document.caretPositionFromPoint?.(e.clientX, e.clientY);
+    const range = pos ? null : document.caretRangeFromPoint?.(e.clientX, e.clientY);
+    const node = pos ? pos.offsetNode : range?.startContainer;
+    const at = pos ? pos.offset : range?.startOffset;
+    if (!node || node.nodeType !== Node.TEXT_NODE) return null;
+    for (const m of node.data.matchAll(EMAIL)) {
+      if (at < m.index || at > m.index + m[0].length) continue;
+      const r = document.createRange();
+      r.setStart(node, m.index);
+      r.setEnd(node, m.index + m[0].length);
+      const rect = r.getBoundingClientRect();
+      return inside(rect, e.clientX, e.clientY) ? { to: m[0], el: node.parentElement, rect } : null;
+    }
+    return null;
+  }
+
+  // The post or block the address sits in: it names the job (its title becomes the subject).
+  function nearText(el) {
+    let box = el;
+    while (box.parentElement && box !== document.body && (box.innerText || '').length < 400
+      && !box.matches('article, section, li, main, [role=article], [role=listitem]')) box = box.parentElement;
+    return (box.innerText || '').slice(0, 4000);
+  }
+
+  function hideChip() { if (chip && !sending) chip.style.display = 'none'; }
+  function hideSoon() {
+    clearTimeout(hideTimer);
+    if (!sending) hideTimer = setTimeout(hideChip, Math.max(600, resultUntil - Date.now()));
+  }
+
+  function showChip(found) {
+    if (!chip) {
+      chip = document.createElement('div');
+      chip.style.cssText = 'position:fixed;z-index:2147483647;';
+      const root = chip.attachShadow({ mode: 'closed' });
+      root.innerHTML = `
+        <style>
+          button{font:600 12px/1.35 system-ui,sans-serif;background:#059669;color:#fff;border:1px solid #047857;
+            border-radius:8px;padding:5px 9px;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.2);max-width:320px;text-align:left}
+          button:disabled{cursor:default}
+          button.bad{background:#b45309;border-color:#92400e}
+        </style>
+        <button type="button"></button>`;
+      chipBtn = root.querySelector('button');
+      chipBtn.addEventListener('click', sendMail);
+      chip.addEventListener('mouseenter', () => clearTimeout(hideTimer));
+      chip.addEventListener('mouseleave', hideSoon);
+      document.documentElement.appendChild(chip);
+    }
+    clearTimeout(hideTimer);
+    if (found.to === chipTo && chip.style.display !== 'none') return;
+    chipTo = found.to;
+    chipNear = nearText(found.el);
+    resultUntil = 0;
+    chipBtn.disabled = false;
+    chipBtn.className = '';
+    chipBtn.textContent = `LinkIt mail: send my CV to ${chipTo}`;
+    const below = found.rect.bottom + 40 < innerHeight;
+    chip.style.left = `${Math.max(4, Math.min(found.rect.left, innerWidth - 330))}px`;
+    chip.style.top = `${below ? found.rect.bottom + 4 : Math.max(4, found.rect.top - 34)}px`;
+    chip.style.display = 'block';
+  }
+
+  async function sendMail() {
+    if (sending || chipBtn.disabled) return;
+    sending = true;
+    const to = chipTo;
+    chipBtn.disabled = true;
+    chipBtn.textContent = `Writing and sending your application to ${to}…`;
+    const r = await ask({ type: 'mail', body: { to, page: pageInfo(), near: chipNear } });
+    const d = r.ok ? r.data : null;
+    sending = false;
+    chipBtn.className = d && d.status === 'applied' ? '' : 'bad';
+    chipBtn.textContent = !r.ok ? r.error
+      : !d ? 'Restart LinKit All: it is older than this extension.'
+      : d.status === 'applied' ? `Sent to ${to}, with your CV. Marked as applied in LinKit All.`
+      : d.status === 'needs_user' ? `Not sent yet: ${d.message}. See Needs you in LinKit All.`
+      : `Not sent: ${d.message}`;
+    resultUntil = Date.now() + 8000;
+    hideSoon();
+  }
+
+  let lastMove = 0;
+  document.addEventListener('mousemove', (e) => {
+    if (sending || Date.now() - lastMove < 120) return;
+    lastMove = Date.now();
+    if (chip && e.composedPath().includes(chip)) return;
+    const found = addressAt(e);
+    if (found && Date.now() >= resultUntil) showChip(found);
+    else if (!found) hideSoon();
+  }, { passive: true, capture: true });
+
   if (TOP) {
     identify(true);
     let url = location.href;

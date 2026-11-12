@@ -1,3 +1,8 @@
+---
+title: "Develop and contribute to LinKit All"
+description: "Set up a LinKit All development checkout: uv, the Angular frontend, tests with HTML fixtures, ruff and mypy, and the rules every change follows."
+---
+
 # Development
 
 LinKit All is open source under the **AGPL-3.0-or-later** license. This page is for people who

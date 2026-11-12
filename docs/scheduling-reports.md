@@ -1,3 +1,8 @@
+---
+title: "Schedule job search runs and read the reports"
+description: "Run LinKit All on a schedule and follow every job from found to applied: funnel, results per platform and career page, and CSV or PDF exports."
+---
+
 # Scheduling and reports
 
 ## Live run

@@ -1,3 +1,8 @@
+---
+title: "LinKit All: open-source AI job search and auto-apply"
+description: "Open-source AI job application tool that runs on your computer: finds jobs, ranks them against your CV, tailors it honestly and fills in applications."
+---
+
 # LinKit All
 
 LinKit All is a job search tool that runs on your own computer. It finds jobs, ranks them
@@ -20,7 +25,7 @@ key, or a local model such as Ollama or LM Studio.
 3. **Scores** the best ones with your AI, in batches, and sorts them into tiers.
 4. **Tailors your CV** for the jobs it will apply to. It changes a few words and leaves the
    layout alone. See [Tailoring](tailoring.md).
-5. **Applies** in a real Chrome window, including sites that need an account. See [Applying](applying.md).
+5. **Applies** in your installed browser (Chrome, Edge or Brave), including sites that need an account. See [Applying](applying.md).
 6. **Asks you** whenever it should not guess. See [Action Center](action-center.md).
 7. **Reports** what happened. See [Scheduling and reports](scheduling-reports.md).
 
@@ -68,3 +73,37 @@ These rules are built into the code, not just written down.
 1. [Install](install.md) LinKit All and its helper tools.
 2. Run `linkit` and follow the [setup wizard](setup.md).
 3. Press **Find jobs now**, look at the results, then try a dry-run apply.
+
+## Questions people ask
+
+### Is LinKit All free?
+
+Yes. It is open source under AGPL-3.0-or-later and costs nothing. Your AI use is paid the way
+you already pay for it: your ChatGPT or Claude plan, your API key, or nothing with a local
+model.
+
+### Does it apply to jobs automatically?
+
+It fills in application forms on its own. It starts in Practice mode, which never presses
+Submit. After you switch to Applying for real, each submission still waits for your click
+unless you turn on "submit without asking".
+
+### Does it make things up on my CV?
+
+No. It changes a few words to match each job and refuses any edit that adds an employer,
+title, date, degree, number or skill you did not give it. See [Tailoring](tailoring.md).
+
+### Does it work with LinkedIn?
+
+It finds LinkedIn jobs, but it never drives LinkedIn, Indeed or Glassdoor. You open those jobs
+in your own browser, and the LinkIt Fill extension fills each step while you press Next and
+Submit. See [Applying](applying.md).
+
+### Can it run with a local AI model?
+
+Yes. Pick Ollama or LM Studio in setup. Your CV and job text then never leave your computer.
+See [Install](install.md#local-models).
+
+### How is it different from AIHawk or ApplyPilot?
+
+See the sourced [comparison](compare.md).

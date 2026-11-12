@@ -197,7 +197,6 @@ export class EmailConnect {
   /** Requeue the applications that waited for an email, tell the parent, and return the message to show. */
   private async afterConnect(e: EmailState): Promise<string> {
     this.setEmail(e);
-    // 'email_not_connected' (the old code) is requeued by the same call
     const count = await this.api.post<{ count: number }>('/actions/retry-code', { code: 'needs_email' }).then((r) => r.count).catch(() => 0);
     this.connected.emit({ email: e, count });
     const text = this.i18n.t('setup.email.connectedMsg', { user: e.imap_user });

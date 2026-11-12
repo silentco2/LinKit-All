@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Literal, Protocol
 
 from docx import Document
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -15,7 +16,7 @@ from linkit_all.core.config import Settings
 from linkit_all.core.models import Job, JobState, LockedFact, Profile, TailoredCV
 from linkit_all.core.state import transition
 from linkit_all.core.tools import soffice_path, tectonic_path
-from linkit_all.providers.base import LLMProvider
+from linkit_all.providers.base import LLMProvider, ProviderError, UsageLimitError
 from linkit_all.providers.base import render as render_prompt
 from linkit_all.tailor import latex
 from linkit_all.tailor.docx.segments import PatchError, apply_patch, load_segments
@@ -213,6 +214,48 @@ def tailor_latex(
     return _tailor(base_tex, base_pdf, texts, patches, rules, out_dir, build, min_ssim, render)
 
 
+class ClaimVerdict(BaseModel):
+    index: int
+    adds: bool
+    why: str = ""
+
+
+class ClaimCheck(BaseModel):
+    verdicts: list[ClaimVerdict]
+
+
+async def vet_claims(
+    texts: dict[int, str], patches: list[Patch], rules: Rules, provider: LLMProvider
+) -> list[tuple[Patch, str]]:
+    """A second opinion on the patches the rules accept: which of them say something the CV
+    does not? The rules read words; a claim made with the CV's own words ("ran the team"), or
+    a tool no list knows, needs a reader. It can only refuse, and a patch it could not judge
+    is refused too: the CV line then simply stays as it was."""
+    accepted = plan_patches(texts, patches, rules).accepted
+    if not accepted:
+        return []
+    items = [
+        (i, texts[p.segment_id], texts[p.segment_id].replace(p.old_text, p.new_text, 1))
+        for i, p in enumerate(accepted)
+    ]
+    unchecked = "could not be checked for new claims"
+    try:
+        check = await provider.complete(render_prompt("tailor_check.j2", items=items), ClaimCheck)
+    except UsageLimitError:
+        raise
+    except ProviderError:
+        return [(p, unchecked) for p in accepted]
+    verdicts = {v.index: v for v in check.verdicts}
+    refused = []
+    for i, p in enumerate(accepted):
+        v = verdicts.get(i)
+        if v is None:
+            refused.append((p, unchecked))
+        elif v.adds:
+            refused.append((p, f"says more than your CV does: {v.why[:80] or 'a new claim'}"))
+    return refused
+
+
 async def tailor_for(
     profile: Profile,
     locked_facts: list[str],
@@ -246,11 +289,17 @@ async def tailor_for(
         max_change=f"{rules.max_word_change:.0%}",
     )
     patches = (await provider.complete(prompt, PatchList)).patches
+    refused: list[tuple[Patch, str]] = []
+    if settings.tailor_claim_check:
+        refused = await vet_claims({s.id: s.text for s in segments}, patches, rules, provider)
+        patches = [p for p in patches if all(p is not r for r, _ in refused)]
     base_pdf = await asyncio.to_thread(ensure_base_pdf, base, render)
-    return await asyncio.to_thread(
+    result = await asyncio.to_thread(
         tailor_latex if is_tex else tailor_docx, base, base_pdf, patches, rules, out_dir,
         min_ssim=settings.tailor_min_ssim, render=render,
     )  # fmt: skip
+    result.rejected += refused
+    return result
 
 
 def load_profile(db: sessionmaker[Session]) -> tuple[Profile, list[str]]:
