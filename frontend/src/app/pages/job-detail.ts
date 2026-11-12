@@ -90,10 +90,10 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
               @for (r of ai.reasons; track r) { <li dir="auto">{{ r }}</li> }
             </ul>
             @if (ai.missing_skills.length) {
-              <p class="mt-3 text-sm"><span class="font-medium">{{ 'detail.ai.missing' | t }}</span> <bdi>{{ ai.missing_skills.join(', ') }}</bdi></p>
+              <p class="mt-3 text-sm"><span class="font-medium">{{ 'detail.ai.missing' | t }}&ngsp;</span><bdi>{{ ai.missing_skills.join(', ') }}</bdi></p>
             }
             @if (ai.red_flags.length) {
-              <p class="mt-1 text-sm text-rose-700 dark:text-rose-300"><span class="font-medium">{{ 'detail.ai.redFlags' | t }}</span> <bdi>{{ ai.red_flags.join(', ') }}</bdi></p>
+              <p class="mt-1 text-sm text-rose-700 dark:text-rose-300"><span class="font-medium">{{ 'detail.ai.redFlags' | t }}&ngsp;</span><bdi>{{ ai.red_flags.join(', ') }}</bdi></p>
             }
           </section>
         }

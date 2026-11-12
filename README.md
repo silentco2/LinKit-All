@@ -8,6 +8,10 @@ You bring your own AI: a ChatGPT plan (Codex CLI), a Claude plan (Claude Code CL
 
 > It starts in Practice mode: it fills forms and takes screenshots but never presses Submit. Real submitting is new; watch your first run.
 
+![LinKit All: Home with a finished practice run, the jobs list with a job's AI reasons and filled answers, and Needs you answering one question for four applications at once](https://raw.githubusercontent.com/silentco2/LinKit-All/main/docs/assets/demo.gif)
+
+<sub>Made-up study data (`scripts/record_demo.py`); nothing was submitted.</sub>
+
 ## What it does
 
 1. Finds jobs from the job boards and company career pages you list.

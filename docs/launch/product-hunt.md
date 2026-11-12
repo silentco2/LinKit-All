@@ -12,7 +12,7 @@ Finds jobs from 100+ job systems, ranks them against your CV for free, tailors y
 inventing anything, and fills in applications in your own browser. Bring your own AI, even a
 local one. No telemetry. Free and open source.
 
-**Gallery:** `docs/assets/social.png` first, then screenshots of Home (a run in progress), Jobs,
+**Gallery:** `docs/assets/social.png` first, then `docs/assets/demo.gif`, then screenshots of Home (a run in progress), Jobs,
 Needs you and a CV red-line. Take them from the app seeded with `scripts/seed_usability.py`,
 never from your real data.
 
