@@ -66,10 +66,6 @@ LinKit All talks to:
   sign-in and Microsoft Graph for Outlook.
 - Hugging Face, once, to download the ranking model.
 - An exchange-rate service, to refresh rates. It sends no personal data.
-- With any model used through the LiteLLM library except `openai/` ones (OpenAI, LM Studio and
-  other OpenAI-compatible servers), `openaipublic.blob.core.windows.net`: the library downloads
-  one public tokenizer file the first time, and again if the file is not kept. It carries none
-  of your data.
 - Only if you turn the feature on: the one-click LibreOffice download from the project's GitHub
   release, Google search in the app browser for the LinkedIn hiring posts source, Google's
   sign-in pages for "Sign in with Google", Telegram

@@ -66,7 +66,6 @@ Real sites: `uv run linkit apply-probe` tries real postings in Practice mode. Th
   - always: the job sites and career pages you list, and the sites you apply on (the app also reads each site's `robots.txt`, only for its `Crawl-delay`);
   - if you connect email: your mail server (Gmail or Yahoo IMAP and SMTP; Microsoft sign-in and Microsoft Graph for Outlook);
   - a one-time download of the ranking model, and an exchange-rate refresh that sends no personal data;
-  - with any model used through the LiteLLM library except `openai/` ones (OpenAI, LM Studio and other OpenAI-compatible servers), the library downloads one public tokenizer file from `openaipublic.blob.core.windows.net` the first time, and again if the file is not kept; it carries none of your data;
   - only if you turn it on: the one-click LibreOffice download from the project's GitHub release, Google search in the app browser for the LinkedIn hiring posts source, Google's sign-in pages if you turn on "Sign in with Google", Telegram channel previews (`t.me/s`) for channels you list, and Common Crawl's index when you run `linkit discover-boards`.
 - LinKit All itself contacts nothing else. The browser it drives, the pages that browser loads, the AI command-line tool you pick, and Tectonic (which downloads TeX files the first time it compiles a LaTeX CV) make their own connections, which the app does not control.
 - There is no telemetry, analytics or crash reporting.
