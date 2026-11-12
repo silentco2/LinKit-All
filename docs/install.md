@@ -1,3 +1,8 @@
+---
+title: "Install LinKit All on Windows, macOS and Linux"
+description: "Install LinKit All with uv on Windows, macOS or Linux, add LibreOffice and a Chromium browser, connect your AI and check every tool with linkit doctor."
+---
+
 # Install
 
 ## What you need
@@ -23,10 +28,8 @@ uv tool install linkit-all
 linkit doctor
 ```
 
-!!! note "Not published yet"
-    LinKit All has not been released on PyPI yet, so `uv tool install linkit-all` works
-    only after the first release. Until then, run it from a source checkout. See
-    [Development](development.md).
+To run the newest code instead of a release, use a source checkout: see
+[Development](development.md).
 
 ### Step by step for your system
 

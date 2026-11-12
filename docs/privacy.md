@@ -1,3 +1,8 @@
+---
+title: "Privacy and security: your job search data stays local"
+description: "What LinKit All keeps on your computer, what reaches your AI provider and job sites, the encrypted password vault, and why there is no telemetry."
+---
+
 # Privacy and security
 
 LinKit All is built so that your CV, answers and passwords stay on your computer.

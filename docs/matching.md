@@ -1,3 +1,8 @@
+---
+title: "Job matching: rank jobs against your CV for free"
+description: "How LinKit All filters jobs with your rules, ranks them against your CV with a free local embedding model, then lets your AI score the best in batches."
+---
+
 # Matching
 
 Thousands of jobs can arrive in one run. Matching cuts them down in three steps. The first two

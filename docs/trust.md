@@ -1,3 +1,8 @@
+---
+title: "Fake job and ghost job detector, offline"
+description: "LinKit All scores every job for scams and ghost postings offline, in English and Arabic: fees, off-platform contact, ID requests, stale and vague ads."
+---
+
 # Job trust check
 
 LinKit All checks every job for two different problems before any AI is used. The check runs

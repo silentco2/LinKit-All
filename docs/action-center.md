@@ -1,3 +1,8 @@
+---
+title: "Needs you: questions and confirmations in one place"
+description: "When LinKit All should not guess (visa, salary, CAPTCHAs, sign-in, a final Submit) the job waits in Needs you, grouped so one answer serves many jobs."
+---
+
 # Action Center
 
 The Action Center is the list of jobs that stopped and need you. LinKit All parks a job here

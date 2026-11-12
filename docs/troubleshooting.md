@@ -1,3 +1,8 @@
+---
+title: "Troubleshooting LinKit All"
+description: "Fixes for common LinKit All problems: browser will not start, LibreOffice missing, AI limits and pauses, email codes not arriving, jobs stuck waiting."
+---
+
 # Troubleshooting
 
 Start with:

@@ -1,3 +1,8 @@
+---
+title: "Command line reference for the linkit command"
+description: "Every linkit command: serve, doctor, run a single stage, bench, apply-probe, tailor a CV from the terminal, install LibreOffice, import a profile."
+---
+
 # Command line
 
 The command is `linkit`. Run `linkit --help`, or `linkit <command> --help`, for the built-in text.
@@ -20,6 +25,9 @@ linkit [--version] [--help] <command>
 | [`status`](#linkit-status) | Job counts by state and tier |
 | [`jobs`](#linkit-jobs) | List jobs |
 | [`tailor`](#linkit-tailor) | Tailor your CV to a job text |
+| [`discover-boards`](#linkit-discover-boards) | Find company job boards in Common Crawl |
+| [`bench`](#linkit-bench) | Measure quality on built-in fake jobs |
+| [`apply-probe`](#linkit-apply-probe) | Try real postings in Practice mode |
 
 `linkit --version` prints the installed version.
 
@@ -142,3 +150,55 @@ the layout check, and the path of the PDF.
 
 This is for checking what tailoring does. The web page and `linkit run apply` tailor
 automatically.
+
+## `linkit discover-boards`
+
+```text
+linkit discover-boards [--ats TEXT]... [--max-per-ats INTEGER]
+```
+
+Look up company job boards in Common Crawl's public index and store them, so the next
+discovery crawls them too. Only Common Crawl is contacted; nothing about you is sent.
+
+| Option | Default | Meaning |
+|---|---|---|
+| `--ats TEXT` | all | Only this applicant tracking system (repeat for more) |
+| `--max-per-ats INTEGER` | `5000` | Boards to keep per system |
+
+## `linkit bench`
+
+```text
+linkit bench [--jobs INTEGER] [--seed INTEGER] [--out PATH] [--apply INTEGER] [--provider TEXT] [--model TEXT]
+```
+
+Measure finding, duplicate removal, the scam and ghost checks, ranking and the CV tailoring
+guard on a built-in fake job board, and write the numbers to `bench.json`. It touches none of
+your data and no real site, and the AI is a scripted stand-in. The same seed gives the same
+numbers.
+
+| Option | Default | Meaning |
+|---|---|---|
+| `--jobs INTEGER` | `10000` | Fake jobs to generate (at least 10) |
+| `--seed INTEGER` | `1` | Same seed, same jobs |
+| `--out PATH` | `bench.json` | Where to write the numbers |
+| `--apply INTEGER` | `0` | Also fill this many fake application forms in Practice mode (needs a browser) |
+| `--provider TEXT`, `--model TEXT` | none | A real AI for the CV claim check only |
+
+## `linkit apply-probe`
+
+```text
+linkit apply-probe [--per-source INTEGER] [--job INTEGER]... [--limit INTEGER] [--restore] [--scorecard PATH] [--provider TEXT] [--model TEXT]
+```
+
+Apply in Practice mode to real postings already in your job list, one per source by default,
+then report where each one got to. Nothing is submitted, and the CV is sent as uploaded. The
+[scorecard](scorecard.md) was made with it.
+
+| Option | Default | Meaning |
+|---|---|---|
+| `--per-source INTEGER` | `1` | Jobs to try per source |
+| `--job INTEGER` | none | Exact job ids (repeat for more) |
+| `--limit INTEGER` | `60` | At most this many jobs in all |
+| `--restore` | off | Only put back jobs an earlier test borrowed |
+| `--scorecard PATH` | none | Also write a per-platform summary to this file |
+| `--provider TEXT`, `--model TEXT` | none | Override the AI choice |

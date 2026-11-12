@@ -1,3 +1,8 @@
+---
+title: "Auto-fill job applications: Greenhouse, Lever, Ashby"
+description: "How LinKit All fills job applications in your own browser: Greenhouse, Lever and Ashby handlers, an AI form agent, accounts, email codes, Practice mode."
+---
+
 # Applying
 
 Applying is the last stage. LinKit All opens each job's application form in your installed browser

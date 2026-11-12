@@ -1,3 +1,8 @@
+---
+title: "First-run setup: CV, AI and the jobs you want"
+description: "The four-step first run of LinKit All: upload your CV, pick an AI (ChatGPT or Claude plan, API key or local model), check what was found, choose jobs."
+---
+
 # Setup wizard
 
 Run `linkit`, then open **Setup** in the left menu. The wizard has nine steps. You can visit

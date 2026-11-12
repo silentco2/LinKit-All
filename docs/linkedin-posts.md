@@ -1,3 +1,8 @@
+---
+title: "Find LinkedIn hiring posts without a LinkedIn account"
+description: "Find jobs that are only posted as LinkedIn hiring posts, through Google and the posts' public pages, with no LinkedIn account and no comments read."
+---
+
 # LinkedIn hiring posts
 
 Many recruiters and company owners announce jobs as ordinary LinkedIn **posts**

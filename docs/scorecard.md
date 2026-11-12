@@ -1,3 +1,8 @@
+---
+title: "Apply scorecard: how far real applications get"
+description: "Practice-mode results on real job postings per platform: how many forms LinKit All filled to the end and why the others stopped. Nothing submitted."
+---
+
 # Apply scorecard
 
 Practice mode, 2026-11-11: 18 real job postings, forms filled and nothing submitted. The CV was
