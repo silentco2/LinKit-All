@@ -201,6 +201,7 @@ def test_browser_path_finds_per_user_brave(tmp_path: Path, monkeypatch: pytest.M
     brave.touch()
     monkeypatch.setattr(tools, "chrome_path", lambda: None)
     monkeypatch.setattr("shutil.which", lambda _name: None)  # nothing on PATH
+    monkeypatch.setattr(tools, "_mac_apps", lambda *_: [])  # a Mac runner has its own Edge
     for key in ("ProgramFiles", "ProgramFiles(x86)"):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
@@ -295,4 +296,10 @@ def test_browser_path_finds_a_mac_app_in_home_applications(
     for key in ("ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setattr(tools.Path, "home", classmethod(lambda _cls: tmp_path))
+    system, own = tools._mac_apps("Microsoft Edge", "Microsoft Edge")
+    assert system == tools.Path("/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge")
+    assert own == edge
+    real = tools._mac_apps
+    # only the user's own folder: the machine running the test may have Edge in /Applications
+    monkeypatch.setattr(tools, "_mac_apps", lambda app, exe: real(app, exe)[1:])
     assert tools.browser_path() == str(edge)
