@@ -1320,6 +1320,7 @@ export const ar: Record<string, string> = {
   'park.below_top': 'خارج الوظائف الأعلى ترتيبًا: لم يقيّمها الذكاء الاصطناعي',
   'park.low_opt_in': 'أُضيفت لأنك اخترت التقديم على التطابقات الضعيفة أيضًا',
   'park.apply_crashed': 'حدث خطأ أثناء التقديم ({error})',
+  'park.daily_cap': 'تم بلوغ الحد اليومي على {site} ({cap} في اليوم): ينتظر حتى الغد',
   'park.not_in_profile': '{what}: غير مضبوط في ملفك الشخصي',
   'park.own_answer': 'أنت وحدك من يجيب عن هذا السؤال ({what})',
   'park.no_option': 'لا يوجد خيار يطابق ملفك الشخصي',

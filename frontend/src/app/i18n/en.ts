@@ -1202,6 +1202,7 @@ export const en: Record<string, string> = {
   'park.below_top': 'Outside the top-ranked jobs: not rated by the AI',
   'park.low_opt_in': 'Queued because you chose to apply to weak matches too',
   'park.apply_crashed': 'The application hit an error ({error})',
+  'park.daily_cap': 'Daily limit reached on {site} ({cap} a day): waits for tomorrow',
   'park.not_in_profile': '{what}: not set in your profile',
   'park.own_answer': 'Only you can answer this {what} question',
   'park.no_option': 'None of the options matches your profile',

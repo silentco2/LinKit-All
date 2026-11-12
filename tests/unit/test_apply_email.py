@@ -12,6 +12,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from test_api import SAME_ORIGIN, client, mem_keyring  # noqa: F401  (fixtures)
 from test_email_send import FakeSMTP
 from test_matching import fake_embed
@@ -444,3 +445,16 @@ def test_attachment_keeps_the_uploaded_files_type(tmp_path: Path) -> None:
     src = tmp_path / "my cv.DOCX"
     src.write_bytes(b"x")
     assert attachment_copy(src, tmp_path / "o", "Jane Doe").name == "Jane Doe - CV.docx"
+
+
+def test_held_by_the_daily_cap_gets_one_event_per_day(make: Any) -> None:
+    env: Env = make(live=True, email_daily_cap=1)
+    ids = [env.job(url=f"mailto:hr{i}@acme.com", n=i) for i in range(3)]
+    for _ in range(2):  # a second run the same day adds nothing
+        assert len(env.applier.pick_jobs()) == 1
+    with env.db() as s:
+        rows = s.scalars(select(JobEvent).where(JobEvent.code == "daily_cap")).all()
+        assert len(rows) == 2  # the two jobs past the cap
+        assert all(e.params == {"site": "email", "cap": 1} for e in rows)
+        assert all(e.from_state == e.to_state == JobState.queued_apply for e in rows)
+    assert {e.job_id for e in rows} < set(ids)

@@ -13,6 +13,7 @@ import shutil
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -512,18 +513,41 @@ class Applier:
         jobs.sort(key=lambda j: (-(j.score or 0), -(j.data.get("rank") or 0)))
         picked: list[int] = []
         per_site: dict[str, int] = {}
+        held: dict[int, dict[str, Any]] = {}  # job id -> why it waits for tomorrow
         for j in jobs:
             by_email = mailto_address(j.data.get("apply_url")) is not None
             key = "email" if by_email else j.ats or ""
             done = (emails_today or 0) if by_email else applied_today.get(j.ats, 0)
             cap = self.cfg.apply.email_daily_cap if by_email else self.cfg.apply.daily_cap_per_site
             if live and done + per_site.get(key, 0) >= cap:
+                held[j.id] = {"site": "email" if by_email else j.ats or "", "cap": cap}
                 continue
+            if len(picked) >= self.cfg.apply.max_per_run:
+                continue  # over this run's limit, not the day's: no event
             per_site[key] = per_site.get(key, 0) + 1
             picked.append(j.id)
-            if len(picked) >= self.cfg.apply.max_per_run:
-                break
+        if held:
+            self._note_daily_cap(held, since)
         return picked
+
+    def _note_daily_cap(self, held: dict[int, dict[str, Any]], since: datetime) -> None:
+        """One `daily_cap` history line per held job per day, so the job says why it waits."""
+        with self.db.begin() as s:
+            noted = set(
+                s.scalars(
+                    select(JobEvent.job_id).where(
+                        JobEvent.code == "daily_cap",
+                        JobEvent.at >= since,
+                        JobEvent.job_id.in_(held),
+                    )
+                )
+            )
+            for job_id, params in held.items():
+                if job_id in noted:
+                    continue
+                job = s.get_one(Job, job_id)
+                msg = f"Daily limit on {params['site']} ({params['cap']}): waits for tomorrow"
+                _event(s, job, msg, [], code="daily_cap", params=params)
 
     async def _posting_closed(self, job: Job, info: JobInfo) -> bool:
         """Ask the job's ATS plugin whether the posting still exists. Only a clear "gone" counts;
