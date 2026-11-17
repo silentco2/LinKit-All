@@ -697,6 +697,7 @@ class Applier:
             # a click or fill that cannot happen fails in 10 s, not Playwright's 30 (two Lever
             # forms lost 3.5 minutes each on optional fields); waits that need longer say so
             page.set_default_timeout(10_000)
+            page.set_default_navigation_timeout(60_000)  # a slow site still loads
         # ponytail: pages of parallel sites all write the one current.jpg, latest frame wins
         live = asyncio.create_task(
             live_frames(

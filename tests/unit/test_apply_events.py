@@ -22,6 +22,8 @@ class Page:
 
     def set_default_timeout(self, ms: float) -> None: ...
 
+    def set_default_navigation_timeout(self, ms: float) -> None: ...
+
 
 class Browser:
     async def new_page(self) -> Page:
