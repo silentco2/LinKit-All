@@ -1,0 +1,94 @@
+name: CI failure report
+
+# After every CI run on main: a failure opens one "CI failing on main" issue (or comments on
+# the open one) with the failing jobs, tests and log tail, mentioning @claude so the Claude
+# GitHub app can pick it up once installed. Jobs GitHub cancelled for lack of runners do not
+# count. A green run closes the issue. Read-only on code: it only writes issues.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  actions: read
+  issues: write
+
+concurrency:
+  group: ci-failure-report
+  cancel-in-progress: false
+
+jobs:
+  report:
+    if: github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RUN_ID: ${{ github.event.workflow_run.id }}
+      RUN_URL: ${{ github.event.workflow_run.html_url }}
+      CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+      SHA: ${{ github.event.workflow_run.head_sha }}
+      LABEL: ci-failure
+      TITLE: CI failing on main
+    steps:
+      - name: Report or clear the failure
+        run: |
+          set -euo pipefail
+          open_issue=$(gh issue list --label "$LABEL" --state open --json number --jq '.[0].number // empty')
+
+          if [ "$CONCLUSION" = "success" ]; then
+            if [ -n "$open_issue" ]; then
+              gh issue close "$open_issue" --comment "CI is green again on ${SHA:0:7}: $RUN_URL"
+            fi
+            exit 0
+          fi
+
+          # only real failures: a job cancelled because no runner picked it up is not one
+          failed=$(gh run view "$RUN_ID" --json jobs --jq '.jobs[] | select(.conclusion == "failure") | "\(.databaseId)\t\(.name)"')
+          if [ -z "$failed" ]; then
+            echo "No failed job (only cancelled or skipped ones): nothing to report."
+            exit 0
+          fi
+
+          body=$(mktemp)
+          {
+            echo "CI failed on \`main\` at ${SHA:0:7}: $RUN_URL"
+            echo
+            echo "@claude please find the root cause of these failures and fix them on a branch with a pull request. Do not push to main."
+            echo
+          } > "$body"
+          while IFS=$'\t' read -r job_id job_name; do
+            log=$(mktemp)
+            # curl, not `gh api`: gh refuses a response holding terminal colour codes
+            curl -sSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$GH_REPO/actions/jobs/$job_id/logs" > "$log" || true
+            # strip timestamps and colour codes
+            sed -E 's/^[0-9T:.Z-]+ //; s/\x1b\[[0-9;]*m//g' "$log" > "$log.txt"
+            {
+              echo "### $job_name"
+              echo
+              echo '```'
+              grep -E '^(FAILED|ERROR) |^=+ .*(passed|failed|error)|^##\[error\]' "$log.txt" | head -40 || true
+              echo '```'
+              echo
+              echo '<details><summary>Log tail</summary>'
+              echo
+              echo '```'
+              # the test output, not GitHub's cleanup that follows it
+              awk '/^Post job cleanup/ {exit} {print}' "$log.txt" | grep -vE '^\s*$' | tail -60 | cut -c1-300
+              echo '```'
+              echo
+              echo '</details>'
+              echo
+            } >> "$body"
+          done <<< "$failed"
+          head -c 60000 "$body" > "$body.cut"
+
+          gh label create "$LABEL" --color B60205 --description "CI failed on main" 2>/dev/null || true
+          if [ -n "$open_issue" ]; then
+            gh issue comment "$open_issue" --body-file "$body.cut"
+          else
+            gh issue create --title "$TITLE" --label "$LABEL" --body-file "$body.cut"
+          fi
