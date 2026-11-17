@@ -6,7 +6,8 @@ Arabic vocabulary is new. Repost and still-open signals come from `job_sightings
 
 Scoring (weights are the named constants below):
 - Time evidence: `stale_posting` (45 d +15, 90 d +25), `still_open` (>= 4 runs over >= 30 d +15,
-  >= 60 d +25) and `reposted` (+20). stale + still_open share one budget of 30 points
+  >= 60 d +25) and `reposted` (+20: a new URL on a later scan day within 90 days; URLs first
+  seen the same day are sibling openings, not a repost). stale + still_open share one budget of 30 points
   (`TIME_CAP`): stale counts first, still_open is trimmed to what is left, because both are the
   same fact seen twice (an old posting that is still listed).
 - Text evidence: `vague_description` (the 0-30 vagueness sub-score scaled to at most 20),
@@ -57,7 +58,7 @@ class GhostHistory:
     first_seen: datetime | None  # earliest sighting (core/sightings.py)
     seen_runs: int  # distinct discovery runs that saw it
     span_days: float  # last sighting - first sighting
-    urls_seen: int  # distinct URLs among sightings (repost under a new URL/id)
+    urls_seen: int  # listings under a new URL on a later scan day, within 90 days (sightings.repost_listings)
     company_open_now: int  # jobs from this company seen in the latest run
     company_open_median: float  # median of that count over earlier runs (0 if no history)
 
@@ -476,7 +477,9 @@ def score_ghost(
                 )
             )
     if history.urls_seen >= REPOST_URLS:
-        signals.append(Signal("reposted", REPOST_WEIGHT, f"listed under {history.urls_seen} URLs"))
+        signals.append(
+            Signal("reposted", REPOST_WEIGHT, f"listed {history.urls_seen} times under a new URL")
+        )
 
     # text evidence, capped as a group
     text_sigs: list[Signal] = []

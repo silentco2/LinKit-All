@@ -6,10 +6,10 @@ With `matching.auto_apply_low` the low tier is queued for apply instead, and exi
 below_threshold jobs are re-queued on the next score run.
 """
 
-from typing import Any, Literal
+from typing import Any, Literal, Self
 
 from loguru import logger
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -27,12 +27,56 @@ MAX_TRUST_FLAGS = 3
 JD_CHARS = 1500  # per job; enough for the role, stack and requirements
 
 
+MAX_REQUIREMENTS = 8
+SHORT_JD = 400  # a description under this many characters cannot carry a confident score
+Confidence = Literal["low", "medium", "high"]
+
+
+def _one_of(*known: str) -> Any:
+    """A before-validator that reads an unknown value as the field's default (the last one
+    named) instead of failing the whole batch."""
+    return lambda v: v if v in known else known[-1]
+
+
+class Requirement(BaseModel):
+    """One thing the posting asks for, and whether the CV shows it."""
+
+    text: str
+    importance: Literal["critical", "high", "preferred", "meaningful"] = "meaningful"
+    # stated: the posting says it; structural: the title or level implies it; inferred: a guess.
+    basis: Literal["stated", "structural", "inferred"] = "inferred"
+    met: Literal["yes", "no", "partial"] = "partial"
+
+    _importance = field_validator("importance", mode="before")(
+        _one_of("critical", "high", "preferred", "meaningful")
+    )
+    _basis = field_validator("basis", mode="before")(_one_of("stated", "structural", "inferred"))
+    _met = field_validator("met", mode="before")(_one_of("yes", "no", "partial"))
+
+    @model_validator(mode="after")
+    def _guess_is_never_decisive(self) -> Self:
+        if self.basis == "inferred" and self.importance in ("critical", "high"):
+            self.importance = "meaningful"
+        return self
+
+
 class JobScore(BaseModel):
     job_id: int
     score: int = Field(ge=1, le=10)
     reasons: list[str] = []
     missing_skills: list[str] = []
     red_flags: list[str] = []
+    # Optional, so cached answers from before these fields still validate.
+    requirements: list[Requirement] = []
+    cv_evidence: Literal["missing", "found"] = "found"
+
+    _cv_evidence = field_validator("cv_evidence", mode="before")(_one_of("missing", "found"))
+
+    @field_validator("requirements")
+    @classmethod
+    def _cap_requirements(cls, v: list[Requirement]) -> list[Requirement]:
+        return v[:MAX_REQUIREMENTS]
+
     # Legitimacy is separate from fit. Optional so old cached answers and models that omit it
     # still validate; an unknown `legit` value is read as "ok" rather than failing the batch.
     legit: Literal["ok", "suspicious", "scam"] = "ok"
@@ -51,6 +95,19 @@ class JobScore(BaseModel):
 
 class ScoreBatch(BaseModel):
     results: list[JobScore]
+
+
+def confidence_of(description: str, r: JobScore) -> Confidence:
+    """How far to trust a score. Shown beside it; never changes the tier.
+
+    low: too little to judge from (a short or cut-off description, or the AI found no CV
+    evidence). high: the AI read the whole description and every requirement it listed comes
+    from the posting or the role itself. medium: everything else."""
+    text = description.strip()
+    if len(text) < SHORT_JD or text.endswith(("…", "...")) or r.cv_evidence == "missing":
+        return "low"
+    grounded = bool(r.requirements) and all(q.basis != "inferred" for q in r.requirements)
+    return "high" if grounded and len(description) <= JD_CHARS else "medium"
 
 
 def tier_for(score: int, cfg: SearchConfig) -> Tier:
@@ -108,12 +165,12 @@ async def score_jobs(
                 render("score.j2", cv=cv, prefs=prefs, jobs=batch), ScoreBatch
             )
         except UsageLimitError as e:  # pause cleanly; ranked jobs are scored on resume
-            logger.bind(code="ai_usage_limit", params={"batches": n - 1}).warning(
-                "AI usage limit reached after {} batches: {}", n - 1, e
+            logger.bind(code=e.code, params={"batches": n - 1}).warning(
+                "AI stopped after {} batches: {}", n - 1, e
             )
             if run_id is not None:
                 pause_run(
-                    db, run_id, e.message, "ai_usage_limit",
+                    db, run_id, e.message, e.code,
                     {"provider": e.provider, "until": e.until},
                 )  # fmt: skip
             counts["not_scored"] += sum(len(b) for b in batches[n - 1 :])
@@ -129,7 +186,7 @@ async def score_jobs(
                 job.score, job.tier, job.data = (
                     r.score,
                     tier_for(r.score, cfg),
-                    {**job.data, "ai": ai},
+                    {**job.data, "ai": ai, "confidence": confidence_of(job.description, r)},
                 )
                 if add_ai_flag(job, r.legit) and job.tier == Tier.high:
                     job.tier = (

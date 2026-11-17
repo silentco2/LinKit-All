@@ -287,6 +287,7 @@ def test_step_seeds_the_secrets_from_the_profile_and_the_answer_bank(
 
     monkeypatch.setattr(agent, "captcha_shown", no)
     monkeypatch.setattr(agent, "snapshot", snap)
+    monkeypatch.setattr(agent, "decline_cookies", text)  # no browser: no cookie banner
     monkeypatch.setattr(agent, "page_text", text)
     monkeypatch.setattr(agent, "field_map", fake_map)
     ctx = Context("A B", "a@b.c", "1", "Cairo", ApplicationAnswers(nationality="Zorbian"))

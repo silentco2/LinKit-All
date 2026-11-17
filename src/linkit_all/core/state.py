@@ -5,7 +5,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from linkit_all.core.models import Job, JobEvent, JobState
+from linkit_all.core.models import Job, JobEvent, JobState, Outcome, utcnow
 
 S = JobState
 
@@ -66,4 +66,29 @@ def transition(
         )
     )
     job.state = to
+    return True
+
+
+class NotApplied(ValueError):
+    pass
+
+
+def set_outcome(session: Session, job: Job, outcome: Outcome, source: str = "user") -> bool:
+    """Record what happened after applying (`source`: user | email). The state stays `applied`;
+    the change is logged as an event. Same outcome again is a no-op. The caller commits."""
+    if job.state != JobState.applied:
+        raise NotApplied(f"job {job.id} is {job.state}, not applied")
+    if job.outcome == outcome:
+        return False
+    session.add(
+        JobEvent(
+            job=job,
+            from_state=job.state,
+            to_state=job.state,
+            message=f"outcome: {outcome.replace('_', ' ')}",
+            code="outcome",
+            params={"outcome": outcome, "source": source, "was": job.outcome},
+        )
+    )
+    job.outcome, job.outcome_at = outcome, utcnow()
     return True

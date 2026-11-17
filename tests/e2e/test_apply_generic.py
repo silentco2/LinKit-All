@@ -179,6 +179,25 @@ def test_live_submit_without_asking_applies_only_on_confirmation_text(env: dict[
     ).exists()
 
 
+def test_successfactors_submission_asks_to_check_the_stored_profile(env: dict[str, Any]) -> None:
+    sf = "https://career5.successfactors.eu/career?company=acme&career_job_req_id=1"
+    env["state"]["extra"][sf] = FORM
+    with env["db"].begin() as s:
+        job = s.get_one(Job, env["job"])
+        job.data = {**job.data, "apply_url": sf}
+    assert run(env, live=True, submit_without_asking=True)["applied"] == 1
+    with env["db"]() as s:
+        codes = [e.code for e in s.get_one(Job, env["job"]).events]
+    assert codes[-2:] == ["confirmed", "check_stored_profile"]
+
+
+def test_other_sites_get_no_stored_profile_note(env: dict[str, Any]) -> None:
+    assert run(env, live=True, submit_without_asking=True)["applied"] == 1
+    with env["db"]() as s:
+        codes = [e.code for e in s.get_one(Job, env["job"]).events]
+    assert "check_stored_profile" not in codes
+
+
 def test_live_without_confirmation_text_is_failed_never_assumed_applied(
     env: dict[str, Any],
 ) -> None:
@@ -286,6 +305,29 @@ def test_captcha_parks_captcha(env: dict[str, Any]) -> None:
     assert env["posts"] == []
 
 
+KNOCKOUT = FORM.replace(
+    '<p id="err1"',
+    "<fieldset><legend>Do you have at least 8 years of professional experience? *</legend>"
+    '<label><input type="radio" name="yrs" value="yes" required> Yes</label>'
+    '<label><input type="radio" name="yrs" value="no"> No</label></fieldset>'
+    '<p id="err1"',
+)
+
+
+def test_knockout_question_parks_before_anything_is_filled(env: dict[str, Any]) -> None:
+    env["state"]["page"] = KNOCKOUT  # the profile says 3 years
+    ai = FakeAI()
+    assert run(env, ai)["needs_user"] == 1
+    item = parked(env)
+    assert item.kind == ActionKind.knockout
+    assert item.params == {"question": "Do you have at least 8 years of professional experience?"}
+    assert ai.asked == []  # nothing was answered or typed
+    assert env["posts"] == []
+    requeue(env, knockout_ok=True)  # "Apply anyway"
+    assert run(env)["dry_run"] == 1
+    assert env["posts"] == []
+
+
 def test_generic_agent_off_leaves_such_jobs_alone(env: dict[str, Any]) -> None:
     counts = run(env, generic_agent=False)
     assert sum(counts.values()) == 0
@@ -346,6 +388,20 @@ def test_job_ad_apply_leads_to_the_form_which_is_filled(
     with env["db"]() as s:
         filled = s.get_one(Job, env["job"]).data["filled"]
     assert filled["Full name"]["value"] == "Jane Doe"
+    assert env["posts"] == []
+
+
+def test_apply_hop_to_another_ats_records_the_form_host(env: dict[str, Any]) -> None:
+    workday = "https://acme.wd5.myworkdayjobs.com/en-US/External/job/X_R1/apply"
+    env["state"]["extra"][workday] = FORM
+    on_board(env, f'<a href="{workday}">Apply now</a>')
+    assert run(env)["dry_run"] == 1
+    with env["db"]() as s:
+        job = s.get_one(Job, env["job"])
+        assert job.data["apply_host"] == "acme.wd5.myworkdayjobs.com"
+        events = [e for e in job.events if e.code == "apply_host_changed"]
+        assert [e.params for e in events] == [{"host": "acme.wd5.myworkdayjobs.com"}]
+        assert job.data["filled"]["Full name"]["value"] == "Jane Doe"  # typed, and it stuck
     assert env["posts"] == []
 
 

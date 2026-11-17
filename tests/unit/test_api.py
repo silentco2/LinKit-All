@@ -256,6 +256,14 @@ def test_action_center_answer_confirm_skip(client: TestClient, tmp_path: Path) -
     with db() as s:
         assert s.get_one(Job, job_id).data["submit_confirmed"] is True
 
+    # "Apply anyway" on a knock-out lets the form be filled; it is no go-ahead to submit
+    job_id, item_id = park(client, ActionKind.knockout, [])
+    r = client.post(f"/api/actions/{item_id}", json={"decision": "confirm"}, headers=SAME_ORIGIN)
+    assert r.json() == {"job_state": "queued_apply"}
+    with db() as s:
+        data = s.get_one(Job, job_id).data
+        assert data["knockout_ok"] is True and "submit_confirmed" not in data
+
     job_id, item_id = park(client, ActionKind.captcha, [])
     assert client.post(
         f"/api/actions/{item_id}", json={"decision": "applied_by_hand"}, headers=SAME_ORIGIN

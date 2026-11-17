@@ -1,8 +1,9 @@
 """The trash: jobs the user never sees again. Nothing is deleted, so later searches still dedupe
 and filter against them.
 
-`data["trash"]` says why: "reported" (the user reported it), "company" (blacklisted company) or
-"off_title" (nothing like the titles searched for). Jobs already applied to are hidden by state.
+`data["trash"]` says why: "reported" (the user reported it), "closed" (the ad was gone when we
+went to apply), "company" (blacklisted company) or "off_title" (nothing like the titles searched
+for). Jobs already applied to are hidden by state.
 """
 
 import hashlib
@@ -72,6 +73,7 @@ _LEFT_ALONE = (JobState.applied, JobState.applying)
 # Still on its way to an application: leaves the pipeline, so no AI or browser is spent on it.
 _ON_THE_WAY = (JobState.ranked, JobState.scored, JobState.awaiting_review, JobState.queued_apply,
                JobState.tailored, JobState.needs_user)  # fmt: skip
+_KEPT = ("reported", "closed")  # facts about the job, not about the search: never undone here
 UNKNOWN = norm_company("Unknown")  # many companies (posts that name none): never blacklisted
 
 
@@ -144,7 +146,7 @@ def sweep(db: sessionmaker[Session], cfg: SearchConfig, embed: Any) -> int:
                 data["title_key"] = key
                 data["off_title"] = job.title in off
             why = data.get("trash")
-            if why != "reported":
+            if why not in _KEPT:
                 why = ("company" if norm_company(job.company) in blocked else None) or (
                     "off_title" if data["off_title"] else None
                 )

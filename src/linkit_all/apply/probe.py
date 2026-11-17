@@ -6,12 +6,14 @@ matches) go back to where they were afterwards, with no card left in Needs you; 
 approved, or that failed before, keep the result like any other run.
 """
 
+import re
 import time
 from collections import Counter, defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from statistics import median
+from typing import Any
 from urllib.parse import urlparse
 
 from loguru import logger
@@ -26,6 +28,7 @@ from linkit_all.core.models import ActionItem, ActionStatus, Job, JobEvent, JobS
 from linkit_all.core.search import SearchConfig
 from linkit_all.core.state import transition
 from linkit_all.matching.rank import Embed
+from linkit_all.matching.trash import not_trash
 from linkit_all.providers.base import LLMProvider
 
 # Best candidates first: jobs that already failed, then ones the user wanted, then the rest.
@@ -39,6 +42,10 @@ _STATES = [
 ]
 AGENT = "form agent"  # every site without its own handler
 SIGNUP = "dry_run_signup"  # reached a sign-up page: as far as practice mode goes
+CLOSED = ("posting_gone", "job_closed")  # the ad was gone: trashed, nothing to apply to
+# Never the app's to finish alone: LinkedIn (the user applies in their own browser) and a
+# question only the user can answer. Listed, but left out of the pass rate.
+YOURS = ("apply_in_browser", "apply_in_browser_offsite", "unknown_question")
 # picked only for the test: put back afterwards
 _GIVE_BACK = {JobState.awaiting_review, JobState.scored, JobState.below_threshold}
 
@@ -54,22 +61,49 @@ class ProbeRow:
     screenshot: str
     platform: str = ""  # what filled the form: an ATS handler, "form agent" or "email"
     seconds: float = 0.0
+    timings: dict[str, Any] = field(default_factory=dict)  # core.timing summary of the job
 
 
-def pick(db: sessionmaker[Session], per_source: int = 1, ids: list[int] | None = None) -> list[int]:
-    """Up to `per_source` jobs per source with a web or email apply link (or exactly `ids`)."""
+def pick(
+    db: sessionmaker[Session],
+    per_source: int = 1,
+    ids: list[int] | None = None,
+    fresh: bool = False,
+    per_site: int | None = None,
+) -> list[int]:
+    """Up to `per_source` jobs per source with a web or email apply link (or exactly `ids`).
+    `fresh`: only jobs no earlier test has tried, so a new sample is really new. `per_site`:
+    at most this many per apply site, so one site's many look-alike forms do not fill it."""
     with db() as s:
         if ids:
             return [j.id for j in s.scalars(select(Job).where(Job.id.in_(ids)))]
-        jobs = list(s.scalars(select(Job).where(Job.state.in_(_STATES))))
+        query = select(Job).where(Job.state.in_(_STATES), not_trash())
+        if fresh:
+            tried = select(JobEvent.job_id).where(JobEvent.code == "probe")
+            query = query.where(Job.id.not_in(tried))
+        jobs = list(s.scalars(query))
     rank = {st: i for i, st in enumerate(_STATES)}
     jobs.sort(key=lambda j: (rank[j.state], -(j.score or 0), -(j.data.get("rank") or 0)))
     out: dict[str, list[int]] = defaultdict(list)
+    sites: Counter[str] = Counter()
     for j in jobs:
         link = j.data.get("apply_url") or j.url
-        if (mailto_address(link) or _web_url(link)) and len(out[j.source]) < per_source:
-            out[j.source].append(j.id)
+        if not (mailto_address(link) or _web_url(link)) or len(out[j.source]) >= per_source:
+            continue
+        if per_site is not None:
+            if sites[site := site_of(link)] >= per_site:
+                continue
+            sites[site] += 1
+        out[j.source].append(j.id)
     return [i for group in out.values() for i in group]
+
+
+def site_of(link: str) -> str:
+    """One apply site: the host plus the first path part (a company's board on a shared ATS)."""
+    if address := mailto_address(link):
+        return "email:" + address.rsplit("@", 1)[-1]
+    u = urlparse(link)
+    return f"{u.netloc}/{u.path.strip('/').split('/')[0]}"
 
 
 def _queue(db: sessionmaker[Session], job_id: int) -> JobState:
@@ -87,6 +121,8 @@ def give_back(db: sessionmaker[Session], job_id: int, state: JobState) -> None:
     """Put a job that was only borrowed for the test back in `state` and close its cards."""
     with db.begin() as s:
         job = s.get_one(Job, job_id)
+        if job.data.get("trash"):
+            return  # e.g. the ad turned out closed: it stays in the trash
         for item in s.scalars(
             select(ActionItem).where(
                 ActionItem.job_id == job_id, ActionItem.status == ActionStatus.open
@@ -142,9 +178,8 @@ def _row(
         link = job.data.get("apply_url") or job.url
         host = "email" if mailto_address(link) else urlparse(link).netloc
         platform = "email" if host == "email" else job.ats if job.ats in HANDLERS else AGENT
-        return ProbeRow(
-            job_id, job.source, host, status, detail, code or "", shots[-1], platform, seconds
-        )
+        return ProbeRow(job_id, job.source, host, status, detail, code or "", shots[-1], platform,
+                        seconds, dict(job.data.get("timings") or {}))  # fmt: skip
 
 
 async def probe(
@@ -188,22 +223,30 @@ def report(rows: list[ProbeRow], out_dir: Path) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / f"probe_{datetime.now():%Y%m%d-%H%M}.md"
     lines = [
-        "| job | source | apply host | result | code | detail | screenshot |",
-        "|---|---|---|---|---|---|---|",
+        "| job | source | apply host | result | code | detail | time | slowest steps "
+        "| screenshot |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
     for r in sorted(rows, key=lambda r: (r.status, r.source)):
         detail = r.detail.replace("|", "/").replace("\n", " ")[:160]
+        slow = "; ".join(
+            f"{x['step']} {x['s']:.0f} s" + (f" ({x['note']})" if x.get("note") else "")
+            for x in (r.timings.get("slow") or [])[:3]
+        ).replace("|", "/")
         lines.append(
             f"| {r.job_id} | {r.source} | {r.host} | {r.status} | {r.code} | {detail} "
-            f"| {r.screenshot} |"
+            f"| {r.seconds:.0f} s | {slow} | {r.screenshot} |"
         )
     path.write_text("# Apply test (Practice mode)\n\n" + "\n".join(lines) + "\n", "utf-8")
     return path
 
 
 def scorecard(rows: list[ProbeRow], when: datetime) -> str:
-    """One Markdown page: per platform, how many practice applications were filled to the last
-    step, how many wait for the user and why, how many failed. Counts only, no job details."""
+    """One Markdown page: per platform, how many practice applications passed, how many wait for
+    the user and why, how many failed. Counts only, no job details.
+
+    Passed = filled to the last step, reached a sign-up form (practice mode never creates an
+    account; real mode signs up and goes on) or found the ad closed (it goes to the trash)."""
     by: dict[str, list[ProbeRow]] = defaultdict(list)
     for r in rows:
         by[r.platform or AGENT].append(r)
@@ -213,25 +256,28 @@ def scorecard(rows: list[ProbeRow], when: datetime) -> str:
         f"Practice mode, {when:%Y-%m-%d}: {len(rows)} real job postings, forms filled and "
         "nothing submitted. The CV was sent as uploaded.",
         "",
-        "| platform | tried | filled to the end | account needed | needs you | failed "
-        "| skipped | median time |",
-        "|---|---|---|---|---|---|---|---|",
+        "| platform | tried | passed | filled to the end | reached sign-up | ad closed "
+        "| needs you | failed | skipped | median time |",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for name, group in sorted(by.items(), key=lambda kv: (-len(kv[1]), kv[0])):
         n = Counter(r.status for r in group)
-        # Practice mode never creates an account, so a form behind a sign-up is not filled.
         signup = sum(r.code == SIGNUP for r in group)
         filled = n["dry_run"] - signup
+        closed = sum(r.status == "skipped" and r.code in CLOSED for r in group)
+        passed = filled + signup + closed
         took = median(r.seconds for r in group)
         out.append(
-            f"| {name} | {len(group)} | {filled} ({filled / len(group):.0%}) | {signup} "
-            f"| {n['needs_user']} | {n['failed'] + n['error']} | {n['skipped']} | {took:.0f} s |"
+            f"| {name} | {len(group)} | {passed} ({passed / len(group):.0%}) | {filled} | {signup} "
+            f"| {closed} | {n['needs_user']} | {n['failed'] + n['error']} "
+            f"| {n['skipped'] - closed} | {took:.0f} s |"
         )
+    out += ["", rate_line(rows)]
     stops = Counter(
         (r.platform or AGENT, r.status, r.code or "-")
         for r in rows
         if r.status != "dry_run" or r.code == SIGNUP
-    )
+    )  # closed ads and sign-ups passed, but the reasons still show what happened
     if stops:
         out += ["", "## Why the others stopped", "", "| platform | result | reason | jobs |",
                 "|---|---|---|---|"]  # fmt: skip
@@ -239,4 +285,64 @@ def scorecard(rows: list[ProbeRow], when: datetime) -> str:
             f"| {platform} | {status} | {code} | {count} |"
             for (platform, status, code), count in sorted(stops.items(), key=lambda kv: -kv[1])
         ]
+    out += step_times(rows)
     return "\n".join(out) + "\n"
+
+
+def passed(r: ProbeRow) -> bool:
+    """Went as far as practice mode allows: filled, reached a sign-up form, or the ad was gone."""
+    return r.status == "dry_run" or (r.status == "skipped" and r.code in CLOSED)
+
+
+def rate_line(rows: list[ProbeRow]) -> str:
+    counted = [r for r in rows if r.code not in YOURS]
+    browser = sum(r.code in YOURS[:2] for r in rows)
+    asked = sum(r.code == "unknown_question" for r in rows)
+    ok = sum(passed(r) for r in counted)
+    share = f"{ok / len(counted):.0%}" if counted else "-"
+    return (
+        f"**Pass rate: {ok} of {len(counted)} ({share})** of the jobs the app may finish on its "
+        f"own. Not counted: {browser} LinkedIn (you apply in your own browser) and {asked} "
+        "waiting for an answer only you can give."
+    )
+
+
+_NUM = re.compile(r"\d+(\.\d+)?")
+
+
+def step_times(rows: list[ProbeRow]) -> list[str]:
+    """Where the time went: per step, the median seconds a job spent in it, its share of all
+    the time, and the most common reasons given for the slow ones."""
+    timed = [r.timings for r in rows if r.timings.get("steps")]
+    if not timed:
+        return []
+    per: dict[str, list[float]] = defaultdict(list)
+    for t in timed:
+        for name, (secs, _n) in t["steps"].items():
+            per[name].append(secs)
+    why: dict[str, Counter[str]] = defaultdict(Counter)
+    for t in timed:
+        for x in t.get("slow") or []:
+            if x.get("note"):  # numbers vary per job; the wording groups them
+                why[x["step"]][_NUM.sub("N", x["note"])] += 1
+    everything = sum(sum(v) for v in per.values()) or 1.0
+    totals = [t["total"] for t in timed]
+    out = [
+        "",
+        "## Where the time goes",
+        "",
+        f"{len(timed)} jobs timed. Median {median(totals):.0f} s per job, slowest "
+        f"{max(totals):.0f} s. A step's time leaves out the steps inside it, so the shares add "
+        'up to 100%. "other" is time outside any named step.',
+        "",
+        "| step | jobs | median per job | slowest | share of all time "
+        "| why the slow ones took long |",
+        "|---|---|---|---|---|---|",
+    ]
+    for name, secs in sorted(per.items(), key=lambda kv: -sum(kv[1])):
+        reasons = "; ".join(f"{text} ({n} jobs)" for text, n in why[name].most_common(2))
+        out.append(
+            f"| {name} | {len(secs)} | {median(secs):.1f} s | {max(secs):.0f} s "
+            f"| {sum(secs) / everything:.0%} | {reasons.replace('|', '/')} |"
+        )
+    return out

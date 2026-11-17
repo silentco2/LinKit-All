@@ -631,6 +631,8 @@ export class ActionsPage {
         return this.ackQuestion(a) ? null : { label: t('actions.saveRetry'), run: () => void this.send(a, 'answer'), ok: this.canSave(a) };
       case 'confirm_submit':
         return { label: t('actions.submit'), run: () => void this.send(a, 'confirm'), ok: true, go: true };
+      case 'knockout':
+        return { label: t('actions.applyAnyway'), run: () => void this.send(a, 'confirm'), ok: true };
       case 'confirm_email':
         return { label: t('actions.email.send'), run: () => void this.confirmEmail(a), ok: this.emailValid(a), go: true };
       case 'apply_by_hand':

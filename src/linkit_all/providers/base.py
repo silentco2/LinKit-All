@@ -14,6 +14,7 @@ from loguru import logger
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session, sessionmaker
 
+from linkit_all.core import timing
 from linkit_all.core.models import LLMCache
 
 T = TypeVar("T", bound=BaseModel)
@@ -33,6 +34,31 @@ def render(template: str, **ctx: object) -> str:
 
 class ProviderError(RuntimeError):
     pass
+
+
+class SecretInPromptError(ProviderError):
+    """The prompt carried a saved password or token: it was not sent."""
+
+
+# Vault passwords, access tokens and mail app passwords this process has handled. No prompt may
+# carry one, whatever built it (a page that echoes the password back, a pasted note).
+# ponytail: module-level and never cleared, like `apply.answers.secrets_seen`.
+_credentials: set[str] = set()
+MIN_CREDENTIAL = 6  # shorter strings would match ordinary words
+
+
+def remember_credentials(*values: str | None) -> None:
+    """Call with every password, token or app password read from or written to the vault."""
+    _credentials.update(v for v in values if v and len(v.strip()) >= MIN_CREDENTIAL)
+
+
+def has_credential(prompt: str) -> bool:
+    if not _credentials:
+        return False
+    from linkit_all.apply.answers import scrub  # late: apply imports this module
+
+    # as typed anywhere, or (scrub) in another case or with other spacing
+    return any(c in prompt for c in _credentials) or scrub(prompt, _credentials) != prompt
 
 
 PROVIDER_NAMES = {"codex_cli": "ChatGPT (Codex)", "claude_cli": "Claude", "litellm": "Your AI"}
@@ -77,6 +103,7 @@ class UsageLimitError(ProviderError):
     upsells); `until` is an ISO date when the vendor said when the limit lifts."""
 
     kind = "usage_limit"
+    code = "ai_usage_limit"  # the run's pause reason
 
     def __init__(self, raw: str = "", provider: str = "", until: str | None = None) -> None:
         self.provider = provider
@@ -89,6 +116,26 @@ class UsageLimitError(ProviderError):
         super().__init__(self.message)
 
 
+class SignedOutError(UsageLimitError):
+    """The AI's sign-in expired or was never made: like a usage limit, every later call would
+    fail the same way, so the run pauses (jobs keep their state) until the user signs in again."""
+
+    kind = "signed_out"
+    code = "ai_signed_out"
+
+    def __init__(self, raw: str = "", provider: str = "") -> None:
+        ProviderError.__init__(self, "")
+        self.provider, self.until = provider, None
+        self.message = f"{PROVIDER_NAMES.get(provider, 'Your AI')} is signed out: sign in again."
+        self.args = (self.message,)
+
+
+# Claude Code: "Failed to authenticate: OAuth session expired", "Invalid API key · Please run
+# /login"; Codex: "Not logged in", "401 Unauthorized"; API keys: "invalid x-api-key".
+_SIGNED_OUT = re.compile(
+    r"(?i)failed to authenticate|not (logged|signed) in|please run /?login|session expired|"
+    r"\b401\b|unauthori[sz]ed|invalid (x-)?api.?key|authentication.?error"
+)
 # Claude Code also says "You've hit your session limit · resets 5:30am" (or weekly, or Opus).
 _LIMIT = re.compile(
     r"(?i)usage.?limit|rate.?limit|session.?limit|weekly.?limit|hit your (?:[\w-]+ ){0,2}limit"
@@ -98,6 +145,8 @@ _FENCE = re.compile(r"```(?:json)?\s*(.*?)```", re.S)
 
 
 def classify(message: str, provider: str = "") -> ProviderError:
+    if _SIGNED_OUT.search(message):
+        return SignedOutError(message, provider)
     if _LIMIT.search(message):
         return UsageLimitError(message, provider)
     return ProviderError(tidy(message) or message)
@@ -137,6 +186,11 @@ class LLMProvider(ABC):
         """Send one prompt and return the model's raw text answer."""
 
     async def complete(self, prompt: str, schema: type[T], *, use_cache: bool = True) -> T:
+        if has_credential(prompt):  # before the cache and the model; the value is never logged
+            logger.error("{}: prompt refused, it contains a saved password or token", self.name)
+            raise SecretInPromptError(
+                f"{self.name}: the prompt contains a saved password or token and was not sent"
+            )
         full = render(
             "json_output.j2", prompt=prompt, schema=json.dumps(schema.model_json_schema())
         )
@@ -149,8 +203,12 @@ class LLMProvider(ABC):
 
         ask = full
         for attempt in range(1, MAX_RETRIES + 2):
-            async with self._sem:
-                raw = await self._call(ask)
+            with timing.step(f"AI {schema.__name__}"):
+                timing.note(f"{self.name}, {len(ask) // 1000}k-character prompt")
+                if attempt > 1:
+                    timing.note(f"attempt {attempt}: the last answer was not valid JSON")
+                async with self._sem:
+                    raw = await self._call(ask)
             try:
                 result = schema.model_validate_json(extract_json(raw))
             except ValidationError as e:

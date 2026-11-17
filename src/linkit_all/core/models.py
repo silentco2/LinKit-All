@@ -38,6 +38,17 @@ class JobState(StrEnum):
     skipped = "skipped"
 
 
+class Outcome(StrEnum):
+    """What happened after applying. Beside the state machine: the job stays `applied`."""
+
+    no_reply = "no_reply"
+    rejected = "rejected"
+    interview = "interview"
+    offer = "offer"
+    hired = "hired"
+    declined = "declined"  # the user turned the offer down
+
+
 class Tier(StrEnum):
     high = "high"
     mid = "mid"
@@ -90,6 +101,8 @@ class Job(Base):
     )
     tier: Mapped[Tier | None] = mapped_column(_enum(Tier))
     score: Mapped[int | None]
+    outcome: Mapped[Outcome | None] = mapped_column(_enum(Outcome))  # after `applied` only
+    outcome_at: Mapped[datetime | None]
     data: Mapped[dict[str, Any]] = mapped_column(default=dict)  # source extras, AI reasons
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)
@@ -255,6 +268,7 @@ class ActionKind(StrEnum):
     two_factor = "two_factor"
     apply_by_hand = "apply_by_hand"  # the app got stuck: the user finishes it in their browser
     apply_in_browser = "apply_in_browser"  # ban-risk site: the extension fills, the user submits
+    knockout = "knockout"  # the form asks a question whose honest answer rejects the application
 
 
 class ActionStatus(StrEnum):

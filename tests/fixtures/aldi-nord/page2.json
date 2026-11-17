@@ -1,0 +1,38 @@
+{
+  "total": 12,
+  "hasNextPage": false,
+  "page": 2,
+  "results": [
+    {
+      "postingId": "1001",
+      "title": "Filialleiter (m/w/d)",
+      "slugTitle": "filialleiter-m-w-d",
+      "locations": [
+        {
+          "city": "Essen",
+          "country": "Deutschland"
+        },
+        {
+          "city": "Dortmund",
+          "country": "Deutschland"
+        }
+      ],
+      "onlineFrom": "2026-10-01T00:00:00Z"
+    },
+    {
+      "postingId": "1002",
+      "title": "Verkäufer (m/w/d)",
+      "slugTitle": "verkaeufer-m-w-d",
+      "locations": [
+        {
+          "city": "Kiel",
+          "country": "Deutschland"
+        },
+        {
+          "city": "Venlo",
+          "country": "Nederland"
+        }
+      ]
+    }
+  ]
+}

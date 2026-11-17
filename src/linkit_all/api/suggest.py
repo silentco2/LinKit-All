@@ -1,4 +1,5 @@
-"""Suggestions from bundled offline lists (countries, places, titles) and from stored jobs.
+"""Suggestions from bundled offline lists (countries, places, titles, company boards) and from
+stored jobs.
 
 Nothing here is looked up online and nothing is written: a suggestion becomes data only when
 the user picks it in the UI.
@@ -18,6 +19,8 @@ from linkit_all.core.infer import _LEX, _LEX_CI, _LEX_CS, read_cv
 from linkit_all.core.models import Job
 from linkit_all.core.names import script_of, translate
 from linkit_all.core.profile import load_fields
+from linkit_all.sources.discovery import seed_list
+from linkit_all.sources.resolve import board_label
 
 router = APIRouter(prefix="/api")
 
@@ -82,6 +85,17 @@ def _missing_skills(job_data: dict[str, Any]) -> set[str]:
     if not isinstance(found, list):
         return set()
     return {x.strip() for x in found if isinstance(x, str) and 0 < len(x.strip()) <= 40}
+
+
+@router.get("/suggest/companies")
+def suggest_companies() -> list[dict[str, str]]:
+    """The bundled company boards. `value` is the `sources.companies` entry a tick adds; nothing
+    here is crawled until the user ticks it (or turns on `use_discovered_boards`)."""
+    return [
+        {"value": f"{b['ats']}:{b['slug']}", "name": b["name"], "ats": b["ats"],
+         "label": board_label(b["ats"], b["name"])}
+        for b in seed_list()
+    ]  # fmt: skip
 
 
 @router.get("/suggest/skills")

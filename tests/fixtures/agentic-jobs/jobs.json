@@ -1,0 +1,38 @@
+{
+  "data": [
+    {
+      "title": "Agent Platform Engineer",
+      "companyName": "Brightloop AI",
+      "slug": "agent-platform-engineer-brightloop",
+      "location": "Remote (EU)",
+      "countries": [
+        "DE",
+        "FR"
+      ],
+      "description": "<p>Ship agents.</p>",
+      "postedAt": "2026-10-11T07:00:00Z",
+      "salaryMin": 90000,
+      "salaryMax": 120000,
+      "salaryCurrency": "eur"
+    },
+    {
+      "title": "Evals Engineer",
+      "companyName": "Quillwork",
+      "slug": "evals-engineer-quillwork",
+      "location": "",
+      "countries": [
+        "IN"
+      ],
+      "postedAt": "2026-10-10T07:00:00Z"
+    },
+    {
+      "title": "No company",
+      "slug": "x"
+    }
+  ],
+  "meta": {
+    "total": 3,
+    "page": 1,
+    "per_page": 50
+  }
+}

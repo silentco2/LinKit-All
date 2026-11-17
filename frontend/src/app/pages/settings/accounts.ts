@@ -89,6 +89,10 @@ type Note = { ok: boolean; text: string };
         <h2>{{ 'settings.acc.gmail' | t }}</h2>
         <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'setup.email.intro' | t }}</p>
         <app-email-connect [unlocked]="unlocked()" (connected)="onEmail($event)" />
+        <label class="flex items-start gap-2 text-sm">
+          <input type="checkbox" role="switch" class="mt-1" [checked]="store.cfg.email.read_replies" (change)="store.update('email.read_replies', !store.cfg.email.read_replies)">
+          <span><span class="font-medium">{{ 'settings.acc.replies' | t }}</span><br><span class="text-slate-600 dark:text-slate-400">{{ 'settings.acc.repliesHint' | t }}</span></span>
+        </label>
       </section>
 
       <section class="card space-y-4">

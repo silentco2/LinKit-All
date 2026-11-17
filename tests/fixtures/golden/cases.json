@@ -1,0 +1,242 @@
+{
+ "cvs": {
+  "backend": {
+   "prefs": {
+    "titles": "Backend Engineer, Python Developer",
+    "locations": "Cairo, Remote",
+    "work_modes": "remote, hybrid",
+    "seniority": "mid"
+   },
+   "cv": "Jane Doe\nBackend Engineer at Fakeco Labs, 2020-2025\n- Built REST APIs in Python (FastAPI, Django) and PostgreSQL\n- Ran services on Docker and AWS; wrote CI pipelines in GitHub Actions\n- Mentored two junior developers\nSoftware Developer at Sampleworks, 2018-2020\n- Maintained a Flask app and Redis queues\nBSc Computer Science, Example University, 2018\nSkills: Python, FastAPI, Django, PostgreSQL, Redis, Docker, AWS, Git"
+  },
+  "data": {
+   "prefs": {
+    "titles": "Data Analyst, BI Analyst",
+    "locations": "Dubai, Remote",
+    "work_modes": "remote, onsite",
+    "seniority": "junior, mid"
+   },
+   "cv": "Omar Test\nData Analyst at Demo Retail Group, 2021-2025\n- Built Power BI dashboards for sales and stock\n- Wrote SQL on SQL Server; cleaned data in Excel and Python (pandas)\n- Presented weekly KPIs to store managers\nIntern, Placeholder Bank, 2020\nBSc Statistics, Sample University, 2020\nSkills: SQL, Power BI, Excel, Python, pandas"
+  },
+  "nurse": {
+   "prefs": {
+    "titles": "Registered Nurse, ICU Nurse",
+    "locations": "Riyadh, Jeddah",
+    "work_modes": "onsite",
+    "seniority": "mid"
+   },
+   "cv": "Sara Example\nRegistered Nurse, ICU, Mock General Hospital, 2017-2025\n- Cared for ventilated and post-surgical patients\n- BLS and ACLS certified\n- Trained new staff on the ward's charting system\nBSc Nursing, Fictional College of Nursing, 2017\nLicensed RN"
+  },
+  "designer": {
+   "prefs": {
+    "titles": "Product Designer, UX Designer",
+    "locations": "Remote",
+    "work_modes": "remote",
+    "seniority": "mid, senior"
+   },
+   "cv": "Lina Sample\nProduct Designer at Pretend Apps, 2019-2025\n- Designed mobile and web flows in Figma; ran usability tests\n- Built and kept a design system used by four teams\nUI Designer at Imaginary Studio, 2016-2019\nBA Graphic Design, Example Arts Academy, 2016\nSkills: Figma, prototyping, user research, design systems"
+  }
+ },
+ "cases": [
+  {
+   "id": 1,
+   "cv": "backend",
+   "title": "Python Backend Engineer",
+   "company": "Acmeville Tech",
+   "location": "Cairo",
+   "remote": "hybrid",
+   "description": "Build APIs in Python and FastAPI on PostgreSQL. Docker and AWS. 3+ years.",
+   "expected": "high"
+  },
+  {
+   "id": 2,
+   "cv": "backend",
+   "title": "Backend Developer (Django)",
+   "company": "Notreal Pay",
+   "location": "Remote",
+   "remote": "remote",
+   "description": "Django REST services, Redis, Celery, PostgreSQL. CI with GitHub Actions.",
+   "expected": "high"
+  },
+  {
+   "id": 3,
+   "cv": "backend",
+   "title": "Software Engineer, Platform",
+   "company": "Sampleforge",
+   "location": "Remote",
+   "remote": "remote",
+   "description": "Python services on AWS, Docker, Terraform a plus. On-call rotation.",
+   "expected": "high"
+  },
+  {
+   "id": 4,
+   "cv": "backend",
+   "title": "Senior Go Engineer",
+   "company": "Mockstream",
+   "location": "Cairo",
+   "remote": "onsite",
+   "description": "Go microservices, Kafka, Kubernetes. 7+ years of Go required.",
+   "expected": "low"
+  },
+  {
+   "id": 5,
+   "cv": "backend",
+   "title": "Full Stack Developer",
+   "company": "Fictive Shop",
+   "location": "Cairo",
+   "remote": "hybrid",
+   "description": "React frontend and Python backend. Some TypeScript.",
+   "expected": "mid"
+  },
+  {
+   "id": 6,
+   "cv": "backend",
+   "title": "Embedded C Engineer",
+   "company": "Dummy Devices",
+   "location": "Alexandria",
+   "remote": "onsite",
+   "description": "Firmware in C for microcontrollers, RTOS, hardware bring-up.",
+   "expected": "low"
+  },
+  {
+   "id": 7,
+   "cv": "data",
+   "title": "Data Analyst",
+   "company": "Placeholder Foods",
+   "location": "Dubai",
+   "remote": "onsite",
+   "description": "SQL, Power BI dashboards, Excel. Report weekly sales KPIs.",
+   "expected": "high"
+  },
+  {
+   "id": 8,
+   "cv": "data",
+   "title": "BI Analyst",
+   "company": "Mocktail Retail",
+   "location": "Remote",
+   "remote": "remote",
+   "description": "Build Power BI reports on SQL Server data. Python is a plus.",
+   "expected": "high"
+  },
+  {
+   "id": 9,
+   "cv": "data",
+   "title": "Data Scientist",
+   "company": "Example AI",
+   "location": "Dubai",
+   "remote": "onsite",
+   "description": "Train ML models, deep learning with PyTorch, MLOps. PhD preferred.",
+   "expected": "mid"
+  },
+  {
+   "id": 10,
+   "cv": "data",
+   "title": "Senior Data Engineer",
+   "company": "Synthetic Cloud",
+   "location": "Remote",
+   "remote": "remote",
+   "description": "Spark, Airflow, Scala pipelines on GCP. 6+ years data engineering.",
+   "expected": "low"
+  },
+  {
+   "id": 11,
+   "cv": "data",
+   "title": "Reporting Analyst",
+   "company": "Fakebank",
+   "location": "Dubai",
+   "remote": "onsite",
+   "description": "Excel and SQL reporting for finance, some Tableau.",
+   "expected": "mid"
+  },
+  {
+   "id": 12,
+   "cv": "nurse",
+   "title": "ICU Registered Nurse",
+   "company": "Mock Medical City",
+   "location": "Riyadh",
+   "remote": "onsite",
+   "description": "Critical care RN, ACLS required, 3+ years ICU, ventilator care.",
+   "expected": "high"
+  },
+  {
+   "id": 13,
+   "cv": "nurse",
+   "title": "Staff Nurse, Surgical Ward",
+   "company": "Sample Care Hospital",
+   "location": "Jeddah",
+   "remote": "onsite",
+   "description": "Licensed RN for post-operative care. BLS required.",
+   "expected": "high"
+  },
+  {
+   "id": 14,
+   "cv": "nurse",
+   "title": "Clinic Nurse",
+   "company": "Demo Family Clinic",
+   "location": "Riyadh",
+   "remote": "onsite",
+   "description": "Outpatient clinic, vaccinations, patient intake.",
+   "expected": "mid"
+  },
+  {
+   "id": 15,
+   "cv": "nurse",
+   "title": "Nurse Manager",
+   "company": "Imaginary Health",
+   "location": "Riyadh",
+   "remote": "onsite",
+   "description": "Lead a 40-bed unit, budgets, staffing, 5+ years management.",
+   "expected": "mid"
+  },
+  {
+   "id": 16,
+   "cv": "nurse",
+   "title": "Pharmacist",
+   "company": "Pretend Pharmacy",
+   "location": "Jeddah",
+   "remote": "onsite",
+   "description": "Licensed pharmacist to dispense and counsel patients.",
+   "expected": "low"
+  },
+  {
+   "id": 17,
+   "cv": "designer",
+   "title": "Product Designer",
+   "company": "Notional Labs",
+   "location": "Remote",
+   "remote": "remote",
+   "description": "Own flows end to end in Figma, run user research, keep our design system.",
+   "expected": "high"
+  },
+  {
+   "id": 18,
+   "cv": "designer",
+   "title": "UX Designer, Mobile",
+   "company": "Fakeway",
+   "location": "Remote",
+   "remote": "remote",
+   "description": "Mobile app UX, prototyping, usability testing.",
+   "expected": "mid"
+  },
+  {
+   "id": 19,
+   "cv": "designer",
+   "title": "Motion Graphics Artist",
+   "company": "Sample Studio",
+   "location": "Cairo",
+   "remote": "onsite",
+   "description": "After Effects and Cinema 4D animation for ads. Onsite only.",
+   "expected": "low"
+  },
+  {
+   "id": 20,
+   "cv": "designer",
+   "title": "Frontend Developer",
+   "company": "Mockup Inc",
+   "location": "Remote",
+   "remote": "remote",
+   "description": "React and TypeScript, implement designs from Figma.",
+   "expected": "low"
+  }
+ ]
+}

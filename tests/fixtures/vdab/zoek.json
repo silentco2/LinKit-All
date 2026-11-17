@@ -1,0 +1,25 @@
+{
+  "resultaten": [
+    {
+      "id": {
+        "id": "70123456"
+      },
+      "vacaturefunctie": {
+        "naam": "Data Engineer"
+      },
+      "vacatureBedrijfsnaam": "Schelde Analytics",
+      "tewerkstellingsLocatieRegioOfAdres": "Gent",
+      "eerstePublicatieDatum": "2026-10-10T00:00:00Z"
+    },
+    {
+      "id": {
+        "id": "70123457"
+      },
+      "vacaturefunctie": {
+        "naam": "Lasser"
+      },
+      "vacatureBedrijfsnaam": "Leie Metaal",
+      "tewerkstellingsLocatieRegioOfAdres": "Kortrijk"
+    }
+  ]
+}

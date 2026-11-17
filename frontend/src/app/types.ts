@@ -162,12 +162,16 @@ export interface SearchConfig {
     skip_below_expectation: boolean;
     company_blacklist: string[];
     one_per_company: boolean;
+    /** Most years of experience a job may ask for; null = not checked. */
+    max_years_required: number | null;
+    years_action: 'label' | 'drop';
+    dealbreakers: string[];
   };
   trust: TrustSection;
   matching: { ai_max_jobs: number; tier_high: number; tier_mid: number; batch_size: number; auto_apply_low: boolean };
   ai: { provider: Provider | null; model: string | null; api_base: string | null };
   apply: ApplySection;
-  email: { imap_host: string; imap_user: string; timeout_s: number; poll_s: number };
+  email: { imap_host: string; imap_user: string; timeout_s: number; poll_s: number; read_replies: boolean };
   schedule: ScheduleSection;
 }
 
@@ -223,6 +227,7 @@ export interface ApplySection {
   parallel_sites: number;
   generic_agent: boolean;
   email_daily_cap: number;
+  followup_days: number;
   /** null = not decided yet, true = tailor the CV per job, false = send the CV as uploaded. */
   tailor_cv: boolean | null;
 }
@@ -260,7 +265,11 @@ export interface ApplicationAnswers {
   eeo_disability: string | null;
   acknowledge_privacy: boolean | null;
   acknowledge_legal: boolean | null;
+  marketing_opt_in: boolean;
 }
+
+export type Outcome = 'no_reply' | 'rejected' | 'interview' | 'offer' | 'hired' | 'declined';
+export const OUTCOMES: Outcome[] = ['no_reply', 'rejected', 'interview', 'offer', 'hired', 'declined'];
 
 export interface JobRow {
   id: number;
@@ -271,6 +280,8 @@ export interface JobRow {
   state: string;
   tier: Tier | null;
   score: number | null;
+  /** What happened after applying (applied jobs only); null until you or a reply say. */
+  outcome?: Outcome | null;
   rank: number | null;
   remote: string | null;
   posted_at: string | null;
@@ -290,7 +301,19 @@ export interface AIScore {
   red_flags: string[];
   legit?: 'ok' | 'suspicious' | 'scam';
   trust_flags?: string[];
+  /** What the posting asks for and whether the CV shows it (absent on scores from older versions). */
+  requirements?: Requirement[];
 }
+
+export interface Requirement {
+  text: string;
+  importance: 'critical' | 'high' | 'meaningful' | 'preferred';
+  basis: 'stated' | 'structural' | 'inferred';
+  met: 'yes' | 'partial' | 'no';
+}
+
+/** Years of experience read from the description: `above` = more than the limit in Settings. */
+export interface YearsRequired { label: string; kind: 'required' | 'preferred' | 'skill'; above: boolean }
 
 export interface TailorPatch {
   segment_id: number;
@@ -310,6 +333,9 @@ export interface Tailoring {
 
 export interface JobDetail extends JobRow {
   tailoring: Tailoring | null;
+  /** How far to trust the AI score; it never changes the tier. */
+  confidence?: 'low' | 'medium' | 'high' | null;
+  years_required?: YearsRequired | null;
   trust?: Trust | null;
   url: string;
   description: string;
@@ -358,7 +384,7 @@ export const lines = (text: string): string[] => text.split('\n').map((l) => l.t
 export const unlines = (list: string[]): string => list.join('\n');
 
 export type ActionKind = 'unknown_question' | 'confirm_submit' | 'confirm_email' | 'captcha' | 'validation_error' | 'login_issue' | 'two_factor'
-  | 'apply_by_hand' | 'apply_in_browser';
+  | 'apply_by_hand' | 'apply_in_browser' | 'knockout';
 export type ActionDecision = 'answer' | 'confirm' | 'retry' | 'applied_by_hand' | 'skip' | 'closed';
 export type AnswerValue = string | boolean | string[];
 
@@ -493,6 +519,16 @@ export interface Report {
   per_run: (Omit<OutcomeRow, 'name'> & { run_id: number; status: string; started_at: string })[];
   over_time: { date: string; applied: number; failed: number; skipped: number; needs_user: number }[];
   filter: { run_id: number | null; since: string | null };
+  /** Interview-or-better per applied job; `rate` is null under `min_sample` applications. */
+  calibration?: { min_sample: number; by_band: CalibrationRow[]; by_ats: CalibrationRow[]; by_source: CalibrationRow[] };
+}
+
+export interface CalibrationRow {
+  name: string;
+  applied: number;
+  interviews: number;
+  rate: number | null;
+  enough: boolean;
 }
 
 /** One guess from the CV: `check` means the rule is unsure; `level` says whether it is used as is or must be confirmed. */
@@ -523,6 +559,8 @@ const REASON_SETTING: Record<string, { section: string; focus: string }> = {
   too_old: { section: 'jobs', focus: 'fld-posted' },
   salary: { section: 'jobs', focus: 'salary' },
   blacklist: { section: 'jobs', focus: 'black' },
+  dealbreaker: { section: 'jobs', focus: 'dealbreak' },
+  years: { section: 'jobs', focus: 'years-max' },
   one_per_company: { section: 'advanced', focus: 'adv-one' },
   one_per_company_better: { section: 'advanced', focus: 'adv-one' },
   scam: { section: 'advanced', focus: 'adv-scam' },

@@ -9,6 +9,7 @@ from typing import Any
 from playwright.async_api import Frame, Locator, Page
 
 from linkit_all.apply.answers import Question
+from linkit_all.apply.quirks import quirks_for
 
 _EXTRACT = r"""
 ({container, label, description, ignore}) => {
@@ -84,9 +85,14 @@ async def extract(
 
 async def fill(page: Page, q: Question, value: Any) -> None:
     """Put `value` into the question's controls. Raises FillError if the page refuses it."""
+    box = page.locator(f'[data-lk="{q.key}"]')
+    if q.kind != "file" and not await box.first.is_visible():
+        # a section the form keeps hidden (Lever's US-only self-identification): failing at
+        # once saves the 10 s each fill would wait for it to show
+        raise FillError(f"could not fill {q.label!r}: it is not shown on the page")
     await fill_in(
         page,
-        page.locator(f'[data-lk="{q.key}"]'),
+        box,
         page.locator(f'[data-lk-input="{q.key}"]'),
         q,
         value,
@@ -98,6 +104,8 @@ async def fill_in(
 ) -> None:
     """`box` holds the question's controls (or is the control itself), `field` is the one
     to type into. Shared by the ATS handlers and the generic form agent."""
+    quirks = quirks_for(page.url)  # the host the form is really on, after any Apply hop
+    trusted = quirks.trusted_ticks_only
     try:
         match q.kind:
             case "file":
@@ -105,17 +113,19 @@ async def fill_in(
             case "select":
                 await field.select_option(label=str(value))
             case "radio":
-                await _choose(page, box, str(value), "radio")
+                await _choose(page, box, str(value), "radio", trusted)
             case "multi":
                 for v in value:
-                    await _choose(page, box, str(v), "checkbox")
+                    await _choose(page, box, str(v), "checkbox", trusted)
             case "checkbox":
                 if value:
-                    await _tick(_inside(page, box, "input[type=checkbox]").first)
+                    await _tick(_inside(page, box, "input[type=checkbox]").first, trusted)
             case "yesno":
                 await box.get_by_role("button", name=str(value), exact=True).click()
             case "combobox":
                 await _combobox(page, field, str(value), exact=bool(q.options))
+            case "text" | "textarea" | "email" | "tel" | "url" if quirks.type_keys:
+                await _type(field, str(value))
             case _:
                 await field.fill(str(value))
     except FillError:
@@ -124,13 +134,27 @@ async def fill_in(
         raise FillError(f"could not fill {q.label!r}: {e}") from e
 
 
-async def _tick(box: Locator) -> None:
+async def _type(field: Locator, text: str) -> None:
+    """Real keystrokes (Workday): a value set by script never reaches React's state."""
+    await field.click()
+    await field.press("ControlOrMeta+A")
+    await field.press("Delete")
+    await field.press_sequentially(text, delay=15)
+    if (await field.input_value()).strip() != text.strip():
+        raise FillError("the typed value did not stick")
+
+
+async def _tick(box: Locator, trusted: bool = False) -> None:
     """Tick a checkbox. Custom-styled ones hide the input under a styled label, so Playwright's
-    check() waits forever: then click it from the page, as the user's click on the label does."""
+    check() waits forever: then click it from the page, as the user's click on the label does.
+    `trusted`: a site that raises a CAPTCHA on script clicks (Lever) gets a real click instead."""
     try:
         await box.check(timeout=5000)
     except Exception:
-        await box.evaluate("el => { if (!el.checked) el.click(); }")
+        if trusted:
+            await box.click(force=True, timeout=5000)
+        else:
+            await box.evaluate("el => { if (!el.checked) el.click(); }")
     if not await box.is_checked():
         raise FillError("the box stays unticked")
 
@@ -140,10 +164,12 @@ def _inside(page: Page | Frame, box: Locator, css: str) -> Locator:
     return box.locator(css).or_(box.and_(page.locator(css)))
 
 
-async def _choose(page: Page | Frame, box: Any, text: str, role: str) -> None:
+async def _choose(
+    page: Page | Frame, box: Any, text: str, role: str, trusted: bool = False
+) -> None:
     control = box.get_by_role(role, name=text, exact=True)
     if await control.count():
-        await _tick(control.first)
+        await _tick(control.first, trusted)
         return
     label = box.locator("label").filter(has_text=text)  # custom-styled inputs: click the label
     if not await label.count():
@@ -170,11 +196,21 @@ _TEXT_KINDS = {"text", "textarea", "email", "tel", "number", "url", "date"}
 async def lost_values(
     page: Page | Frame, questions: list[Question], answers: dict[str, Any]
 ) -> list[Question]:
-    """Text fields whose value did not stick (React forms can reset fields while hydrating)."""
+    """Text fields and drop-downs whose value did not stick (React forms can reset fields while
+    hydrating; Henkel's site empties Country after reading the uploaded CV)."""
     lost = []
     for q in questions:
-        if q.kind in _TEXT_KINDS and q.key in answers:
-            current = await page.locator(f'[data-lk-input="{q.key}"]').input_value()
-            if current.strip() != str(answers[q.key]).strip():
-                lost.append(q)
+        if q.key not in answers:
+            continue
+        box = page.locator(f'[data-lk-input="{q.key}"]')
+        if q.kind in _TEXT_KINDS:
+            current = await box.input_value()
+        elif q.kind == "select" and await box.evaluate("e => e.tagName === 'SELECT'"):
+            current = await box.evaluate(
+                "e => e.selectedIndex < 0 ? '' : e.options[e.selectedIndex].text"
+            )
+        else:
+            continue
+        if current.strip() != str(answers[q.key]).strip():
+            lost.append(q)
     return lost

@@ -1,0 +1,64 @@
+{
+  "meta": {
+    "page": 1,
+    "has_next_page": false
+  },
+  "links": {},
+  "items": [
+    {
+      "id": "j1",
+      "title": "Support Agent",
+      "hosted_url": "https://northwind.hirehive.com/support-agent-x1",
+      "location": "Cork",
+      "country": {
+        "name": "Ireland"
+      },
+      "language": {
+        "code": "en"
+      },
+      "published_date": "2026-10-05T09:00:00Z",
+      "description": {
+        "html": "<p>Help customers.</p>",
+        "text": "Help customers."
+      },
+      "compensation_tiers": [
+        {
+          "type": "none",
+          "interval": "year",
+          "min_value": 1
+        },
+        {
+          "type": "range_salary",
+          "interval": "year",
+          "min_value": "40000",
+          "max_value": 50000,
+          "currency_code": "eur"
+        }
+      ]
+    },
+    {
+      "id": "j2",
+      "title": "Group Role",
+      "hosted_url": "https://sister.hirehive.com/group-role-y2",
+      "location": "Remote, Ireland",
+      "country": {
+        "name": "Ireland"
+      },
+      "description": {
+        "text": "Plain body."
+      },
+      "compensation_tiers": [
+        {
+          "type": "fixed_salary",
+          "interval": "hour",
+          "min_value": 20
+        }
+      ]
+    },
+    {
+      "id": "j3",
+      "title": "Bad host",
+      "hosted_url": "https://elsewhere.example/x"
+    }
+  ]
+}

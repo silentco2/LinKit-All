@@ -1,0 +1,19 @@
+{
+  "status": 200,
+  "error": null,
+  "data": {
+    "count": 1,
+    "positions": [
+      {
+        "id": 7,
+        "name": "Designer",
+        "locations": [
+          "Paris"
+        ],
+        "postedTs": 1790000000,
+        "positionUrl": "/careers/job/7",
+        "atsJobId": "A7"
+      }
+    ]
+  }
+}

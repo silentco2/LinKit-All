@@ -1,0 +1,23 @@
+{
+  "total": 12,
+  "hasNextPage": true,
+  "page": 1,
+  "results": [
+    {
+      "postingId": "1001",
+      "title": "Filialleiter (m/w/d)",
+      "slugTitle": "filialleiter-m-w-d",
+      "locations": [
+        {
+          "city": "Essen",
+          "country": "Deutschland"
+        },
+        {
+          "city": "Dortmund",
+          "country": "Deutschland"
+        }
+      ],
+      "onlineFrom": "2026-10-01T00:00:00Z"
+    }
+  ]
+}

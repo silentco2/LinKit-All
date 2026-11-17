@@ -5,6 +5,7 @@ from collections.abc import Callable
 from dataclasses import asdict
 from typing import TYPE_CHECKING, Any
 
+from loguru import logger
 from pydantic import ValidationError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -96,9 +97,7 @@ async def run_stage(
     try:
         stats = await _run_stage(stage, db, settings, run_id, ai_override, vault, publish)
     except UsageLimitError as e:
-        pause = PipelinePause(
-            e.message, "ai_usage_limit", {"provider": e.provider, "until": e.until}
-        )
+        pause = PipelinePause(e.message, e.code, {"provider": e.provider, "until": e.until})
     except PipelinePause as e:
         pause = e
     except PipelineError as e:
@@ -168,6 +167,7 @@ async def _run_stage(
             stats = await apply_jobs(
                 db, settings, cfg, provider, await _get_embedder(settings), vault, publish
             )
+            await _after_apply(db, settings, cfg, vault, provider)
         except ApplyBlocked as e:  # with a code: nothing wrong, the run waits (see ApplyBlocked)
             raise (PipelinePause if e.code else PipelineError)(str(e), e.code, e.params) from e
         except UsageLimitError:
@@ -177,6 +177,40 @@ async def _run_stage(
     else:
         raise PipelineError(f"unknown stage {stage!r}; stages: {', '.join(STAGES)}")
     return stats
+
+
+async def _after_apply(
+    db: sessionmaker[Session],
+    settings: Settings,
+    cfg: SearchConfig,
+    vault: "Vault | None",
+    provider: Any,
+) -> None:
+    """Mail work after applying: employer replies -> outcomes (opt-in), then one follow-up for
+    email applications left without a reply. Never fails the stage."""
+    from linkit_all.apply.followup import send_followups
+    from linkit_all.apply.replies import read_replies
+    from linkit_all.apply.runner import emails_sent_today
+    from linkit_all.apply.vault import vault_for
+    from linkit_all.core.models import Profile
+
+    if vault is None:
+        vault = vault_for(settings, db)
+        if not vault.unlocked() and vault.initialized():
+            vault.unlock_from_keyring()
+    with db() as s:
+        profile = s.get(Profile, 1)
+        email = profile.email if profile else ""
+    await read_replies(db, cfg.email, vault, email)  # logs its counts; outcomes show on jobs
+    with db() as s:
+        sent_today = emails_sent_today(s)
+    try:
+        counts = await send_followups(db, settings, cfg, provider, vault, sent_today)
+    except Exception as e:
+        logger.warning("follow-ups skipped ({})", type(e).__name__)
+        return
+    logger.info("follow-ups: {} sent, {} previewed, {} due", counts["sent"], counts["previewed"],
+                counts["due"])  # fmt: skip
 
 
 def finish_run(db: sessionmaker[Session], run_id: int) -> None:

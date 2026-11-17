@@ -3,13 +3,16 @@
 `discover_boards` asks the CDX index which URLs on an ATS's hosts (`Source.cdx_hosts`) were
 crawled, turns them into board slugs with the plugin's own `url_patterns`, and stores them.
 `board_tasks` then hands the oldest-crawled ones to the discover stage, a few hundred per run,
-and `note_crawl` records how each went (boards that fail 5 times in a row are switched off).
+and `note_crawl` records how each went (boards that answer 404 / 410 five times in a row are
+switched off; throttles, timeouts and network errors never count). `seed_boards` loads the bundled
+company list. Dead-board rule: logic adapted from career-ops (MIT).
 """
 
 import asyncio
 import json
 from collections.abc import AsyncIterator, Awaitable, Callable, Collection, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -28,7 +31,10 @@ COLLINFO = "https://index.commoncrawl.org/collinfo.json"
 CC_HOST = "index.commoncrawl.org"
 CC_RATE = 1.0  # requests per second to the index
 MAX_COLLECTIONS = 3  # newest collections tried before giving up
-MAX_FAILURES = 5  # failed crawls in a row before a board is switched off
+MAX_FAILURES = 5  # "gone" answers in a row before a board is switched off
+GONE = frozenset({404, 410})  # the only answers that say a board is not there
+SEED_SOURCE = "career-ops"
+SEED_FILE = Path(__file__).resolve().parents[1] / "data" / "company_boards.json"
 # Path segments that look like a slug but are the vendor's own pages or crawler leftovers.
 NOT_SLUGS = frozenset(
     {"robots", "sitemap", "favicon", "static", "assets", "images", "image", "api", "wday", "en"}
@@ -186,6 +192,20 @@ def upsert_boards(db: sessionmaker[Session], ats: str, slugs: Collection[str], s
     return len(new)
 
 
+def seed_list() -> list[dict[str, str]]:
+    """The bundled company boards, `{ats, slug, name}` each (scripts/build_company_boards.py)."""
+    rows: list[dict[str, str]] = json.loads(SEED_FILE.read_text("utf-8"))
+    return rows
+
+
+def seed_boards(db: sessionmaker[Session]) -> int:
+    """Store the bundled boards that are not in the table yet; returns how many were new."""
+    by_ats: dict[str, list[str]] = {}
+    for row in seed_list():
+        by_ats.setdefault(row["ats"], []).append(row["slug"])
+    return sum(upsert_boards(db, ats, slugs, SEED_SOURCE) for ats, slugs in by_ats.items())
+
+
 async def discover_boards(
     db: sessionmaker[Session],
     http: Http,
@@ -235,14 +255,18 @@ def board_tasks(
     return [t for t in tasks if t.key not in skip][:n]
 
 
-def note_crawl(db: sessionmaker[Session], ats: str, slug: str, jobs: int, ok: bool) -> None:
-    """Record one crawl of a stored board: jobs seen, and the failure streak."""
+def note_crawl(
+    db: sessionmaker[Session], ats: str, slug: str, jobs: int, ok: bool, status: int | None = None
+) -> None:
+    """Record one crawl of a stored board: jobs seen, and the failure streak. Only a failed
+    crawl whose HTTP `status` is 404 or 410 adds to the streak; any other failure (429, 5xx,
+    timeout, DNS) says nothing about the board and leaves the streak as it was."""
     with db.begin() as s:
         board = s.scalar(select(Board).filter_by(ats=ats, slug=slug))
         if board is None:  # a board that is not stored (a user's own company)
             return
         board.last_crawled_at = utcnow()
         board.last_jobs = jobs if ok else board.last_jobs
-        board.failures = 0 if ok else board.failures + 1
+        board.failures = 0 if ok else board.failures + (status in GONE)
         if board.failures >= MAX_FAILURES:
             board.active = False

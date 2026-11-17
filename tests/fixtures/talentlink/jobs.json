@@ -1,0 +1,35 @@
+{
+  "globals": {
+    "jobsCount": 2
+  },
+  "jobs": [
+    {
+      "id": 4401,
+      "jobFields": {
+        "jobTitle": "Claims Handler",
+        "SLOVLIST5": "Leeds",
+        "SLOVLIST7": "Permanent",
+        "WorkMode": "Hybrid",
+        "DPOSTINGSTART": "2026-10-08T00:00:00Z",
+        "jobNumber": "REQ-88",
+        "applicationUrl": "https://emea3.recruitmentplatform.com/apply?jobId=4401&langCode=en_GB"
+      },
+      "customFields": [
+        {
+          "title": "The role",
+          "content": "<p>Handle claims.</p>"
+        },
+        {
+          "title": "Empty",
+          "content": ""
+        }
+      ]
+    },
+    {
+      "id": "x",
+      "jobFields": {
+        "jobTitle": "Bad id"
+      }
+    }
+  ]
+}

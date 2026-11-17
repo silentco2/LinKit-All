@@ -1,0 +1,42 @@
+{
+  "code": 0,
+  "data": {
+    "count": 2,
+    "job_post_list": [
+      {
+        "id": "7300000000000000001",
+        "title": "大模型算法工程师",
+        "city_list": [
+          {
+            "name": "上海"
+          },
+          {
+            "name": "北京"
+          }
+        ],
+        "job_category": {
+          "name": "研发"
+        },
+        "recruit_type": {
+          "name": "社招"
+        },
+        "description": "负责模型训练。",
+        "requirement": "熟悉 PyTorch。",
+        "publish_time": 1790000000000
+      },
+      {
+        "id": "7300000000000000002",
+        "title": "Product Manager",
+        "city_list": [
+          {
+            "name": "Singapore"
+          }
+        ]
+      },
+      {
+        "id": null,
+        "title": "No id"
+      }
+    ]
+  }
+}

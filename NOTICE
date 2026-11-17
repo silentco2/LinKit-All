@@ -116,7 +116,20 @@ Logic ported from MIT-licensed projects (re-implemented in Python, no files copi
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
     SOFTWARE.
 
+  - career-ops (https://github.com/career-ops-hq/career-ops), MIT License,
+    Copyright (c) 2026 Santiago Fernández de Valderrama.
+    Job-source adapter logic, application-form safety rules (knock-out pre-scan,
+    required-field sweep, per-ATS quirks), closed-posting text patterns, the
+    years-of-experience reader, requirement importance, reply matching, follow-up
+    cadence, outcome calibration, CV fact checks, board resolver and upkeep rules.
+    The MIT License text above applies to those portions, with this copyright line.
+
 Bundled data (src/linkit_all/data/, built by scripts/build_datasets.py):
+  - Suggested company boards (company_boards.json, built by scripts/build_company_boards.py):
+    derived from career-ops' portals.example.yml (MIT, as above) and its employer registry
+    (employers/, licensor and database maker Santiago Fernández de Valderrama), licensed under
+    Creative Commons Attribution 4.0 (https://creativecommons.org/licenses/by/4.0/). Rows were
+    reduced to ATS, board id and employer name, and deduplicated.
   - Countries and cities (countries.json, cities.json): derived from GeoNames
     (https://www.geonames.org), licensed under Creative Commons Attribution 4.0
     (https://creativecommons.org/licenses/by/4.0/). Data was filtered, renamed and compacted;

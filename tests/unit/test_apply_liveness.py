@@ -110,6 +110,8 @@ def test_vanished_posting_is_skipped_without_tailoring(
     assert (status, calls, state) == ("skipped", 0, JobState.skipped)
     assert events[-1].code == "job_closed"
     assert events[-1].message == f"The posting is no longer open on {ats}"
+    with init_db(Settings(data_dir=tmp_path / "data").db_path)() as s:
+        assert s.get_one(Job, 1).data["trash"] == "closed"  # hidden, kept for dedupe
 
 
 @pytest.mark.parametrize("job_id", ["gone", "hidden"])

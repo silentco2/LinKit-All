@@ -1,0 +1,34 @@
+{
+  "data": [
+    {
+      "slug": "tatra-labs-python-developer-krakow",
+      "title": "Python Developer",
+      "companyName": "Tatra Labs",
+      "workplaceType": "hybrid",
+      "locations": [
+        {
+          "city": "Kraków"
+        },
+        {
+          "city": "Warszawa"
+        }
+      ],
+      "city": "Kraków",
+      "publishedAt": "2026-10-01T10:00:00Z",
+      "lastPublishedAt": "2026-10-12T10:00:00Z"
+    },
+    {
+      "slug": "baltic-go-remote",
+      "title": "Go Engineer",
+      "companyName": "Baltic Byte",
+      "workplaceType": "remote",
+      "city": "Gdańsk",
+      "publishedAt": "2026-10-11T10:00:00Z"
+    }
+  ],
+  "meta": {
+    "next": {
+      "cursor": null
+    }
+  }
+}

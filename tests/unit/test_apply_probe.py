@@ -35,7 +35,10 @@ def test_one_job_per_source_failed_first_and_only_with_an_apply_link(tmp_path: P
 def test_report_is_a_markdown_table(tmp_path: Path) -> None:
     row = ProbeRow(7, "builtin", "builtin.com", "needs_user", "a | b", "apply_by_hand", "x.png")
     text = report([row], tmp_path).read_text("utf-8")
-    assert "| 7 | builtin | builtin.com | needs_user | apply_by_hand | a / b | x.png |" in text
+    assert (
+        "| 7 | builtin | builtin.com | needs_user | apply_by_hand | a / b | 0 s |  | x.png |"
+        in text
+    )
 
 
 def test_scorecard_counts_per_platform_and_says_why_the_rest_stopped() -> None:
@@ -54,13 +57,14 @@ def test_scorecard_counts_per_platform_and_says_why_the_rest_stopped() -> None:
             row(4, "needs_user", "captcha", "form agent", 30),
             row(5, "error", "", "form agent", 2),
             row(6, "dry_run", "dry_run_signup", "form agent", 4),
+            row(7, "skipped", "posting_gone", "form agent", 3),
         ],
         datetime(2026, 11, 11),
     )
-    assert "2026-11-11: 6 real job postings" in text
-    assert "| greenhouse | 3 | 2 (67%) | 0 | 1 | 0 | 0 | 20 s |" in text
-    # a form behind a sign-up page is not counted as filled
-    assert "| form agent | 3 | 0 (0%) | 1 | 1 | 1 | 0 | 4 s |" in text
+    assert "2026-11-11: 7 real job postings" in text
+    assert "| greenhouse | 3 | 2 (67%) | 2 | 0 | 0 | 1 | 0 | 0 | 20 s |" in text
+    # reaching a sign-up form and finding the ad closed both pass; neither counts as filled
+    assert "| form agent | 4 | 2 (50%) | 0 | 1 | 1 | 1 | 1 | 0 | 4 s |" in text
     assert "| form agent | dry_run | dry_run_signup | 1 |" in text
     assert "| greenhouse | needs_user | captcha | 1 |" in text
     assert "| form agent | error | - | 1 |" in text

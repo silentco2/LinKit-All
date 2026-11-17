@@ -1,0 +1,51 @@
+{
+  "results": [
+    {
+      "nbPages": 1,
+      "hits": [
+        {
+          "id": "a-1",
+          "title": "Growth Marketer",
+          "company": "{\"name\": \"Kopi Labs\"}",
+          "city": {
+            "name": "Jakarta",
+            "country_name": "Indonesia"
+          },
+          "is_remote": false,
+          "description": "<p>Grow users.</p>",
+          "published_at": "2026-10-14 03:00:00",
+          "external_link": "https://jobs.lever.co/kopilabs/1"
+        },
+        {
+          "id": "a-2",
+          "title": "Intern A",
+          "company": {
+            "name": "Noteform Co"
+          },
+          "city": {
+            "name": "Singapore",
+            "country_name": "Singapore"
+          },
+          "is_remote": true,
+          "external_link": "https://forms.example/intake"
+        },
+        {
+          "id": "a-3",
+          "title": "Intern B",
+          "company": {
+            "name": "Noteform Co"
+          },
+          "external_link": "https://forms.example/intake"
+        },
+        {
+          "id": "a-4",
+          "title": "Shortened",
+          "company": {
+            "name": "Tiny"
+          },
+          "external_link": "https://bit.ly/xyz"
+        }
+      ]
+    }
+  ]
+}

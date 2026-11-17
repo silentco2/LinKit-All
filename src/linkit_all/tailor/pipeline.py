@@ -3,7 +3,7 @@
 import asyncio
 import shutil
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Protocol
 
@@ -23,6 +23,7 @@ from linkit_all.tailor.docx.segments import PatchError, apply_patch, load_segmen
 from linkit_all.tailor.patches import Patch, PatchList, Rules, plan_patches, vocabulary
 from linkit_all.tailor.render.latex import render_pdf_latex
 from linkit_all.tailor.render.libreoffice import render_pdf
+from linkit_all.tailor.verify.facts import new_facts, pdf_text
 from linkit_all.tailor.verify.layout import VerifyReport, verify_pdf
 
 Renderer = Callable[[Path, Path], Path]
@@ -39,6 +40,8 @@ class TailorResult:
     applied: list[Patch]
     rejected: list[tuple[Patch, str]]
     verify: VerifyReport | None
+    # What a rendered attempt said that the CV does not (that attempt was rolled back).
+    invented: list[str] = field(default_factory=list)
 
 
 class CvSegment(Protocol):
@@ -132,6 +135,7 @@ def _tailor(
         attempts.append(shrinking)
 
     report: VerifyReport | None = None
+    invented: list[str] = []
     for attempt in attempts:
         dest = out_dir / f"cv{base.suffix}"
         applied, failed = build(attempt, dest)
@@ -140,9 +144,19 @@ def _tailor(
             break
         pdf = render(dest, out_dir)
         report = verify_pdf(base_pdf, pdf, min_ssim)
+        if report.ok and (
+            new := new_facts(
+                pdf_text(base_pdf), pdf_text(pdf), rules.locked_facts, rules.allowed_terms
+            )
+        ):  # the finished CV says something the original does not (CLAUDE.md §2)
+            invented = new
+            why = f"fact check: new {', '.join(new[:5])}"
+            report = VerifyReport(False, report.pages, report.min_ssim, why)
         if report.ok:
             dropped = [(p, "dropped to keep the layout") for p in plan.accepted if p not in attempt]
-            return TailorResult(dest, pdf, applied, plan.rejected + failed + dropped, report)
+            return TailorResult(
+                dest, pdf, applied, plan.rejected + failed + dropped, report, invented
+            )
 
     # Nothing safe to apply, or layout broke: submit the untouched CV.
     shutil.copyfile(base, out_dir / f"cv{base.suffix}")
@@ -150,8 +164,9 @@ def _tailor(
     why = f"rolled back: {report.reason}" if report else "not applied"
     rolled_back = [(p, why) for p in plan.accepted if all(p is not r for r, _ in plan.rejected)]
     return TailorResult(
-        out_dir / f"cv{base.suffix}", out_dir / "cv.pdf", [], plan.rejected + rolled_back, report
-    )
+        out_dir / f"cv{base.suffix}", out_dir / "cv.pdf", [], plan.rejected + rolled_back, report,
+        invented,
+    )  # fmt: skip
 
 
 def tailor_docx(
@@ -355,5 +370,7 @@ async def tailor_job(
             JobState.tailored,
             f"{len(result.applied)} patches applied, {len(result.rejected)} rejected",
             [str(result.docx), str(result.pdf)],
+            code="tailor_fact_check_failed" if result.invented else None,
+            params={"new": result.invented[:10]} if result.invented else None,
         )
     return row

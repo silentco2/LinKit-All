@@ -6,6 +6,8 @@ window.lkSnapshot = (prefix) => {  // prefix: makes ids unique across the page's
   // "Postular", "Candidatar", "Postuler", Arabic "takadam"
   const APPLY = /^(easy |quick )?(apply|bewerben|jetzt bewerben|postular|postúlate|candidat|postuler)\b|\bapply (now|here|for|on|to|online|externally|with)\b|\b(sign|log) ?(in|up) to apply\b|^i'?m interested$|^me interesa\b|^quiero (aplicar|postular)|^ap[uú]ntate|^inscr[ií]bete|^(aplicar|candidatar|solicitar|откликнуться|отклик|ansök|sök tjänsten|solliciteer|søg|hae|aplikuj|bewirb|postularme|応募|申请|지원)|^(تقدم|قدم|التقديم)/i;
   // Sign-up links of a sign-in form, for the account flow
+  // A link that submits the form it ends (JazzHR's "SUBMIT APPLICATION"): a button
+  const SUBMITS = /^(submit|send)( (my |your |the )?(application|cv|resume|profile))?$/i;
   const SIGNUP = /^(sign ?up|create (an |your |a free )?account|register|join( now| free| us)?|new (user|here)|don.?t have an account)/i;
   const clean = (t) => (t || '').replace(/[*✱]/g, '').replace(/\s+/g, ' ').trim();
   const parent = (n) => n.parentElement || (n.getRootNode() instanceof ShadowRoot ? n.getRootNode().host : null);
@@ -22,7 +24,14 @@ window.lkSnapshot = (prefix) => {  // prefix: makes ids unique across the page's
     }
     return out.join(' ');
   };
-  const hiddenUp = (e) => { for (let n = e; n; n = parent(n)) if (n.getAttribute('aria-hidden') === 'true' || n.hasAttribute('inert')) return true; return false; };
+  // An open modal dialog is shown even when the page hid <body> around it (Wuzzuf's sign-up popup).
+  const hiddenUp = (e) => {
+    for (let n = e; n; n = parent(n)) {
+      if (n.getAttribute('aria-modal') === 'true' || (n.tagName === 'DIALOG' && n.open)) return false;
+      if (n.getAttribute('aria-hidden') === 'true' || n.hasAttribute('inert')) return true;
+    }
+    return false;
+  };
   const shown = (e) => {
     const cs = getComputedStyle(e), r = e.getBoundingClientRect();
     return cs.display !== 'none' && cs.visibility !== 'hidden' && +cs.opacity !== 0 && (r.width || r.height)
@@ -83,9 +92,13 @@ window.lkSnapshot = (prefix) => {  // prefix: makes ids unique across the page's
     const says = clean(e.innerText || e.getAttribute('aria-label') || '');
     const opensApply = e.matches('a, button, [role=button]') && APPLY.test(says);
     const link = e.tagName === 'A' && !e.matches('[role]') && ((opensApply) || (e.hasAttribute('href') && SIGNUP.test(clean(e.innerText || ''))));
-    if (!link && !e.matches('input, select, textarea, button, [role=combobox], [role=radio], [role=checkbox], [role=switch], [role=button]')) continue;
-    if (e.disabled || (hiddenUp(e) && !opensApply)) continue;  // a cookie popup hides the whole page from screen readers, Apply included
+    const submits = e.tagName === 'A' && !e.matches('[role]') && SUBMITS.test(says);
+    if (!link && !submits && !e.matches('input, select, textarea, button, [role=combobox], [role=radio], [role=checkbox], [role=switch], [role=button]')) continue;
     const type = (e.getAttribute('type') || '').toLowerCase(), role = e.getAttribute('role') || '';
+    // a cookie popup hides the whole page from screen readers, Apply included; an upload input is
+    // often hidden from them behind its own label button (Henkel's careers site), which still shows
+    const shownUpload = type === 'file' && labelsOf(e).some(shown);
+    if (e.disabled || (hiddenUp(e) && !opensApply && !shownUpload)) continue;
     if (e.tagName === 'INPUT' && ['hidden', 'image', 'reset', 'range', 'color'].includes(type)) continue;
     if (/captcha-response/.test(e.name || '')) continue;
     if (type === 'checkbox' && parent(e)?.querySelector('button[aria-pressed]')) continue;  // mirror of a Yes/No toggle
@@ -99,6 +112,7 @@ window.lkSnapshot = (prefix) => {  // prefix: makes ids unique across the page's
     else if (e.tagName === 'TEXTAREA') kind = 'textarea';
     else if (type === 'file') kind = 'file';
     else if (role === 'combobox' || e.classList.contains('select__input')) kind = 'combobox';
+    else if (submits) kind = 'button';
     else if (link) kind = 'link';
     else if (e.hasAttribute('aria-pressed')) kind = 'toggle';
     else if (e.tagName === 'BUTTON' || ['submit', 'button'].includes(type) || role === 'button') kind = 'button';
@@ -148,7 +162,10 @@ window.lkSnapshot = (prefix) => {  // prefix: makes ids unique across the page's
     } else if (kind === 'checkbox') { value = first.checked ? 'checked' : ''; empty = !first.checked; }
     else if (kind === 'select') {
       options = [...first.options].map((o) => clean(o.text)).filter((t, i) => t && !(i === 0 && /^(select|choose|please|--|click here)/i.test(t))).slice(0, 2000);
-      value = first.value ? clean(first.selectedOptions[0]?.text) : ''; empty = !first.value;
+      const pick = first.selectedOptions[0];
+      // a placeholder option ("Select...", disabled, or an empty value) is no answer
+      const none = !first.value || !pick || pick.disabled || (first.selectedIndex === 0 && /^(select|choose|please|--|click here|اختر)/i.test(clean(pick.text)));
+      value = none ? '' : clean(pick.text); empty = none;
     } else if (kind === 'file') { value = [...first.files].map((f) => f.name).join(', '); empty = !first.files.length; }
     else if (kind === 'combobox') {
       const box = first.closest('[class*=container i], [class*=select i]') || parent(first);

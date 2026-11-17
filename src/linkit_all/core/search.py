@@ -244,6 +244,10 @@ class FiltersSection(BaseModel):
     skip_below_expectation: bool = False  # no floor set: use the salary you expect (Answers)
     company_blacklist: list[str] = []
     one_per_company: bool = True
+    # Years of experience read from the description (matching/years.py). None = off.
+    max_years_required: int | None = Field(None, ge=0, le=60)
+    years_action: Literal["label", "drop"] = "label"  # drop only on a clear overall requirement
+    dealbreakers: list[str] = []  # a description sentence containing one filters the job out
 
     @field_validator("work_modes")
     @classmethod
@@ -283,6 +287,7 @@ class ApplySection(BaseModel):
     # ban-risk sites: never driven by the app; the job waits in Needs you for the user's browser
     assisted_hosts: list[str] = ["linkedin.com", "indeed.com", "glassdoor.com"]
     email_daily_cap: int = Field(15, ge=1, le=100)  # live application emails per day
+    followup_days: int = Field(7, ge=3, le=60)  # one follow-up after this many days of silence
     # None = not decided yet, True = tailor the CV per job (needs LibreOffice), False = send
     # the CV as uploaded. Without LibreOffice, practice mode sends it as uploaded either way.
     tailor_cv: bool | None = None
@@ -305,6 +310,7 @@ class EmailSection(BaseModel):
     smtp_port: int = Field(465, ge=1, le=65535)
     timeout_s: int = Field(300, ge=30, le=1800)  # how long to wait for a verification email
     poll_s: int = Field(10, ge=3, le=120)
+    read_replies: bool = False  # opt in: read employer replies to set outcomes (rules, no AI)
 
     def effective_smtp_host(self) -> str:
         """The SMTP host; an unchanged Gmail default follows a Yahoo IMAP host."""

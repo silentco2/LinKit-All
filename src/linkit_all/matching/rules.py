@@ -7,6 +7,7 @@ from typing import Any
 from linkit_all.core import fx
 from linkit_all.core.models import Job
 from linkit_all.core.search import SearchConfig, Seniority
+from linkit_all.matching.years import sentences, years_required
 from linkit_all.sources.base import remote_from_text
 from linkit_all.sources.text import norm_company
 
@@ -46,7 +47,8 @@ def rule_violation(
     job: Job, cfg: SearchConfig, now: datetime, expectation: tuple[float, str] | None = None
 ) -> str | None:
     """Why the job fails the hard filters, or None if it passes. `expectation` is
-    `expectation_of(answers)`; it is the salary floor when none is set and the user opted in."""
+    `expectation_of(answers)`; it is the salary floor when none is set and the user opted in.
+    With the years filter on, the figure read is also kept in `job.data["years_required"]`."""
     f = cfg.filters
     title = job.title.lower()
     if f.title_include and not any(w.lower() in title for w in f.title_include):
@@ -80,4 +82,27 @@ def rule_violation(
             return f"salary up to {pay:,.0f} {currency}/month is below your floor"
     if norm_company(job.company) in {norm_company(c) for c in f.company_blacklist}:
         return "company is blacklisted"
+    if said := dealbreaker(job.description, f.dealbreakers):
+        return f'dealbreaker {said[0]!r}: "{said[1]}"'
+    if f.max_years_required is not None:
+        years = years_required(job.description)
+        above = years.floor is not None and years.floor > f.max_years_required
+        label = {"label": years.label, "kind": years.kind, "above": above} if years.label else None
+        if job.data.get("years_required") != label:  # the UI shows it on the job
+            job.data = {**job.data, "years_required": label}
+        if above and years.confident and f.years_action == "drop":
+            return f"asks for {years.label} years of experience, above your {f.max_years_required}"
+    return None
+
+
+def dealbreaker(description: str, phrases: list[str]) -> tuple[str, str] | None:
+    """(phrase, the sentence that contains it) for the first dealbreaker the text states."""
+    wanted = [(p, " ".join(p.lower().split())) for p in phrases if p.strip()]
+    if not wanted:
+        return None
+    for sentence in sentences(description):
+        low = sentence.lower()
+        for phrase, needle in wanted:
+            if needle in low:
+                return phrase, sentence if len(sentence) <= 220 else f"{sentence[:217]}..."
     return None

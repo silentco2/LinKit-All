@@ -266,4 +266,5 @@ def test_marking_a_job_closed_drops_it_and_says_why(client: TestClient) -> None:
     with client.app.state.db() as s:  # type: ignore[attr-defined]
         last = s.query(JobEvent).filter_by(job_id=job).order_by(JobEvent.id.desc()).first()
         assert last is not None and last.code == "marked_closed"
+        assert s.get(Job, job).data["trash"] == "closed"
     assert client.get("/api/actions").json() == []

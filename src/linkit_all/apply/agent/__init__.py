@@ -28,6 +28,7 @@ from playwright.async_api import Frame, Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeout
 from pydantic import BaseModel
 
+from linkit_all.apply import knockout
 from linkit_all.apply.answers import (
     Context,
     Kind,
@@ -39,8 +40,10 @@ from linkit_all.apply.answers import (
 )
 from linkit_all.apply.assist import AnswerBank, answer_questions, remember_bank_secrets
 from linkit_all.apply.form import FillError, fill_in, lost_values
-from linkit_all.apply.handlers.base import CAPTCHA, ERRORS
+from linkit_all.apply.handlers.base import CAPTCHA, ERRORS, goto
+from linkit_all.core import timing
 from linkit_all.providers.base import LLMProvider, render
+from linkit_all.sources.liveness import closed_text
 
 _SNAPSHOT = (Path(__file__).parent / "snapshot.js").read_text("utf-8")
 
@@ -134,13 +137,15 @@ async def snapshot(page: Page) -> list[Control]:
     """Visible, enabled form controls in page order (open shadow roots and iframes included).
     Tags them on the page and keeps ids stable across calls."""
     controls: list[Control] = []
-    for frame in await frames_of(page):
-        try:
-            raw: list[dict[str, Any]] = await frame.evaluate(_SNAPSHOT, _prefix(frame))
-        except Exception as e:  # a frame that navigates or detaches mid-read
-            logger.debug("skipping frame {}: {}", frame.url, e)
-            continue
-        controls += [Control(**r) for r in raw]
+    with timing.step("read page"):
+        for frame in await frames_of(page):
+            try:
+                raw: list[dict[str, Any]] = await frame.evaluate(_SNAPSHOT, _prefix(frame))
+            except Exception as e:  # a frame that navigates or detaches mid-read
+                logger.debug("skipping frame {}: {}", frame.url, e)
+                continue
+            controls += [Control(**r) for r in raw]
+        timing.note(f"{len(controls)} controls")
     return controls
 
 
@@ -331,6 +336,14 @@ async def fill_page(
 ) -> dict[str, str]:
     """Fill every answered question through `form.fill_in`, inside its own frame.
     Returns {key: why} for failures."""
+    with timing.step("fill form"):
+        timing.note(f"{len(answers)} answers")
+        return await _fill_page(page, questions, answers)
+
+
+async def _fill_page(
+    page: Page, questions: list[Question], answers: dict[str, Any]
+) -> dict[str, str]:
     failed = {}
     frames = {q.key: await _frame_of(page, q.key) for q in questions if q.key in answers}
     for q in questions:
@@ -339,6 +352,8 @@ async def fill_page(
                 await _fill(frames[q.key], q, answers[q.key])
             except FillError as e:
                 failed[q.key] = str(e)
+                timing.note(f"could not fill {q.label[:40]!r}")
+    await _quiet_alerts(page)  # a site reading the uploaded CV may reset fields when it is done
     for frame in dict.fromkeys(frames.values()):
         mine = [q for q in questions if frames.get(q.key) is frame]
         for q in await lost_values(frame, mine, answers):  # React forms can reset fields
@@ -351,20 +366,53 @@ async def fill_page(
 
 
 _MAX_ERROR = 300  # longer is a wrapper around the form that happens to have an error class
+# Progress notes some sites show in an alert box (Henkel parses the uploaded CV): not errors.
+_BUSY = re.compile(
+    r"\b(processing|uploading|please wait|could take (several|a few) seconds)\b", re.I
+)
+BUSY_WAIT_S = 20.0
+REVEAL_WAIT_MS = 400  # ponytail: fixed pause; wait on a DOM mutation if pages need longer
+SWEEP_PASSES = 3  # extra surveys of a page after filling, for fields a fill revealed
 _GOOD_NEWS = re.compile(r"\b(is attached|file selected|uploaded successfully)\b", re.I)
 
 
-async def page_errors(page: Page) -> list[str]:
-    """Visible validation messages of the page and its frames (same selector as the handlers)."""
-    texts = []
+# A class name only counts when it is a word of its own: Tailwind's "[&>.field-with-errors]:w-auto"
+# is styling around every field (Teamtailor), not an error message.
+_REAL_ERROR_JS = """e => e.getAttribute('role') === 'alert' || e.matches('.application-error')
+  || [...e.classList].some(c => !c.includes('[') && /error|invalid/i.test(c))"""
+
+
+async def _alerts(page: Page) -> set[str]:
+    texts = set()
     for frame in await frames_of(page):
         found = frame.locator(ERRORS).locator("visible=true")
         for i in range(min(await found.count(), 30)):
             with contextlib.suppress(Exception):  # e.g. an SVG error icon has no inner text
-                texts.append(" ".join((await found.nth(i).inner_text(timeout=2000)).split()))
-    return sorted({t for t in texts if t and len(t) <= _MAX_ERROR and not _GOOD_NEWS.search(t)})[
-        :10
-    ]
+                el = found.nth(i)
+                if await el.evaluate(_REAL_ERROR_JS, timeout=2000):
+                    texts.add(" ".join((await el.inner_text(timeout=2000)).split()))
+    # a bare "*" is a required-field marker some sites style as an error, not a message
+    return {t for t in texts if any(ch.isalpha() for ch in t) and len(t) <= _MAX_ERROR}
+
+
+async def _quiet_alerts(page: Page, busy_wait_s: float = BUSY_WAIT_S) -> set[str]:
+    """The page's alert texts once it no longer says it is working ("Processing Resume/CV...")."""
+    with timing.step("wait for site"):
+        texts = await _alerts(page)
+        deadline = time.monotonic() + busy_wait_s
+        if busy := next((t for t in texts if _BUSY.search(t)), None):
+            timing.note(f"the site said: {busy[:60]}")
+        while any(_BUSY.search(t) for t in texts) and time.monotonic() < deadline:
+            await page.wait_for_timeout(1000)
+            texts = await _alerts(page)
+    return texts
+
+
+async def page_errors(page: Page, busy_wait_s: float = BUSY_WAIT_S) -> list[str]:
+    """Visible validation messages of the page and its frames (same selector as the handlers).
+    While the page says it is still working, wait for it first."""
+    texts = await _quiet_alerts(page, busy_wait_s)
+    return sorted(t for t in texts if not _GOOD_NEWS.search(t) and not _BUSY.search(t))[:10]
 
 
 @dataclass
@@ -407,16 +455,26 @@ def pick_button(
     if nxt is not None:
         return "next", nxt
     lone = [c for c in by_id.values() if c.submit_like]
+    if len(lone) > 1:  # JazzHR: "Apply" at the top of the ad and "Apply" ending the form
+        lone = [c for c in lone if c.type == "submit"] or lone
     return ("submit", lone[0]) if len(lone) == 1 else ("stop", None)
 
 
 # The site's own words on a job ad that cannot be applied to: nothing for the user to finish.
 _NOT_ELIGIBLE = re.compile(r"^not eligible$", re.I)
-_GONE = re.compile(
-    r"^404\b|\b(error 404|404 error|page not found)\b|\bno longer (available|accepting)\b"
-    r"|\bthis (job|position|posting|vacancy) (has )?(expired|closed|been filled)\b",
+# The site itself is down for now: worth trying again later, not a dead end for the user.
+_DOWN = re.compile(
+    r"\b(under|down for) (scheduled )?maintenance\b|\btemporarily unavailable\b"
+    r"|\bservice unavailable\b|\b503\b",
     re.I,
 )
+_TEXT_LIMIT = 20_000  # a site menu can push "no longer available" past the first 800 characters
+
+
+def _closed_badge(title: str) -> re.Pattern[str] | None:
+    """A "Closed" or "Expired" label right before the job's own title (Wuzzuf's closed ads)."""
+    words = " ".join(title.split())
+    return re.compile(rf"\b(closed|expired)\W+{re.escape(words)}", re.I) if words else None
 
 
 def _apply_control(controls: list[Control]) -> Control | None:
@@ -427,12 +485,17 @@ def _apply_control(controls: list[Control]) -> Control | None:
     )
 
 
-async def _dead_end(page: Page, controls: list[Control]) -> StepResult | None:
+async def _dead_end(page: Page, controls: list[Control], title: str = "") -> StepResult | None:
     if any(c.kind == "button" and _NOT_ELIGIBLE.search(c.name) for c in controls):
         why = "the site says you are not eligible for this job"
         return StepResult("listing", "stop", reason=why, code="not_eligible")
-    if _GONE.search(f"{await page.title()} {await page_text(page)}"):
+    text = f"{await page.title()} {await page_text(page, _TEXT_LIMIT)}"
+    badge = _closed_badge(title)
+    if closed_text(text) or (badge is not None and badge.search(text)):
         return StepResult("listing", "stop", reason="the posting is gone", code="posting_gone")
+    if _DOWN.search(text):
+        why = "the site is down for maintenance: try again later"
+        return StepResult("listing", "stop", reason=why, code="site_down")
     return None
 
 
@@ -448,6 +511,7 @@ async def step(
     *,
     dry_run: bool = True,
     password: str | None = None,
+    knockout_ok: bool = False,
 ) -> StepResult:
     """One page: snapshot -> map -> answer -> fill -> re-check. Never clicks anything;
     `result.button` is what the caller may press (`press_next`, or `click_submit`).
@@ -457,7 +521,9 @@ async def step(
         return StepResult(
             "other", "stop", reason="a CAPTCHA is shown: only you can solve it", code="captcha"
         )
-    controls = await snapshot(page)
+    with timing.step("wait for page"):
+        await decline_cookies(page)
+    controls = await _drawn(page)
     if not controls:
         return StepResult("other", "stop", reason="no form controls on the page", code="no_form")
     if password is None and any(c.kind == "password" for c in controls):
@@ -474,7 +540,7 @@ async def step(
             return StepResult(
                 "listing", "open", opener, dismiss=by_id.get(fmap.dismiss_button or "")
             )
-        if (dead := await _dead_end(page, controls)) is not None:
+        if (dead := await _dead_end(page, controls, job.get("title", ""))) is not None:
             return dead
         if fmap.page_kind == "listing":
             return StepResult(
@@ -490,15 +556,40 @@ async def step(
         )
 
     questions = to_questions(controls, fmap)
+    hits = [] if knockout_ok else knockout.find(questions, ctx, cv, job.get("description", ""))
+    if hits:
+        asked = [h.question for h in hits]
+        return StepResult(fmap.page_kind, "stop", None, hits[0].reason, asked, code="knockout")
     r = await answer_questions(questions, ctx, bank, provider, cv, profile, job, out_dir)
     remember_secrets(ctx.answers, questions, r.answers)
     failed = await fill_page(page, questions, r.answers)
     for c in controls:
         if password and c.kind == "password":
             await (await locate(page, c.id)).fill(password)
-    required = {q.key: q for q in questions if q.required}
+    answers, sources, missing = dict(r.answers), dict(r.sources), list(r.missing)
+    await page.wait_for_timeout(REVEAL_WAIT_MS)  # a form adds revealed fields after its update
     after = {c.id: c for c in await snapshot(page)}
-    parked = {m.question.key for m in r.missing}
+    # A fill can create required fields ("Yes" reveals its follow-up, a country swaps in a
+    # region): survey the page again until nothing new appears (career-ops' required sweep).
+    for _ in range(SWEEP_PASSES):
+        seen = {q.key for q in questions}
+        new = [q for q in page_questions(list(after.values())) if q.required and q.key not in seen]
+        if not new:
+            break
+        if not knockout_ok and (hits := knockout.find(new, ctx, cv, job.get("description", ""))):
+            asked = [h.question for h in hits]
+            return StepResult(fmap.page_kind, "stop", None, hits[0].reason, asked, code="knockout")
+        more = await answer_questions(new, ctx, bank, provider, cv, profile, job, out_dir)
+        remember_secrets(ctx.answers, new, more.answers)
+        failed.update(await fill_page(page, new, more.answers))
+        questions = [*questions, *new]
+        answers.update(more.answers)
+        sources.update(more.sources)
+        missing.extend(more.missing)
+        await page.wait_for_timeout(REVEAL_WAIT_MS)
+        after = {c.id: c for c in await snapshot(page)}
+    required = {q.key: q for q in questions if q.required}
+    parked = {m.question.key for m in missing}
     action, button = pick_button(controls, fmap)
     result = StepResult(
         fmap.page_kind,
@@ -506,9 +597,9 @@ async def step(
         button,
         "" if button else "no Next or Submit button found",
         questions,
-        r.answers,
-        r.sources,
-        r.missing,
+        answers,
+        sources,
+        missing,
         {k: why for k, why in failed.items() if k in required},
         [
             required[k].label
@@ -517,7 +608,7 @@ async def step(
             and c.empty
             and k not in parked
             and k not in failed
-            and not (c.kind == "file" and k in r.answers)  # upload widgets empty their input
+            and not (c.kind == "file" and k in answers)  # upload widgets empty their input
         ],
         await page_errors(page),
         dry_run,
@@ -604,7 +695,7 @@ async def open_signup(page: Page) -> bool:
     for c in await snapshot(page):
         if c.kind in ("button", "link") and _SIGNUP.search(c.name):
             if c.href.startswith(("http://", "https://")):
-                await page.goto(c.href, wait_until="domcontentloaded", timeout=60000)
+                await goto(page, c.href)
             else:
                 try:
                     await (await locate(page, c.id)).click(timeout=5000)
@@ -640,6 +731,27 @@ async def enter_code(page: Page, code: str) -> bool:
     return True
 
 
+SPA_WAIT_S = 10.0  # Workday draws its job page about 8 s after it loads
+NEW_TAB_WAIT_S = 3  # a button that opens a new tab does so within this
+
+
+async def _drawn(page: Page) -> list[Control]:
+    """The page's controls; a page with no field and no Apply yet is given time to draw them."""
+    controls = await snapshot(page)
+    if any(c.apply or c.kind not in ("button", "link") for c in controls):
+        return controls
+    with timing.step("wait for page"):
+        timing.note("no form or Apply yet: waited for the page to draw them")
+        deadline = time.monotonic() + SPA_WAIT_S
+        while time.monotonic() < deadline:
+            await page.wait_for_timeout(1000)
+            await decline_cookies(page)
+            controls = await snapshot(page)
+            if any(c.apply or c.kind not in ("button", "link") for c in controls):
+                break
+    return controls
+
+
 async def press_apply(page: Page, result: StepResult) -> None:
     """On a job ad: close the popup covering it, then open the application in this tab. A link
     is followed by its address; a button that opens a new tab has that tab's address loaded
@@ -652,21 +764,67 @@ async def press_apply(page: Page, result: StepResult) -> None:
     href = result.button.href
     here = page.url.split("#")[0]
     if href.startswith(("http://", "https://")) and href.split("#")[0] != here:
-        await page.goto(href, wait_until="domcontentloaded", timeout=60000)
+        await goto(page, href)
         return  # a "#" link is a script button: clicked below
     target = await locate(page, result.button.id)
-    try:
-        async with page.context.expect_page(timeout=8000) as new:
-            await target.click()
-    except PlaywrightTimeout:  # same-tab navigation or an in-page form
+    await decline_cookies(page)
+    before, here_now = set(page.context.pages), page.url
+    await target.click()
+    tab = None
+    for _ in range(NEW_TAB_WAIT_S * 4):  # same-tab navigation or an in-page form: no new tab
+        if new := [p for p in page.context.pages if p not in before]:
+            tab = new[0]
+            break
+        if page.url != here_now:
+            return
+        await asyncio.sleep(0.25)
+    if tab is None:
         return
-    tab = await new.value
     with contextlib.suppress(Exception):
         await tab.wait_for_load_state("domcontentloaded", timeout=30000)
     url = tab.url
     await tab.close()
     if url.startswith(("http://", "https://")):
-        await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+        await goto(page, url)
+
+
+# "Decline all", "Reject all", "Disagree and close", "Continue without agreeing", "Only
+# necessary": the privacy-preserving answer to a cookie banner, which otherwise covers Apply.
+_DECLINE = (
+    r"^(decline|reject|refuse|deny|disagree)( all)?( (non-?(necessary|essential)|optional|"
+    r"additional))?( cookies)?( and close)?$|^continue without (agreeing|accepting)"
+    r"|^(use |allow )?(only )?(strictly )?(necessary|essential|required)( cookies)?( only)?$"
+)
+_DECLINE_JS = """(re) => {
+  const rx = new RegExp(re, 'i');
+  for (const b of document.querySelectorAll('button, a, [role=button]')) {
+    const raw = b.innerText || b.getAttribute('aria-label') || '';
+    const t = raw.replace(/[\\s\u2192>]+$/, '').trim();
+    if (!rx.test(t)) continue;
+    const r = b.getBoundingClientRect();
+    if (!r.width || !r.height) continue;
+    // the nearest block around it that talks about cookies, and holds no form (an EEO
+    // "Decline" sits in a form; a cookie banner has no fields)
+    let box = b.parentElement;
+    while (box && !/cookie|consent|tracking/i.test(box.innerText || '')) box = box.parentElement;
+    const FORM = 'input:not([type=checkbox]), select, textarea, fieldset';
+    if (!box || box.querySelector(FORM)) continue;
+    b.click();
+    return t;
+  }
+  return null;
+}"""
+
+
+async def decline_cookies(page: Page) -> str | None:
+    """Press a cookie banner's decline button, if one shows. Never "Accept"."""
+    for frame in await frames_of(page):
+        with contextlib.suppress(Exception):
+            if pressed := await frame.evaluate(_DECLINE_JS, _DECLINE):
+                timing.note(f"declined cookies ({pressed})")
+                await page.wait_for_timeout(500)
+                return str(pressed)
+    return None
 
 
 async def captcha_shown(page: Page) -> bool:

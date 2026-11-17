@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:job_listing="https://wpjobmanager.com">
+<channel><title>Coastline Jobs</title>
+<item><title>Marine Biologist</title>
+<link>https://jobs.coastline.example/job/marine-biologist/</link>
+<pubDate>Tue, 13 Oct 2026 08:00:00 +0000</pubDate>
+<description><![CDATA[Short excerpt]]></description>
+<content:encoded><![CDATA[<p>Study the <b>reef</b>.</p>]]></content:encoded>
+<job_listing:company>Reefwatch Trust</job_listing:company>
+<job_listing:location>Galway, Ireland</job_listing:location></item>
+<item><title>Deckhand</title>
+<link>https://jobs.coastline.example/job/deckhand/</link>
+<pubDate>Mon, 12 Oct 2026 08:00:00 +0000</pubDate>
+<job_listing:location>Remote</job_listing:location></item>
+<item><title>Elsewhere</title><link>https://other.example/job/x/</link></item>
+</channel></rss>

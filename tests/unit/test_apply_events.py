@@ -20,6 +20,8 @@ from linkit_all.core.state import transition
 class Page:
     async def close(self) -> None: ...
 
+    def set_default_timeout(self, ms: float) -> None: ...
+
 
 class Browser:
     async def new_page(self) -> Page:

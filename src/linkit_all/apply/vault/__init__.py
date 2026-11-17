@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from linkit_all.core.config import Settings
 from linkit_all.core.models import VaultMeta, VaultRow, utcnow
+from linkit_all.providers.base import remember_credentials
 
 SERVICE = "linkit-all"
 MIN_PASSPHRASE = 8
@@ -204,6 +205,7 @@ class Vault:
     ) -> int:
         """Insert or update the entry for (kind, site, username). `meta` is stored in plaintext."""
         key = self._need_key()
+        remember_credentials(secret)  # the AI never receives a vault secret (providers.base)
         nonce = os.urandom(12)
         ct = AESGCM(key).encrypt(nonce, secret.encode(), _aad(kind, site, username))
         with self._db.begin() as s:
@@ -227,7 +229,9 @@ class Vault:
             plain = AESGCM(key).decrypt(r.nonce, r.ciphertext, _aad(r.kind, r.site, r.username))
         except InvalidTag:
             raise VaultError(f"entry {r.id} failed authentication") from None
-        return plain.decode()
+        secret = plain.decode()
+        remember_credentials(secret)
+        return secret
 
     def get(self, entry_id: int) -> str:
         key = self._need_key()

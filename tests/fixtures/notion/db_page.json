@@ -1,0 +1,33 @@
+{
+  "recordMap": {
+    "block": {
+      "01234567-89ab-cdef-0123-456789abcdef": {
+        "role": "reader",
+        "value": {
+          "id": "01234567-89ab-cdef-0123-456789abcdef",
+          "type": "collection_view_page",
+          "collection_id": "col1",
+          "view_ids": [
+            "view1"
+          ],
+          "space_id": "s1"
+        }
+      }
+    },
+    "collection_view": {
+      "view1": {
+        "role": "reader",
+        "value": {
+          "id": "view1",
+          "query2": {
+            "filter": {
+              "operator": "and",
+              "filters": []
+            },
+            "sort": []
+          }
+        }
+      }
+    }
+  }
+}

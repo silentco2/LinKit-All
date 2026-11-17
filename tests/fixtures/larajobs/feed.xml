@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:job="https://larajobs.com/rss">
+<channel><title>LaraJobs</title>
+<item>
+  <title>Senior Laravel Developer</title>
+  <link>https://larajobs.com/job/3001?utm_source=rss</link>
+  <guid>https://larajobs.com/job/3001</guid>
+  <pubDate>Mon, 12 Oct 2026 14:00:00 +0000</pubDate>
+  <description><![CDATA[<p>Build &amp; maintain apps.</p>]]></description>
+  <job:company>Copperleaf Apps</job:company>
+  <job:location>Remote</job:location>
+</item>
+<item>
+  <title>PHP Engineer</title>
+  <link>https://larajobs.com/job/3002</link>
+  <pubDate>Sun, 11 Oct 2026 09:00:00 +0000</pubDate>
+  <job:company>Harbor &amp; Co</job:company>
+  <job:location>Lisbon, Portugal</job:location>
+</item>
+<item><title>Off site</title><link>https://elsewhere.example/1</link><job:company>X</job:company></item>
+</channel></rss>

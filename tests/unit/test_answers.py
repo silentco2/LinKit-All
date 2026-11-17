@@ -148,6 +148,56 @@ def test_sponsorship_derived_per_job(
         assert r.answers["q2"].startswith(expected)
 
 
+@pytest.mark.parametrize(
+    ("label", "job_location", "expected"),
+    [  # real questions, 2026-11-11 scorecard; the profile: Egypt only, visa for Canada and the US
+     ("Are you authorized to work in the country where the job is located?", "Ontario - Remote", "No"),
+     ("Are you authorized to work in the location(s) you selected in your previous response?",
+      "Toronto Canada, San Francisco, Remote in US, Remote in Canada", "No"),
+     ("Are you authorized to work?", "Cairo, Egypt", "Yes"),
+     ("Are you authorized to work?", "Cairo, Egypt or Toronto", None),  # differs per place: ask
+     ("Are you authorized to work in the US?", "Cairo, Egypt", "No"),  # the question's country wins
+     ("Are you authorized to work?", "Remote", None)],
+)  # fmt: skip
+def test_work_authorization_follows_every_job_country(
+    label: str, job_location: str, expected: str | None
+) -> None:
+    c = ctx(authorized_countries=["Egypt"], visa_countries=["Canada", "United States"])
+    c.job_location = job_location
+    r = resolve_static([Question("a", label, "yesno", True, ["Yes", "No"])], c)
+    assert r.answers.get("a") == expected
+
+
+@pytest.mark.parametrize(
+    ("label", "kind", "options", "expected"),
+    [  # real questions, 2026-11-11 scorecard
+     ("Do you opt-in to receive WhatsApp or SMS messages from Stripe Recruiting?", "combobox",
+      ["Yes", "No"], "No"),
+     ("Keep your profile in the global talent community for other current and future opportunities?",
+      "select", ["Yes", "No"], "No"),
+     ("Do you consent to receive marketing emails?", "radio", ["Yes, please", "No, thanks"], "No, thanks"),
+     ("Do you opt in to SMS updates?", "checkbox", [], False),
+     ("Can you get to our office in Cairo?", "yesno", ["Yes", "No"], None),
+     # recording consent stays the user's, even worded as an opt-in (Lever fixture)
+     ("We may use AI notetakers to transcribe interviews. Your decision to opt in or out will "
+      "not impact your candidacy.", "radio", ["Yes", "No"], None)],
+)  # fmt: skip
+def test_marketing_opt_ins_are_declined(
+    label: str, kind: Any, options: list[str], expected: str | None
+) -> None:
+    r = resolve_static([Question("o", label, kind, True, options)], ctx(acknowledge_privacy=True))
+    assert r.answers.get("o") == expected
+
+
+@pytest.mark.parametrize(
+    ("kind", "options", "expected"),
+    [("yesno", ["Yes", "No"], "Yes"), ("checkbox", [], True)],
+)
+def test_marketing_opt_ins_follow_the_setting(kind: Any, options: list[str], expected: Any) -> None:
+    q = Question("o", "Would you like to receive job alerts by SMS?", kind, False, options)
+    assert resolve_static([q], ctx(marketing_opt_in=True)).answers["o"] == expected
+
+
 def test_sensitive_without_profile_data_goes_to_user() -> None:
     r = resolve_static([AUTH, SPONSOR, GENDER, PRIVACY, CRIMINAL], ctx())
     assert {m.question.key for m in r.missing} == {"q1", "q2", "q3", "q5", "q8"}
@@ -248,3 +298,35 @@ def test_phone_country_code_is_the_dialling_code_not_the_number() -> None:
 
 def test_phone_country_code_without_a_home_country_is_left_for_the_user() -> None:
     assert standard_answer(Question("k", "Phone number country code", "text"), ctx()) is None
+
+
+def test_the_ai_hears_when_remote_jobs_are_welcome() -> None:
+    from linkit_all.apply.assist import profile_summary
+
+    c = ctx()
+    assert "remote" not in profile_summary(c)
+    c.open_to_remote = True
+    assert "Open to remote work: True" in profile_summary(c)
+
+
+@pytest.mark.parametrize(
+    ("q", "expected"),
+    [  # real questions, 2026-11-14 probe
+     (Question("p", "Passport Country", "text", True), "Egypt"),
+     (Question("w", "Where do you plan on working from (for payroll tax purposes)?", "combobox", True),
+      "Egypt"),
+     (Question("s", "Phone", "radio", True, ["Yes - I consent to receiving SMS text messages",
+                                             "No - I do not consent to receiving SMS text messages"]),
+      "No - I do not consent to receiving SMS text messages"),
+     (Question("e", "Please email me about future job openings", "checkbox", False), False),
+     (Question("f", "Yes, Axis can contact me directly about specific future job opportunities.",
+               "checkbox", False), False),
+     (Question("o", "OFAC: Please indicate whether you are either a citizen or lawful permanent resident"
+                    " of any of the following countries: Cuba, Iran, North Korea, Syria", "radio", True,
+               ["Yes", "No"]), "No"),
+     (Question("c", "Are you a citizen of Egypt?", "yesno", True, ["Yes", "No"]), "Yes"),
+     (Question("m", "Desired salary currency", "select", True, ["EUR", "USD", "EGP"]), "USD")],
+)  # fmt: skip
+def test_questions_the_profile_settles(q: Question, expected: Any) -> None:
+    c = ctx(nationality="EG", country="Egypt", salary_expectation="3000", salary_currency="USD")
+    assert resolve_static([q], c).answers.get(q.key) == expected

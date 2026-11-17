@@ -1,0 +1,28 @@
+{
+  "positions": [
+    {
+      "id": "p1",
+      "title": "Office Manager",
+      "hostedUrl": "https://secure.collage.co/jobs/northwind/101",
+      "location": [
+        "Toronto, ON",
+        "Remote"
+      ],
+      "department": "Ops",
+      "commitment": "Full-time",
+      "descriptionPlain": "Run the office.",
+      "createdDate": "2026-09-15T00:00:00Z"
+    },
+    {
+      "id": "p2",
+      "title": "Bookkeeper",
+      "url": "https://secure.collage.co/jobs/northwind/102",
+      "location": "Ottawa, ON",
+      "createdAt": 1790000000
+    },
+    {
+      "id": "p3",
+      "title": "No Link"
+    }
+  ]
+}

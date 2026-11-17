@@ -100,6 +100,9 @@ const MODE = 'rounded-lg border p-3 text-start text-sm focus-visible:outline-2 f
           <app-field key="apply.email_daily_cap" for="lim-mail" [label]="'setup.email.cap' | t" [hint]="'setup.email.capHint' | t">
             <input id="lim-mail" type="number" min="1" max="100" class="input" [value]="store.cfg.apply.email_daily_cap" (change)="store.update('apply.email_daily_cap', num($event))">
           </app-field>
+          <app-field key="apply.followup_days" for="followup-days" [label]="'settings.apply.followup' | t" [hint]="'settings.apply.followupHint' | t">
+            <input id="followup-days" type="number" min="3" max="60" class="input" [value]="store.cfg.apply.followup_days" (change)="store.update('apply.followup_days', num($event))">
+          </app-field>
         </div>
       </section>
 

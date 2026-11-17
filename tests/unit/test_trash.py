@@ -156,3 +156,14 @@ def test_reporting_an_unnamed_company_does_not_blacklist_every_unnamed_post(tmp_
         assert row is not None
         assert SearchConfig.model_validate(row.data).filters.company_blacklist == []
         assert s.get(Job, job_id).data["trash"] == "reported"  # type: ignore[union-attr]
+
+
+def test_a_closed_ad_stays_in_the_trash(tmp_path: Path) -> None:
+    _, db = _app(tmp_path)
+    with db.begin() as s:
+        job = _job(s, "near gone", JobState.skipped)
+        job.data = {"trash": "closed"}
+        job_id = job.id
+    sweep(db, _cfg("Wanted"), _embed)
+    with db() as s:
+        assert s.get_one(Job, job_id).data["trash"] == "closed"

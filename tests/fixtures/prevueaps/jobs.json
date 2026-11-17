@@ -1,0 +1,29 @@
+{
+  "data": {
+    "jobs": [
+      {
+        "id": 31,
+        "title": "Site Supervisor",
+        "jobUrl": "https://northwind.prevueaps.ca/jobs/site-supervisor-31",
+        "jobLocation": "",
+        "city": "Kelowna",
+        "abbreviation": "BC",
+        "employmentType": "Full Time",
+        "classification": "Construction",
+        "minSalary": "60,000",
+        "maxSalary": "75,000",
+        "payTypeFrame": "per year"
+      },
+      {
+        "id": 32,
+        "title": "Estimator",
+        "jobUrl": "https://northwind.prevueaps.ca/jobs/estimator-32",
+        "jobLocation": "Remote - Canada"
+      },
+      {
+        "id": 33,
+        "title": "No url"
+      }
+    ]
+  }
+}

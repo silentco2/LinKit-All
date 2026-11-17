@@ -1,0 +1,52 @@
+{
+  "result": {
+    "reducerResults": {
+      "collection_group_results": {
+        "blockIds": [
+          "eeeeeeee-0000-0000-0000-000000000001"
+        ]
+      }
+    }
+  },
+  "recordMap": {
+    "collection": {
+      "col1": {
+        "role": "reader",
+        "value": {
+          "schema": {
+            "title": {
+              "name": "Role",
+              "type": "title"
+            },
+            "Lx~1": {
+              "name": "Location",
+              "type": "select"
+            }
+          }
+        }
+      }
+    },
+    "block": {
+      "eeeeeeee-0000-0000-0000-000000000001": {
+        "role": "reader",
+        "value": {
+          "id": "eeeeeeee-0000-0000-0000-000000000001",
+          "type": "page",
+          "properties": {
+            "title": [
+              [
+                "Backend Engineer"
+              ]
+            ],
+            "Lx~1": [
+              [
+                "Remote, EU"
+              ]
+            ]
+          },
+          "created_time": 1790000000000
+        }
+      }
+    }
+  }
+}

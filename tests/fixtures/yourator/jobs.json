@@ -1,0 +1,29 @@
+{
+  "payload": {
+    "hasMore": false,
+    "currentPage": 1,
+    "jobs": [
+      {
+        "id": 41001,
+        "name": "Frontend Engineer",
+        "path": "/companies/formosa/jobs/41001",
+        "salary": "NT$ 60,000 - 80,000 (月薪)",
+        "lastActiveAt": "2026-10-12T04:00:00Z",
+        "location": "台北市",
+        "company": {
+          "brand": "Formosa Labs"
+        },
+        "thirdPartyUrl": "https://jobs.lever.co/formosa/xyz?utm_source=yourator&lever-source=y"
+      },
+      {
+        "id": 41002,
+        "name": "PM",
+        "path": "/companies/kaohsiung/jobs/41002",
+        "location": "Remote",
+        "company": {
+          "brand": "Harbor Apps"
+        }
+      }
+    ]
+  }
+}

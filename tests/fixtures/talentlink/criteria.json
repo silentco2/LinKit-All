@@ -1,0 +1,32 @@
+{
+  "LOV5": {
+    "lovName": "Location",
+    "items": [
+      {
+        "value": "10",
+        "label": "Leeds",
+        "bindTo": [
+          "20"
+        ]
+      }
+    ]
+  },
+  "LOV6": {
+    "lovName": "Country",
+    "items": [
+      {
+        "value": "20",
+        "label": "United Kingdom"
+      }
+    ]
+  },
+  "LOV7": {
+    "lovName": "Contract",
+    "items": [
+      {
+        "value": "30",
+        "label": "Permanent"
+      }
+    ]
+  }
+}

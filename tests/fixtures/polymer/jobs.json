@@ -1,0 +1,32 @@
+{
+  "items": [
+    {
+      "id": "11",
+      "title": "Account  Executive",
+      "job_post_url": "https://jobs.polymer.co/northwind/11",
+      "city": "Denver",
+      "state_region": "CO",
+      "country": "United States",
+      "remoteness_pretty": "Hybrid",
+      "published_at": "2026-10-12T00:00:00Z",
+      "salary_pretty": "$80k"
+    },
+    {
+      "id": "12",
+      "title": "Intern",
+      "display_location": "Anywhere",
+      "published_at_timestamp": 1790000000
+    },
+    {
+      "id": "13",
+      "title": ""
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "count": 3,
+    "total": 1,
+    "is_last": false,
+    "next_page": 2
+  }
+}

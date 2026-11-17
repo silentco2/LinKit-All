@@ -49,6 +49,7 @@ from linkit_all.core.models import (
     Job,
     JobEvent,
     JobState,
+    Outcome,
     Profile,
     Run,
     SearchConfigRow,
@@ -88,7 +89,13 @@ from linkit_all.core.search import (
     normalize_channel,
     save_search,
 )
-from linkit_all.core.state import InvalidTransition, can_transition, transition
+from linkit_all.core.state import (
+    InvalidTransition,
+    NotApplied,
+    can_transition,
+    set_outcome,
+    transition,
+)
 from linkit_all.core.tools import soffice_path, tectonic_path
 from linkit_all.matching.reasons import FilterEvent, job_reason
 from linkit_all.matching.trash import UNKNOWN, not_trash, visible
@@ -98,6 +105,7 @@ from linkit_all.sources import registry
 from linkit_all.sources.ats_detector import detect
 from linkit_all.sources.base import OPT_IN_KINDS, Source
 from linkit_all.sources.labels import label_for, offline_label
+from linkit_all.sources.resolve import resolve as resolve_boards
 from linkit_all.sources.text import norm_company
 
 router = APIRouter(prefix="/api")
@@ -782,7 +790,8 @@ def _row(j: Job, filter_event: FilterEvent | None = None) -> dict[str, Any]:
             "id": j.id, "title": j.title, "company": j.company, "location": j.location,
             "source": j.source, "state": j.state, "tier": j.tier, "score": j.score,
             "rank": j.data.get("rank"), "remote": j.data.get("remote"), "ai": j.data.get("ai"),
-            "posted_at": j.posted_at.isoformat() if j.posted_at else None}  # fmt: skip
+            "posted_at": j.posted_at.isoformat() if j.posted_at else None,
+            "outcome": j.outcome}  # fmt: skip
 
 
 def _last_drops(s: Session) -> dict[int, FilterEvent]:
@@ -872,6 +881,8 @@ def job_detail(request: Request, job_id: int) -> dict[str, Any]:
             "ats": job.ats,
             "apply_url": job.data.get("apply_url"),
             "ai": job.data.get("ai"),
+            "confidence": job.data.get("confidence"),
+            "years_required": job.data.get("years_required"),
             "trust": job.data.get("trust"),
             "filled": job.data.get("filled"),
             "extra": job.data.get("extra") or {},
@@ -934,6 +945,26 @@ def job_actions(request: Request, body: JobAction) -> dict[str, Any]:
             except InvalidTransition as e:
                 errors[job_id] = str(e)
     return {"done": done, "errors": errors}
+
+
+class OutcomeBody(BaseModel):
+    outcome: Outcome
+
+
+@router.post("/jobs/{job_id}/outcome")
+def job_outcome(request: Request, job_id: int, body: OutcomeBody) -> dict[str, Any]:
+    """What happened after you applied. Only an applied job has an outcome."""
+    with _db(request).begin() as s:
+        job = s.get(Job, job_id)
+        if job is None:
+            raise HTTPException(404, "Job not found")
+        try:
+            set_outcome(s, job, body.outcome)
+            job.data = {**job.data, "outcome_by": "user"}  # replies never change it again
+        except NotApplied:
+            raise HTTPException(409, "Only an applied job has an outcome") from None
+        at = job.outcome_at
+        return {"outcome": job.outcome, "outcome_at": at.isoformat() if at else None}
 
 
 class TrustAction(BaseModel):
@@ -1384,7 +1415,9 @@ def _unanswered(item: ActionItem) -> list[dict[str, Any]]:
 
 def _close_item(s: Session, item: ActionItem, job: Job, decision: str) -> None:
     """Apply an Action Center decision to the item and its job."""
-    if decision == "confirm":
+    if decision == "confirm" and item.kind == ActionKind.knockout:
+        job.data = {**job.data, "knockout_ok": True}  # "Apply anyway": not a go-ahead to submit
+    elif decision == "confirm":
         job.data = {**job.data, "submit_confirmed": True}
     if decision == "skip":
         transition(s, job, JobState.skipped, "you skipped it in the Action Center", code="skipped")
@@ -1392,6 +1425,7 @@ def _close_item(s: Session, item: ActionItem, job: Job, decision: str) -> None:
         transition(
             s, job, JobState.skipped, "you marked it as closed or expired", code="marked_closed"
         )
+        job.data = {**job.data, "trash": "closed"}
     elif decision == "applied_by_hand":
         transition(s, job, JobState.applying, "you applied by hand", code="applied_by_hand")
         transition(s, job, JobState.applied, "you applied by hand", code="applied_by_hand")
@@ -1939,6 +1973,20 @@ def _careers_url(raw: str) -> str:
     if u.scheme not in ("http", "https") or "." not in u.netloc or "@" in u.netloc or " " in raw:
         raise ValueError(f"{raw!r} is not a web address or a Telegram channel")
     return url
+
+
+@router.post("/sources/find")
+async def find_source(request: Request, body: AddSource) -> dict[str, Any]:
+    """Boards a company name has on the ATSs we can ask (`sources/resolve.py`). Saves nothing:
+    the user adds one with `/sources/add` and its `value`. An empty list = look it up by hand."""
+    name = body.value.strip()
+    found, _ = await resolve_boards(registry(None, _settings(request).data_dir), [name])
+    return {
+        "boards": [
+            {"value": b.value, "label": b.label, "ats": b.ats, "name": b.name, "jobs": b.jobs}
+            for b in found.get(name, [])
+        ]
+    }
 
 
 @router.post("/sources/add")

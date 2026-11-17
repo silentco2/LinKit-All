@@ -66,6 +66,7 @@ export function runReason(i18n: I18n, code: string | null | undefined, params: R
   if (!code) return fallback;
   const p = { ...params };
   let key = code;
+  if (code === 'ai_signed_out') p['provider'] = i18n.provider(String(p['provider'] ?? ''));
   if (code === 'ai_usage_limit') {
     p['provider'] = i18n.provider(String(p['provider'] ?? ''));
     const until = dayOf(typeof p['until'] === 'string' ? p['until'] : null);

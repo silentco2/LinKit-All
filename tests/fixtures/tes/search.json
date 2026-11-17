@@ -1,0 +1,54 @@
+[
+  {
+    "result": {
+      "data": {
+        "json": {
+          "jobs": [
+            {
+              "id": 1300001,
+              "title": "Teacher of Maths",
+              "canonicalUrl": "/jobs/vacancy/teacher-of-maths-1300001",
+              "employer": {
+                "name": "Larkfield Academy"
+              },
+              "displayLocation": "Leeds, West Yorkshire",
+              "advert": {
+                "startDate": "2026-10-13T09:00:00Z"
+              },
+              "application": {
+                "closeDate": "2026-11-01"
+              },
+              "shortDescription": "Join our maths team.",
+              "salary": {
+                "range": "£31,650 - £49,084 per year"
+              }
+            },
+            {
+              "id": 1300002,
+              "title": "Head of Science",
+              "canonicalUrl": "/jobs/vacancy/head-of-science-1300002",
+              "employer": {
+                "name": "Brookside School"
+              },
+              "displayLocation": "Dubai, UAE",
+              "advert": {
+                "startDate": "2026-10-12T09:00:00Z"
+              },
+              "salary": {
+                "range": "Competitive"
+              }
+            },
+            {
+              "id": 1300003,
+              "title": "Bad url",
+              "canonicalUrl": "https://evil.example/x",
+              "employer": {
+                "name": "X"
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+]

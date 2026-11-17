@@ -78,10 +78,29 @@ def test_claude_usage_limit_with_epoch_and_without_a_date() -> None:
 
 
 def test_other_failures_are_not_limits_and_are_deduplicated() -> None:
-    err = classify("not logged in; not logged in\nnot logged in", "codex_cli")
-    assert type(err) is ProviderError and str(err) == "not logged in"
+    err = classify("model crashed; model crashed\nmodel crashed", "codex_cli")
+    assert type(err) is ProviderError and str(err) == "model crashed"
     assert base.parse_until("resets 4 Nov 2026") == "2026-11-04"
     assert base.parse_until("on 2026-13-45") is None  # not a date: no guess
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "Failed to authenticate: OAuth session expired and could not be refreshed",
+        "Invalid API key · Please run /login",
+        "Not logged in",
+        "Error code: 401 - unauthorized",
+    ],
+)
+def test_a_signed_out_ai_pauses_the_run_like_a_limit(raw: str) -> None:
+    from linkit_all.apply.runner import usage_blocked
+    from linkit_all.providers.base import SignedOutError
+
+    err = classify(raw, "claude_cli")
+    assert isinstance(err, SignedOutError) and isinstance(err, UsageLimitError)
+    assert str(err) == err.message == "Claude is signed out: sign in again."
+    assert usage_blocked(err).code == "ai_signed_out"  # the run pauses; jobs keep their state
 
 
 def test_litellm_rate_limit_is_a_usage_limit(monkeypatch: pytest.MonkeyPatch) -> None:

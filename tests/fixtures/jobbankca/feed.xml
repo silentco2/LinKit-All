@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom"><title>Job Bank</title>
+<entry><title>software engineer</title>
+<link rel="alternate" href="https://www.jobbank.gc.ca/jobsearch/jobposting/44000001;jsessionid=X?source=searchresults"/>
+<updated>2026-10-11T14:00:00Z</updated>
+<summary type="html">&lt;strong&gt;Employer:&lt;/strong&gt; Maple Grove Tech Inc.&lt;br&gt;&lt;strong&gt;Location:&lt;/strong&gt; Halifax (NS)&lt;br&gt;&lt;strong&gt;Salary:&lt;/strong&gt; $45.00 hourly</summary></entry>
+<entry><title>developer</title>
+<link rel="alternate" href="https://www.jobbank.gc.ca/jobsearch/jobposting/44000002"/>
+<updated>2026-10-10T14:00:00Z</updated>
+<summary type="html">&lt;strong&gt;Employer:&lt;/strong&gt; Prairie Code Ltd&lt;br&gt;&lt;strong&gt;Location:&lt;/strong&gt; Regina (SK)</summary></entry>
+</feed>

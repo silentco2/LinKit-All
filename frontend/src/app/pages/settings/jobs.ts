@@ -68,6 +68,20 @@ const FALLBACK_CURRENCIES = ['EGP', 'SAR', 'AED', 'QAR', 'KWD', 'BHD', 'OMR', 'J
         <app-field key="filters.company_blacklist" for="black" [label]="'setup.filters.blacklist' | t">
           <app-tag-input inputId="black" [values]="store.cfg.filters.company_blacklist" (changed)="store.update('filters.company_blacklist', $event)" />
         </app-field>
+        <app-field key="filters.dealbreakers" for="dealbreak" [label]="'settings.jobs.dealbreakers' | t" [hint]="'settings.jobs.dealbreakersHint' | t">
+          <app-tag-input inputId="dealbreak" [values]="store.cfg.filters.dealbreakers" (changed)="store.update('filters.dealbreakers', $event)" />
+        </app-field>
+        <app-field key="filters.max_years_required" for="years-max" [label]="'settings.jobs.maxYears' | t" [hint]="'settings.jobs.maxYearsHint' | t">
+          <div class="flex max-w-md flex-wrap gap-2">
+            <input id="years-max" type="number" min="0" max="60" step="1" dir="ltr" class="input !w-24" [value]="store.cfg.filters.max_years_required ?? ''" (change)="setMaxYears($event)">
+            @if (store.cfg.filters.max_years_required !== null) {
+              <select class="input !w-auto" [attr.aria-label]="'settings.jobs.yearsAction' | t" (change)="store.update('filters.years_action', val($event))">
+                <option value="label" [selected]="store.cfg.filters.years_action !== 'drop'">{{ 'settings.jobs.yearsAction.label' | t }}</option>
+                <option value="drop" [selected]="store.cfg.filters.years_action === 'drop'">{{ 'settings.jobs.yearsAction.drop' | t }}</option>
+              </select>
+            }
+          </div>
+        </app-field>
       </section>
 
       <section class="card space-y-5">
@@ -131,6 +145,12 @@ export class JobsSection implements OnInit {
 
   protected checked(e: Event): boolean {
     return (e.target as HTMLInputElement).checked;
+  }
+
+  /** Empty = the years check is off (null); a whole number from 0 to 60 otherwise. */
+  protected setMaxYears(e: Event): void {
+    const n = Math.round((e.target as HTMLInputElement).valueAsNumber);
+    this.store.update('filters.max_years_required', n >= 0 && n <= 60 ? n : null);
   }
 
   // ---- places ------------------------------------------------------------------------------

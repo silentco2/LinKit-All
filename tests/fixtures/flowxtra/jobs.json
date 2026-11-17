@@ -1,0 +1,36 @@
+{
+  "success": true,
+  "data": {
+    "data": [
+      {
+        "title": "QA Engineer",
+        "urlJobApplay": "https://flowxtra.com/jobs/qa-engineer-77",
+        "name_company": "Bluefin GmbH",
+        "city_company": "Vienna",
+        "state_company": "",
+        "country_company": "Austria",
+        "workplace": "Remote",
+        "date_share": "2026-10-10T08:00:00Z",
+        "has_id": "77"
+      },
+      {
+        "title": "Clerk",
+        "urlJobApplay": "https://flowxtra.com/jobs/clerk-78",
+        "name_company": "Harbor Logistik",
+        "city_company": "Graz",
+        "country_company": "Austria",
+        "workplace": "Onsite"
+      },
+      {
+        "title": "Off host",
+        "urlJobApplay": "https://elsewhere.example/x",
+        "name_company": "X"
+      }
+    ],
+    "next_page_url": null,
+    "last_page": 1,
+    "per_page": 100,
+    "total": 3
+  },
+  "message": "ok"
+}

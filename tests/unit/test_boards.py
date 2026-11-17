@@ -253,8 +253,11 @@ class FakeAts(Source):
 
     async def search(self, http: Http, task: Task, start_page: int) -> AsyncIterator[list[JobStub]]:
         self.crawled.append(task.board)
-        if task.board in self.fail:
-            raise RuntimeError("boom")
+        if task.board in self.fail:  # a removed board: only a 404/410 counts toward switching off
+            req = httpx.Request("GET", f"https://x.io/{task.board}")
+            raise httpx.HTTPStatusError(
+                "gone", request=req, response=httpx.Response(404, request=req)
+            )
         yield [
             JobStub(
                 source=self.name, url=f"https://x.io/{task.board}/{i}", title=f"T{i}",

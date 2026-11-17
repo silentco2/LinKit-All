@@ -1,7 +1,11 @@
-"""Shared async HTTP: per-host rate limits and retries on 429/5xx/network errors."""
+"""Shared async HTTP: per-host rate limits, retries on 429/5xx/network errors, and a guard
+that keeps pasted or scraped links away from this computer and its network (SSRF).
+
+The address guard's logic is adapted from career-ops (MIT)."""
 
 import asyncio
 import contextlib
+import ipaddress
 from collections.abc import Mapping
 from typing import Any
 from urllib.parse import urlsplit
@@ -53,6 +57,51 @@ def crawl_delay(text: str, token: str = ROBOTS_TOKEN) -> float | None:
                     groups[-1][1].append(float(value))
     mine = [g for g in groups if token.lower() in g[0]] or [g for g in groups if "*" in g[0]]
     return max((d for g in mine for d in g[1] if d > 0), default=None)
+
+
+class BlockedAddress(httpx.RequestError):
+    """The link points at this computer or its private network: never fetched. Not a
+    `TransportError`, so it is not retried; callers that catch `httpx.HTTPError` see it."""
+
+
+async def _resolve(host: str) -> list[str]:
+    infos = await asyncio.get_running_loop().getaddrinfo(host, None)
+    return [str(info[4][0]) for info in infos]
+
+
+def is_public(address: str) -> bool:
+    """False for loopback, link-local (169.254.169.254 is the cloud metadata service), RFC1918,
+    CGNAT, unique-local, multicast, reserved and unparseable addresses."""
+    try:
+        ip = ipaddress.ip_address(address.split("%")[0])  # fe80::1%eth0
+    except ValueError:
+        return False  # refuse to guess
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped  # ::ffff:127.0.0.1 is loopback however it is spelled
+    return ip.is_global
+
+
+async def guard(request: httpx.Request) -> None:
+    """httpx request hook: runs before every request and every redirect hop.
+
+    `localhost` by name stays allowed (our own local API); everything else is resolved first
+    and refused when any of its addresses is not public.
+    ponytail: checked just before the connection, not pinned to it, so a name that answers
+    public then private (DNS rebinding) can slip by; pin the address in a custom transport if
+    that ever matters for a local single-user app."""
+    host = request.url.host
+    if host == "localhost":
+        return
+    try:
+        ipaddress.ip_address(host)
+        addresses = [host]
+    except ValueError:
+        try:
+            addresses = await _resolve(host)
+        except OSError:
+            return  # does not resolve: the request fails on its own
+    if not all(is_public(a) for a in addresses):
+        raise BlockedAddress(f"{host} is a private or local address: not fetched", request=request)
 
 
 class RetryableStatus(Exception):
@@ -152,5 +201,9 @@ class Http:
 
 def make_client(**kwargs: Any) -> httpx.AsyncClient:
     return httpx.AsyncClient(
-        timeout=30, follow_redirects=True, headers={"User-Agent": USER_AGENT}, **kwargs
+        timeout=30,
+        follow_redirects=True,
+        headers={"User-Agent": USER_AGENT},
+        event_hooks={"request": [guard]},
+        **kwargs,
     )

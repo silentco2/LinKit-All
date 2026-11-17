@@ -74,6 +74,30 @@ const FUNNEL: Record<string, string> = {
         <h2>{{ 'report.overtime.title' | t }}</h2>
         <div class="mt-4 h-64"><canvas #overtime [attr.aria-label]="'report.overtime.aria' | t" role="img"></canvas></div>
       </section>
+      @if (r.calibration?.by_band?.length) {
+        <section class="card mt-6 overflow-x-auto">
+          <h2>{{ 'report.calibration.title' | t }}</h2>
+          <p class="text-sm text-slate-600 dark:text-slate-400">{{ 'report.calibration.hint' | t: { n: r.calibration!.min_sample } }}</p>
+          <table class="mt-3 w-full text-sm">
+            <thead><tr class="text-start text-slate-500">
+              <th scope="col" class="py-1 text-start">{{ 'report.calibration.band' | t }}</th>
+              <th scope="col" class="py-1 text-end">{{ 'report.calibration.applied' | t }}</th>
+              <th scope="col" class="py-1 text-end">{{ 'report.calibration.interviews' | t }}</th>
+              <th scope="col" class="py-1 text-end">{{ 'report.calibration.rate' | t }}</th>
+            </tr></thead>
+            <tbody>
+              @for (b of r.calibration!.by_band; track b.name) {
+                <tr class="border-t border-slate-100 dark:border-slate-800">
+                  <th scope="row" class="py-1 text-start font-medium">{{ 'report.calibration.' + b.name | t }}</th>
+                  <td class="py-1 text-end">{{ num(b.applied) }}</td>
+                  <td class="py-1 text-end">{{ num(b.interviews) }}</td>
+                  <td class="py-1 text-end">@if (b.rate !== null) { {{ pct(b.rate) }} } @else { <span class="text-slate-500">{{ 'report.calibration.notEnough' | t }}</span> }</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </section>
+      }
       <details id="report" class="mt-6">
         <summary class="cursor-pointer text-lg font-semibold text-slate-900 dark:text-white">{{ 'report.full' | t }}</summary>
 
@@ -236,6 +260,7 @@ export class ReportPage implements OnDestroy {
   }
 
   protected num = (n: number | null | undefined): string => fmtNum(this.loc(), n);
+  protected pct = (n: number): string => fmtNum(this.loc(), n, { style: 'percent', maximumFractionDigits: 0 });
 
   /** "Search 3" / "Applying 4" / "Search and apply 5". */
   protected title(id: number): string {

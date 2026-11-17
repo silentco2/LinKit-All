@@ -12,7 +12,9 @@ import { Saved } from './saved';
 import { SettingsStore } from './store';
 
 type Note = { kind: 'ok' | 'info' | 'error'; text: string };
-type GroupId = 'sites' | 'regional' | 'aggregator' | 'board' | 'company' | 'telegram';
+type GroupId = 'sites' | 'regional' | 'aggregator' | 'board' | 'company' | 'suggested' | 'telegram';
+/** A bundled company board (`/suggest/companies`) or one found by name (`/sources/find`); `value` is the `sources.companies` entry. */
+interface BoardHit { value: string; label: string }
 /** One line of the list: a switch (`toggle`), or a user's own entry with a remove button (`remove`). */
 interface Row {
   id: string;
@@ -30,10 +32,10 @@ interface Row {
 }
 interface View { chips: ChipOption[]; rows: Row[]; on: number; total: number; sites: boolean }
 
-const GROUPS: GroupId[] = ['sites', 'regional', 'aggregator', 'board', 'company', 'telegram'];
+const GROUPS: GroupId[] = ['sites', 'regional', 'aggregator', 'board', 'company', 'suggested', 'telegram'];
 const GROUP_LABEL: Record<GroupId, string> = {
   sites: 'src.group.sites', regional: 'src.group.regional', aggregator: 'setup.sources.group.aggregator',
-  board: 'setup.sources.group.board', company: 'setup.sources.group.company', telegram: 'src.group.telegram',
+  board: 'setup.sources.group.board', company: 'setup.sources.group.company', suggested: 'src.group.suggested', telegram: 'src.group.telegram',
 };
 const JOBSPY = ['linkedin', 'indeed', 'glassdoor', 'google', 'zip_recruiter'];
 const REGIONAL = ['wuzzuf', 'bayt', 'forasna'];
@@ -93,6 +95,12 @@ const OWN_ROW = new Set(['telegram', 'linkedin_posts']);
             <button type="submit" class="btn btn-primary" [disabled]="adding()">{{ 'welcome.jobs.add' | t }}</button>
           </form>
           @if (addNote(); as n) { <div class="alert mt-2" [class.alert-ok]="n.kind === 'ok'" [class.alert-error]="n.kind === 'error'" role="status" dir="auto">{{ n.text }}</div> }
+          @if (hits().length) {
+            <div class="mt-2 flex flex-wrap items-center gap-2 text-sm" role="group" [attr.aria-label]="'src.find.pick' | t">
+              <span>{{ 'src.find.pick' | t }}</span>
+              @for (h of hits(); track h.value) { <button type="button" class="btn" [disabled]="adding()" (click)="addValue(h.value, box)"><bdi>{{ h.label }}</bdi></button> }
+            </div>
+          }
           <p class="hint">{{ 'src.add.hint' | t }}@if (list().ats_count) { {{ i18n.plural('setup.sources.ats', list().ats_count) }} }</p>
         </div>
 
@@ -145,11 +153,16 @@ export class SourcesSection implements OnInit {
   protected readonly openKey = signal<string | null>(null);
   protected readonly adding = signal(false);
   protected readonly addNote = signal<Note | null>(null);
+  /** The bundled company boards, offered as switches; ticking one adds it to `sources.companies`. */
+  protected readonly suggested = signal<BoardHit[]>([]);
+  /** Boards found for a company name typed in the Add box, waiting for the user to pick one. */
+  protected readonly hits = signal<BoardHit[]>([]);
 
   ngOnInit(): void {
     void this.countries.load();
     this.api.get<SourceList>('/sources').then((l) => this.list.set(l)).catch(() => this.loadFailed.set(true)).finally(() => this.loading.set(false));
     void this.loadKeys();
+    this.api.get<BoardHit[]>('/suggest/companies').then((b) => this.suggested.set(b)).catch(() => undefined); // the list simply has no suggestions
     // no CV or country yet: nothing is recommended, which is fine
     this.api.get<InferPayload>('/infer').then((p) => this.rec.set(new Set([...p.sources.enabled, ...p.sources.jobspy, ...p.sources.regional]))).catch(() => undefined);
   }
@@ -193,6 +206,7 @@ export class SourcesSection implements OnInit {
     const fixed = (group: GroupId, key: string, ids: string[]): Row[] =>
       ids.map((id) => ({ id: `${key}:${id}`, group, label: id, rec: this.rec().has(id), on: this.has(key, id), toggle: () => this.toggle(key, id) }));
     const kind = (k: GroupId) => plugins.filter((s) => s.kind === k).map((s) => this.plugin(s));
+    const offered = new Set(this.suggested().map((b) => b.value)); // a ticked suggestion shows as its switch, not twice
     const all: Row[] = [
       ...fixed('sites', 'sources.jobspy', JOBSPY),
       { id: 'linkedin_posts', group: 'sites', label: this.i18n.t('setup.linkedin.title'), plain: true, description: this.i18n.t('src.linkedin.desc'), on: this.has('sources.enabled', 'linkedin_posts'), toggle: () => this.toggle('sources.enabled', 'linkedin_posts') },
@@ -200,7 +214,8 @@ export class SourcesSection implements OnInit {
       ...kind('aggregator'),
       ...kind('board'),
       ...kind('company'),
-      ...c.companies.map((u): Row => ({ id: `url:${u}`, group: 'company', label: this.companyLabel(u), title: u, remove: () => this.drop('sources.companies', u) })),
+      ...c.companies.filter((u) => !offered.has(u)).map((u): Row => ({ id: `url:${u}`, group: 'company', label: this.companyLabel(u), title: u, remove: () => this.drop('sources.companies', u) })),
+      ...this.suggested().map((b): Row => ({ id: `sug:${b.value}`, group: 'suggested', label: b.label, plain: true, on: c.companies.includes(b.value), toggle: () => this.tick(b) })),
       { id: 'telegram', group: 'telegram', label: this.i18n.t('setup.search.telegram'), plain: true, description: this.i18n.t('setup.search.telegramHint'), on: this.has('sources.enabled', 'telegram'), toggle: () => this.toggle('sources.enabled', 'telegram') },
       ...c.telegram_channels.map((ch): Row => ({ id: `tg:${ch}`, group: 'telegram', label: /^\w+$/.test(ch) ? `@${ch}` : ch, remove: () => this.drop('sources.telegram_channels', ch) })),
     ];
@@ -219,6 +234,13 @@ export class SourcesSection implements OnInit {
       ...GROUPS.filter((id) => n(id) || id === g).map((id) => ({ value: id, label: `${this.i18n.t(GROUP_LABEL[id])} (${n(id)})` })),
     ];
     return { chips, rows, on: rows.filter((r) => r.on).length, total: rows.filter((r) => r.toggle).length, sites: rows.some((r) => r.group === 'sites') };
+  }
+
+  /** Tick or untick a suggested company; its readable name goes into `company_labels` first so the list never shows the shorthand. */
+  private tick(b: BoardHit): void {
+    const src = this.store.cfg.sources;
+    src.company_labels = { ...src.company_labels, [b.value]: b.label };
+    this.toggle('sources.companies', b.value);
   }
 
   protected groupLabel(g: GroupId): string {
@@ -253,13 +275,31 @@ export class SourcesSection implements OnInit {
 
   // ---- add one source -----------------------------------------------------------------------
 
-  /** A Telegram link / @name or a careers page: the server saves it; we take over the fields it changed so the next autosave keeps them. */
+  /** The Add box. A bare company name ("Stripe") is looked up on the job-board platforms first and the user picks from what is found; anything else is added as typed. */
   protected async add(e: Event, box: HTMLInputElement): Promise<void> {
     e.preventDefault();
     const value = box.value.trim();
     if (!value) return;
+    if (/[.:@/]/.test(value)) return this.addValue(value, box);
     this.adding.set(true);
     this.addNote.set(null);
+    this.hits.set([]);
+    try {
+      const r = await this.api.post<{ boards: BoardHit[] }>('/sources/find', { value });
+      this.hits.set(r.boards);
+      if (!r.boards.length) this.addNote.set({ kind: 'error', text: this.i18n.t('src.find.none', { name: value }) });
+    } catch (err) {
+      this.addNote.set({ kind: 'error', text: (err as Error).message });
+    } finally {
+      this.adding.set(false);
+    }
+  }
+
+  /** A Telegram link / @name, a careers page or an "ats:board" shorthand: the server saves it; we take over the fields it changed so the next autosave keeps them. */
+  protected async addValue(value: string, box: HTMLInputElement): Promise<void> {
+    this.adding.set(true);
+    this.addNote.set(null);
+    this.hits.set([]);
     try {
       const r = await this.api.post<{ kind: 'telegram' | 'ats' | 'careers'; label: string; config: Partial<SearchConfig['sources']> }>('/sources/add', { value });
       Object.assign(this.store.cfg.sources, r.config);

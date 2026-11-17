@@ -14,7 +14,7 @@ import pymupdf
 from sqlalchemy import ColumnElement, Select, func, select
 from sqlalchemy.orm import InstrumentedAttribute, Session
 
-from linkit_all.core.models import Job, JobEvent, JobState, Run, utcnow
+from linkit_all.core.models import Job, JobEvent, JobState, Outcome, Run, utcnow
 from linkit_all.matching.trash import visible
 
 # Job states at or past each funnel step.
@@ -25,6 +25,8 @@ TO_APPLY = {JobState.queued_apply, JobState.tailored, JobState.applying, JobStat
             JobState.applied, JobState.failed}  # fmt: skip
 OUTCOMES = (JobState.applied, JobState.failed, JobState.skipped, JobState.needs_user)
 OVER_TIME_DAYS = 90
+MIN_SAMPLE = 5  # fewer applications than this in a group: no rate, "not enough data"
+POSITIVE = {Outcome.interview, Outcome.offer, Outcome.hired, Outcome.declined}
 BOARD_LIMIT = 100
 
 
@@ -111,6 +113,40 @@ def _over_time(s: Session, run_id: int | None, since: date | None) -> list[dict[
     return [{"date": d, **v} for d, v in days.items()]
 
 
+def _band(score: int | None) -> str:
+    if score is None:
+        return "unscored"
+    return "strong" if score >= 8 else "possible" if score >= 5 else "weak"
+
+
+def _calibration(s: Session, conds: Sequence[ColumnElement[bool]]) -> dict[str, Any]:
+    """Do higher scores lead to interviews for you? Interview-or-better per applied job, by
+    score band, ATS and source. Advisory only: it never changes thresholds or scores.
+    Logic adapted from career-ops (MIT)."""
+    rows = s.execute(
+        select(Job.score, Job.ats, Job.source, Job.outcome).where(
+            Job.state == JobState.applied, *conds
+        )
+    ).all()
+    groups: dict[str, dict[str, list[bool]]] = {"band": {}, "ats": {}, "source": {}}
+    for score, ats, source, outcome in rows:
+        good = outcome in POSITIVE
+        for kind, key in (("band", _band(score)), ("ats", ats or "unknown"), ("source", source)):
+            groups[kind].setdefault(key, []).append(good)
+
+    def table(kind: str) -> list[dict[str, Any]]:
+        out = []
+        for name, hits in groups[kind].items():
+            enough = len(hits) >= MIN_SAMPLE
+            out.append({"name": name, "applied": len(hits), "interviews": sum(hits),
+                        "rate": round(sum(hits) / len(hits), 3) if enough else None,
+                        "enough": enough})  # fmt: skip
+        return sorted(out, key=lambda r: (-r["applied"], r["name"]))
+
+    return {"min_sample": MIN_SAMPLE, "by_band": table("band"), "by_ats": table("ats"),
+            "by_source": table("source")}  # fmt: skip
+
+
 def build_report(
     s: Session, run_id: int | None = None, since: date | None = None
 ) -> dict[str, Any]:
@@ -152,6 +188,7 @@ def build_report(
         "per_board": _grouped(s, Job.company, conds, BOARD_LIMIT),
         "per_run": _per_run(s, since),
         "over_time": _over_time(s, run_id, since),
+        "calibration": _calibration(s, conds),
         "filter": {"run_id": run_id, "since": since.isoformat() if since else None},
     }
 

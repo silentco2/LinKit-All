@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>SYNTHETIC reveal-on-answer form (hand-written test fixture, not a real company)</title></head>
+<body>
+<!-- Synthetic fixture for tests/unit/test_required_sweep.py. Not copied from any real site.
+     Answering "Yes" reveals two required follow-ups, like real forms do; neither exists in
+     the page the agent maps first. -->
+<form id="app" onsubmit="window.submitted = (window.submitted || 0) + 1; return false;">
+  <div>
+    <label for="full_name">Full name *</label>
+    <input id="full_name" name="full_name" type="text" required>
+  </div>
+  <fieldset>
+    <legend>Do you hold a driving licence? *</legend>
+    <label><input type="radio" name="licence" value="yes" required> Yes</label>
+    <label><input type="radio" name="licence" value="no"> No</label>
+  </fieldset>
+  <div id="more"></div>
+  <button type="submit" id="send">Submit application</button>
+</form>
+<script>
+  window.submitted = 0;
+  document.querySelectorAll('input[name=licence]').forEach((r) => r.addEventListener('change', () => {
+    const more = document.getElementById('more');
+    if (r.value !== 'yes' || !r.checked || more.children.length) return;
+    // added a moment later, as React forms do after their state update
+    setTimeout(() => {
+      more.innerHTML =
+        '<div><label for="years_held">How many years have you held it? *</label>' +
+        '<input id="years_held" name="years_held" type="text" required></div>' +
+        '<div><label for="category">Licence category *</label>' +
+        '<select id="category" name="category" required>' +
+        '<option>Select...</option><option>B (car)</option><option>C (truck)</option></select></div>';
+    }, 50);
+  }));
+</script>
+</body>
+</html>

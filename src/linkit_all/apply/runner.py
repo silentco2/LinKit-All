@@ -29,6 +29,7 @@ from playwright.async_api import (
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
+from linkit_all.apply import knockout
 from linkit_all.apply.accounts import (
     Account,
     PasswordRules,
@@ -86,8 +87,10 @@ from linkit_all.apply.email_verify import EmailLoginError, credentials, wait_for
 from linkit_all.apply.form import FillError, fill, lost_values
 from linkit_all.apply.google_signin import sign_in_with_google
 from linkit_all.apply.handlers import HANDLERS, Handler, JobInfo
-from linkit_all.apply.handlers.base import GENERIC_CONFIRMATION
+from linkit_all.apply.handlers.base import GENERIC_CONFIRMATION, PostingGone, goto
+from linkit_all.apply.quirks import host_of, quirks_for
 from linkit_all.apply.vault import Vault, vault_for
+from linkit_all.core import timing
 from linkit_all.core.chrome import RunningChrome, open_context
 from linkit_all.core.config import Settings
 from linkit_all.core.models import (
@@ -101,6 +104,7 @@ from linkit_all.core.models import (
 )
 from linkit_all.core.search import SearchConfig
 from linkit_all.core.state import transition
+from linkit_all.matching.deadline import deadline_first
 from linkit_all.matching.rank import Embed, cv_text
 from linkit_all.providers.base import LLMProvider, UsageLimitError
 from linkit_all.sources import registry
@@ -108,6 +112,8 @@ from linkit_all.sources.ats_detector import detect
 from linkit_all.sources.base import JobStub, Source
 from linkit_all.sources.http import Http, make_client
 from linkit_all.sources.jobspy_sites import linkedin_apply
+from linkit_all.sources.liveness import workday_listing
+from linkit_all.sources.text import norm_company
 from linkit_all.tailor.pipeline import TailorError, cv_plan, original_cv, tailor_job
 from linkit_all.tailor.render.libreoffice import RenderError
 
@@ -129,7 +135,7 @@ class ApplyBlocked(RuntimeError):
 
 
 def usage_blocked(e: UsageLimitError) -> ApplyBlocked:
-    return ApplyBlocked(e.message, "ai_usage_limit", {"provider": e.provider, "until": e.until})
+    return ApplyBlocked(e.message, e.code, {"provider": e.provider, "until": e.until})
 
 
 NEEDS_TOOL = {
@@ -152,7 +158,9 @@ def assisted(url: str | None, hosts: list[str]) -> bool:
     return any(h.lower().split(".")[0] in labels for h in hosts)
 
 
-def job_context(profile: Profile, job: Job, resume_path: str = "") -> Context:
+def job_context(
+    profile: Profile, job: Job, resume_path: str = "", open_to_remote: bool = False
+) -> Context:
     """What the answer engine knows when applying to `job` (profile facts, job place)."""
     return Context(
         full_name=profile.full_name,
@@ -168,6 +176,7 @@ def job_context(profile: Profile, job: Job, resume_path: str = "") -> Context:
         job_location=job.location,
         job_source=job.source,
         resume_path=resume_path,
+        open_to_remote=open_to_remote,
     )
 
 
@@ -238,7 +247,7 @@ def emails_sent_today(s: Session) -> int:
         s.scalar(
             select(func.count())
             .select_from(JobEvent)
-            .where(JobEvent.code == "applied_by_email", JobEvent.at >= since)
+            .where(JobEvent.code.in_(("applied_by_email", "followup_sent")), JobEvent.at >= since)
         )
         or 0
     )
@@ -257,9 +266,12 @@ def emailed(s: Session, addr: str, but: int | None = None) -> Job | None:
 
 async def _settle(page: Page) -> None:
     """Human pace, then let the next page finish loading (pages that long-poll never go idle)."""
-    await asyncio.sleep(random.uniform(0.3, 1.0))  # noqa: S311 (human pace, not crypto)
-    with contextlib.suppress(Exception):
-        await page.wait_for_load_state("networkidle", timeout=10000)
+    with timing.step("wait for page"):
+        await asyncio.sleep(random.uniform(0.3, 1.0))  # noqa: S311 (human pace, not crypto)
+        try:  # ponytail: 5 s; a page that draws late is waited for by the agent (_drawn)
+            await page.wait_for_load_state("networkidle", timeout=5000)
+        except Exception:
+            timing.note("the page never went quiet; stopped waiting after 5 s")
 
 
 async def run_signup(
@@ -271,23 +283,32 @@ async def run_signup(
     await handler.signup(page, job, account)
 
 
-async def _where(page: Page) -> tuple[str, int]:
-    return page.url.split("#")[0], len(_fields(await snapshot(page)))
+async def _shot(page: Page, **kw: Any) -> None:
+    with timing.step("screenshot"):
+        await page.screenshot(**kw)
 
 
-async def _moved_on(page: Page, before: tuple[str, int]) -> bool:
+async def _where(page: Page) -> tuple[str, int, frozenset[str]]:
+    controls = await snapshot(page)
+    buttons = frozenset(c.name for c in controls if c.kind in ("button", "link"))
+    return page.url.split("#")[0], len(_fields(controls)), buttons
+
+
+async def _moved_on(page: Page, before: tuple[str, int, frozenset[str]]) -> bool:
     """Apply led somewhere. Boards like RemoteOK redirect from a script, seconds later, so the
     page is watched for a while. A half-loaded page looks different: it must differ once settled."""
     loop = asyncio.get_running_loop()
     deadline = loop.time() + APPLY_REDIRECT_WAIT_S
-    while True:
-        if await _where(page) != before:
-            await _settle(page)
+    with timing.step("wait for redirect"):
+        while True:
             if await _where(page) != before:
-                return True
-        if loop.time() >= deadline:
-            return False
-        await asyncio.sleep(0.5)
+                await _settle(page)
+                if await _where(page) != before:
+                    return True
+            if loop.time() >= deadline:
+                timing.note(f"Apply changed nothing in {APPLY_REDIRECT_WAIT_S:.0f} s")
+                return False
+            await asyncio.sleep(0.5)
 
 
 @dataclass
@@ -511,6 +532,7 @@ class Applier:
         generic = self.cfg.apply.generic_agent
         jobs = [j for j in jobs if is_pickable(j, generic, live)]
         jobs.sort(key=lambda j: (-(j.score or 0), -(j.data.get("rank") or 0)))
+        jobs = deadline_first(jobs, utcnow())  # closing within 3 days: these go first
         picked: list[int] = []
         per_site: dict[str, int] = {}
         held: dict[int, dict[str, Any]] = {}  # job id -> why it waits for tomorrow
@@ -590,6 +612,7 @@ class Applier:
                 code="job_closed",
                 params={"ats": job.ats},
             )
+            row.data = {**row.data, "trash": "closed"}
         return True
 
     async def _cv_pdf(self, job_id: int, tailor: bool = True) -> str:
@@ -621,6 +644,17 @@ class Applier:
         return str(path)
 
     async def apply(self, job_id: int) -> Outcome:
+        """Apply to one job; how long each step took is saved on it (`data["timings"]`)."""
+        t = timing.start()
+        try:
+            return await self._apply(job_id)
+        finally:
+            timing.stop()
+            with self.db.begin() as s:
+                if (row := s.get(Job, job_id)) is not None:
+                    row.data = {**row.data, "timings": t.summary()}
+
+    async def _apply(self, job_id: int) -> Outcome:
         with self.db() as s:  # decide first: never tailor a job we won't apply to (CLAUDE.md §4)
             job = s.get_one(Job, job_id)
             info = job_info(job)
@@ -639,9 +673,12 @@ class Applier:
             return Outcome(
                 "skipped", f"no form handler for this posting ({job.ats})", reason="no_handler"
             )
-        if await self._posting_closed(job, info):  # a read-only check; costs no AI
+        with timing.step("check posting"):
+            closed = await self._posting_closed(job, info)  # a read-only check; costs no AI
+        if closed:
             return Outcome("skipped", f"the posting is no longer open on {job.ats}")
-        cv_pdf = await self._cv_pdf(job_id)
+        with timing.step("prepare CV"):
+            cv_pdf = await self._cv_pdf(job_id)
         with self.db.begin() as s:  # the file the LinkIt extension uploads if the user takes over
             row = s.get_one(Job, job_id)
             row.data = {**row.data, "cv_pdf": cv_pdf}
@@ -651,11 +688,15 @@ class Applier:
             profile = s.get_one(Profile, 1)
         out_dir = self.settings.data_dir / "applications" / f"job_{job_id}"
         out_dir.mkdir(parents=True, exist_ok=True)
-        ctx = job_context(profile, job, cv_pdf)
+        ctx = job_context(profile, job, cv_pdf, self.cfg.search.remote)
         key = handler.ats if handler else "generic"
-        browser = await self._context(key)
-        await self._trace_start(key, browser)
-        page = await browser.new_page()
+        with timing.step("open browser"):
+            browser = await self._context(key)
+            await self._trace_start(key, browser)
+            page = await browser.new_page()
+            # a click or fill that cannot happen fails in 10 s, not Playwright's 30 (two Lever
+            # forms lost 3.5 minutes each on optional fields); waits that need longer say so
+            page.set_default_timeout(10_000)
         # ponytail: pages of parallel sites all write the one current.jpg, latest frame wins
         live = asyncio.create_task(
             live_frames(
@@ -674,6 +715,12 @@ class Applier:
             return outcome
         except UsageLimitError as e:  # before any state change: the job just waits
             raise usage_blocked(e) from e
+        except PostingGone as e:  # the handler's form never showed: the ad is gone
+            with self.db.begin() as s:
+                job = s.get_one(Job, job_id)
+                transition(s, job, JobState.skipped, str(e), code="posting_gone")
+                job.data = {**job.data, "trash": "closed"}
+            return Outcome("skipped", str(e))
         except Exception as e:
             keep_trace = True
             logger.bind(
@@ -950,13 +997,15 @@ class Applier:
         unless told not to, and "applied" needs a confirmation text on the page."""
         apply_cfg = self.cfg.apply
         live = apply_cfg.live
-        await page.goto(info.apply_url or info.url, wait_until="domcontentloaded", timeout=60000)
+        await goto(page, info.apply_url or info.url)
         await _settle(page)
         brief = {"title": info.title, "company": info.company, "description": info.description}
         cv, summary = cv_text(profile), profile_summary(ctx)
         filled: dict[str, Any] = {}
         shots: list[str] = []
-        tried_google = tried_account = False
+        tried_google = tried_account = retried = False
+        with self.db() as s:
+            knockout_ok = bool(s.get_one(Job, info.id).data.get("knockout_ok"))
 
         def park(
             kind: ActionKind,
@@ -994,10 +1043,11 @@ class Applier:
         hops = 0
         for n in range(1, MAX_AGENT_PAGES + 1):
             r = await step(
-                page, self.provider, ctx, self.bank, cv, summary, brief, out_dir, dry_run=not live
-            )
+                page, self.provider, ctx, self.bank, cv, summary, brief, out_dir,
+                dry_run=not live, knockout_ok=knockout_ok,
+            )  # fmt: skip
             shots.append(str(out_dir / f"page_{n}.png"))
-            await page.screenshot(path=shots[-1], full_page=True)
+            await _shot(page, path=shots[-1], full_page=True)
             filled.update(_summary(r.questions, r.answers, r.sources))
             if await captcha_shown(page):
                 return park(ActionKind.captcha, CAPTCHA_MSG, "captcha")
@@ -1010,11 +1060,7 @@ class Applier:
                         with self.db.begin() as s:
                             job = s.get_one(Job, info.id)
                             _event(s, job, "signed in with Google", [], "signed_in_google")
-                        await page.goto(
-                            info.apply_url or info.url,
-                            wait_until="domcontentloaded",
-                            timeout=60000,
-                        )
+                        await goto(page, info.apply_url or info.url)
                         await _settle(page)
                         continue
                     if google == "needs_user":
@@ -1030,9 +1076,7 @@ class Applier:
                     )
                     if gated is not None:
                         return gated
-                    await page.goto(
-                        info.apply_url or info.url, wait_until="domcontentloaded", timeout=60000
-                    )
+                    await goto(page, info.apply_url or info.url)
                     await _settle(page)
                     continue
                 return park(
@@ -1064,27 +1108,45 @@ class Applier:
                 if hops > MAX_APPLY_HOPS:
                     return by_hand("Apply kept leading to more job ads", "too_many_hops")
                 before = await _where(page)
-                await press_apply(page, r)
+                with timing.step("press button"):
+                    await press_apply(page, r)
                 await _settle(page)
                 # same page, no new questions, even after waiting: e.g. a sign-up teaser popup
                 if not await _moved_on(page, before):
                     return by_hand("pressing Apply opened nothing", "apply_no_effect")
                 if assisted(page.url, apply_cfg.assisted_hosts):
                     return await self._park_in_browser(info.id, page.url, filled)
+                self._note_apply_host(info.id, page.url)
                 handed = await self._hand_to_handler(page, info, ctx, profile, out_dir)
                 if handed is not None:
                     return handed
                 continue
+            if r.code == "posting_gone" and (listing := workday_listing(page.url)) and not retried:
+                retried = True  # a Workday /apply link can 404 while the posting is live
+                with self.db.begin() as s:
+                    job = s.get_one(Job, info.id)
+                    _event(s, job, "the apply link 404s: trying the listing", [], "workday_listing")
+                await goto(page, listing)
+                await _settle(page)
+                continue
             if r.code in ("not_eligible", "posting_gone"):
                 with self.db.begin() as s:
-                    transition(
-                        s, s.get_one(Job, info.id), JobState.skipped, r.reason, shots[-1:], r.code
-                    )
+                    job = s.get_one(Job, info.id)
+                    transition(s, job, JobState.skipped, r.reason, shots[-1:], r.code)
+                    if r.code == "posting_gone":
+                        job.data = {**job.data, "trash": "closed"}
                 return Outcome("skipped", r.reason, shots[-1:])
+            if r.code == "site_down":  # failed, not parked: a later run tries it again
+                return fail(r.reason, r.code)
+            if r.code == "knockout":  # before anything is typed: the user decides
+                return park(
+                    ActionKind.knockout, r.reason, "knockout", {"question": r.questions[0].label}
+                )
             if r.action == "stop" or r.button is None:
                 return by_hand(r.reason or "no way forward", r.code or "no_way_forward")
             if r.action == "next":
-                await press_next(page, r)
+                with timing.step("press button"):
+                    await press_next(page, r)
                 await _settle(page)
                 continue
 
@@ -1124,7 +1186,7 @@ class Applier:
             done = str(out_dir / "after_submit.png")
             seen = await wait_for_confirmation(page, GENERIC_CONFIRMATION)
             confirmed = seen and not await self._form_again(page)
-            await page.screenshot(path=done, full_page=True)
+            await _shot(page, path=done, full_page=True)
             proof = [shots[-1], done]
             if confirmed:
                 with self.db.begin() as s:
@@ -1133,6 +1195,9 @@ class Applier:
                     transition(
                         s, job, JobState.applied, "confirmation page seen", proof, "confirmed"
                     )
+                    if quirks_for(page.url).stored_profile:
+                        msg = "check the profile this site stored: it may keep an older CV"
+                        _event(s, job, msg, [], "check_stored_profile", {"site": host_of(page.url)})
                 return Outcome("applied", "submitted and confirmed", proof)
             shots.append(done)
             if await captcha_shown(page):
@@ -1225,7 +1290,7 @@ class Applier:
                         ActionKind.login_issue, str(e), "email_login_failed", {"detail": str(e)}
                     )
                 if found is not None and found.link:
-                    await page.goto(found.link, wait_until="domcontentloaded", timeout=60000)
+                    await goto(page, found.link)
                     await _settle(page)
                 elif found is None or not found.code or not await enter_code(page, found.code):
                     msg = f"No verification email from {host} arrived in time: check your inbox"
@@ -1244,6 +1309,18 @@ class Applier:
         if account.status != "active":
             mark_active(vault, account, WEB, host)
         return None
+
+    def _note_apply_host(self, job_id: int, url: str) -> None:
+        """Apply led to another site: keep its host on the job, so its quirks and reports
+        follow the form's real ATS rather than the board the job was found on."""
+        host = host_of(url)
+        with self.db.begin() as s:
+            job = s.get_one(Job, job_id)
+            if not host or host == job.data.get("apply_host", host_of(job.url)):
+                return
+            job.data = {**job.data, "apply_host": host}
+            _event(s, job, f"the application form is on {host}", [], "apply_host_changed",
+                   {"host": host})  # fmt: skip
 
     async def _hand_to_handler(
         self, page: Page, info: JobInfo, ctx: Context, profile: Profile, out_dir: Path
@@ -1303,7 +1380,7 @@ class Applier:
             kind: ActionKind, message: str, code: str, params: dict[str, Any] | None = None
         ) -> Outcome:
             shot = str(out_dir / "account.png")
-            await page.screenshot(path=shot)
+            await _shot(page, path=shot)
             with self.db.begin() as s:
                 _park(s, s.get_one(Job, info.id), kind, message, [], {}, [shot], code, params)
             return Outcome("needs_user", message, [shot])
@@ -1387,10 +1464,39 @@ class Applier:
     ) -> Outcome:
         apply_cfg = self.cfg.apply
         await handler.open(page, info)
-        if (gated := await self._account_gate(page, handler, info, profile, out_dir)) is not None:
+        with timing.step("account"):
+            gated = await self._account_gate(page, handler, info, profile, out_dir)
+        if gated is not None:
             return gated
-        questions = await handler.questions(page, info)
+        with timing.step("read page"):
+            questions = await handler.questions(page, info)
+            timing.note(f"{len(questions)} questions")
         job_brief = {"title": info.title, "company": info.company, "description": info.description}
+        with self.db.begin() as s:
+            job = s.get_one(Job, info.id)
+            knockout_ok = bool(job.data.get("knockout_ok"))
+            if quirks_for(info.apply_url or info.url).email_merge and _applied_before(s, job):
+                msg = f"you applied to {job.company} on this site before: it may merge the two"
+                _event(s, job, msg, [], "email_merge", {"company": job.company})
+        hits = (
+            [] if knockout_ok else knockout.find(questions, ctx, cv_text(profile), info.description)
+        )
+        if hits:
+            shot = str(out_dir / "form.png")
+            await _shot(page, path=shot, full_page=True)
+            with self.db.begin() as s:
+                _park(
+                    s,
+                    s.get_one(Job, info.id),
+                    ActionKind.knockout,
+                    hits[0].reason,
+                    [],
+                    {},
+                    [shot],
+                    "knockout",
+                    {"question": hits[0].question.label},
+                )
+            return Outcome("needs_user", hits[0].reason, [shot])
         r = await answer_questions(
             questions,
             ctx,
@@ -1403,7 +1509,7 @@ class Applier:
         )
         shot = str(out_dir / "form.png")
         if r.missing:
-            await page.screenshot(path=shot, full_page=True)
+            await _shot(page, path=shot, full_page=True)
             with self.db.begin() as s:
                 _park(
                     s,
@@ -1419,21 +1525,24 @@ class Applier:
             return Outcome("needs_user", f"{len(r.missing)} questions need you", [shot])
 
         failed = []
-        for q in questions:
-            if q.key in r.answers:
+        with timing.step("fill form"):
+            timing.note(f"{len(r.answers)} answers, a 0.2-0.7 s human pause after each")
+            for q in questions:
+                if q.key in r.answers:
+                    try:
+                        await fill(page, q, r.answers[q.key])
+                    except FillError as e:
+                        timing.note(f"could not fill {q.label[:40]!r}")
+                        if q.required:
+                            failed.append(str(e))
+                    await asyncio.sleep(random.uniform(0.2, 0.7))  # noqa: S311 (human pace)
+            for q in await lost_values(page, questions, r.answers):  # one refill for reset fields
                 try:
                     await fill(page, q, r.answers[q.key])
                 except FillError as e:
                     if q.required:
                         failed.append(str(e))
-                await asyncio.sleep(random.uniform(0.2, 0.7))  # noqa: S311 (human pace, not crypto)
-        for q in await lost_values(page, questions, r.answers):  # one refill for reset fields
-            try:
-                await fill(page, q, r.answers[q.key])
-            except FillError as e:
-                if q.required:
-                    failed.append(str(e))
-        await page.screenshot(path=shot, full_page=True)
+        await _shot(page, path=shot, full_page=True)
         filled = _summary(questions, r.answers, r.sources)
         if failed:
             with self.db.begin() as s:
@@ -1480,7 +1589,7 @@ class Applier:
         await click_submit(page, handler, dry_run=not apply_cfg.live)
         done = str(out_dir / "after_submit.png")
         confirmed = await handler.confirmed(page)
-        await page.screenshot(path=done, full_page=True)
+        await _shot(page, path=done, full_page=True)
         with self.db.begin() as s:
             job = s.get_one(Job, info.id)
             if confirmed:
@@ -1528,6 +1637,14 @@ class Applier:
 
 _END_STATE = {"needs_user": JobState.needs_user, "failed": JobState.failed,
               "skipped": JobState.skipped}  # fmt: skip
+
+
+def _applied_before(s: Session, job: Job) -> bool:
+    """Another application to the same company already went out (Ashby merges them by email)."""
+    rows = s.scalars(
+        select(Job.company).where(Job.state == JobState.applied, Job.id != job.id)
+    ).all()
+    return norm_company(job.company) in {norm_company(c) for c in rows}
 
 
 def _outcome_params(db: sessionmaker[Session], job_id: int, outcome: Outcome) -> dict[str, Any]:

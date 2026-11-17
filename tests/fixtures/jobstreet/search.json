@@ -1,0 +1,41 @@
+{
+  "totalCount": 2,
+  "data": [
+    {
+      "id": "88001234",
+      "title": "Data Analyst",
+      "advertiser": {
+        "description": "Merapi Retail"
+      },
+      "locations": [
+        {
+          "label": "Jakarta Selatan, Jakarta Raya"
+        }
+      ],
+      "listingDate": "2026-10-13T02:53:00Z",
+      "teaser": "Analyse sales data.",
+      "salaryLabel": "Rp 10.000.000 – Rp 14.000.000 per month",
+      "workArrangements": {
+        "data": [
+          {
+            "id": "2",
+            "label": {
+              "text": "Hybrid"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "88001235",
+      "title": "Driver",
+      "companyName": "Bromo Logistik",
+      "locations": [
+        {
+          "label": "Surabaya"
+        }
+      ],
+      "listingDate": "2026-10-12T02:53:00Z"
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "jobs": [
+    {
+      "id": 901,
+      "title": "Product Designer",
+      "slug": "product-designer-lumen",
+      "company_name": "Lumen Studio",
+      "work_arrangement": "remote",
+      "locations": [
+        {
+          "city": "",
+          "country": "United Kingdom"
+        }
+      ],
+      "posted": 1790000000,
+      "is_expired": false
+    },
+    {
+      "id": 902,
+      "title": "Backend Dev",
+      "slug": "backend-dev-oakline",
+      "company": {
+        "name": "Oakline"
+      },
+      "work_arrangement": "hybrid",
+      "locations": [
+        {
+          "city": "Bristol",
+          "country": "United Kingdom"
+        }
+      ],
+      "posted": 1789000000
+    },
+    {
+      "id": 903,
+      "title": "Old",
+      "slug": "old-role",
+      "company_name": "Gone Ltd",
+      "is_expired": true
+    }
+  ],
+  "total": 3,
+  "page": 1,
+  "has_more": false
+}

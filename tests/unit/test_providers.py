@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from linkit_all.core.db import init_db
 from linkit_all.core.log import redact
 from linkit_all.providers import ProviderError, UsageLimitError, claude_cli, codex_cli
-from linkit_all.providers.base import LLMProvider, extract_json
+from linkit_all.providers.base import LLMProvider, SignedOutError, extract_json
 
 
 class Answer(BaseModel):
@@ -89,8 +89,8 @@ def test_codex_parse_output() -> None:
     )
     with pytest.raises(UsageLimitError):
         codex_cli.parse_output(1, events, "", "")
-    with pytest.raises(ProviderError, match="not logged in"):
-        codex_cli.parse_output(1, "", "not logged in", "")
+    with pytest.raises(SignedOutError, match="ChatGPT \\(Codex\\) is signed out"):
+        codex_cli.parse_output(1, "", "not logged in", "")  # pauses the run like a limit
 
 
 def test_redact_secrets() -> None:
@@ -99,3 +99,31 @@ def test_redact_secrets() -> None:
     for secret in ("hunter2", "abc123", "xyz.token", "ABCDEFGH12345678"):
         assert secret not in out
     assert "password=***" in out
+
+
+def test_prompt_with_a_remembered_secret_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    from loguru import logger
+
+    from linkit_all.providers import base
+    from linkit_all.providers.base import SecretInPromptError, remember_credentials
+
+    monkeypatch.setattr(base, "_credentials", set())
+    lines: list[str] = []
+    sink = logger.add(lines.append, format="{message}")
+    p = Fake(['{"score": 9}'] * 2)
+    remember_credentials("Xk9#vault-Pw7!", "abcd efgh ijkl mnop", None, "no")  # "no" is too short
+    try:
+        for prompt in (
+            "The page says: your password is Xk9#vault-Pw7! keep it safe",
+            "pasted note: ABCD  EFGH IJKL MNOP",  # an app password in another case and spacing
+            "tokenXk9#vault-Pw7!glued",
+        ):
+            with pytest.raises(SecretInPromptError):
+                asyncio.run(p.complete(prompt, Answer))
+    finally:
+        logger.remove(sink)
+    assert p.prompts == []  # nothing reached the model
+    assert len(lines) == 3 and "prompt refused" in lines[0]
+    assert not any("Xk9" in line or "efgh" in line.lower() for line in lines)  # value not logged
+    assert issubclass(SecretInPromptError, ProviderError)
+    assert asyncio.run(p.complete("no secrets here, rate it", Answer)).score == 9

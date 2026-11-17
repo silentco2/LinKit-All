@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Northwind Coffee jobs</title>
+  <entry>
+    <author><name>Northwind Coffee</name></author>
+    <title type="text">Backend Engineer</title>
+    <link rel="alternate" type="text/html" href="https://northwind.homerun.co/backend-engineer"></link>
+    <id>job_abc123</id>
+    <description type="html"><![CDATA[<p>Build the <b>roaster</b> API.</p>]]></description>
+    <location><name>Amsterdam</name></location>
+    <salary_indication>€60000.00 to €70000.00 per year</salary_indication>
+    <updated>2026-09-29 15:07:45</updated>
+  </entry>
+  <entry>
+    <author><name>Northwind Coffee</name></author>
+    <title type="text">Barista Trainer</title>
+    <link rel="alternate" type="text/html" href="https://northwind.homerun.co/barista-trainer"></link>
+    <id>job_def456</id>
+    <description type="html"><![CDATA[<p>Train baristas.</p>]]></description>
+    <location><name>Remote-Lisbon</name></location>
+    <updated>2026-10-02 09:00:00</updated>
+  </entry>
+</feed>

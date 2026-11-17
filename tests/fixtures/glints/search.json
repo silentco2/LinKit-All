@@ -1,0 +1,35 @@
+{
+  "data": {
+    "searchJobsV3": {
+      "hasMore": false,
+      "jobsInPage": [
+        {
+          "id": "aaaa-1111",
+          "title": "Backend Engineer",
+          "company": {
+            "name": "Nusantara Pay"
+          },
+          "city": {
+            "name": "Jakarta Selatan"
+          },
+          "country": {
+            "code": "ID",
+            "name": "Indonesia"
+          },
+          "createdAt": "2026-10-13T02:00:00.000Z"
+        },
+        {
+          "id": "bbbb-2222",
+          "title": "Remote QA",
+          "company": {
+            "brandName": "Komodo Labs"
+          },
+          "country": {
+            "code": "ID",
+            "name": "Indonesia"
+          }
+        }
+      ]
+    }
+  }
+}

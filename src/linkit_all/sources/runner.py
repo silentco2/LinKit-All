@@ -117,6 +117,7 @@ async def discover(
             page = start
             seen = 0
             ok = True
+            status: int | None = None
             try:
                 pages = registry[task.source].search(http, task, start)
                 limit = registry[task.source].page_timeout(task)
@@ -146,6 +147,8 @@ async def discover(
                 mark_task(db, run_id, task.key, str(e))
             except httpx.HTTPStatusError as e:  # e.g. board removed: retrying will not help
                 ok = False
+                # a 404 after a page of jobs is not a missing board
+                status = e.response.status_code if seen == 0 else None
                 stats.errors[task.key] = str(e)
                 mark_task(db, run_id, task.key, str(e))
             except _PageTimeout as e:  # stuck source: leave undone so a resume retries it
@@ -161,7 +164,7 @@ async def discover(
                 stats.tasks_done += 1
                 mark_task(db, run_id, task.key, None)
             if task.key in board_keys:
-                note_crawl(db, task.source, task.board, seen, ok)
+                note_crawl(db, task.source, task.board, seen, ok, status)
 
     # Priority no longer orders the run: store_page upgrades a stored duplicate to the
     # higher-priority source's copy whenever that arrives.

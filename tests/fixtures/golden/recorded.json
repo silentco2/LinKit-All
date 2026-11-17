@@ -1,0 +1,25 @@
+{
+ "prompt_sha": "eef471fecf486c03b7410a9172cf470c2a8a7c57de8214d79ad90b4c433d2cb4",
+ "answers": {
+  "1": "{\"results\": [{\"job_id\": 1, \"score\": 9, \"reasons\": [\"recorded\"]}]}",
+  "2": "{\"results\": [{\"job_id\": 2, \"score\": 9, \"reasons\": [\"recorded\"]}]}",
+  "3": "{\"results\": [{\"job_id\": 3, \"score\": 8, \"reasons\": [\"recorded\"]}]}",
+  "4": "{\"results\": [{\"job_id\": 4, \"score\": 4, \"reasons\": [\"recorded\"]}]}",
+  "5": "{\"results\": [{\"job_id\": 5, \"score\": 6, \"reasons\": [\"recorded\"]}]}",
+  "6": "{\"results\": [{\"job_id\": 6, \"score\": 2, \"reasons\": [\"recorded\"]}]}",
+  "7": "{\"results\": [{\"job_id\": 7, \"score\": 9, \"reasons\": [\"recorded\"]}]}",
+  "8": "{\"results\": [{\"job_id\": 8, \"score\": 8, \"reasons\": [\"recorded\"]}]}",
+  "9": "{\"results\": [{\"job_id\": 9, \"score\": 5, \"reasons\": [\"recorded\"]}]}",
+  "10": "{\"results\": [{\"job_id\": 10, \"score\": 3, \"reasons\": [\"recorded\"]}]}",
+  "11": "{\"results\": [{\"job_id\": 11, \"score\": 7, \"reasons\": [\"recorded\"]}]}",
+  "12": "{\"results\": [{\"job_id\": 12, \"score\": 9, \"reasons\": [\"recorded\"]}]}",
+  "13": "{\"results\": [{\"job_id\": 13, \"score\": 8, \"reasons\": [\"recorded\"]}]}",
+  "14": "{\"results\": [{\"job_id\": 14, \"score\": 6, \"reasons\": [\"recorded\"]}]}",
+  "15": "{\"results\": [{\"job_id\": 15, \"score\": 5, \"reasons\": [\"recorded\"]}]}",
+  "16": "{\"results\": [{\"job_id\": 16, \"score\": 2, \"reasons\": [\"recorded\"]}]}",
+  "17": "{\"results\": [{\"job_id\": 17, \"score\": 9, \"reasons\": [\"recorded\"]}]}",
+  "18": "{\"results\": [{\"job_id\": 18, \"score\": 7, \"reasons\": [\"recorded\"]}]}",
+  "19": "{\"results\": [{\"job_id\": 19, \"score\": 3, \"reasons\": [\"recorded\"]}]}",
+  "20": "{\"results\": [{\"job_id\": 20, \"score\": 4, \"reasons\": [\"recorded\"]}]}"
+ }
+}

@@ -1,0 +1,29 @@
+{
+  "results": [
+    {
+      "id": 1,
+      "userDefinedId": "REQ-1",
+      "positionTitle": "Data  Analyst",
+      "description": "<p>Analyse data.</p>",
+      "postedDate": "2026-10-01T12:00:00Z",
+      "locations": [
+        {
+          "city": "Austin",
+          "subdivision": "TX",
+          "country": "US",
+          "isRemote": true
+        }
+      ],
+      "brandName": "Northwind Labs",
+      "applyLink": "https://jobs.clearcompany.com/careers/jobs/1/apply"
+    },
+    {
+      "id": 2,
+      "positionTitle": "Email Only",
+      "applyLink": "hr@northwind.example"
+    }
+  ],
+  "currentPageIndex": 0,
+  "totalCount": 2,
+  "currentPageCount": 2
+}

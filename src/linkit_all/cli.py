@@ -285,6 +285,44 @@ def discover_boards_cmd(
         )
 
 
+@app.command("seed-boards")
+def seed_boards_cmd() -> None:
+    """Store the bundled list of company job boards (crawled only with use_discovered_boards)."""
+    from linkit_all.sources.discovery import seed_boards, seed_list
+
+    typer.echo(f"{seed_boards(_stage_db())} new boards stored (of {len(seed_list())} in the list)")
+
+
+@app.command("find-board")
+def find_board_cmd(
+    names: Annotated[list[str], typer.Argument(help="Company names, e.g. Stripe.")],
+    add: Annotated[bool, typer.Option("--add", help="Save what is found.")] = False,
+) -> None:
+    """Look a company up on the job-board platforms we read. Shows what it finds; --add saves it."""
+    from linkit_all.core.search import SearchConfig, load_search, save_search
+    from linkit_all.sources import registry
+    from linkit_all.sources.resolve import resolve
+
+    db = _stage_db()
+    found, missing = asyncio.run(resolve(registry(), names))
+    cfg = load_search(db) or SearchConfig()
+    src = cfg.sources
+    for name, boards in found.items():
+        for b in boards:
+            new = add and b.value.lower() not in {c.lower() for c in src.companies}
+            if new:
+                src.companies = [*src.companies, b.value]
+                src.company_labels = {**src.company_labels, b.value: b.label}
+            typer.echo(f"{name}: {b.label}, {b.jobs} jobs ({b.value}){' - added' if new else ''}")
+    if add and found:
+        save_search(db, cfg)
+    for name in missing:
+        hint = "Paste its careers page in Settings > Sources."
+        typer.secho(f"{name}: no board found. {hint}", fg="yellow")
+    if found and not add:
+        typer.echo("Nothing saved. Run again with --add to keep these.")
+
+
 @run_app.command("enrich")
 def run_enrich() -> None:
     """Fill in missing job descriptions (discovered -> enriched)."""
@@ -343,6 +381,41 @@ def jobs(
         score = f"{j.score:>2}" if j.score else " -"
         head = f"{j.id:>6} {score} {j.data.get('rank', 0):.2f} {j.state:<15}"
         typer.echo(f"{head} {j.title[:45]:<45} | {j.company[:25]} | {j.location[:30]}")
+
+
+@app.command("filter-audit")
+def filter_audit_cmd() -> None:
+    """What each title word in your filters decides, and how its jobs scored (read-only)."""
+    from linkit_all.core.search import load_search
+    from linkit_all.matching.audit import filter_audit
+
+    db = init_db(get_settings().db_path)
+    cfg = load_search(db)
+    if cfg is None:
+        typer.echo("Set up your search first.", err=True)
+        raise typer.Exit(1)
+    with db() as s:
+        rows = filter_audit(s, cfg)
+    if not rows:
+        typer.echo("Your filters have no include or exclude title words.")
+    for r in rows:
+        avg = "-" if r.avg_score is None else f"{r.avg_score:.1f}"
+        typer.echo(f"{r.kind:<8} {r.word[:30]:<30} jobs {r.jobs:>6}  average score {avg}")
+
+
+@app.command("why-missed")
+def why_missed_cmd(url: str) -> None:
+    """Why a posting you found yourself is not in your list (read-only)."""
+    from linkit_all.core.search import load_search
+    from linkit_all.matching.audit import why_missed
+
+    db = init_db(get_settings().db_path)
+    cfg = load_search(db)
+    if cfg is None:
+        typer.echo("Set up your search first.", err=True)
+        raise typer.Exit(1)
+    with db() as s:
+        typer.echo(why_missed(s, cfg, url))
 
 
 @run_app.command("apply")
@@ -415,6 +488,12 @@ def apply_probe(
     per_source: Annotated[int, typer.Option(help="Jobs to try per source.")] = 1,
     job: Annotated[list[int] | None, typer.Option(help="Exact job ids (repeat).")] = None,
     limit: Annotated[int, typer.Option(help="At most this many jobs in all.")] = 60,
+    fresh: Annotated[
+        bool, typer.Option("--fresh", help="Only jobs no earlier test has tried.")
+    ] = False,
+    per_site: Annotated[
+        int | None, typer.Option(help="At most this many per apply site (or company board).")
+    ] = None,
     restore: Annotated[
         bool, typer.Option("--restore", help="Only put back jobs an earlier test borrowed.")
     ] = False,
@@ -440,7 +519,7 @@ def apply_probe(
     if cfg is None:
         typer.echo("No search saved yet: finish setup first.", err=True)
         raise typer.Exit(1)
-    ids = pick(db, per_source, job)[:limit]
+    ids = pick(db, per_source, job, fresh, per_site)[:limit]
     typer.echo(f"Trying {len(ids)} jobs in Practice mode...")
 
     async def go() -> list[Any]:

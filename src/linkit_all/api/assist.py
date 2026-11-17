@@ -273,7 +273,8 @@ async def plan(
     except ProviderError:  # no AI set up: recorded answers still fill the form
         provider = None
     questions = page_questions([Control(**c.model_dump()) for c in body.controls])
-    ctx = job_context(profile, job, str(job.data.get("cv_pdf") or profile.cv_path or ""))
+    cv = str(job.data.get("cv_pdf") or profile.cv_path or "")
+    ctx = job_context(profile, job, cv, cfg.search.remote)
     out_dir = settings.data_dir / "applications" / f"job_{job.id or 'page'}"
     out_dir.mkdir(parents=True, exist_ok=True)
     brief = {"title": job.title, "company": job.company, "description": job.description}

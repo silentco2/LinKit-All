@@ -70,6 +70,7 @@ class ApplicationAnswers(BaseModel):
     visa_countries: list[str] = []  # countries where you would need a visa to work
     acknowledge_privacy: bool | None = None  # privacy notices, data-processing consent
     acknowledge_legal: bool | None = None  # arbitration agreements, "I certify this is true"
+    marketing_opt_in: bool = False  # SMS/WhatsApp messages, newsletters, talent pools
 
     @field_validator("date_of_birth")
     @classmethod
@@ -96,6 +97,7 @@ class Context:
     job_source: str = ""  # where we found the job, for "how did you hear about us"
     resume_path: str = ""
     cover_letter_path: str = ""  # filled in when the form has a cover-letter field
+    open_to_remote: bool = False  # the search also takes remote jobs
 
 
 @dataclass
@@ -145,7 +147,8 @@ _SENSITIVE: list[tuple[str, re.Pattern[str]]] = [
                             r"الموقف من التجنيد|التجنيد|الخدمة العسكرية|الموقف من الخدمة"),
         ("eeo_veteran", r"veteran|armed forces|served in the military|protected veteran"),
         ("military_status", r"military service"),  # a bare label is still never the AI's to answer
-        ("nationality", r"nationality|\bcitizen(ship)?\b|الجنسية"),
+        ("nationality", r"nationality|\bcitizen(ship)?\b|\bpassport (country|nationality)\b|"
+                        r"country of (your )?passport|الجنسية"),
         ("date_of_birth", r"date of birth|birth ?date|\bdob\b|تاريخ الميلاد|\bage\b|how old|عمرك"),
         ("marital_status", r"marital|تعيش|الحالة الاجتماعية"),
         ("eeo_disability", r"disabilit"),
@@ -174,9 +177,11 @@ def sensitive_category(q: Question) -> str | None:
 
 _COUNTRIES = {
     "united states": ["united states", "u.s.", "usa", "america", "san francisco", "new york", "seattle",
-                      "boston", "austin", "chicago", "los angeles"],
+                      "boston", "austin", "chicago", "los angeles", "california", "texas", "maryland",
+                      "virginia", "massachusetts", "new jersey", "denver", "atlanta"],
     "united kingdom": ["united kingdom", "u.k.", "britain", "england", "london", "scotland"],
-    "canada": ["canada", "toronto", "vancouver", "montreal"],
+    "canada": ["canada", "toronto", "vancouver", "montreal", "ontario", "british columbia", "quebec",
+               "alberta", "ottawa", "calgary"],
     "egypt": ["egypt", "cairo", "giza", "alexandria", "6th of october", "new capital"],
     "united arab emirates": ["united arab emirates", "uae", "emirates", "dubai", "abu dhabi", "sharjah"],
     "saudi arabia": ["saudi arabia", "saudi", "ksa", "riyadh", "jeddah", "dammam"],
@@ -186,6 +191,9 @@ _COUNTRIES = {
     "netherlands": ["netherlands", "amsterdam"], "france": ["france", "paris"], "spain": ["spain", "madrid"],
     "india": ["india", "bangalore", "bengaluru", "hyderabad", "mumbai"], "singapore": ["singapore"],
     "australia": ["australia", "sydney", "melbourne"], "japan": ["japan", "tokyo"],
+    # named by sanctions (OFAC) questions: "a citizen of any of: Cuba, Iran, ...?"
+    "cuba": ["cuba"], "iran": ["iran"], "north korea": ["north korea"], "syria": ["syria"],
+    "russia": ["russia"], "belarus": ["belarus"], "venezuela": ["venezuela"],
 }  # fmt: skip
 _ISO = {"us": "united states", "gb": "united kingdom", "uk": "united kingdom", "eg": "egypt",
         "ae": "united arab emirates", "sa": "saudi arabia", "ca": "canada", "ie": "ireland",
@@ -196,15 +204,23 @@ _THIS_COUNTRY = re.compile(r"country where (the|this) (job|role|position)|this (
                            r"where the (job|role|position) is|country (for|to) which you (are )?apply", re.I)  # fmt: skip
 
 
-def country_of(text: str) -> str | None:
-    if re.search(r"\bU\.?S\.?A?\b", text):  # case-sensitive: "contact us" is not the USA
-        return "united states"
+def countries_of(text: str) -> list[str]:
+    """Every country `text` names, in our list's order ("Toronto, San Francisco" -> both)."""
     low = text.lower()
-    for country, aliases in _COUNTRIES.items():
-        if any(re.search(rf"(?<![a-z]){re.escape(a)}(?![a-z])", low) for a in aliases):
-            return country
-    tail = low.rsplit(",", 1)[-1].strip()
-    return _ISO.get(tail)
+    found = [
+        country
+        for country, aliases in _COUNTRIES.items()
+        if any(re.search(rf"(?<![a-z]){re.escape(a)}(?![a-z])", low) for a in aliases)
+    ]
+    if re.search(r"\bU\.?S\.?A?\b", text) and "united states" not in found:
+        found.insert(0, "united states")  # case-sensitive: "contact us" is not the USA
+    tail = _ISO.get(low.rsplit(",", 1)[-1].strip())
+    return found or ([tail] if tail else [])
+
+
+def country_of(text: str) -> str | None:
+    found = countries_of(text)
+    return found[0] if found else None
 
 
 _ISO_OF = {name: iso for iso, name in _ISO.items() if iso != "uk"}
@@ -320,7 +336,8 @@ _STANDARD: list[tuple[str, re.Pattern[str]]] = [
                       r"^(arabic|english)\s+(full\s+)?name$|^(full[ _-])?name[ _-](ar|en)$|"
                       r"^الاسم( الكامل| بالكامل| الرباعي| الثلاثي)?"
                       r"( ب(اللغة )?(ال)?(عربية|عربي|إنجليزية|انجليزية|إنجليزي|انجليزي))?$"),
-        ("country", r"^country\b"),
+        ("country", r"^country\b|where (do|will) you (plan (on|to) )?(be )?work(ing)? from|"
+                    r"^(current )?country of residence\b"),
         ("city", r"^(city|location|current location|location \(city\))\b"),
         # asked as a sentence: "Where are you currently located?", "Where do you live?"
         ("where", r"where are you (currently |presently )?(located|based|living)|"
@@ -460,32 +477,39 @@ def sensitive_answer(q: Question, category: str, ctx: Context) -> tuple[Any, str
         return value.replace("_", " ").capitalize(), ""
     if category in ("work_authorization", "sponsorship"):
         text = f"{q.label} {q.description}"
-        country = (
-            country_of(ctx.job_location) if _THIS_COUNTRY.search(text) else None
-        ) or country_of(text)
+        # The country the question names; else the job's ("the location(s) you selected", a
+        # bare "authorized to work?"). A job in several countries is answered only when the
+        # profile says the same for each of them.
+        named = None if _THIS_COUNTRY.search(text) else country_of(text)
+        places = [named] if named else countries_of(ctx.job_location)
         authorized = {canonical_country(c) for c in a.authorized_countries}
         visa = {canonical_country(c) for c in a.visa_countries}
+
+        def everywhere(group: set[str]) -> bool:
+            return bool(places) and all(p in group for p in places)
+
         if category == "work_authorization":
-            if country in authorized:
+            if everywhere(authorized):
                 return yes_no(q, True), ""
-            if country in visa:
+            if everywhere(visa):
                 return yes_no(q, False), ""
             return None, "work authorization: country unknown or not set in your profile"
-        if country in authorized:
+        if everywhere(authorized):
             return yes_no(q, False), ""  # authorized there already: no sponsorship needed
         if a.needs_sponsorship is not None:
             return yes_no(q, a.needs_sponsorship), ""  # set explicitly: it wins
         # "Ask me": derive per job from the places you listed and the job's country (profile data only).
-        where = country or country_of(ctx.job_location)
-        if where in authorized:
-            return yes_no(q, False), ""
-        if where in visa:
+        if everywhere(visa):
             return yes_no(q, True), ""
         return None, "visa sponsorship: not set in your profile"
     if category == "nationality":
         if not a.nationality:
             return None, "nationality not set in your profile"
         name = canonical_country(a.nationality).title()
+        listed = countries_of(f"{q.label} {q.description}")
+        if listed and pick_canonical(q.options or ["Yes", "No"], "yes") is not None:
+            # "Are you a citizen of any of: Cuba, Iran, ...?" asks about the countries it lists
+            return yes_no(q, canonical_country(a.nationality) in listed), ""
         if q.kind in CHOICE_KINDS or q.kind == "multi":
             picked = pick_option(q.options, name) or pick_option(q.options, a.nationality)
             if picked is None:
@@ -499,6 +523,11 @@ def sensitive_answer(q: Question, category: str, ctx: Context) -> tuple[Any, str
             return None, "date of birth not set in your profile"
         return a.date_of_birth, ""  # a date input takes ISO; a text field gets it as stored
     if category == "salary":
+        if re.search(r"currency", q.label, re.I) and a.salary_currency:
+            if not q.options:
+                return a.salary_currency, ""
+            if (picked := pick_option(q.options, a.salary_currency)) is not None:
+                return picked, ""
         if not a.salary_expectation or q.kind in CHOICE_KINDS:
             return None, "salary expectation needed"
         number = re.sub(r"[^\d.]", "", a.salary_expectation)
@@ -541,10 +570,35 @@ class Resolution:
     missing: list[Missing] = field(default_factory=list)  # for the user
 
 
+# Messages, newsletters and talent pools beyond this application: answered from the profile's
+# `marketing_opt_in` (default No), required or not. It wins over the privacy-notice rule only, so
+# "Do you consent to receive SMS?" is not taken for the notice the user pre-approved; every other
+# sensitive rule still decides ("opt in or out of AI notetakers" stays the user's).
+_OPT_IN = re.compile(
+    r"\bopt[ -]?in\b|\btalent (community|pool|network)\b|\bsubscribe\b|"
+    r"\b(receive|receiving|get|send you)\b.{0,40}\b(sms|text messages?|whatsapp|newsletters?|"
+    r"marketing|promotional|job alerts?)\b|\b(e-?mail|contact|notify|message) me\b.{0,60}\b(future|other|new|upcoming)\b",
+    re.I,
+)
+
+
+def opt_in_answer(q: Question, ctx: Context) -> Any:
+    """The profile's choice for a marketing or messaging opt-in; None for anything else."""
+    said = q.label if q.kind == "checkbox" else " ".join([q.label, *q.options])
+    if q.kind not in (*CHOICE_KINDS, "checkbox") or not _OPT_IN.search(said):
+        return None
+    if sensitive_category(q) not in (None, "acknowledge_privacy"):
+        return None
+    return yes_no(q, ctx.answers.marketing_opt_in)
+
+
 def resolve_static(questions: list[Question], ctx: Context) -> Resolution:
     """Everything answerable without the bank or the AI. Sensitive misses go to `missing`."""
     r = Resolution()
     for q in questions:
+        if (choice := opt_in_answer(q, ctx)) is not None:
+            r.answers[q.key], r.sources[q.key] = choice, "profile"
+            continue
         if q.kind == "file":
             if (path := file_answer(q, ctx)) is not None:
                 r.answers[q.key], r.sources[q.key] = path, "file"

@@ -1,0 +1,28 @@
+[
+  {
+    "id": 101,
+    "title": "Senior Backend Engineer",
+    "category": "Engineering",
+    "locations": [
+      "San Francisco - United States -   San Francisco, California 94104 United States",
+      "Remote - United States"
+    ],
+    "portalJobPost": {
+      "portalUrl": "https://careers-atlassian.icims.com/jobs/101/job"
+    },
+    "applyUrl": "https://careers-atlassian.icims.com/jobs/101/job?mode=apply"
+  },
+  {
+    "id": 102,
+    "title": "Recruiter",
+    "locations": [
+      "Sydney - Australia"
+    ],
+    "applyUrl": "https://careers-atlassian.icims.com/jobs/102/job?mode=apply"
+  },
+  {
+    "id": 103,
+    "title": "No link",
+    "applyUrl": "javascript:void(0)"
+  }
+]

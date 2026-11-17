@@ -6,7 +6,7 @@ import { DtPipe, fmtNum, labelOr, localeOf } from '../locale';
 import { PatchDiff } from '../components/patch-diff';
 import { Toast } from '../components/toast';
 import { Shell } from '../shell';
-import { isLeftOut, JobDetail, reasonSetting, reasonText, SCAM_MEDIUM, TrustVerdict } from '../types';
+import { isLeftOut, JobDetail, Outcome, OUTCOMES, reasonSetting, reasonText, SCAM_MEDIUM, TrustVerdict } from '../types';
 import { SettingsStore } from './settings/store';
 
 interface Filled { value: unknown; source: string }
@@ -36,8 +36,18 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
           <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
             @if (j.tier) { <span class="badge tier-{{ j.tier }}">{{ 'detail.tier.' + j.tier | t }}</span> }
             <span class="badge tier-low">{{ 'common.state.' + j.state | t }}</span>
+            @if (j.state === 'applied') {
+              <label class="inline-flex items-center gap-1.5">
+                <span class="text-slate-500">{{ 'detail.outcome.label' | t }}</span>
+                <select class="input py-0.5 text-xs" (change)="setOutcome($any($event.target).value)" [disabled]="busy()">
+                  <option value="" disabled [selected]="!j.outcome">{{ 'detail.outcome.none' | t }}</option>
+                  @for (o of outcomes; track o) { <option [value]="o" [selected]="j.outcome === o">{{ 'detail.outcome.' + o | t }}</option> }
+                </select>
+              </label>
+            }
             <span class="badge tier-low"><bdi>{{ j.source | src }}</bdi></span>
             @if (j.rank !== null) { <span class="badge tier-low">{{ 'detail.match' | t: { pct: num(j.rank, { style: 'percent', maximumFractionDigits: 0 }) } }}</span> }
+            @if (j.years_required; as y) { <span class="badge {{ y.above ? 'tier-mid' : 'tier-low' }}">{{ 'detail.years.' + y.kind | t: { years: '⁦' + y.label + '⁩' } }}@if (y.above) { <span class="gap-dot"></span>{{ 'detail.years.above' | t }} }</span> }
             @if (j.posted_at) { <span class="text-slate-500">{{ 'detail.posted' | t }} {{ j.posted_at | dt: 'date' }}</span> }
           </div>
           @if (why(j); as text) {
@@ -85,10 +95,25 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
 
         @if (j.ai; as ai) {
           <section class="rounded-lg bg-slate-50 p-4 dark:bg-slate-950">
-            <h3 class="font-semibold">{{ 'detail.ai.score' | t: { score: ai.score, out: 10 } }}</h3>
+            <h3 class="flex flex-wrap items-center gap-2 font-semibold">
+              {{ 'detail.ai.score' | t: { score: ai.score, out: 10 } }}
+              @if (j.confidence; as c) { <span class="badge text-xs font-normal {{ c === 'low' ? 'tier-mid' : 'tier-low' }}" [attr.title]="'detail.confidence.tip.' + c | t">{{ 'detail.confidence.' + c | t }}</span> }
+            </h3>
             <ul class="mt-2 list-disc space-y-1 ps-5 text-sm">
               @for (r of ai.reasons; track r) { <li dir="auto">{{ r }}</li> }
             </ul>
+            @if (ai.requirements?.length) {
+              <h4 class="mt-3 text-sm font-medium">{{ 'detail.req.title' | t }}</h4>
+              <ul class="mt-1 space-y-1 text-sm">
+                @for (q of ai.requirements; track $index) {
+                  <li class="flex flex-wrap items-baseline gap-x-2">
+                    <span class="badge text-xs {{ q.met === 'yes' ? 'tier-high' : q.met === 'no' ? 'tier-mid' : 'tier-low' }}">{{ 'detail.req.met.' + q.met | t }}</span>
+                    <span dir="auto">{{ q.text }}</span>
+                    <span class="text-xs text-slate-500">{{ 'detail.req.importance.' + q.importance | t }}</span>
+                  </li>
+                }
+              </ul>
+            }
             @if (ai.missing_skills.length) {
               <p class="mt-3 text-sm"><span class="font-medium">{{ 'detail.ai.missing' | t }}&ngsp;</span><bdi>{{ ai.missing_skills.join(', ') }}</bdi></p>
             }
@@ -377,6 +402,24 @@ export class JobDetailPanel implements OnDestroy {
       if (seq === this.loadSeq) this.job.set(d);
     } catch (e) {
       if (seq === this.loadSeq) this.error.set((e as Error).message);
+    }
+  }
+
+  protected readonly outcomes = OUTCOMES;
+
+  async setOutcome(outcome: Outcome): Promise<void> {
+    const j = this.job();
+    if (!j || !outcome) return;
+    this.busy.set(true);
+    this.error.set('');
+    try {
+      await this.api.post(`/jobs/${j.id}/outcome`, { outcome });
+      await this.load(j.id);
+      this.changed.emit();
+    } catch (e) {
+      this.error.set((e as Error).message);
+    } finally {
+      this.busy.set(false);
     }
   }
 

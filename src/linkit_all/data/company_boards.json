@@ -1,0 +1,717 @@
+[
+{
+"ats": "ashby",
+"slug": "1password",
+"name": "1Password"
+},
+{
+"ats": "greenhouse",
+"slug": "abnormalsecurity",
+"name": "Abnormal Security"
+},
+{
+"ats": "greenhouse",
+"slug": "ada18",
+"name": "Ada"
+},
+{
+"ats": "ashby",
+"slug": "addi",
+"name": "Addi"
+},
+{
+"ats": "adpmyjobs",
+"slug": "apply",
+"name": "ADP"
+},
+{
+"ats": "greenhouse",
+"slug": "airtable",
+"name": "Airtable"
+},
+{
+"ats": "ashby",
+"slug": "AlephAlpha",
+"name": "Aleph Alpha"
+},
+{
+"ats": "hirehive",
+"slug": "amcsgroup",
+"name": "AMCS Group"
+},
+{
+"ats": "greenhouse",
+"slug": "amplemarket",
+"name": "Amplemarket"
+},
+{
+"ats": "ashby",
+"slug": "andela",
+"name": "Andela"
+},
+{
+"ats": "greenhouse",
+"slug": "anthropic",
+"name": "Anthropic"
+},
+{
+"ats": "polymer",
+"slug": "aperturelabs",
+"name": "Aperture Labs"
+},
+{
+"ats": "greenhouse",
+"slug": "arizeai",
+"name": "Arize AI"
+},
+{
+"ats": "ashby",
+"slug": "attio",
+"name": "Attio"
+},
+{
+"ats": "pageup",
+"slug": "798",
+"name": "Bank of China (Hong Kong)"
+},
+{
+"ats": "greenhouse",
+"slug": "bishopfox",
+"name": "Bishop Fox"
+},
+{
+"ats": "ashby",
+"slug": "black-forest-labs",
+"name": "Black Forest Labs"
+},
+{
+"ats": "ashby",
+"slug": "bland",
+"name": "Bland AI"
+},
+{
+"ats": "greenhouse",
+"slug": "boomilp",
+"name": "Boomi"
+},
+{
+"ats": "greenhouse",
+"slug": "bugcrowd",
+"name": "Bugcrowd"
+},
+{
+"ats": "feishu-jobs",
+"slug": "jobs.bytedance.com",
+"name": "ByteDance"
+},
+{
+"ats": "applitrack",
+"slug": "camas",
+"name": "Camas School District"
+},
+{
+"ats": "greenhouse",
+"slug": "careem",
+"name": "Careem"
+},
+{
+"ats": "ashby",
+"slug": "causaly",
+"name": "Causaly"
+},
+{
+"ats": "greenhouse",
+"slug": "celonis",
+"name": "Celonis"
+},
+{
+"ats": "greenhouse",
+"slug": "chainguard",
+"name": "Chainguard"
+},
+{
+"ats": "recruitee",
+"slug": "channable",
+"name": "Channable"
+},
+{
+"ats": "greenhouse",
+"slug": "clara",
+"name": "Clara"
+},
+{
+"ats": "lever",
+"slug": "clarity-ai",
+"name": "Clarity AI"
+},
+{
+"ats": "neogov",
+"slug": "schooljobs/clarkcollege",
+"name": "Clark College (Faculty)"
+},
+{
+"ats": "ashby",
+"slug": "claylabs",
+"name": "Clay Labs"
+},
+{
+"ats": "ashby",
+"slug": "clerk",
+"name": "Clerk"
+},
+{
+"ats": "paylocity",
+"slug": "a432d829-f701-4cf3-9108-56ef703b2ac5",
+"name": "CloudBees"
+},
+{
+"ats": "lever",
+"slug": "coalfire",
+"name": "Coalfire"
+},
+{
+"ats": "greenhouse",
+"slug": "cobre",
+"name": "Cobre"
+},
+{
+"ats": "ashby",
+"slug": "cohere",
+"name": "Cohere"
+},
+{
+"ats": "greenhouse",
+"slug": "contentful",
+"name": "Contentful"
+},
+{
+"ats": "ashby",
+"slug": "corti",
+"name": "Corti"
+},
+{
+"ats": "ashby",
+"slug": "cradlebio",
+"name": "Cradle"
+},
+{
+"ats": "workday",
+"slug": "crowdstrike/wd5/crowdstrikecareers",
+"name": "CrowdStrike"
+},
+{
+"ats": "ashby",
+"slug": "decagon",
+"name": "Decagon"
+},
+{
+"ats": "ashby",
+"slug": "deepgram",
+"name": "Deepgram"
+},
+{
+"ats": "ashby",
+"slug": "DeepL",
+"name": "DeepL"
+},
+{
+"ats": "mokahr",
+"slug": "high-flyer/140576",
+"name": "DeepSeek"
+},
+{
+"ats": "lever",
+"slug": "deuna",
+"name": "Deuna"
+},
+{
+"ats": "lever",
+"slug": "diabolocom",
+"name": "Diabolocom"
+},
+{
+"ats": "lever",
+"slug": "dlocal",
+"name": "dLocal"
+},
+{
+"ats": "ashby",
+"slug": "todoist-inc",
+"name": "Doist"
+},
+{
+"ats": "greenhouse",
+"slug": "ebanx",
+"name": "EBANX"
+},
+{
+"ats": "ashby",
+"slug": "elevenlabs",
+"name": "ElevenLabs"
+},
+{
+"ats": "factorial",
+"slug": "careers.factorialhr.com",
+"name": "Factorial"
+},
+{
+"ats": "ashby",
+"slug": "faculty",
+"name": "Faculty"
+},
+{
+"ats": "ashby",
+"slug": "forto",
+"name": "Forto"
+},
+{
+"ats": "smartrecruiters",
+"slug": "freshworks",
+"name": "Freshworks"
+},
+{
+"ats": "lever",
+"slug": "getir",
+"name": "Getir"
+},
+{
+"ats": "greenhouse",
+"slug": "getyourguide",
+"name": "GetYourGuide"
+},
+{
+"ats": "ashby",
+"slug": "glacis-ai",
+"name": "Glacis AI"
+},
+{
+"ats": "greenhouse",
+"slug": "gleanwork",
+"name": "Glean"
+},
+{
+"ats": "workday",
+"slug": "wd5.myworkdaysite.com/guidewire/external",
+"name": "Guidewire"
+},
+{
+"ats": "ashby",
+"slug": "hackerone",
+"name": "HackerOne"
+},
+{
+"ats": "greenhouse",
+"slug": "hellofresh",
+"name": "HelloFresh"
+},
+{
+"ats": "greenhouse",
+"slug": "helsing",
+"name": "Helsing"
+},
+{
+"ats": "greenhouse",
+"slug": "hightouch",
+"name": "Hightouch"
+},
+{
+"ats": "greenhouse",
+"slug": "hootsuite",
+"name": "Hootsuite"
+},
+{
+"ats": "lever",
+"slug": "contentsquare",
+"name": "Hotjar"
+},
+{
+"ats": "workable",
+"slug": "huggingface",
+"name": "Hugging Face"
+},
+{
+"ats": "greenhouse",
+"slug": "humeai",
+"name": "Hume AI"
+},
+{
+"ats": "greenhouse",
+"slug": "huntress",
+"name": "Huntress"
+},
+{
+"ats": "ashby",
+"slug": "inngest",
+"name": "Inngest"
+},
+{
+"ats": "greenhouse",
+"slug": "intercom",
+"name": "Intercom"
+},
+{
+"ats": "greenhouse",
+"slug": "isomorphiclabs",
+"name": "Isomorphic Labs"
+},
+{
+"ats": "adp",
+"slug": "ffe28c5e-dcff-41b8-b801-1ae1a70edb00/19000101_000001",
+"name": "Ivey Business School"
+},
+{
+"ats": "greenhouse",
+"slug": "jumia",
+"name": "Jumia"
+},
+{
+"ats": "deel",
+"slug": "klarna",
+"name": "Klarna"
+},
+{
+"ats": "ashby",
+"slug": "klue",
+"name": "Klue"
+},
+{
+"ats": "ashby",
+"slug": "lakera.ai",
+"name": "Lakera"
+},
+{
+"ats": "ashby",
+"slug": "langchain",
+"name": "LangChain"
+},
+{
+"ats": "greenhouse",
+"slug": "later",
+"name": "Later"
+},
+{
+"ats": "ashby",
+"slug": "legora",
+"name": "Legora"
+},
+{
+"ats": "ashby",
+"slug": "lindy",
+"name": "Lindy"
+},
+{
+"ats": "ashby",
+"slug": "lovable",
+"name": "Lovable"
+},
+{
+"ats": "inrecruiting",
+"slug": "maggioli",
+"name": "Maggioli"
+},
+{
+"ats": "ashby",
+"slug": "mistral.ai",
+"name": "Mistral AI"
+},
+{
+"ats": "ashby",
+"slug": "mollie",
+"name": "Mollie"
+},
+{
+"ats": "greenhouse",
+"slug": "moniepoint",
+"name": "Moniepoint"
+},
+{
+"ats": "greenhouse",
+"slug": "n26",
+"name": "N26"
+},
+{
+"ats": "ashby",
+"slug": "n8n",
+"name": "n8n"
+},
+{
+"ats": "icims",
+"slug": "en-nortal",
+"name": "Nortal"
+},
+{
+"ats": "ashby",
+"slug": "nubank",
+"name": "Nubank"
+},
+{
+"ats": "workday",
+"slug": "nvidia/wd5/NVIDIAExternalCareerSite",
+"name": "NVIDIA"
+},
+{
+"ats": "pageup",
+"slug": "1216",
+"name": "Oklahoma State University"
+},
+{
+"ats": "lever",
+"slug": "palantir",
+"name": "Palantir"
+},
+{
+"ats": "greenhouse",
+"slug": "parloa",
+"name": "Parloa"
+},
+{
+"ats": "ashby",
+"slug": "perplexity",
+"name": "Perplexity"
+},
+{
+"ats": "ashby",
+"slug": "photoroom",
+"name": "Photoroom"
+},
+{
+"ats": "greenhouse",
+"slug": "physicsx",
+"name": "PhysicsX"
+},
+{
+"ats": "lever",
+"slug": "pigment",
+"name": "Pigment"
+},
+{
+"ats": "ashby",
+"slug": "pinecone",
+"name": "Pinecone"
+},
+{
+"ats": "greenhouse",
+"slug": "planetscale",
+"name": "PlanetScale"
+},
+{
+"ats": "workable",
+"slug": "platzi",
+"name": "Platzi"
+},
+{
+"ats": "ashby",
+"slug": "pleo",
+"name": "Pleo"
+},
+{
+"ats": "greenhouse",
+"slug": "polyai",
+"name": "PolyAI"
+},
+{
+"ats": "greenhouse",
+"slug": "praetorian",
+"name": "Praetorian"
+},
+{
+"ats": "hibob",
+"slug": "productsup",
+"name": "Productsup"
+},
+{
+"ats": "ashby",
+"slug": "qonto",
+"name": "Qonto"
+},
+{
+"ats": "jazzhr",
+"slug": "ratehubinc",
+"name": "Ratehub"
+},
+{
+"ats": "ashby",
+"slug": "resend",
+"name": "Resend"
+},
+{
+"ats": "gem",
+"slug": "retool",
+"name": "Retool"
+},
+{
+"ats": "redrover",
+"slug": "1651",
+"name": "Ridgefield School District"
+},
+{
+"ats": "ashby",
+"slug": "runpod",
+"name": "RunPod"
+},
+{
+"ats": "ashby",
+"slug": "runway-ml",
+"name": "Runway"
+},
+{
+"ats": "greenhouse",
+"slug": "safariai",
+"name": "Safari AI"
+},
+{
+"ats": "lever",
+"slug": "sanctuary",
+"name": "Sanctuary AI"
+},
+{
+"ats": "greenhouse",
+"slug": "scandit",
+"name": "Scandit"
+},
+{
+"ats": "ashby",
+"slug": "semgrep",
+"name": "Semgrep"
+},
+{
+"ats": "workable",
+"slug": "semios",
+"name": "Semios"
+},
+{
+"ats": "zoho",
+"slug": "shijigroup.zohorecruit.com",
+"name": "Shiji Group"
+},
+{
+"ats": "ashby",
+"slug": "sierra",
+"name": "Sierra"
+},
+{
+"ats": "ashby",
+"slug": "simetrik",
+"name": "Simetrik"
+},
+{
+"ats": "lever",
+"slug": "sophos",
+"name": "Sophos"
+},
+{
+"ats": "greenhouse",
+"slug": "speechmatics",
+"name": "Speechmatics"
+},
+{
+"ats": "lever",
+"slug": "spotify",
+"name": "Spotify"
+},
+{
+"ats": "greenhouse",
+"slug": "stabilityai",
+"name": "Stability AI"
+},
+{
+"ats": "greenhouse",
+"slug": "sumup",
+"name": "SumUp"
+},
+{
+"ats": "ashby",
+"slug": "supabase",
+"name": "Supabase"
+},
+{
+"ats": "ashby",
+"slug": "synthesia",
+"name": "Synthesia"
+},
+{
+"ats": "teamtailor",
+"slug": "templafy.teamtailor.com",
+"name": "Templafy"
+},
+{
+"ats": "ashby",
+"slug": "temporal",
+"name": "Temporal"
+},
+{
+"ats": "pageup",
+"slug": "932",
+"name": "The University of Hong Kong"
+},
+{
+"ats": "lever",
+"slug": "tinybird",
+"name": "Tinybird"
+},
+{
+"ats": "ashby",
+"slug": "toggl",
+"name": "Toggl"
+},
+{
+"ats": "greenhouse",
+"slug": "traderepublicbank",
+"name": "Trade Republic"
+},
+{
+"ats": "trakstar",
+"slug": "demoaccount",
+"name": "Trakstar demo board"
+},
+{
+"ats": "ashby",
+"slug": "perk",
+"name": "Travelperk"
+},
+{
+"ats": "ashby",
+"slug": "vapi",
+"name": "Vapi"
+},
+{
+"ats": "greenhouse",
+"slug": "vercel",
+"name": "Vercel"
+},
+{
+"ats": "ashby",
+"slug": "wayve",
+"name": "Wayve"
+},
+{
+"ats": "greenhouse",
+"slug": "coreweave",
+"name": "Weights & Biases (CoreWeave)"
+},
+{
+"ats": "greenhouse",
+"slug": "wizinc",
+"name": "Wiz"
+},
+{
+"ats": "ashby",
+"slug": "workos",
+"name": "WorkOS"
+},
+{
+"ats": "ukg",
+"slug": "recruiting.ultipro.ca/YMC5001YMGT/7fde8f3e-7920-4d9d-8394-87bd44cc2330",
+"name": "YMCA of Greater Toronto"
+},
+{
+"ats": "lever",
+"slug": "yuno",
+"name": "Yuno"
+},
+{
+"ats": "ashby",
+"slug": "zapier",
+"name": "Zapier"
+}
+]

@@ -107,6 +107,9 @@ type Choice = { v: boolean | null; label: string };
         <app-field key="answers.acknowledge_legal" [label]="'setup.answers.legal' | t" [hint]="'setup.answers.legalHint' | t">
           <ng-container [ngTemplateOutlet]="choice" [ngTemplateOutletContext]="{ k: 'answers.acknowledge_legal', opts: agree }" />
         </app-field>
+        <app-field key="answers.marketing_opt_in" [label]="'setup.answers.marketing' | t" [hint]="'setup.answers.marketingHint' | t">
+          <ng-container [ngTemplateOutlet]="choice" [ngTemplateOutletContext]="{ k: 'answers.marketing_opt_in', opts: optIn }" />
+        </app-field>
       </section>
 
       <section class="card space-y-4">
@@ -183,6 +186,7 @@ export class AnswersSection implements OnInit {
   private readonly countries = inject(Countries);
   protected readonly yesNo: Choice[] = [{ v: null, label: 'welcome.forms.ask' }, { v: true, label: 'common.yes' }, { v: false, label: 'common.no' }];
   protected readonly agree: Choice[] = [{ v: null, label: 'welcome.forms.askEach' }, { v: true, label: 'settings.ans.always' }];
+  protected readonly optIn: Choice[] = [{ v: false, label: 'setup.answers.marketingNo' }, { v: true, label: 'setup.answers.marketingYes' }];
   // the stored value is this English text (it is typed into English forms); the label is translated
   protected readonly noticeOptions: [string, string][] = [
     ['Immediately', 'settings.ans.n.now'], ['1 week', 'settings.ans.n.1w'], ['2 weeks', 'settings.ans.n.2w'], ['1 month', 'settings.ans.n.1m'], ['2 months', 'settings.ans.n.2m'],

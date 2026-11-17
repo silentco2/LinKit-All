@@ -1,0 +1,35 @@
+{
+  "jobs": [
+    {
+      "title": "Founding Engineer",
+      "url": "https://jobs.ashbyhq.com/tidewater/abc",
+      "applyUrl": "https://jobs.ashbyhq.com/tidewater/abc/application",
+      "companyName": "Tidewater",
+      "locations": [
+        "Zurich, Switzerland"
+      ],
+      "timeStamp": 1790000000000,
+      "remote": false
+    },
+    {
+      "title": "Ops Lead",
+      "url": "https://boards.greenhouse.io/kestrel/jobs/55",
+      "companyName": "Kestrel",
+      "normalizedLocations": [
+        {
+          "label": "London, UK"
+        }
+      ],
+      "timeStamp": "2026-10-01T00:00:00Z",
+      "remote": true
+    },
+    {
+      "title": "No company",
+      "url": "https://example.com/x"
+    }
+  ],
+  "total": 3,
+  "meta": {
+    "size": 500
+  }
+}

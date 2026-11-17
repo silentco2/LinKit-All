@@ -1,0 +1,37 @@
+{
+  "jobs": [
+    {
+      "_geoloc": [],
+      "data": {
+        "id": 9001,
+        "title": "R&amp;D Engineer Sonar",
+        "company": "TKMS GmbH",
+        "locations": [
+          {
+            "cityState": "Kiel, SH"
+          },
+          {
+            "city": "Kiel, SH"
+          },
+          {
+            "city": "Wismar"
+          }
+        ],
+        "postingDate": "2026-07-02T22:00:00"
+      }
+    },
+    {
+      "data": {
+        "id": 9002,
+        "title": "Welder",
+        "city": "Kiel",
+        "country": "Germany",
+        "postingDate_timestamp": 1790000000
+      }
+    }
+  ],
+  "page": 0,
+  "jobsPerPage": 20,
+  "nextPage": null,
+  "totalHits": 2
+}

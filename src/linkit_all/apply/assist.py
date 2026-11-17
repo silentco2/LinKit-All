@@ -25,6 +25,7 @@ from linkit_all.apply.answers import (
     secrets_seen,
     valid_for,
 )  # fmt: skip
+from linkit_all.core import timing
 from linkit_all.core.models import AnswerEntry
 from linkit_all.matching.rank import Embed
 from linkit_all.providers.base import LLMProvider, UsageLimitError, render
@@ -293,6 +294,25 @@ async def answer_questions(
     """Full resolution; anything required and still unanswered ends in `missing`. `ai_optional`
     False: the AI is asked only for required questions and open text boxes (when nothing has
     told the fields of a page apart, an optional box may be anything)."""
+    with timing.step("answer questions"):
+        timing.note(f"{len(questions)} questions")
+        return await _answer_questions(
+            questions, ctx, bank, provider, cv, profile, job, out_dir, ai_optional=ai_optional
+        )
+
+
+async def _answer_questions(
+    questions: list[Question],
+    ctx: Context,
+    bank: AnswerBank,
+    provider: LLMProvider | None,
+    cv: str,
+    profile: str,
+    job: dict[str, str],
+    out_dir: Path,
+    *,
+    ai_optional: bool,
+) -> Resolution:
     letter, letter_arabic = "", False
     if provider is not None and any(is_cover_letter(q) for q in questions):
         try:
@@ -368,5 +388,6 @@ def profile_summary(ctx: Context) -> str:
         "GitHub": a.github,
         "Portfolio": a.portfolio,
         "Willing to relocate": a.willing_to_relocate,
+        "Open to remote work": True if ctx.open_to_remote else None,
     }
     return "\n".join(f"{k}: {v}" for k, v in facts.items() if v not in (None, ""))

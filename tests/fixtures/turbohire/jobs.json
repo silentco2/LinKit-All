@@ -1,0 +1,26 @@
+{
+  "Result": [
+    {
+      "JobTitle": "Sales &amp; Ops Lead",
+      "JobIdObfuscated": "ab12cd",
+      "Location": "[{\"Address\": \"Pune, India\"}, {\"Address\": \"Pune, India\"}, {\"Address\": \"Remote\"}]",
+      "PublishedDate": "2026-10-09T06:30:00Z",
+      "JobCode": "TH-7",
+      "JobDescV2": "<p>Lead sales.</p>",
+      "ShowClientName": true,
+      "ClientName": "[REDACTED]"
+    },
+    {
+      "JobTitle": "Chef",
+      "JobIdObfuscated": "ef34",
+      "Location": "Goa",
+      "ShowClientName": true,
+      "ClientName": "Saffron Kitchens"
+    },
+    {
+      "JobTitle": "",
+      "JobIdObfuscated": "zz"
+    }
+  ],
+  "TotalCount": 3
+}

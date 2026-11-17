@@ -1,0 +1,39 @@
+{
+  "data": {
+    "jobSeekerSiteUnauthenticated": {
+      "jobPostingSearch": {
+        "results": [
+          {
+            "id": "901",
+            "name": "Math Teacher",
+            "organizationName": "Lakeside Unified",
+            "location": {
+              "name": "Lakeside High"
+            },
+            "activePublicOnDateUtc": "2026-10-01T00:00:00Z",
+            "closedOnDateUtc": null,
+            "allowsRemote": false
+          },
+          {
+            "id": "902",
+            "name": "Internal Aide",
+            "organizationName": "Lakeside Unified",
+            "location": null,
+            "activePublicOnDateUtc": null,
+            "closedOnDateUtc": null,
+            "allowsRemote": false
+          },
+          {
+            "id": "903",
+            "name": "Closed Role",
+            "organizationName": "Lakeside Unified",
+            "activePublicOnDateUtc": "2026-09-01T00:00:00Z",
+            "closedOnDateUtc": "2026-09-20T00:00:00Z",
+            "allowsRemote": true
+          }
+        ],
+        "hasMoreData": false
+      }
+    }
+  }
+}

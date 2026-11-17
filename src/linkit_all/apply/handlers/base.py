@@ -1,16 +1,18 @@
 """ATS handler interface: where the form is, how to read it, what success looks like."""
 
-import contextlib
 import re
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
 
+from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import Page
 
 from linkit_all.apply.accounts import Account, PasswordRules
 from linkit_all.apply.answers import Question
 from linkit_all.apply.form import extract
+from linkit_all.core import timing
+from linkit_all.sources.liveness import closed_text
 
 CAPTCHA = (
     'iframe[src*="recaptcha/api2/bframe"], iframe[src*="hcaptcha.com"][src*="challenge"], '
@@ -19,6 +21,11 @@ CAPTCHA = (
 
 # .ng-invalid is Angular's state class on whole forms, not a message
 ERRORS = "[role=alert], [class*=error i], [class*=invalid i]:not(.ng-invalid), .application-error"
+
+
+class PostingGone(Exception):
+    """The form never showed and the page says the posting is gone."""
+
 
 # Confirmation wording of sites without a handler (the generic form agent).
 GENERIC_CONFIRMATION = re.compile(
@@ -64,6 +71,28 @@ class JobInfo:
     extra: dict[str, Any]
 
 
+# A connection the site dropped or reset mid-load (seen on Ashby): worth one more try. Anything
+# else (a 404, a DNS failure, a timeout) is the site's answer and is not retried.
+_DROPPED = re.compile(
+    r"ERR_(CONNECTION_(CLOSED|RESET|ABORTED)|EMPTY_RESPONSE|NETWORK_CHANGED|HTTP2_)"
+)
+
+
+async def goto(page: Page, url: str, timeout_ms: int = 60000) -> None:
+    """Open `url` in `page`, once more after a short wait if the site dropped the connection."""
+    with timing.step("load page"):
+        timing.note(urlparse(url).netloc)
+        for attempt in (1, 2):
+            try:
+                await page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+                return
+            except PlaywrightError as e:
+                if attempt == 2 or not _DROPPED.search(str(e)):
+                    raise
+                timing.note("the site dropped the connection; tried again")
+                await page.wait_for_timeout(3000)
+
+
 class Handler:
     ats: str
     container: str
@@ -78,12 +107,21 @@ class Handler:
         return job.apply_url or job.url
 
     async def open(self, page: Page, job: JobInfo) -> None:
-        await page.goto(self.form_url(job), wait_until="domcontentloaded", timeout=60000)
-        await page.locator(self.container).first.wait_for(timeout=30000)
-        # Let React finish hydrating, or it resets fields filled too early. Pages that
-        # long-poll never go idle; the refill check after filling covers those.
-        with contextlib.suppress(Exception):
-            await page.wait_for_load_state("networkidle", timeout=15000)
+        await goto(page, self.form_url(job))
+        with timing.step("wait for page"):
+            try:
+                await page.locator(self.container).first.wait_for(timeout=30000)
+            except PlaywrightError:
+                text = await page.evaluate("() => document.body ? document.body.innerText : ''")
+                if closed_text(f"{await page.title()} {text[:5000]}"):
+                    raise PostingGone("the posting is gone") from None
+                raise
+            # Let React finish hydrating, or it resets fields filled too early. Pages that
+            # long-poll never go idle; the refill check after filling covers those.
+            try:
+                await page.wait_for_load_state("networkidle", timeout=15000)
+            except PlaywrightError:
+                timing.note("the form never went quiet; stopped waiting after 15 s")
 
     async def questions(self, page: Page, job: JobInfo) -> list[Question]:
         return await extract(page, self.container, self.label, self.description, self.ignore)
@@ -134,4 +172,4 @@ class Handler:
         raise NotImplementedError
 
     async def follow_link(self, page: Page, link: str) -> None:
-        await page.goto(link, wait_until="domcontentloaded", timeout=60000)
+        await goto(page, link)

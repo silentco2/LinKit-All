@@ -242,3 +242,19 @@ def test_vault_for_key_is_per_data_dir(db: sessionmaker[Session], tmp_path: Path
     b = vault_for(Settings(data_dir=tmp_path / "b"), db)
     assert a._key_id != b._key_id
     assert a._key_id == vault_for(Settings(data_dir=tmp_path / "a"), db)._key_id
+
+
+def test_vault_secrets_are_never_sent_to_the_ai(
+    vault: Vault, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Group D's outbound guard (providers.base) learns every secret the vault stores or reads."""
+    from linkit_all.providers import base
+
+    monkeypatch.setattr(base, "_credentials", set())
+    written = "Wr1tten-App-Pass-7781"
+    entry = vault.put("imap", "imap.gmail.com", "me@x.io", written)
+    assert base.has_credential(f"please use {written} to sign in")
+    base._credentials.clear()
+    assert vault.get(entry) == written  # reading it teaches the guard too
+    assert base.has_credential(f"the code is {written}")
+    assert not base.has_credential("an ordinary prompt about a job")
