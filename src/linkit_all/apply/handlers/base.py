@@ -78,8 +78,14 @@ _DROPPED = re.compile(
 )
 
 
+_STALLED = re.compile(r"\bTimeout \d+ms exceeded\b")
+RETRY_TIMEOUT_MS = 30000  # a load that stalled once gets this much on its second try
+
+
 async def goto(page: Page, url: str, timeout_ms: int = 60000) -> None:
-    """Open `url` in `page`, once more after a short wait if the site dropped the connection."""
+    """Open `url` in `page`, once more after a short wait if the site dropped the connection or
+    the load stalled (Chrome on Windows sometimes hangs a navigation that loads at once on a
+    second try)."""
     with timing.step("load page"):
         timing.note(urlparse(url).netloc)
         for attempt in (1, 2):
@@ -87,9 +93,12 @@ async def goto(page: Page, url: str, timeout_ms: int = 60000) -> None:
                 await page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
                 return
             except PlaywrightError as e:
-                if attempt == 2 or not _DROPPED.search(str(e)):
+                dropped, stalled = _DROPPED.search(str(e)), _STALLED.search(str(e))
+                if attempt == 2 or not (dropped or stalled):
                     raise
-                timing.note("the site dropped the connection; tried again")
+                timing.note("the load stalled; tried again" if stalled else
+                            "the site dropped the connection; tried again")  # fmt: skip
+                timeout_ms = RETRY_TIMEOUT_MS if stalled else timeout_ms
                 await page.wait_for_timeout(3000)
 
 

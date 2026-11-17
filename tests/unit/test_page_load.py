@@ -40,3 +40,25 @@ def test_other_failures_are_not_retried(errors: list[str]) -> None:
     with pytest.raises(PlaywrightError):
         asyncio.run(goto(page, "https://x.test"))  # type: ignore[arg-type]
     assert page.calls == len(errors)
+
+
+def test_a_stalled_load_is_tried_once_more_with_a_shorter_limit() -> None:
+    timeouts: list[int] = []
+
+    class Stalls(FakePage):
+        async def goto(self, url: str, **kw: Any) -> None:
+            timeouts.append(kw["timeout"])
+            await super().goto(url, **kw)
+
+    page = Stalls(
+        'Page.goto: Timeout 60000ms exceeded.\nCall log:\n  - navigating to "https://x.test"'
+    )
+    asyncio.run(goto(page, "https://x.test"))  # type: ignore[arg-type]
+    assert (page.calls, timeouts) == (2, [60000, 30000])
+
+
+def test_a_load_that_stalls_twice_fails() -> None:
+    page = FakePage("Page.goto: Timeout 60000ms exceeded.", "Page.goto: Timeout 30000ms exceeded.")
+    with pytest.raises(PlaywrightError):
+        asyncio.run(goto(page, "https://x.test"))  # type: ignore[arg-type]
+    assert page.calls == 2
