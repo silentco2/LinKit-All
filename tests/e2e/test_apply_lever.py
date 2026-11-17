@@ -165,9 +165,11 @@ def test_lever_dry_run_action_center_confirm_and_submit(env: dict[str, Any]) -> 
     assert filled["Full name"]["value"] == "Jane Doe"
     assert filled["Resume/CV"]["value"] == "resume.pdf"
     assert any(v["value"] == "No, I do not consent" for v in filled.values())
-    assert not any(
-        "marketing" in k.lower() or "future job opportunities" in k for k in filled
-    )  # optional consent
+    # an optional "contact me about future jobs" opt-in follows the profile (default No): left
+    # unticked, never opted in (answers.opt_in_answer)
+    opt_ins = [v for k, v in filled.items() if "future job opportunities" in k]
+    assert opt_ins == [{"value": False, "source": "profile"}]
+    assert not any("marketing" in k.lower() and v["value"] for k, v in filled.items())
     assert env["posts"] == []
 
     # 4. Live, but each submission waits for the user's click.
