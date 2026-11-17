@@ -13,7 +13,9 @@ def test_a_step_counts_only_its_own_time_and_slow_ones_keep_their_note(monkeypat
     t = timing.start()
     try:
         with timing.step("load page"):
+            a = time.perf_counter()
             time.sleep(0.05)
+            outer = time.perf_counter() - a  # what the sleep really took on this machine
             with timing.step("AI FieldMap"):
                 timing.note("fresh call")
                 time.sleep(0.05)
@@ -23,7 +25,11 @@ def test_a_step_counts_only_its_own_time_and_slow_ones_keep_their_note(monkeypat
         timing.stop()
     s = t.summary()
     load, ai = s["steps"]["load page"], s["steps"]["AI FieldMap"]
-    assert 0.04 < load[0] < 0.09 and ai[1] == 2  # the inner step is not counted twice
+    # Compared with the measured sleep, not fixed bounds: a slow CI runner oversleeps. The
+    # inner step's 0.05 s is not counted twice, so "load page" stays near its own sleep.
+    # (the summary rounds to 0.01 s)
+    assert outer - 0.01 <= load[0] < outer + 0.03 and ai[1] == 2
+    assert ai[0] >= 0.04
     assert {"step": "AI FieldMap", "s": 0.1, "note": "fresh call"} in s["slow"] or any(
         x["step"] == "AI FieldMap" and x["note"] == "fresh call" for x in s["slow"]
     )
