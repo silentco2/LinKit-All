@@ -48,7 +48,7 @@ discovered -> enriched -> filtered_out | ranked -> scored
 scored -> below_threshold (low) | awaiting_review (mid) | queued_apply (high/approved/low opt-in)
 queued_apply -> tailored -> applying -> needs_user -> applied | failed | skipped
 ```
-Tailoring happens just before applying, never for jobs that will not be applied to.
+Tailoring happens just before applying, After applied, jobs.outcome (no_reply, rejected, interview, offer, hired, declined) records what happened; the state stays applied.
 - Every transition writes a `job_events` row (timestamp, state, message, artifact paths).
 - Every stage is idempotent, resumable after crash or pause, and runnable alone (CLI + API).
 
@@ -84,7 +84,7 @@ Tailoring happens just before applying, never for jobs that will not be applied 
 
 ### 5.3 Matching (`matching/`)
 1. Hard rules: titles include/exclude, location (if not remote), remote mode, seniority, posted date,
-   salary floor, company blacklist, one application per company (default on).
+   salary floor, company blacklist, one application per company (default on), years asked in the JD body (label or drop), dealbreaker phrases
 2. Local rank: 0.8 cosine(CV, JD) + 0.2 skills overlap; fastembed multilingual MiniLM-L12
    (Arabic + English, chunked). Free, no AI calls.
 3. Trust check (offline, no AI): scam score (fees, off-platform contact, mule/crypto/ID requests,
@@ -108,7 +108,7 @@ Tailoring happens just before applying, never for jobs that will not be applied 
 
 ### 5.5 Apply (`apply/`)
 - Order: per-ATS handler -> generic AI form agent (accessibility-tree snapshot -> field map JSON -> fill -> validate -> next) -> Action Center.
-  Handlers today: Greenhouse, Lever, Ashby; every other site (Workday, iCIMS, Taleo, ...) falls back to the generic agent.
+  Handlers today: Greenhouse, Lever, Ashby; every other site (Workday, iCIMS, Taleo, ...) falls back to the generic agent A rules-only knock-out pre-scan (apply/knockout.py) parks knockout before filling; per-host quirks live in apply/quirks.py.
   On a job ad (board listing) the agent presses Apply (<= 3 hops) and hands Greenhouse/Lever/Ashby links to their handler.
 - Headedless browser (apply.headless), persistent profile per site, human pacing, per-site daily caps, 1–3 parallel
   browsers. Jobs closed on Greenhouse/Lever/Ashby are skipped before tailoring.
@@ -127,7 +127,7 @@ Tailoring happens just before applying, never for jobs that will not be applied 
   Dead ends park `apply_by_hand` (link, CV, answers so far). No CAPTCHA solving: CAPTCHAs park for the user.
 - Email applications (`mailto:`, `apply/email_apply.py`): Gmail/Yahoo SMTP or Outlook Graph; short cover
   email (greeting/signature in code, body from the model, CV/profile only), subject = job title, the CV as uploaded (never tailored). Dry run writes an
-  .eml only; live follows "submit without asking" (else `confirm_email`). 15/day, never the same address twice. LinkIt mail: hover an address in a page, the extension offers to email it; the press is the go-ahead, sent at once (live only, `POST /api/assist/email`).
+  .eml only; live follows "submit without asking" (else `confirm_email`). 15/day, never the same address twice, except one follow-up after apply.followup_days without a reply (apply/followup.py; sent live with “submit without asking”, else a history note). LinkIt mail: hover an address in a page, the extension offers to email it; the press is the go-ahead, sent at once (live only, `POST /api/assist/email`).
 - Names (`core/names.py`): split on spaces; other script from the bundled arabnamer list, no AI. Cover letter only if the form has a field. All AI-written prose is English only, never Arabic (copying stays verbatim). Screenshot before submit and on confirmation; trace on failure.
 - Success = confirmation page text and/or email, else failed with reason, never assumed. A sent email = applied
   (by email); the sent message is the proof.
@@ -138,7 +138,7 @@ approve/reject); <5 or dropped by prefilter = `low` -> hidden, but the user may 
 
 ### 5.7 Action Center (UI: "Needs you", tabs Approve jobs = review, Finish applications)
 Parked: unknown_question, confirm_submit, confirm_email, captcha, validation_error, login_issue,
-two_factor, apply_by_hand, apply_in_browser ("Open in my browser", "I applied"). Reopen via "Open in app browser" (same browser profile), then Retry. Notify via
+two_factor, apply_by_hand, apply_in_browser ("Open in my browser", "I applied"), knockout ("Apply anyway"). Reopen via "Open in app browser" (same browser profile), then Retry. Notify via
 WebSocket + optional desktop notification. Open questions are grouped and answered once for many; sensitive
 ones group only on exact wording. One-time "always" choices (agreements, notice period, relocation,
 demographics) are saved to the profile.
@@ -152,7 +152,7 @@ Derived by rules. AI gap-fill must be verbatim from the CV (checked). On CV uplo
 - App data under platformdirs user data dir: db, CVs, tailored versions, screenshots, traces.
 - Vault: AES-GCM, key from master passphrase via Argon2id, cached with keyring; export re-asks it.
   Created just in time (first account sign-up or Gmail added), not as a setup step. Crypto unchanged.
-- IMAP/SMTP: app passwords (Gmail, Yahoo). Outlook/Hotmail: msal loopback sign-in (our Azure app id in config; `LINKIT_MS_CLIENT_ID` overrides), token cache in vault, mail via Microsoft Graph (IMAP XOAUTH2 fails server-side for personal accounts).
+- IMAP/SMTP: app passwords (Gmail, Yahoo). Outlook/Hotmail: msal loopback sign-in (our Azure app id in config; `LINKIT_MS_CLIENT_ID` overrides), token cache in vault, mail via Microsoft Graph (IMAP XOAUTH2 fails server-side for personal accounts) Opt-in email.read_replies: replies are matched by rules on this machine to set outcomes; never sent to the AI or logged.
 - External tools: LibreOffice required (DOCX->PDF), Chromium for applying (not needed with Chrome, Edge or Brave), Tectonic for LaTeX.
   `linkit doctor` checks them. End-user install: `uv tool install linkit-all`.
 - LibreOffice: minimal portable bundle (Win 1.6 GB -> 439 MB) from `scripts/bundle_libreoffice.py` (removals kept only if renders stay identical);
@@ -178,7 +178,7 @@ src/linkit_all/
   tailor/     docx/, latex/, odt/, pdf_in/, render/, verify/
   apply/      handlers/<ats>.py, agent/, accounts/, vault/, email_verify/, answers/, probe.py
   extension/  LinkIt Fill browser extension (MV3, plain JS; snapshot.js mirrors apply/agent/snapshot.js)
-  reports/ · cli.py  `linkit` (serve), `linkit doctor`, `linkit run <stage>`, `linkit apply-probe`
+  reports/ · cli.py  `linkit` (serve), `linkit doctor`, `linkit run <stage>`, `linkit apply-probe`, `linkit filter-audit`, `linkit why-missed`, `linkit seed-boards`, `linkit find-board`
 frontend/     Angular 21 app (pages: welcome, home, jobs, needs-you, settings/) -> src/linkit_all/static (Angular 22 needs Node >= 24.15)
 tests/        unit, fixtures/<ats>/*.html, e2e (dry-run only) · docs/
 ```
@@ -190,11 +190,11 @@ tests/        unit, fixtures/<ats>/*.html, e2e (dry-run only) · docs/
 - Ask before updating this file when a decision in it changes (max 200 lines). Unsure? Ask; don't guess.
 
 ## 10. Build order
-Phases 1-13 are built; blocked items: handoff.md. 1 core, models, providers, DOCX tailoring · 2 discovery + matching
+Phases 1-14 are built; blocked items: handoff.md. 1 core, models, providers, DOCX tailoring · 2 discovery + matching
 · 3 UI v1 · 4 apply v1 (Greenhouse, Lever, Ashby, answer bank, Action Center) · 5 vault, IMAP, account gate
 (Workday/iCIMS/Taleo/SuccessFactors blocked: need pages) · 6 careers extractor, AI form agent (Naukrigulf blocked)
 · 7 local models, LaTeX/ODT/PDF CVs, scheduler, reports, Arabic UI, Outlook OAuth (pending: macOS/Linux LO bundles,
-release) · 8 freehire ports · 9 debt · 10 trust filter · 11 LinkedIn hiring posts · 12 UX for V1 (UX7 usability round pending) · 13 autonomous apply: Apply-button hops, board accounts, assisted sites + LinkIt Fill, apply-probe.
+release) · 8 freehire ports · 9 debt · 10 trust filter · 11 LinkedIn hiring posts · 12 UX for V1 (UX7 usability round pending) · 13 autonomous apply: Apply-button hops, board accounts, assisted sites + LinkIt Fill, apply-probe · 14 career-ops ideas: knock-outs, outcomes, replies, follow-ups, 52 sources (docs/career-ops-borrow-plan.md).
 
 ## 11. License
 AGPL-3.0-or-later (code reused from ApplyPilot/AIHawk). Reused files keep original headers, listed in NOTICE.
