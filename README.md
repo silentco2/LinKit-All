@@ -2,7 +2,7 @@
 
 **Open-source AI job search that runs on your computer: it finds jobs, ranks them against your CV, tailors your CV honestly and fills in the applications.**
 
-[Docs](https://silentco2.github.io/LinKit-All/) · [Install](https://silentco2.github.io/LinKit-All/install/) · [Compared with AIHawk and ApplyPilot](https://silentco2.github.io/LinKit-All/compare/) · [Changelog](https://github.com/silentco2/LinKit-All/blob/main/CHANGELOG.md)
+[Docs](https://silentco2.github.io/LinKit-All/docs/) · [Install](https://silentco2.github.io/LinKit-All/docs/install/) · [Compared with AIHawk and ApplyPilot](https://silentco2.github.io/LinKit-All/docs/compare/) · [Changelog](https://github.com/silentco2/LinKit-All/blob/main/CHANGELOG.md)
 
 You bring your own AI: a ChatGPT plan (Codex CLI), a Claude plan (Claude Code CLI), an API key, or a local model such as Ollama or LM Studio. It works on Windows, macOS and Linux, in English and Arabic.
 
@@ -30,7 +30,7 @@ linkit doctor     # checks LibreOffice, the browser and your AI tools
 linkit            # opens http://127.0.0.1:8765
 ```
 
-The first run opens a setup page: upload your CV, pick an AI, check what was found, say what jobs you want. Step-by-step for each system: [Install](https://silentco2.github.io/LinKit-All/install/). Then [Setup](https://silentco2.github.io/LinKit-All/setup/).
+The first run opens a setup page: upload your CV, pick an AI, check what was found, say what jobs you want. Step-by-step for each system: [Install](https://silentco2.github.io/LinKit-All/docs/install/). Then [Setup](https://silentco2.github.io/LinKit-All/docs/setup/).
 
 - **LibreOffice** is needed to tailor Word, OpenDocument and PDF CVs (LaTeX CVs need Tectonic instead). Without it, applications go out with your CV as uploaded. On Windows the app installs it for you in one click.
 - **Applying** needs Chrome, Edge, Brave or Chromium. Finding and ranking jobs do not.
@@ -62,7 +62,7 @@ A built-in fake job board generates made-up jobs whose right answers are known: 
 
 CV tailoring guard, rules only (no AI reads the edits). The test planted 25 edits that we wrote for it: 6 honest and 19 that must be refused. Of those 19, 15 invent or change a fact (a changed employer, date, metric or email, an inflated title, an unlisted tool, a bigger role) and 4 break a formatting rule (Arabic text, a line break, text that is not in the CV, a segment grown far past its length). 17 of the 19 were refused and all 6 honest edits accepted. The 2 that got through were a tool the rules do not know and a bigger role said in other words. This is a small set of cases, not a guarantee that invented edits never get through.
 
-Real sites: `uv run linkit apply-probe` tries real postings in Practice mode. The [scorecard](https://silentco2.github.io/LinKit-All/scorecard/) covers 115 real postings run in Practice mode with a made-up test profile. Nothing was submitted. Of the 70 jobs the app may finish on its own, 67 (96%) went as far as Practice mode allows: the form filled to the last step, a sign-up page reached, or the ad found closed. Not counted: 39 jobs left waiting for an answer or a decision only you can give, and 6 jobs on sites the app never drives (such as LinkedIn), which you apply to in your own browser. It is a small sample, not a success rate.
+Real sites: `uv run linkit apply-probe` tries real postings in Practice mode. The [scorecard](https://silentco2.github.io/LinKit-All/docs/scorecard/) covers 115 real postings run in Practice mode with a made-up test profile. Nothing was submitted. Of the 70 jobs the app may finish on its own, 67 (96%) went as far as Practice mode allows: the form filled to the last step, a sign-up page reached, or the ad found closed. Not counted: 39 jobs left waiting for an answer or a decision only you can give, and 6 jobs on sites the app never drives (such as LinkedIn), which you apply to in your own browser. It is a small sample, not a success rate.
 
 ## Limits
 
@@ -87,13 +87,13 @@ Real sites: `uv run linkit apply-probe` tries real postings in Practice mode. Th
 - LinKit All itself contacts nothing else. The browser it drives, the pages that browser loads, the AI command-line tool you pick, and Tectonic (which downloads TeX files the first time it compiles a LaTeX CV) make their own connections, which the app does not control.
 - If you turn on "Read employer replies", the app also reads recent inbox mail to spot rejections and interview invitations, by rules on your computer. That mail is never sent to the AI or logged.
 - There is no telemetry, analytics or crash reporting.
-- LinKit All never asks the AI to answer sensitive questions and never adds your saved answers to a prompt. The form agent does send a short piece of the page's own text to the AI, with your sensitive answers removed first. A value shown in a different form can still get through; see [docs/privacy.md](https://silentco2.github.io/LinKit-All/privacy/). Your passwords are never sent to the AI.
+- LinKit All never asks the AI to answer sensitive questions and never adds your saved answers to a prompt. The form agent does send a short piece of the page's own text to the AI, with your sensitive answers removed first. A value shown in a different form can still get through; see [docs/privacy.md](https://silentco2.github.io/LinKit-All/docs/privacy/). Your passwords are never sent to the AI.
 
-Details: [Privacy and security](https://silentco2.github.io/LinKit-All/privacy/).
+Details: [Privacy and security](https://silentco2.github.io/LinKit-All/docs/privacy/).
 
 ## Docs
 
-[Install](https://silentco2.github.io/LinKit-All/install/) · [Setup](https://silentco2.github.io/LinKit-All/setup/) · [Sources](https://silentco2.github.io/LinKit-All/sources/) · [Matching](https://silentco2.github.io/LinKit-All/matching/) · [Job trust check](https://silentco2.github.io/LinKit-All/trust/) · [Tailoring](https://silentco2.github.io/LinKit-All/tailoring/) · [Applying](https://silentco2.github.io/LinKit-All/applying/) · [Action Center](https://silentco2.github.io/LinKit-All/action-center/) · [Scheduling and reports](https://silentco2.github.io/LinKit-All/scheduling-reports/) · [LinkedIn posts](https://silentco2.github.io/LinKit-All/linkedin-posts/) · [CLI](https://silentco2.github.io/LinKit-All/cli/) · [Troubleshooting](https://silentco2.github.io/LinKit-All/troubleshooting/) · [Apply scorecard](https://silentco2.github.io/LinKit-All/scorecard/) · [Compared with AIHawk and ApplyPilot](https://silentco2.github.io/LinKit-All/compare/) · [Development](https://silentco2.github.io/LinKit-All/development/)
+[Install](https://silentco2.github.io/LinKit-All/docs/install/) · [Setup](https://silentco2.github.io/LinKit-All/docs/setup/) · [Sources](https://silentco2.github.io/LinKit-All/docs/sources/) · [Matching](https://silentco2.github.io/LinKit-All/docs/matching/) · [Job trust check](https://silentco2.github.io/LinKit-All/docs/trust/) · [Tailoring](https://silentco2.github.io/LinKit-All/docs/tailoring/) · [Applying](https://silentco2.github.io/LinKit-All/docs/applying/) · [Action Center](https://silentco2.github.io/LinKit-All/docs/action-center/) · [Scheduling and reports](https://silentco2.github.io/LinKit-All/docs/scheduling-reports/) · [LinkedIn posts](https://silentco2.github.io/LinKit-All/docs/linkedin-posts/) · [CLI](https://silentco2.github.io/LinKit-All/docs/cli/) · [Troubleshooting](https://silentco2.github.io/LinKit-All/docs/troubleshooting/) · [Apply scorecard](https://silentco2.github.io/LinKit-All/docs/scorecard/) · [Compared with AIHawk and ApplyPilot](https://silentco2.github.io/LinKit-All/docs/compare/) · [Development](https://silentco2.github.io/LinKit-All/docs/development/)
 
 To contribute, read [CONTRIBUTING.md](https://github.com/silentco2/LinKit-All/blob/main/CONTRIBUTING.md). To report a security problem, read [SECURITY.md](https://github.com/silentco2/LinKit-All/blob/main/SECURITY.md).
 

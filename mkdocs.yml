@@ -1,5 +1,5 @@
 site_name: LinKit All
-site_url: https://silentco2.github.io/LinKit-All/
+site_url: https://silentco2.github.io/LinKit-All/docs/
 site_description: >-
   Open-source AI job search that runs on your computer: finds jobs, ranks them against your
   CV, tailors it with small edits and fills in applications. Your data stays local.
@@ -17,7 +17,9 @@ exclude_docs: |
 theme:
   name: material
   custom_dir: overrides
-  font: false # system fonts only: no requests to Google Fonts
+  logo: assets/logo.svg
+  favicon: assets/favicon.svg
+  font: false # IBM Plex Sans is self-hosted (assets/fonts): no requests to Google Fonts
   language: en
   features:
     - navigation.sections
@@ -39,7 +41,11 @@ theme:
 plugins:
   - search # built in and fully local
 
+extra_css:
+  - assets/stylesheets/desk.css
+
 extra:
+  homepage: https://silentco2.github.io/LinKit-All/ # the header title links back to the landing page
   generator: false
   # No analytics, no feedback widgets, no social cards.
 
@@ -62,7 +68,7 @@ markdown_extensions:
       alternate_style: true
 
 nav:
-  - Home: index.md
+  - Documentation: index.md
   - Getting started:
       - Install: install.md
       - Setup wizard: setup.md

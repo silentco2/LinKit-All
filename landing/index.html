@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LinKit All: open-source AI job search that applies for you</title>
+<meta name="description" content="LinKit All finds jobs on 295 sources, tailors your CV a few words at a time and fills in the application forms on your own computer. Free, open source, no account.">
+<link rel="canonical" href="https://silentco2.github.io/LinKit-All/">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<meta name="theme-color" content="#e5e2db" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#191816" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:title" content="LinKit All: open-source AI job search that applies for you">
+<meta property="og:description" content="Finds jobs, tailors your CV and fills in applications on your own computer. Free, open source, no account.">
+<meta property="og:url" content="https://silentco2.github.io/LinKit-All/">
+<meta property="og:image" content="https://silentco2.github.io/LinKit-All/docs/assets/social.png">
+<meta name="twitter:card" content="summary_large_image">
+<script>document.documentElement.classList.add('js')</script>
+<link rel="stylesheet" href="desk.css">
+<link rel="stylesheet" href="landing.css">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"LinKit All","operatingSystem":"Windows, macOS, Linux","applicationCategory":"BusinessApplication","description":"Open-source app that finds jobs, tailors your CV and fills in applications on your own computer.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://www.gnu.org/licenses/agpl-3.0.html","url":"https://silentco2.github.io/LinKit-All/","downloadUrl":"https://pypi.org/project/linkit-all/"}
+</script>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-replay" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.5-5.8M4 4v5h5"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M12 4v8M6 7.5a8 8 0 1 0 12 0"/></symbol>
+</svg>
+<a class="skip" href="#main">Skip to content</a>
+<header class="desk-top">
+  <a class="wordmark" href="./"><span class="logo-mark" aria-hidden="true"><svg viewBox="0 0 256 256" aria-hidden="true" focusable="false"><g transform="rotate(-3 128 128)"><path fill-rule="evenodd" d="M76 24 H180 A52 52 0 0 1 232 76 V180 A52 52 0 0 1 180 232 H76 A52 52 0 0 1 24 180 V76 A52 52 0 0 1 76 24 Z M77 35 H179 A42 42 0 0 1 221 77 V179 A42 42 0 0 1 179 221 H77 A42 42 0 0 1 35 179 V77 A42 42 0 0 1 77 35 Z M77 46 H179 A31 31 0 0 1 210 77 V179 A31 31 0 0 1 179 210 H77 A31 31 0 0 1 46 179 V77 A31 31 0 0 1 77 46 Z M125.63 160.96 L125.68 160.47 L125.82 160 L126.06 159.57 L126.37 159.19 L126.75 158.88 L127.18 158.65 L127.65 158.51 L128.13 158.46 L128.62 158.51 L129.09 158.65 L129.52 158.88 L129.9 159.19 L147.3 176.59 L147.39 176.67 L147.63 176.87 L147.83 177 L148.05 177.12 L148.27 177.21 L148.51 177.28 L148.75 177.33 L149.05 177.36 L149.18 177.37 L173.09 177.37 L173.22 177.36 L173.52 177.33 L173.76 177.28 L173.99 177.21 L174.22 177.12 L174.44 177 L174.64 176.87 L174.83 176.71 L175 176.54 L175.16 176.35 L175.29 176.15 L175.41 175.93 L175.5 175.7 L175.57 175.47 L175.62 175.23 L175.64 174.99 L175.64 174.74 L175.62 174.5 L175.57 174.26 L175.5 174.03 L175.41 173.8 L175.29 173.58 L175.16 173.38 L174.96 173.14 L174.88 173.05 L148.96 147.13 L148.65 146.75 L148.42 146.32 L148.27 145.85 L148.23 145.37 L148.27 144.88 L148.42 144.41 L148.65 143.98 L148.96 143.6 L201.6 90.95 L201.68 90.86 L201.88 90.63 L202.01 90.42 L202.13 90.21 L202.22 89.98 L202.29 89.75 L202.34 89.51 L202.37 89.27 L202.37 89.02 L202.34 88.78 L202.29 88.54 L202.22 88.3 L202.13 88.08 L202.01 87.86 L201.88 87.66 L201.68 87.42 L201.6 87.33 L189.67 75.4 L189.58 75.32 L189.34 75.12 L189.14 74.99 L188.92 74.87 L188.7 74.78 L188.46 74.71 L188.22 74.66 L187.98 74.63 L187.73 74.63 L187.49 74.66 L187.25 74.71 L187.02 74.78 L186.79 74.87 L186.58 74.99 L186.37 75.12 L186.14 75.32 L186.05 75.4 L129.9 131.54 L129.52 131.85 L129.09 132.08 L128.62 132.23 L128.13 132.27 L127.65 132.23 L127.18 132.08 L126.75 131.85 L126.37 131.54 L126.06 131.16 L125.82 130.73 L125.68 130.26 L125.63 129.77 L125.63 83.93 L125.63 83.8 L125.6 83.5 L125.55 83.26 L125.48 83.03 L125.39 82.8 L125.27 82.58 L125.14 82.38 L124.98 82.19 L124.81 82.02 L124.62 81.86 L124.42 81.73 L124.2 81.61 L123.97 81.52 L123.74 81.45 L123.5 81.4 L123.2 81.37 L123.07 81.37 L103.2 81.37 L103.07 81.37 L102.77 81.4 L102.53 81.45 L102.3 81.52 L102.07 81.61 L101.85 81.73 L101.65 81.86 L101.46 82.02 L101.29 82.19 L101.13 82.38 L101 82.58 L100.88 82.8 L100.79 83.03 L100.72 83.26 L100.67 83.5 L100.64 83.8 L100.63 83.93 L100.63 174.8 L100.64 174.93 L100.67 175.23 L100.72 175.47 L100.79 175.7 L100.88 175.93 L101 176.15 L101.13 176.35 L101.29 176.54 L101.46 176.71 L101.65 176.87 L101.85 177 L102.07 177.12 L102.3 177.21 L102.53 177.28 L102.77 177.33 L103.07 177.36 L103.2 177.37 L123.07 177.37 L123.2 177.36 L123.5 177.33 L123.74 177.28 L123.97 177.21 L124.2 177.12 L124.42 177 L124.62 176.87 L124.81 176.71 L124.98 176.54 L125.14 176.35 L125.27 176.15 L125.39 175.93 L125.48 175.7 L125.55 175.47 L125.6 175.23 L125.63 174.93 L125.63 174.8 Z M53.63 174.8 L53.64 174.93 L53.67 175.23 L53.72 175.47 L53.79 175.7 L53.88 175.93 L54 176.15 L54.13 176.35 L54.29 176.54 L54.46 176.71 L54.65 176.87 L54.85 177 L55.07 177.12 L55.3 177.21 L55.53 177.28 L55.77 177.33 L56.07 177.36 L56.2 177.37 L76.07 177.37 L76.2 177.36 L76.5 177.33 L76.74 177.28 L76.97 177.21 L77.2 177.12 L77.42 177 L77.62 176.87 L77.81 176.71 L77.98 176.54 L78.14 176.35 L78.27 176.15 L78.39 175.93 L78.48 175.7 L78.55 175.47 L78.6 175.23 L78.63 174.93 L78.63 174.8 L78.63 83.93 L78.63 83.8 L78.6 83.5 L78.55 83.26 L78.48 83.03 L78.39 82.8 L78.27 82.58 L78.14 82.38 L77.98 82.19 L77.81 82.02 L77.62 81.86 L77.42 81.73 L77.2 81.61 L76.97 81.52 L76.74 81.45 L76.5 81.4 L76.2 81.37 L76.07 81.37 L56.2 81.37 L56.07 81.37 L55.77 81.4 L55.53 81.45 L55.3 81.52 L55.07 81.61 L54.85 81.73 L54.65 81.86 L54.46 82.02 L54.29 82.19 L54.13 82.38 L54 82.58 L53.88 82.8 L53.79 83.03 L53.72 83.26 L53.67 83.5 L53.64 83.8 L53.63 83.93 Z"/></g></svg></span>LinKit All</a>
+  <nav aria-label="Project links">
+    <a class="nav-link" href="docs/">Docs</a>
+    <a class="nav-link" href="https://github.com/silentco2/LinKit-All">GitHub</a>
+    <a class="nav-link" href="https://pypi.org/project/linkit-all/">PyPI</a>
+  </nav>
+</header>
+
+<main id="main">
+  <!-- HERO -->
+  <section class="wrap" aria-labelledby="hero-h">
+    <div class="stage" id="stage">
+      <div class="hero-grid">
+        <div class="hero-text hs" style="--d:0s">
+          <h1 id="hero-h">It applies to jobs for you. On your own computer.</h1>
+          <p class="lede">LinKit All finds jobs on 295 sources, tailors your CV a few words at a time, and fills in the application forms. Questions it should not guess wait for you.</p>
+          <div class="actions">
+            <a class="btn btn-primary" href="docs/install/">Install</a>
+            <a class="btn" href="docs/">Read the docs</a>
+          </div>
+        </div>
+
+        <div class="formcol hs hf" style="--d:0.25s">
+          <div class="sheet appform has-cv has-note has-banner real has-proof stamped" id="appform">
+            <p class="sr">Sample: an application form fills itself in. Practice mode stops before Submit. When applying for real, it ends with the Applied stamp after a confirmation page is seen. The visa question stays empty for you.</p>
+            <div aria-hidden="true">
+              <div class="af-head"><h2>Product Analyst, Northwind Labs</h2><span class="small">Sample</span></div>
+              <div class="mode"><span class="m1">Practice mode</span><span class="m2">Applying for real</span></div>
+              <div class="fld" data-f="0"><b>Name</b><div class="val"><span class="v" data-text="Sara Haddad">Sara Haddad</span></div></div>
+              <div class="fld" data-f="1"><b>Email</b><div class="val"><span class="v" data-text="sara.haddad@example.com">sara.haddad@example.com</span></div></div>
+              <div class="fld" data-f="2"><b>CV</b><div class="val"><span class="file"><svg class="icon"><use href="#i-check"/></svg>cv-product-analyst.pdf</span></div></div>
+              <div class="fld" data-f="3"><b>Why this role?</b><div class="val tall"><span class="v" data-text="Funnel analysis is the work I enjoy most, and this team ships it weekly.">Funnel analysis is the work I enjoy most, and this team ships it weekly.</span></div></div>
+              <div class="fld" data-f="4"><b>Do you need visa sponsorship?</b><div class="val"><em class="ask">Empty on purpose</em></div><p class="note pin" style="--r:2.5deg">Left for you</p></div>
+              <p class="banner"><svg class="icon"><use href="#i-pause"/></svg>Practice mode: Submit not pressed</p>
+              <p class="proof"><svg class="icon"><use href="#i-check"/></svg>Confirmation page seen</p>
+              <div class="stampwrap"><span class="stamp">Applied</span></div>
+            </div>
+          </div>
+          <div class="formcap">
+            <p class="small">Sample form on a practice job board.</p>
+            <button class="btn btn-sm" type="button" id="replay" hidden><svg class="icon"><use href="#i-replay"/></svg>Replay</button>
+          </div>
+        </div>
+
+        <div class="screen-wrap hs" style="--d:0.1s">
+          <p class="small screen-label">Sample run</p>
+          <div class="screen" role="group" aria-label="Sample of the Home screen">
+            <div class="folder-tabs">
+              <div class="folder-tab"><strong data-count="1284">1,284</strong><span>Found</span></div>
+              <div class="folder-tab"><strong data-count="37">37</strong><span>Strong</span></div>
+              <div class="folder-tab"><strong data-count="112">112</strong><span>Possible</span></div>
+              <div class="folder-tab"><strong data-count="18">18</strong><span>Applied</span></div>
+              <div class="folder-tab"><strong class="stop" data-count="4">4</strong><span>Needs you</span></div>
+            </div>
+            <div class="folder">
+              <div class="steps">
+                <div class="step"><header><h3>Find jobs</h3><span class="state done"><svg class="icon"><use href="#i-check"/></svg>Done</span></header><p>1,284 jobs from 295 sources</p></div>
+                <div class="step"><header><h3>Rank and score</h3><span class="state done"><svg class="icon"><use href="#i-check"/></svg>Done</span></header><p>37 strong, 112 possible</p></div>
+                <div class="step"><header><h3>Apply</h3><span class="state">Running, 18 of 37</span></header>
+                  <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="37" aria-valuenow="18" aria-label="Applications"><i></i></div></div>
+              </div>
+              <aside class="tray" aria-label="Needs you">
+                <h3>Needs you</h3>
+                <ul><li><span>Visa question</span><span>3 jobs</span></li><li><span>Confirm submit</span><span>1 job</span></li></ul>
+              </aside>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="notes">
+        <p class="note hs hn" style="--d:1.1s">295 sources: job APIs, boards, career pages</p>
+        <p class="note hs hn" style="--d:1.25s">Practice mode never presses Submit</p>
+        <p class="note hs hn" style="--d:1.4s">Sensitive questions wait for you</p>
+        <p class="note hs hn" style="--d:1.55s">Your data stays on this computer</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- AUTO-APPLY -->
+  <section class="wrap band" id="applies" aria-labelledby="ap-h">
+    <h2 id="ap-h" data-rv="sheet">It applies for you.</h2>
+    <p class="lede" data-rv="sheet">Forms get filled, sites that need an account get one, and anything that should be your call comes back to you. This is the part of a job search that is mostly typing.</p>
+    <div class="ap-board">
+      <article class="sheet p-forms" data-rv="sheet">
+        <h3>Forms, typed by code</h3>
+        <ul class="route">
+          <li><ul class="chips"><li class="chip">Greenhouse</li><li class="chip">Lever</li><li class="chip">Ashby</li></ul><span class="to"><svg class="icon"><use href="#i-arrow"/></svg>Dedicated handler</span></li>
+          <li><ul class="chips"><li class="chip">Workday</li><li class="chip">iCIMS</li><li class="chip">Taleo</li><li class="chip">and more</li></ul><span class="to"><svg class="icon"><use href="#i-arrow"/></svg>AI form agent</span></li>
+        </ul>
+        <p>The agent reads the page and maps the fields. The model only decides. LinKit's own code does the typing.</p>
+      </article>
+      <article class="sheet p-ads" data-rv="sheet" style="--d:0.08s">
+        <h3>Job ads, followed to the form</h3>
+        <ol class="hops"><li class="chip">Job ad</li><li class="chip go">Apply</li><li class="chip go">Apply</li><li class="chip">Form</li></ol>
+        <p>It presses Apply and follows up to 3 hops to the real form.</p>
+      </article>
+      <article class="sheet p-acct" data-rv="sheet">
+        <h3>Accounts, when a site wants one</h3>
+        <ol class="steps-ol">
+          <li>A unique password is made.</li>
+          <li>It goes into the encrypted vault before sign-up.</li>
+          <li>The email code or link is verified (Gmail, Yahoo, Outlook).</li>
+        </ol>
+      </article>
+      <article class="sheet p-mail" data-rv="sheet" style="--d:0.08s">
+        <h3>Email applications</h3>
+        <p class="mailhead">To: <b>jobs@example.com</b> &nbsp; Subject: <b>Product Analyst</b></p>
+        <p>A short cover email with your CV as uploaded.</p>
+        <ul class="chips"><li class="chip">Up to 15 a day</li><li class="chip">Never the same address twice</li><li class="chip">One follow-up if no reply</li></ul>
+      </article>
+      <article class="sheet p-hand" data-rv="sheet">
+        <h3>LinkedIn, Indeed, Glassdoor: never driven</h3>
+        <p>Accounts there get banned, so LinKit does not touch them. The LinkIt Fill browser extension fills the form in your own browser, and you press Submit.</p>
+      </article>
+      <article class="sheet p-ask" data-rv="sheet" style="--d:0.08s">
+        <h3>Screening questions</h3>
+        <ul class="qlist">
+          <li><span>In your answer bank</span><span>Filled</span></li>
+          <li><span>Not there yet</span><span>Drafted from your profile</span></li>
+          <li><span>Visa, salary, demographics</span><span>From your profile, or waits in Needs you</span></li>
+        </ul>
+      </article>
+      <article class="sheet p-prac" data-rv="sheet">
+        <div>
+          <h3>Practice mode first</h3>
+          <p>It fills everything, takes screenshots and never presses Submit. Applying for real is a switch you turn on. A job counts as applied only with proof: a confirmation page or an email. Without it the job is marked failed, with the reason.</p>
+        </div>
+        <span class="stamp">Applied</span>
+      </article>
+    </div>
+  </section>
+
+  <!-- PIPELINE -->
+  <section class="wrap band pipe" id="pipeline" aria-labelledby="pipe-h">
+    <h2 id="pipe-h" data-rv="sheet">Everything before the application</h2>
+    <p class="lede" data-rv="sheet">Five steps, each one runnable on its own. Open a folder tab.</p>
+    <div data-rv="sheet">
+      <div class="folder-tabs" role="tablist" aria-label="Pipeline steps">
+        <button class="folder-tab" role="tab" id="t-find" aria-controls="p-find" aria-selected="true"><strong>Find</strong><span>295 sources</span></button>
+        <button class="folder-tab" role="tab" id="t-check" aria-controls="p-check" aria-selected="false" tabindex="-1"><strong>Check</strong><span>Scams, ghosts</span></button>
+        <button class="folder-tab" role="tab" id="t-rank" aria-controls="p-rank" aria-selected="false" tabindex="-1"><strong>Rank</strong><span>Match tiers</span></button>
+        <button class="folder-tab" role="tab" id="t-tailor" aria-controls="p-tailor" aria-selected="false" tabindex="-1"><strong>Tailor</strong><span>A few words</span></button>
+        <button class="folder-tab" role="tab" id="t-report" aria-controls="p-report" aria-selected="false" tabindex="-1"><strong>Report</strong><span>Funnel, export</span></button>
+      </div>
+      <div class="folder">
+        <div class="panel" role="tabpanel" id="p-find" aria-labelledby="t-find" tabindex="0">
+          <div><h3>Find</h3><p>One search across public job APIs, job boards, regional sites and any careers page you paste. Duplicates are merged, and each site is paced so it is not hammered.</p></div>
+          <div class="sheet"><ul class="chips"><li class="chip">Greenhouse</li><li class="chip">Lever</li><li class="chip">Ashby</li><li class="chip">Workday</li><li class="chip">100+ more job APIs</li><li class="chip">LinkedIn, Indeed, Glassdoor via JobSpy</li><li class="chip">ZipRecruiter, Google, Bayt</li><li class="chip">Wuzzuf, Forasna</li><li class="chip">Any careers page</li><li class="chip">LinkedIn hiring posts</li><li class="chip">Telegram channels</li></ul><p class="small">LinkedIn hiring posts and Telegram channels are opt-in.</p></div>
+        </div>
+        <div class="panel" role="tabpanel" id="p-check" aria-labelledby="t-check" tabindex="0">
+          <div><h3>Check</h3><p>Offline scam and ghost-job scores, in English and Arabic, with no AI call. Likely scams are dropped. Likely ghost jobs rank low.</p></div>
+          <div class="sheet"><p><b>Scam signs:</b> fees, contact moved off the platform, crypto or ID requests, a domain that does not match.</p><p><b>Ghost signs:</b> old postings, repeat sightings across runs, vague evergreen text.</p></div>
+        </div>
+        <div class="panel" role="tabpanel" id="p-rank" aria-labelledby="t-rank" tabindex="0">
+          <div><h3>Rank</h3><p>A free local model compares your CV with each job. Then your AI scores the best ones, in batches. The cut-offs are yours to change.</p></div>
+          <div class="sheet"><ul class="qlist"><li><span class="badge tier-high">Strong match</span><span>Applied automatically</span></li><li><span class="badge tier-mid">Possible match</span><span>You approve first</span></li><li><span class="badge tier-low">Weak match</span><span>Hidden</span></li></ul></div>
+        </div>
+        <div class="panel" role="tabpanel" id="p-tailor" aria-labelledby="t-tailor" tabindex="0">
+          <div><h3>Tailor</h3><p>A few words change per job, never a rewrite. Layout, employers, titles, dates and numbers never change, and rules check every edit. Word, LaTeX, ODT and PDF CVs are supported. If the result does not match the original layout, the edits are rolled back.</p></div>
+          <div class="sheet"><p class="small">Sample edit</p><p><del>Built reports for the product team</del> <ins>Built product analytics reports for the team</ins></p></div>
+        </div>
+        <div class="panel" role="tabpanel" id="p-report" aria-labelledby="t-report" tabindex="0">
+          <div><h3>Report</h3><p>The funnel from found to applied, results per site and per career page, for each run and over time. Export to CSV or PDF.</p></div>
+          <div class="sheet"><p class="small">Sample funnel</p>
+            <div class="funnel"><div>Found: 1,284<i style="width:100%"></i></div><div>Strong or possible: 149<i style="width:11.6%"></i></div><div>Applied: 18<i style="width:1.4%"></i></div></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AI -->
+  <section class="wrap band" id="ai" aria-labelledby="ai-h">
+    <div class="ai-grid">
+      <div data-rv="sheet">
+        <h2 id="ai-h">Bring your own AI</h2>
+        <p class="lede" style="margin-top:0.75rem">Use what you already pay for, or run a model on your own machine.</p>
+      </div>
+      <div class="sheet" data-rv="sheet" style="--d:0.08s">
+        <ul class="ways">
+          <li><b>ChatGPT plan</b><span>Codex CLI</span></li>
+          <li><b>Claude plan</b><span>Claude Code CLI</span></li>
+          <li><b>An API key</b><span>Your own provider</span></li>
+          <li><b>A local model</b><span>Ollama, LM Studio</span></li>
+        </ul>
+        <ul class="vows" style="margin-top:1rem">
+          <li><svg class="icon"><use href="#i-lock"/></svg><span><b>Only the provider you pick sees your CV and job text.</b> Everything else stays on this computer.</span></li>
+          <li><svg class="icon"><use href="#i-lock"/></svg><span><b>No telemetry. No account.</b></span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROOF -->
+  <section class="wrap band" id="proof" aria-labelledby="proof-h">
+    <div class="proof-grid">
+      <div data-rv="sheet">
+        <h2 id="proof-h">Proof, honestly</h2>
+        <p class="lede">115 real job postings, run in Practice mode with a made-up profile. Of the 70 the app may finish on its own, 67 (96%) went as far as Practice mode allows. Nothing was submitted. A small sample, not a success rate.</p>
+        <a class="btn" href="docs/scorecard/">Read the scorecard<svg class="icon"><use href="#i-arrow"/></svg></a>
+      </div>
+      <div class="sheets" data-rv="sheet" style="--d:0.1s">
+        <span class="under"></span><span class="under"></span>
+        <figure class="sheet gif">
+          <img src="assets/demo.gif" width="960" height="600" loading="lazy" alt="Screen recording of LinKit All filling in an application on a practice job board, step by step.">
+          <figcaption class="small">Demo on a practice job board. Nothing was sent.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMING SOON -->
+  <section class="wrap band" id="soon" aria-labelledby="soon-h">
+    <h2 id="soon-h" data-rv="sheet">Coming soon</h2>
+    <p class="lede" data-rv="sheet">Two things that are not available yet.</p>
+    <div class="soon-grid">
+      <article class="sheet" data-rv="sheet">
+        <h3>Phone companion</h3>
+        <p>Install it on your phone over your own private network. Start and pause runs, approve jobs, answer questions and fill in an answer sheet. Push alerts carry no personal text.</p>
+        <span class="tag">Coming soon</span>
+      </article>
+      <article class="sheet" data-rv="sheet" style="--d:0.08s">
+        <h3>Freelance gigs</h3>
+        <p>A Gigs workspace beside Jobs. It finds and scores gigs on Upwork, Freelancer.com, Mostaql, Khamsat, Ureed and Bahr, and drafts proposals in English. You send them.</p>
+        <span class="tag">Coming soon</span>
+      </article>
+    </div>
+  </section>
+
+  <!-- INSTALL -->
+  <section class="wrap band install" id="install" aria-labelledby="inst-h">
+    <h2 id="inst-h" data-rv="sheet" style="margin-bottom:1.5rem">Install</h2>
+    <div class="sheet" data-rv="sheet">
+      <ol>
+        <li><div><span>Install it.</span><div class="codeline"><code id="cmd1">uv tool install linkit-all</code><button class="btn copy" type="button" data-copy="cmd1"><svg class="icon"><use href="#i-copy"/></svg><span>Copy</span></button></div></div></li>
+        <li><div><span>Run <code>linkit</code>. The app opens in your browser.</span></div></li>
+        <li><div><span>Upload your CV, pick your AI, then press Find jobs in practice mode.</span></div></li>
+      </ol>
+      <p class="small">Windows, macOS and Linux · Python 3.11.5 or newer · Free and open source, AGPL-3.0</p>
+      <div class="actions" style="margin-top:1rem"><a class="btn btn-primary" href="docs/install/">Full install guide</a></div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <nav aria-label="Footer">
+      <a class="nav-link" href="docs/">Docs</a>
+      <a class="nav-link" href="docs/install/">Install</a>
+      <a class="nav-link" href="docs/privacy/">Privacy</a>
+      <a class="nav-link" href="https://github.com/silentco2/LinKit-All">GitHub</a>
+      <a class="nav-link" href="https://pypi.org/project/linkit-all/">PyPI</a>
+      <a class="nav-link" href="https://github.com/silentco2/LinKit-All/blob/main/CHANGELOG.md">Changelog</a>
+      <a class="nav-link" href="https://www.gnu.org/licenses/agpl-3.0.html">License AGPL-3.0</a>
+    </nav>
+    <p class="small">No analytics on this site.</p>
+  </div>
+</footer>
+<script src="landing.js" defer></script>
+</body>
+</html>

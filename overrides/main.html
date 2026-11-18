@@ -10,6 +10,8 @@
 {% endblock %}
 
 {% block extrahead %}
+  <link rel="icon" href="{{ 'assets/favicon.ico' | url }}" sizes="32x32">
+  <link rel="apple-touch-icon" href="{{ 'assets/apple-touch-icon.png' | url }}">
   {%- set title = (page.meta.title if page and page.meta and page.meta.title else config.site_name) -%}
   {%- set description = (page.meta.description if page and page.meta and page.meta.description else config.site_description) -%}
   {%- set image = config.site_url ~ "assets/social.png" -%}
@@ -46,7 +48,7 @@
     "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
     "inLanguage": ["en", "ar"],
     "downloadUrl": "https://pypi.org/project/linkit-all/",
-    "installUrl": "https://silentco2.github.io/LinKit-All/install/",
+    "installUrl": "https://silentco2.github.io/LinKit-All/docs/install/",
     "sameAs": ["https://github.com/silentco2/LinKit-All", "https://pypi.org/project/linkit-all/"],
     "author": {"@type": "Person", "name": "silentco2", "url": "https://github.com/silentco2"}
   }

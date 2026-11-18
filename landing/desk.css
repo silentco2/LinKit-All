@@ -1,0 +1,124 @@
+/* LinKit All landing: the application desk. Tokens copied from frontend/src/styles.css. No external requests. */
+
+/* fonts: self-hosted (OFL licenses beside the files) */
+@font-face { font-family: 'IBM Plex Sans Variable'; font-style: normal; font-display: swap; font-weight: 100 700;
+  src: url(fonts/ibm-plex-sans-latin-ext-wght-normal.woff2) format('woff2-variations');
+  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+@font-face { font-family: 'IBM Plex Sans Variable'; font-style: normal; font-display: swap; font-weight: 100 700;
+  src: url(fonts/ibm-plex-sans-latin-wght-normal.woff2) format('woff2-variations');
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+/* Arabic family: fontsource ships no unicode-range for these, so one is set here to keep the latin and arabic files apart */
+@font-face { font-family: 'IBM Plex Sans Arabic'; font-style: normal; font-display: swap; font-weight: 400;
+  src: url(fonts/ibm-plex-sans-arabic-arabic-400-normal.woff2) format('woff2'); unicode-range: U+0600-06FF,U+0750-077F,U+08A0-08FF,U+FB50-FDFF,U+FE70-FEFF; }
+@font-face { font-family: 'IBM Plex Sans Arabic'; font-style: normal; font-display: swap; font-weight: 400;
+  src: url(fonts/ibm-plex-sans-arabic-latin-400-normal.woff2) format('woff2'); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+2000-206F,U+20AC,U+2122; }
+@font-face { font-family: 'IBM Plex Sans Arabic'; font-style: normal; font-display: swap; font-weight: 500;
+  src: url(fonts/ibm-plex-sans-arabic-arabic-500-normal.woff2) format('woff2'); unicode-range: U+0600-06FF,U+0750-077F,U+08A0-08FF,U+FB50-FDFF,U+FE70-FEFF; }
+@font-face { font-family: 'IBM Plex Sans Arabic'; font-style: normal; font-display: swap; font-weight: 500;
+  src: url(fonts/ibm-plex-sans-arabic-latin-500-normal.woff2) format('woff2'); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+2000-206F,U+20AC,U+2122; }
+@font-face { font-family: 'IBM Plex Sans Arabic'; font-style: normal; font-display: swap; font-weight: 600;
+  src: url(fonts/ibm-plex-sans-arabic-arabic-600-normal.woff2) format('woff2'); unicode-range: U+0600-06FF,U+0750-077F,U+08A0-08FF,U+FB50-FDFF,U+FE70-FEFF; }
+@font-face { font-family: 'IBM Plex Sans Arabic'; font-style: normal; font-display: swap; font-weight: 600;
+  src: url(fonts/ibm-plex-sans-arabic-latin-600-normal.woff2) format('woff2'); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+2000-206F,U+20AC,U+2122; }
+
+:root {
+  --desk: #e5e2db; --folder: #efebe3; --paper: #fbfaf7; --paper-2: #f3f0e9;
+  --ink: #1f1d1a; --ink-2: #5b564e; --ink-3: #675f55;
+  --line: rgb(31 29 26 / 0.12); --line-2: rgb(31 29 26 / 0.32);
+  --stamp: #2c43a6; --stop: #ab2f27; --go: #2f7349;
+  --note: #f6ebc8; --note-ink: #5f4209;
+  --err: #f6dfda; --err-ink: #74201b; --ok: #dcebde; --ok-ink: #1e4a2f;
+  --shadow: 0 1px 1px rgb(40 34 22 / 0.08), 0 8px 20px rgb(40 34 22 / 0.09);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --font: "IBM Plex Sans Variable", "IBM Plex Sans Arabic", system-ui, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --desk: #191816; --folder: #201e1b; --paper: #26241f; --paper-2: #2f2c27;
+    --ink: #efebe3; --ink-2: #b3ada2; --ink-3: #9a9388;
+    --line: rgb(239 235 227 / 0.12); --line-2: rgb(239 235 227 / 0.32);
+    --stamp: #9dadf5; --stop: #f29389; --go: #6db585;
+    --note: #3a3220; --note-ink: #e8d9ae;
+    --err: #3f1f1b; --err-ink: #f6cdc6; --ok: #1c3325; --ok-ink: #c5e3cc;
+    --shadow: 0 1px 1px rgb(0 0 0 / 0.4), 0 8px 20px rgb(0 0 0 / 0.28);
+  }
+}
+
+/* base */
+*, ::before, ::after { box-sizing: border-box; }
+html { color-scheme: light dark; overflow-x: clip; scrollbar-color: var(--line-2) transparent; -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--desk); color: var(--ink); font: 400 1rem/1.6 var(--font); font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; overflow-x: clip; }
+h1, h2, h3, p, ul, ol, figure { margin: 0; }
+[hidden] { display: none !important; }
+img { display: block; max-width: 100%; height: auto; }
+::selection { background: var(--stamp); color: var(--paper); }
+input, textarea { caret-color: var(--stamp); }
+a { color: var(--stamp); text-underline-offset: 2px; }
+a:hover { text-decoration: underline; }
+:focus-visible { outline: 2px solid var(--stamp); outline-offset: 2px; }
+code, kbd { font-family: var(--mono); font-size: 0.9em; }
+h1 { font-size: clamp(2.25rem, 1.2rem + 4.4vw, 4.5rem); line-height: 1.04; font-weight: 500; letter-spacing: -0.03em; text-wrap: balance; }
+h2 { font-size: clamp(1.375rem, 1.1rem + 1vw, 1.875rem); line-height: 1.2; font-weight: 500; letter-spacing: -0.02em; text-wrap: balance; }
+.lede { max-width: 62ch; font-size: clamp(1.0625rem, 1rem + 0.3vw, 1.25rem); line-height: 1.55; color: var(--ink-2); text-wrap: pretty; }
+.small { font-size: 0.8125rem; line-height: 1.5; color: var(--ink-3); }
+.wrap { max-width: 76rem; margin-inline: auto; padding-inline: clamp(1rem, 3vw, 2rem); }
+@media (prefers-reduced-motion: reduce) { *, ::before, ::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; scroll-behavior: auto !important; } }
+
+/* icons (stroke 1.75 like the app) */
+.icon { display: inline-block; width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.125em; }
+
+/* header strip (not sticky) */
+.desk-top { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.75rem; max-width: 76rem; width: 100%; margin-inline: auto; padding: 1rem clamp(1rem, 3vw, 2rem); }
+.wordmark { font-size: 1.0625rem; font-weight: 600; color: var(--ink); white-space: nowrap; text-decoration: none; margin-inline-end: auto; }
+.wordmark:hover { text-decoration: none; }
+.desk-top nav { display: flex; align-items: center; gap: 0 1.25rem; }
+.nav-link { display: inline-flex; align-items: center; gap: 0.375rem; min-height: 2.5rem; font-size: 0.875rem; font-weight: 500; color: var(--ink-2); text-decoration: none; border-bottom: 2px solid transparent; transition: color 150ms var(--ease); }
+.nav-link:hover { color: var(--ink); text-decoration: none; }
+
+/* a sheet of paper */
+.sheet { background: var(--paper); box-shadow: var(--shadow); border-radius: 3px; padding: clamp(1rem, 2.5vw, 1.5rem); }
+.sheets { position: relative; margin-inline: 0.75rem; }
+.sheets > .under { position: absolute; inset: 0; background: var(--paper); box-shadow: var(--shadow); border-radius: 2px; }
+.sheets > .under:nth-child(1) { transform: rotate(2.4deg) translate(10px, 4px); }
+.sheets > .under:nth-child(2) { transform: rotate(-1.5deg) translate(-6px, 2px); }
+.sheets > .sheet { position: relative; }
+
+/* the rubber stamp: an outcome, nothing else */
+.stamp { display: inline-block; border: 2px solid currentColor; border-radius: 3px; padding: 0.0625rem 0.5rem; font-size: 0.8125rem; line-height: 1.125rem; font-weight: 600; color: var(--stamp); white-space: nowrap; transform: rotate(-3deg); }
+.stamp::first-letter { text-transform: uppercase; }
+
+/* folder tabs */
+.folder-tabs { display: flex; align-items: flex-end; gap: 2px; }
+.folder-tab { flex: 1 1 0; min-width: 0; display: block; background: var(--paper); color: var(--ink-2); border-radius: 8px 8px 0 0; padding: 0.75rem 1rem; box-shadow: 0 -1px 0 var(--line); transition: transform 150ms var(--ease), background-color 150ms var(--ease); text-decoration: none; font: inherit; border: 0; text-align: start; }
+a.folder-tab:hover { transform: translateY(-2px); text-decoration: none; }
+.folder-tab strong { display: block; font-size: clamp(1.25rem, 1rem + 1vw, 1.75rem); line-height: 1.15; font-weight: 500; color: var(--ink); }
+.folder-tab:nth-child(2) { padding-bottom: 1rem; }
+.folder-tab:nth-child(3) { padding-bottom: 1.25rem; }
+.folder-tab:nth-child(4) { padding-bottom: 1.5rem; }
+.folder-tab:nth-child(5) { padding-bottom: 1.75rem; }
+@media (max-width: 640px) { .folder-tabs { flex-wrap: wrap; } .folder-tab { flex: 1 1 40%; padding-bottom: 0.75rem !important; } }
+.folder { background: var(--folder); border-radius: 0 3px 3px 3px; padding: clamp(0.75rem, 2vw, 1.5rem); }
+
+/* sticky note */
+.note { background: var(--note); color: var(--note-ink); border-radius: 2px; padding: 0.75rem 0.875rem; font-size: 0.875rem; line-height: 1.4; font-weight: 500; box-shadow: var(--shadow); }
+
+/* buttons */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 2.5rem; padding: 0.5rem 1.125rem; border-radius: 3px; border: 1px solid var(--line-2); background: transparent; color: var(--ink); font: 500 0.9375rem/1.25rem var(--font); text-decoration: none; cursor: pointer; transition: background-color 150ms var(--ease), color 150ms var(--ease), border-color 150ms var(--ease), transform 150ms var(--ease); }
+.btn:hover { background: var(--paper-2); text-decoration: none; }
+.btn:active { transform: scale(0.98); }
+.btn-primary { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.btn-primary:hover { background: var(--ink-2); border-color: var(--ink-2); }
+.actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+
+/* badge (tier) */
+.badge { display: inline-flex; align-items: center; border-radius: 3px; padding: 0.125rem 0.375rem; font-size: 0.75rem; line-height: 1rem; font-weight: 500; }
+.tier-high { background: var(--ok); color: var(--ok-ink); }
+.tier-mid { background: var(--note); color: var(--note-ink); }
+.tier-low { background: var(--paper-2); color: var(--ink-2); }
+
+/* code line with a copy button */
+.codeline { min-width: 0; display: flex; align-items: center; gap: 0.5rem; background: var(--paper-2); border: 1px solid var(--line); border-radius: 3px; padding: 0.375rem 0.375rem 0.375rem 0.75rem; }
+.codeline code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; color: var(--ink); }
+.copy { min-height: 2.5rem; min-width: 5rem; padding: 0.25rem 0.75rem; font-size: 0.8125rem; }
+.copy[data-copied] { color: var(--go); border-color: var(--go); }

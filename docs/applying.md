@@ -9,8 +9,10 @@ Applying is the last stage. LinKit All opens each job's application form in your
 (Chrome, Edge or Brave), tailors your CV, answers the questions and, only if you allow it, submits.
 
 !!! warning "Live applying sends real applications in your name"
-    Submitted applications cannot be taken back. Start with a dry run, look at the screenshots,
-    and only then turn on live mode. The first live run should be one you watch.
+    Submitted applications cannot be taken back. LinKit All starts in **Practice mode**: it fills
+    in forms and takes screenshots but never presses Submit, and you turn live applying on yourself.
+    Start with a dry run, look at the screenshots, and only then turn on live mode. The first live
+    run should be one you watch.
 
 ## Dry run and live
 

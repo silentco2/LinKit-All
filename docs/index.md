@@ -13,11 +13,6 @@ computer can open.
 You bring your own AI: a ChatGPT plan (Codex CLI), a Claude plan (Claude Code CLI), an API
 key, or a local model such as Ollama or LM Studio.
 
-!!! warning "Be careful with live applying"
-    LinKit All starts in **Practice mode**. It fills in forms and takes screenshots, but it
-    never presses Submit. You have to turn on live applying yourself. Read
-    [Applying](applying.md) before you do.
-
 ## What it does
 
 1. **Finds jobs** from the company career pages and job sites you list. See [Sources](sources.md).

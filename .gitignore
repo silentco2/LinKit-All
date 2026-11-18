@@ -42,3 +42,6 @@ site/
 
 # Usability study notes (participant quotes stay local)
 docs/usability/results/
+
+# Built site
+_site/
