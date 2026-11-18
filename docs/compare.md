@@ -16,14 +16,14 @@ tool lacks the feature.
 | License | AGPL-3.0-or-later | MIT | AGPL-3.0 |
 | How you use it | Local web page, plus a `linkit` command line | Started from a terminal script; applies in a Firefox window | Command line, plus an HTML results dashboard |
 | AI it works with | ChatGPT plan (Codex CLI), Claude plan (Claude Code), API keys through LiteLLM, local models (Ollama, LM Studio) | A key from OrcaRouter; others not stated | A Gemini key for scoring and tailoring (OpenAI and local models also supported); auto-apply needs the Claude Code CLI |
-| Where it finds jobs | 100+ applicant tracking systems' public APIs, LinkedIn, Indeed, Glassdoor, ZipRecruiter, Google and Bayt through JobSpy, regional boards, any careers page, Telegram channels | "37 public sources" | Indeed, LinkedIn, Glassdoor, ZipRecruiter and Google Jobs through JobSpy, about 48 Workday portals, 30+ career sites |
+| Where it finds jobs | 100+ applicant tracking systems' public APIs, LinkedIn, Indeed, Glassdoor, ZipRecruiter, Google and Bayt through JobSpy, regional boards, any careers page, Telegram channels | "37 public sources" | Indeed, LinkedIn, Glassdoor, ZipRecruiter and Google Jobs through JobSpy, about 48 Workday portals, about 30 career sites |
 | Submits for you | Only after you switch from Practice mode to Applying for real; each submit waits for your OK unless you turn that off | Yes, once you pick the jobs and confirm | Yes; a dry-run option fills forms without submitting |
 | CV per job | Small word-level edits to your own file; layout kept, numbers, dates and listed facts locked | Not stated | Rewritten by AI per job, with listed facts kept |
 | Cover letter | Only when the form has a field for one | Not stated | Generated per job |
 | Sensitive questions (visa, salary, demographics) | Never sent to the AI: answered from your profile or left for you | Not stated | Defaults stored in the profile; screening questions are answered with AI |
 | LinkedIn, Indeed, Glassdoor | Never driven; a browser extension fills them while you press Submit | Not stated | Read through JobSpy; applying not stated per site |
 | Accounts on job sites | Created when needed, with a generated password in an encrypted local vault | Not stated | Not stated |
-| Telemetry | None | Usage events sent to PostHog | Not stated |
+| Telemetry | None | Not stated | Not stated |
 
 [aihawk]: https://github.com/feder-cr/Jobs_Applier_AI_Agent
 [applypilot]: https://github.com/Pickle-Pixel/ApplyPilot
@@ -31,8 +31,9 @@ tool lacks the feature.
 ## Where LinKit All is weaker
 
 - Only three sites have their own form handlers (Greenhouse, Lever and Ashby). Every other
-  site goes through a general AI form agent, which finished none of its 12 postings in the
-  first [scorecard](scorecard.md).
+  site goes through a general AI form agent. In the latest [scorecard](scorecard.md) run it
+  filled 11 of 55 postings to the end; 22 stopped at a sign-up page and 21 were left for the user
+  (12 questions, 6 sites it never drives, 3 it could not finish) (Practice mode, a made-up profile, nothing submitted).
 - Real submitting has been tried only in a few applications that were watched by hand.
 - It is young. Both other projects have far more users and stars on GitHub.
 
@@ -40,7 +41,7 @@ tool lacks the feature.
 
 - You want full control of what is sent, sensitive answers kept away from the AI, and your CV
   layout untouched: LinKit All.
-- You want the largest community and the most press coverage: AIHawk.
+- You want the largest community: AIHawk.
 - You want a command-line tool that rewrites your CV and writes a cover letter for every job,
   with a free Gemini key: ApplyPilot.
 

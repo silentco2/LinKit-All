@@ -22,6 +22,7 @@ Each item shows the job, a message, and screenshots of the page when it stopped.
 | **CAPTCHA** | The site showed a CAPTCHA. LinKit All never solves them. | Open the application page and finish by hand, then **I applied by hand**. Or press **Retry**. |
 | **Validation error** | The form rejected an answer, or a required field could not be filled. The message says which. | Read the screenshot. **Retry**, or open the page and apply by hand. |
 | **Login issue** | The site needs an account and LinKit All could not sign in: the vault is locked, the mailbox is not connected, the verification email did not arrive, the saved login was rejected, or the page is a sign-in page. | Fix the cause the message names (unlock the vault, connect email), then **Retry**. Or apply by hand. |
+| **Knock-out question** | A question on the form would reject you if you answered it honestly: more years of experience than your profile shows, a degree above the one on your CV, no sponsorship offered when you need it, a work-authorization requirement your profile does not meet, or a pay ceiling below what you expect. A fixed set of rules finds it before anything is filled, with no AI. | Press **Apply anyway** to send the application with your real answer, or skip the job under **More**. **Apply anyway** is not a go-ahead to submit: with *Submit without asking me first* off, the form still waits as **Ready to submit**. |
 | **Two-factor** | The site asked for a sign-in code. | Apply by hand, or retry after you have dealt with the code. |
 
 ## Buttons

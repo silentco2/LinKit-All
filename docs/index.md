@@ -14,7 +14,7 @@ You bring your own AI: a ChatGPT plan (Codex CLI), a Claude plan (Claude Code CL
 key, or a local model such as Ollama or LM Studio.
 
 !!! warning "Be careful with live applying"
-    LinKit All starts in **dry-run mode**. It fills in forms and takes screenshots, but it
+    LinKit All starts in **Practice mode**. It fills in forms and takes screenshots, but it
     never presses Submit. You have to turn on live applying yourself. Read
     [Applying](applying.md) before you do.
 
@@ -59,7 +59,7 @@ These rules are built into the code, not just written down.
 - **The AI never answers sensitive questions.** Work authorization, visa and sponsorship,
   salary, gender, race, disability, veteran status, criminal record and legal statements
   are answered only from what you typed in, or sent to you. See [Action Center](action-center.md).
-- **Dry run never submits.** In dry-run mode the Submit button is never clicked.
+- **Practice mode never submits.** In Practice mode the Submit button is never clicked.
 - **"Applied" needs proof.** A job is marked applied only when the site's confirmation page
   is seen (or you say you applied by hand). Otherwise it is failed or waiting for you.
 - **CAPTCHAs are yours.** LinKit All never solves or bypasses a CAPTCHA. It stops and asks you.
@@ -72,7 +72,7 @@ These rules are built into the code, not just written down.
 
 1. [Install](install.md) LinKit All and its helper tools.
 2. Run `linkit` and follow the [setup wizard](setup.md).
-3. Press **Find jobs now**, look at the results, then try a dry-run apply.
+3. Press **Find jobs now**, look at the results, then try a Practice-mode apply.
 
 ## Questions people ask
 

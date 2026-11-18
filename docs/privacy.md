@@ -44,6 +44,7 @@ your computer. These are the cases:
 | Answer drafts and cover letters | The question, your CV, and non-sensitive profile facts (name, location, current role, years of experience, notice period, links, relocation) |
 | Generic form agent | The form controls of the current page, its text, and a brief of the job |
 | Careers pages without structured data | Short excerpts of job pages, 10 per call |
+| Follow-up emails | The job's title, company and first 3,000 characters of its description, the date you applied, and the first 5,000 characters of your CV |
 | Verification emails | Only when pattern matching finds no code or link: the email text, up to about 4,000 characters |
 
 LinKit All never asks the AI to answer [sensitive questions](action-center.md#sensitive-questions)
@@ -66,9 +67,20 @@ LinKit All talks to:
 
 - Always: the job sources you list and the application sites you apply to. It also fetches
   their `robots.txt` files, only to read a site's `Crawl-delay`.
+- Looking up a company by name asks each supported job-board platform (Greenhouse, Lever, Ashby
+  and others) whether that company has a board. Only the company name is sent.
 - Your AI provider (with a local model, your CV and job text stay on your computer).
 - Your mail server, only if you connect email: Gmail or Yahoo IMAP and SMTP, or Microsoft
   sign-in and Microsoft Graph for Outlook.
+  If you turn on **Read employer replies**, LinKit All also reads the newest messages in that
+  mailbox's inbox and spam folder, starting a day before your first application (up to 50 per
+  folder over IMAP, up to 500 per folder through Microsoft Graph), to spot rejections and interview invitations. Fixed word
+  rules do this on your computer: the mail is never sent to the AI, never stored and never
+  written to the logs. Only the outcome on the job is saved.
+  An application sent by email can get one follow-up email to the same address after
+  `followup_days` (7 by default) without a reply. In Practice mode it is only saved as an .eml
+  file. When Applying for real, it is sent only if "submit without asking" is on; otherwise the
+  job's history notes that it is due.
 - Hugging Face, once, to download the ranking model.
 - An exchange-rate service, to refresh rates. It sends no personal data.
 - Only if you turn the feature on: the one-click LibreOffice download from the project's GitHub

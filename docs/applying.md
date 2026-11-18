@@ -46,6 +46,25 @@ If there is no confirmation, the job is never assumed applied. It is parked in t
 Center (a CAPTCHA or form errors) or marked `failed` with the reason. A Playwright trace is
 kept for failed jobs. If you submitted something yourself, press **I applied by hand**.
 
+## Outcomes, replies and follow-ups
+
+After a job is applied, its **Outcome** records what happened: no reply, rejected, interview,
+offer, hired, or declined (you turned it down). Set it by hand in the job's panel. The job
+stays applied.
+
+With **Read employer replies** on (**Settings > Accounts & email**, off by default), LinKit All
+reads recent mail in your connected inbox and spam folder after each run's apply step and sets *Rejected* or *Interview* when a
+message clearly names the company. Fixed word rules do this on your computer, and the mail never
+goes to the AI. An outcome you set by hand is never changed by a reply. See
+[Privacy](privacy.md#other-network-traffic).
+
+An application sent by email can get one short follow-up email to the same address after
+**Follow up after (days)** without a reply (7 by default, 3 to 60). It is never sent twice, or once
+the job has an outcome (set by you or from a read reply). With Read employer replies off, the app
+cannot see a reply, so set the outcome by hand. In Practice mode it is only saved as an .eml file. When Applying for real, it is
+sent only if *Submit without asking me first* is on; otherwise the job's history notes that a
+follow-up is due.
+
 ## Limits and pauses
 
 | Setting | Default | Meaning |

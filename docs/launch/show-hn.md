@@ -32,9 +32,12 @@ A few rules are enforced in code, not prompts:
 - No telemetry. Passwords for site accounts live in an AES-GCM vault on your disk.
 
 Honest limits: only Greenhouse, Lever and Ashby have dedicated form handlers. Everything else
-goes through a generic AI form agent, which finished none of 12 real postings in the first
-scorecard (sign-up walls, questions it left for the user, forms it could not finish). The
-numbers are in the README, along with a benchmark on a fake job board you can run yourself
+goes through a generic AI form agent. In the latest scorecard run (115 real postings, Practice
+mode, a made-up profile, nothing submitted) it was tried on 55: 11 were filled to the end, 22
+stopped at a sign-up page and 21 were left for the user (12 questions, 6 on sites it never
+drives, 3 it could not finish). Across all sites, 67 of the 70 jobs the
+app may finish alone went as far as Practice mode allows; 39 waiting for the user and 6
+jobs on sites the app never drives are not counted. The numbers are in the README, along with a benchmark on a fake job board you can run yourself
 with `linkit bench`.
 
 Python (FastAPI, SQLite, Playwright attached to your installed Chrome over CDP) and an Angular

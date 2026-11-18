@@ -26,6 +26,10 @@ linkit [--version] [--help] <command>
 | [`jobs`](#linkit-jobs) | List jobs |
 | [`tailor`](#linkit-tailor) | Tailor your CV to a job text |
 | [`discover-boards`](#linkit-discover-boards) | Find company job boards in Common Crawl |
+| [`seed-boards`](#linkit-seed-boards) | Store the bundled list of company job boards |
+| [`find-board`](#linkit-find-board) | Look a company up on the job-board platforms |
+| [`filter-audit`](#linkit-filter-audit) | Show what each title word in your filters decides |
+| [`why-missed`](#linkit-why-missed) | Explain why a posting is not in your list |
 | [`bench`](#linkit-bench) | Measure quality on built-in fake jobs |
 | [`apply-probe`](#linkit-apply-probe) | Try real postings in Practice mode |
 
@@ -164,6 +168,41 @@ discovery crawls them too. Only Common Crawl is contacted; nothing about you is 
 |---|---|---|
 | `--ats TEXT` | all | Only this applicant tracking system (repeat for more) |
 | `--max-per-ats INTEGER` | `5000` | Boards to keep per system |
+
+## `linkit seed-boards`
+
+Store the bundled list of company job boards. They are crawled only when *use discovered
+boards* is on. Prints how many boards were new. No options.
+
+## `linkit find-board`
+
+```text
+linkit find-board NAME... [--add]
+```
+
+Look each company name up on the job-board platforms LinKit All reads (Greenhouse, Lever, Ashby
+and others). Prints each board found with its job count. Only the company name is sent. A name
+with no board is reported, so you can paste its careers page instead.
+
+| Option | Default | Meaning |
+|---|---|---|
+| `--add` | off | Save the boards found to your company sources |
+
+Without `--add` nothing is saved.
+
+## `linkit filter-audit`
+
+Show, for each include or exclude title word in your filters, how many jobs it matched and their
+average AI score. Read-only. Needs your search to be set up. No options.
+
+## `linkit why-missed`
+
+```text
+linkit why-missed URL
+```
+
+Explain why a posting you found yourself is not in your list. Read-only. Needs your search to be
+set up.
 
 ## `linkit bench`
 

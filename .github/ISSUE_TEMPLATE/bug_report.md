@@ -16,6 +16,6 @@ For a security problem, do not use this form. See SECURITY.md.
 
 **Site or ATS** (if about applying; Greenhouse, Lever, Ashby or other):
 
-**Setup**: operating system, Python version, `uv run linkit doctor` output, AI provider (`codex_cli`, `claude_cli`, `litellm`)
+**Setup**: operating system, Python version, `linkit doctor` output (`uv run linkit doctor` if run from source), AI provider (`codex_cli`, `claude_cli`, `litellm`)
 
 **Logs or screenshots**: remove personal details first. Never paste passwords, tokens or your full CV.

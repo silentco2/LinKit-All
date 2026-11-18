@@ -1,6 +1,6 @@
 ---
 title: "Apply scorecard: how far real applications get"
-description: "Practice-mode results on 115 real job postings per platform: how many applications LinKit All carried as far as practice mode goes, why the others stopped, and where the time goes. Nothing submitted."
+description: "Practice-mode results on 115 real job postings: how far LinKit All got, why the rest stopped and where the time goes. Nothing was submitted."
 ---
 
 # Apply scorecard
@@ -17,7 +17,7 @@ submitted. The CV was sent as uploaded. A made-up test profile, Claude Haiku as 
 - it found the ad closed (the job goes to the trash, hidden but kept so later searches skip it).
 
 **Pass rate: 67 of 70 (96%)** of the jobs the app may finish on its own. Not counted, but listed
-below: 6 LinkedIn jobs (you apply in your own browser) and 39 that wait for an answer or a
+below: 6 jobs on sites the app never drives, such as LinkedIn (you apply in your own browser) and 39 that wait for an answer or a
 decision only you can give.
 
 10 of the 67 are ads an earlier run of the same sample already found closed; they stay in the

@@ -12,7 +12,7 @@ requires-python = ">=3.11"
 keywords = ["job search", "auto apply", "job application", "resume", "cv tailoring",
             "ai agent", "greenhouse", "lever", "ashby", "local llm"]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 4 - Beta",
     "Environment :: Web Environment",
     "Intended Audience :: End Users/Desktop",
     "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",

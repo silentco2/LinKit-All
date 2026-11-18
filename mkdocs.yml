@@ -12,6 +12,7 @@ strict: true
 exclude_docs: |
   launch/
   usability/
+  career-ops-borrow-plan.md
 
 theme:
   name: material

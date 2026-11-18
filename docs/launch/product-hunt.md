@@ -29,4 +29,6 @@ salary or demographics never reach the AI.
 
 It starts in Practice mode, so you can watch it fill forms before you let it submit anything.
 It is young: three job systems have dedicated handlers and the rest use a general form agent
-that still misses often. I publish the numbers in the README. Tell me what breaks.
+that filled 11 of 55 postings to the end in my latest Practice-mode test (made-up profile,
+nothing submitted; the rest hit a sign-up page, a closed ad, or a step left for me). I publish the numbers in the
+README. Tell me what breaks.

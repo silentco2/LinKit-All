@@ -14,4 +14,4 @@ Examples: the local web server reachable from another computer or website, a way
 
 See [docs/privacy.md](docs/privacy.md) for where data is stored, what the AI provider sees, how the vault works and what is logged.
 
-LinKit All is early software and the package is not on PyPI yet, so only the latest commit on the main branch is supported.
+LinKit All is early software. Only the latest release gets fixes.

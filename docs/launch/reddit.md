@@ -24,7 +24,8 @@ Bring your own AI: ChatGPT/Claude plan via their CLIs, an API key, or Ollama/LM 
 fully local. No telemetry, no account, AGPL-3.0.
 
 Limits: dedicated form handlers only for Greenhouse, Lever and Ashby; the generic form agent
-is still weak (numbers in the README). LinkedIn/Indeed/Glassdoor are never automated; a
+filled 11 of 55 real postings to the end in my latest Practice-mode test (numbers in the
+README). LinkedIn/Indeed/Glassdoor are never automated; a
 browser extension fills them while you click.
 
 `uv tool install linkit-all` → `linkit`. Repo: https://github.com/silentco2/LinKit-All
@@ -51,6 +52,6 @@ Repo: https://github.com/silentco2/LinKit-All. Feedback on the architecture welc
 
 ## r/cscareerquestions (only where the rules allow tools)
 
-**Title:** Free, open-source tool that applies to jobs for you without sending your data anywhere
+**Title:** Free, open-source tool that applies to jobs for you, runs on your computer, no telemetry
 
 **Body:** Use the r/opensource text, and lead with the privacy point and Practice mode.
