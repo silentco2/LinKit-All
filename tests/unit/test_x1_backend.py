@@ -624,6 +624,8 @@ def test_litellm_price_list_fetch_is_off(monkeypatch: pytest.MonkeyPatch) -> Non
 
     monkeypatch.delenv("LITELLM_LOCAL_MODEL_COST_MAP", raising=False)
     monkeypatch.delenv("LITELLM_LOCAL_ANTHROPIC_BETA_HEADERS", raising=False)
+    monkeypatch.delenv("LITELLM_OFFLINE_MODE", raising=False)
     importlib.reload(litellm_api)
     assert os.environ["LITELLM_LOCAL_MODEL_COST_MAP"] == "True"
     assert os.environ["LITELLM_LOCAL_ANTHROPIC_BETA_HEADERS"] == "True"
+    assert os.environ["LITELLM_OFFLINE_MODE"] == "True"

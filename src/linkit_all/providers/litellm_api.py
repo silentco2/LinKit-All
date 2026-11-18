@@ -7,10 +7,12 @@ from typing import Any
 
 from linkit_all.providers.base import LLMProvider, ProviderError, UsageLimitError, classify
 
-# No network call for LiteLLM's price list (rule: no traffic beyond the chosen provider).
+# No network call from LiteLLM beyond the chosen provider: the price list, Anthropic beta headers,
+# and HuggingFace tokenizer downloads (token_counter, llama/command-r names) use bundled copies.
 # Set before any litellm import; this module is the only place that imports it.
 os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
 os.environ.setdefault("LITELLM_LOCAL_ANTHROPIC_BETA_HEADERS", "True")
+os.environ.setdefault("LITELLM_OFFLINE_MODE", "True")
 
 
 @functools.cache
