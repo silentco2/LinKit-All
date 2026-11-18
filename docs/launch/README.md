@@ -25,5 +25,5 @@ Before posting:
 - **Website:** https://silentco2.github.io/LinKit-All/
 - **Topics:** `job-search`, `auto-apply`, `job-application`, `resume`, `cv`, `ai-agent`,
   `llm`, `ollama`, `playwright`, `fastapi`, `angular`, `privacy`, `self-hosted`, `arabic`
-- **Social preview:** upload `docs/assets/social.png` (1280 × 640).
+- **Social preview:** upload `docs/assets/social.png` (1280 × 640; regenerate with `uv run --no-sync python scripts/make_social_card.py`).
 - **Pages:** Source "GitHub Actions" (the `Docs` workflow deploys on every push to `main`).
