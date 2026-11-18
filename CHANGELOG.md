@@ -2,7 +2,7 @@
 
 All notable changes to LinKit All. Dates are release dates.
 
-## 1.0.0 — unreleased
+## 1.0.0 — 2026-11-18
 
 The first public release.
 
@@ -31,7 +31,7 @@ The first public release.
 ### Tailor the CV
 - Small word-level edits to Word, LaTeX, OpenDocument and PDF CVs, never a rewrite. Edits that
   touch locked facts, add unlisted skills, change numbers or dates, or grow the text too much
-  are refused, and an AI claim check catches invented claims in other words.
+  are refused.
 - The PDF must keep the same page count and look; otherwise every edit is rolled back.
 - Tailoring is optional: the CV can go out exactly as uploaded.
 

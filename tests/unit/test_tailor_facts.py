@@ -133,7 +133,7 @@ class _Patches(LLMProvider):
 
 
 def test_tailor_job_writes_the_fact_check_event(tmp_path: Path) -> None:
-    settings = Settings(data_dir=tmp_path / "data", tailor_claim_check=False)
+    settings = Settings(data_dir=tmp_path / "data")
     db = init_db(settings.db_path)
     cv = _cv(tmp_path / "cv.docx")
     import_profile(

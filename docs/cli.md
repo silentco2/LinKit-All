@@ -62,7 +62,7 @@ Start the local web page on `127.0.0.1`.
 
 ## `linkit doctor`
 
-Check Python (3.11 or newer), LibreOffice, a Chromium browser (Chromium, Chrome, Edge or Brave), Codex CLI, Claude CLI and Tectonic.
+Check Python (3.11.5 or newer), LibreOffice, a Chromium browser (Chromium, Chrome, Edge or Brave), Codex CLI, Claude CLI and Tectonic.
 Prints `ok`, `MISSING` or `optional` for each. Exits with code 1 if Python or LibreOffice
 is missing. No options.
 
@@ -207,7 +207,7 @@ set up.
 ## `linkit bench`
 
 ```text
-linkit bench [--jobs INTEGER] [--seed INTEGER] [--out PATH] [--apply INTEGER] [--provider TEXT] [--model TEXT]
+linkit bench [--jobs INTEGER] [--seed INTEGER] [--out PATH] [--apply INTEGER]
 ```
 
 Measure finding, duplicate removal, the scam and ghost checks, ranking and the CV tailoring
@@ -221,7 +221,6 @@ numbers.
 | `--seed INTEGER` | `1` | Same seed, same jobs |
 | `--out PATH` | `bench.json` | Where to write the numbers |
 | `--apply INTEGER` | `0` | Also fill this many fake application forms in Practice mode (needs a browser) |
-| `--provider TEXT`, `--model TEXT` | none | A real AI for the CV claim check only |
 
 ## `linkit apply-probe`
 

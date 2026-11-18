@@ -66,9 +66,9 @@ def lo_hint() -> str:
 
 
 def run_checks() -> list[Check]:
-    py_ok = sys.version_info >= (3, 11)
+    py_ok = sys.version_info >= (3, 11, 5)
     return [
-        Check("Python >= 3.11", sys.executable if py_ok else None, True, "uv python install 3.12"),
+        Check("Python >= 3.11.5", sys.executable if py_ok else None, True, "uv python install 3.12"),  # noqa: E501
         Check("LibreOffice", soffice_path(), True, lo_hint()),
         Check("Chromium browser", browser_path(), False, f"needed to apply: {CHROMIUM_HINT}"),
         Check("Codex CLI", shutil.which("codex"), False, "npm i -g @openai/codex"),
@@ -445,8 +445,6 @@ def bench(
         int,
         typer.Option(min=0, help="Also fill this many fake application forms (needs a browser)."),
     ] = 0,
-    provider: ProviderOpt = None,
-    model: ModelOpt = None,
 ) -> None:
     """Measure finding, ranking and the CV tailoring guard on built-in fake data, and with
     --apply the form filling too (practice mode: nothing is submitted). Touches none of your
@@ -462,9 +460,7 @@ def bench(
     embed = Embedder(settings.embedding_model, settings.data_dir / "models")
     # ignore_cleanup_errors: Windows may still hold the SQLite file when the folder goes
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
-        # only the CV claim check uses it: the one judgement the scripted AI cannot fake
-        checker = get_provider(_settings(provider, model)) if provider else None
-        result = asyncio.run(run_bench(jobs, seed, embed, Path(tmp), apply, checker))
+        result = asyncio.run(run_bench(jobs, seed, embed, Path(tmp), apply))
     out.write_text(json.dumps(result, indent=2), encoding="utf-8")
     q, t = result["quality"], result["timing"]
     typer.echo(f"{jobs} jobs in {t['total_s']} s ({t['jobs_per_minute']} jobs/minute)")
@@ -483,7 +479,6 @@ def bench(
         f"tailor  honest edits accepted {tl['honest_accepted']}, invented edits refused "
         f"{tl['invented_refused']}, layout {'ok' if tl['layout']['ok'] else 'CHANGED'}"
         + ("" if tl["layout"]["checked"] else " (not checked: no LibreOffice)")
-        + f", claim check: {tl['claim_check']}"
     )
     if a := result.get("apply"):
         typer.echo(

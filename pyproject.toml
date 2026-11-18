@@ -8,7 +8,7 @@ license-files = ["LICENSE", "NOTICE"]
 authors = [
     { name = "silentco2", email = "osamakhalifa333@gmail.com" }
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.11.5"
 keywords = ["job search", "auto apply", "job application", "resume", "cv tailoring",
             "ai agent", "greenhouse", "lever", "ashby", "local llm"]
 classifiers = [

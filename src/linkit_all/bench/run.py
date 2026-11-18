@@ -39,7 +39,6 @@ from linkit_all.core.search import SearchConfig, TrustSection
 from linkit_all.matching.rank import Embed, rank_jobs
 from linkit_all.matching.score import score_jobs
 from linkit_all.matching.trust_stage import score_jobs_trust
-from linkit_all.providers.base import LLMProvider
 from linkit_all.sources.base import Source
 from linkit_all.sources.http import Http
 from linkit_all.sources.runner import discover, enrich
@@ -242,11 +241,9 @@ async def run_bench(
     embed: Embed,
     work: Path,
     apply: int = 0,
-    checker: LLMProvider | None = None,
 ) -> dict[str, Any]:
     """The real stages on `n` fake jobs, in a throwaway data folder `work`. `apply` > 0 also
-    scores the best jobs and fills that many fake application forms in practice mode.
-    `checker` is a real model for the CV claim check (see bench/tailor.py)."""
+    scores the best jobs and fills that many fake application forms in practice mode."""
     jobs = generate(n, seed)
     db = init_db(work / "bench.db")
     cv = docx.Document()
@@ -308,7 +305,7 @@ async def run_bench(
             **counts,
         },
         "quality": quality(jobs, stored, scores, cfg.trust),
-        "tailor": await run_tailor(work, Settings(data_dir=work / "data"), checker),
+        "tailor": await run_tailor(work, Settings(data_dir=work / "data")),
         **({"apply": applied} if applied else {}),
         # Timings change from run to run; everything above is the same for the same n and seed.
         "timing": {

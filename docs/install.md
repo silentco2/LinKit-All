@@ -7,7 +7,7 @@ description: "Install LinKit All with uv on Windows, macOS or Linux, add LibreOf
 
 ## What you need
 
-- **Python 3.11 or newer.** [uv](https://docs.astral.sh/uv/) can install it for you.
+- **Python 3.11.5 or newer.** [uv](https://docs.astral.sh/uv/) can install it for you.
 - **LibreOffice**, to turn your CV into a PDF. Required for tailoring and applying.
 - **[Chromium](https://www.chromium.org/getting-involved/download-chromium/)**, to apply to
   jobs. Not needed for finding and scoring jobs.
@@ -105,7 +105,7 @@ To run the newest code instead of a release, use a source checkout: see
 with `ok`, `MISSING` or `optional`:
 
 ```text
-[ok] Python >= 3.11: ...
+[ok] Python >= 3.11.5: ...
 [ok] LibreOffice: ...
 [ok] Chromium browser: ...
 [optional] Codex CLI: npm i -g @openai/codex
