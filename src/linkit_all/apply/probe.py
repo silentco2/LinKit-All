@@ -308,7 +308,8 @@ def rate_line(rows: list[ProbeRow]) -> str:
     share = f"{ok / len(counted):.0%}" if counted else "-"
     return (
         f"**Pass rate: {ok} of {len(counted)} ({share})** of the jobs the app may finish on its "
-        f"own. Not counted: {browser} LinkedIn (you apply in your own browser) and {asked} "
+        f"own. Not counted: {browser} on sites the app never drives, such as LinkedIn (you "
+        f"apply in your own browser) and {asked} "
         "waiting for an answer or a decision only you can give."
     )
 

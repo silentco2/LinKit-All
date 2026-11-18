@@ -1349,6 +1349,8 @@ export const ar: Record<string, string> = {
   'run.reason.ai_usage_limit.noDate': 'استُنفدت حصة اشتراك {provider} حاليًا. بدّل الذكاء الاصطناعي أو انتظر.',
   'run.reason.needs_libreoffice': 'التخصيص يحتاج LibreOffice. ثبّته أو قدّم بسيرتك كما هي.',
   'run.reason.needs_tectonic': 'سيرتك الذاتية ملف LaTeX وتحتاج Tectonic لإنتاج ملف PDF. ثبّت Tectonic ثم حاول مرة أخرى.',
+  'run.reason.no_screen': 'لا توجد شاشة لعرض المتصفح. افتح LinKit All في جلسة سطح مكتب، أو عطّل الخيار «أظهر نافذة المتصفح» في الإعدادات › التقديم.',
+  'run.reason.no_browser': 'لم يُعثر على متصفح. ثبّت Chrome أو Edge أو Brave أو Chromium (وليس نسخة Snap)، ثم اضغط تشغيل.',
   'run.reason.pipeline_error': 'حدث خطأ ما: {detail}',
   'run.fix.ai': 'افتح الإعدادات ← الذكاء الاصطناعي',
   'live.paused.is': 'متوقف مؤقتًا:',

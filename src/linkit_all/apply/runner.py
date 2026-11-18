@@ -91,7 +91,7 @@ from linkit_all.apply.handlers.base import GENERIC_CONFIRMATION, PostingGone, go
 from linkit_all.apply.quirks import host_of, quirks_for
 from linkit_all.apply.vault import Vault, vault_for
 from linkit_all.core import timing
-from linkit_all.core.chrome import RunningChrome, open_context
+from linkit_all.core.chrome import ChromeError, RunningChrome, open_context
 from linkit_all.core.config import Settings
 from linkit_all.core.models import (
     ActionItem,
@@ -478,9 +478,12 @@ class Applier:
                 if self._pw is None:
                     raise RuntimeError("use Applier as an async context manager")
                 profile = profile_dir(self.settings, ats)
-                chrome, ctx = await open_context(
-                    self._pw, profile, headless=self.cfg.apply.headless
-                )
+                try:
+                    chrome, ctx = await open_context(
+                        self._pw, profile, headless=self.cfg.apply.headless
+                    )
+                except ChromeError as e:  # no browser, no screen: the run shows the message
+                    raise ApplyBlocked(str(e), e.code) from e
                 self._chromes[ats], self._contexts[ats] = chrome, ctx
             return self._contexts[ats]
 

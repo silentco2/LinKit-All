@@ -7,9 +7,25 @@ from pathlib import Path
 from linkit_all.core.config import get_settings
 
 
+def is_snap(path: str) -> bool:
+    """A Snap build (or Ubuntu's wrapper script that starts one). Snap confinement cannot open
+    the app's hidden data folder, so such a program is never used."""
+    for p in (path, os.path.realpath(path)):
+        if p.replace("\\", "/").startswith(("/snap/", "/var/lib/snapd/snap/")):
+            return True
+    if os.path.basename(path) in ("chromium", "chromium-browser"):
+        try:
+            with open(path, "rb") as f:
+                head = f.read(512)
+        except OSError:
+            return False
+        return head.startswith(b"#!") and b"snap" in head
+    return False
+
+
 def find_tool(names: list[str], fallbacks: list[Path]) -> str | None:
     for name in names:
-        if found := shutil.which(name):
+        if (found := shutil.which(name)) and not is_snap(found):
             return found
     return next((str(p) for p in fallbacks if p.is_file()), None)
 
@@ -31,13 +47,27 @@ def bundled_libreoffice(data_dir: Path | None = None) -> Path:
     return (data_dir or get_settings().data_dir) / "tools" / "libreoffice"
 
 
+SOFFICE_NAMES = ["soffice", "libreoffice"]
+CHROME_NAMES = ["google-chrome", "google-chrome-stable", "chrome"]
+OTHER_BROWSERS = [
+    "microsoft-edge", "microsoft-edge-stable", "msedge", "brave-browser", "brave", "chromium",
+    "chromium-browser",
+]  # fmt: skip
+BROWSER_NAMES = CHROME_NAMES + OTHER_BROWSERS
+
+
+def snap_only(names: list[str]) -> bool:
+    """True when one of `names` is on PATH only as a Snap build (for `linkit doctor`)."""
+    return any((w := shutil.which(n)) and is_snap(w) for n in names)
+
+
 def soffice_path(data_dir: Path | None = None) -> str | None:
     bundled = bundled_libreoffice(data_dir) / "program" / "soffice.exe"
     if bundled.is_file():
         return str(bundled)
     fallbacks = [d / "LibreOffice/program/soffice.exe" for d in _program_dirs()]
     fallbacks += _mac_apps("LibreOffice", "soffice")
-    return find_tool(["soffice", "libreoffice"], fallbacks)
+    return find_tool(SOFFICE_NAMES, fallbacks)
 
 
 def tectonic_path() -> str | None:
@@ -48,7 +78,7 @@ def tectonic_path() -> str | None:
 def chrome_path() -> str | None:
     fallbacks = [d / "Google/Chrome/Application/chrome.exe" for d in _program_dirs()]
     fallbacks += _mac_apps("Google Chrome", "Google Chrome")
-    return find_tool(["google-chrome", "google-chrome-stable", "chrome"], fallbacks)
+    return find_tool(CHROME_NAMES, fallbacks)
 
 
 CHROMIUM_URL = "https://www.chromium.org/getting-involved/download-chromium/"
@@ -68,8 +98,4 @@ def browser_path() -> str | None:
     for base in _program_dirs():  # Brave's per-user install lives under LOCALAPPDATA
         fallbacks.append(base / "Microsoft/Edge/Application/msedge.exe")
         fallbacks.append(base / "BraveSoftware/Brave-Browser/Application/brave.exe")
-    return find_tool(
-        ["microsoft-edge", "microsoft-edge-stable", "msedge", "brave-browser", "brave",
-         "chromium", "chromium-browser"],
-        fallbacks,
-    )  # fmt: skip
+    return find_tool(OTHER_BROWSERS, fallbacks)

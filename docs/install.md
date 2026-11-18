@@ -49,11 +49,15 @@ To run the newest code instead of a release, use a source checkout: see
 
     ```bash
     curl -LsSf https://astral.sh/uv/install.sh | sh
-    brew install --cask libreoffice
+    source $HOME/.local/bin/env
+    brew install --cask libreoffice google-chrome
     uv tool install linkit-all
     linkit doctor
     linkit
     ```
+
+    Safari cannot be used: LinKit All needs Chrome, Edge, Brave or Chromium. If `linkit` is
+    not found after the install, run `uv tool update-shell` and open a new terminal.
 
     Without Homebrew, get LibreOffice from [libreoffice.org](https://www.libreoffice.org/download/).
     LinKit All finds Chrome, Edge, Brave, Chromium and LibreOffice in `/Applications` or in
@@ -64,6 +68,7 @@ To run the newest code instead of a release, use a source checkout: see
 
     ```bash
     curl -LsSf https://astral.sh/uv/install.sh | sh
+    source $HOME/.local/bin/env
     sudo apt install libreoffice-writer
     uv tool install linkit-all
     linkit doctor
@@ -71,9 +76,20 @@ To run the newest code instead of a release, use a source checkout: see
     ```
 
     On Fedora use `sudo dnf install libreoffice-writer`; on Arch, `sudo pacman -S libreoffice-fresh`.
-    For applying, install [Google Chrome](https://www.google.com/chrome/) from its `.deb` or
-    `.rpm` package. Ubuntu's own Chromium is a Snap, and a Snap cannot open the browser profiles
-    LinKit All keeps in its hidden data folder.
+    If `linkit` is not found, run `uv tool update-shell` and open a new terminal.
+
+    For applying, install Google Chrome. Download the `.deb` from
+    [google.com/chrome](https://www.google.com/chrome/), then run
+    `sudo apt install ./google-chrome-stable_current_amd64.deb`. Chrome on Linux is x86_64
+    only. On ARM, install Chromium from your distribution's own package (not the Snap).
+
+    Snap and Flatpak browsers and LibreOffice cannot be used: they cannot open the hidden data
+    folder where LinKit All keeps its profiles. Ubuntu's `chromium-browser` is a Snap. LinKit All
+    does not look them up (Flatpak) or skips them (Snap), and `linkit doctor` says so. Install the `.deb` or apt package instead.
+
+    For CVs that look the same as in Word, install fonts that match Calibri, Cambria and
+    Arial (optional): `sudo apt install fonts-crosextra-carlito fonts-crosextra-caladea
+    fonts-liberation2`. For Arabic text add `fonts-noto-core`.
 
     - **No screen** (a server or an SSH session): turn off **Settings > Applying > Show the
       browser window**, or the browser cannot start.
@@ -151,8 +167,9 @@ everyday browsing. The LinkIt Fill extension goes in whichever browser you use d
 ## Tectonic (LaTeX CVs only)
 
 If your CV is a `.tex` file, install [Tectonic](https://tectonic-typesetting.github.io) and
-make sure `tectonic` is on your PATH (or in `~/.cargo/bin`). Word, OpenDocument and PDF CVs
-do not need it.
+make sure `tectonic` is on your PATH (or in `~/.cargo/bin`). On macOS run
+`brew install tectonic`. On other systems run your package manager, or follow
+[Tectonic's install page](https://tectonic-typesetting.github.io/en-US/install.html). Word, OpenDocument and PDF CVs do not need it.
 
 ## AI providers
 

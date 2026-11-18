@@ -73,7 +73,11 @@ def test_the_scorecard_says_where_the_time_went_and_the_pass_rate() -> None:
     ]  # fmt: skip
     text = scorecard(rows, datetime(2026, 11, 13))
     # LinkedIn and the user's own question are listed but not counted
-    assert "**Pass rate: 2 of 3 (67%)**" in text and "1 LinkedIn" in text and "1 waiting" in text
+    assert (
+        "**Pass rate: 2 of 3 (67%)**" in text
+        and "1 on sites the app never drives, such as LinkedIn" in text
+        and "1 waiting" in text
+    )
     assert "## Where the time goes" in text
     assert "| load page | 2 | 16.0 s | 30 s | 52% |" in text  # 32 of 61 s
     assert "claude_cli, Nk-character prompt (1 jobs)" in text  # numbers grouped away

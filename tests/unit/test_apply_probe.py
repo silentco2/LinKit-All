@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from linkit_all.apply.probe import ProbeRow, pick, report
+from linkit_all.apply.probe import ProbeRow, pick, rate_line, report
 from linkit_all.core.db import init_db
 from linkit_all.core.models import Job, JobState
 
@@ -143,3 +143,8 @@ def test_a_job_an_earlier_test_finished_is_listed_not_retried(tmp_path: Path, mo
         probe_mod.probe(db, Settings(data_dir=tmp_path), SearchConfig(), None, None, [1])
     )  # type: ignore[arg-type]
     assert [(r.status, r.code) for r in rows] == [("skipped", "posting_gone")]
+
+
+def test_rate_line_names_every_site_the_app_never_drives() -> None:
+    row = ProbeRow(1, "indeed", "indeed.com", "needs_user", "", "apply_in_browser", "")
+    assert "1 on sites the app never drives, such as LinkedIn" in rate_line([row])

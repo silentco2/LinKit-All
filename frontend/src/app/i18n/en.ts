@@ -1231,6 +1231,8 @@ export const en: Record<string, string> = {
   'run.reason.ai_usage_limit.noDate': 'Your {provider} plan is out of uses for now. Switch AI or wait.',
   'run.reason.needs_libreoffice': 'Tailoring needs LibreOffice. Install it, or apply with your CV as it is.',
   'run.reason.needs_tectonic': 'Your CV is a LaTeX file and needs Tectonic to make the PDF. Install Tectonic, then try again.',
+  'run.reason.no_screen': 'There is no screen to show the browser on. Open LinKit All in a desktop session, or turn off Settings › Applying › Show the browser window.',
+  'run.reason.no_browser': 'No browser was found. Install Chrome, Edge, Brave or Chromium (not a Snap build), then press play.',
   'run.reason.pipeline_error': 'Something went wrong: {detail}',
   'run.fix.ai': 'Open Settings → AI',
   'live.paused.is': 'is paused:',

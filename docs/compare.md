@@ -33,7 +33,8 @@ tool lacks the feature.
 - Only three sites have their own form handlers (Greenhouse, Lever and Ashby). Every other
   site goes through a general AI form agent. In the latest [scorecard](scorecard.md) run it
   filled 11 of 55 postings to the end; 22 stopped at a sign-up page and 21 were left for the user
-  (12 questions, 6 sites it never drives, 3 it could not finish) (Practice mode, a made-up profile, nothing submitted).
+  (12 questions, 6 sites it never drives, 3 it could not finish). The run used Practice mode and a
+  made-up profile, and nothing was submitted.
 - Real submitting has been tried only in a few applications that were watched by hand.
 - It is young. Both other projects have far more users and stars on GitHub.
 

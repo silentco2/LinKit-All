@@ -21,7 +21,15 @@ from linkit_all.core.models import Job
 from linkit_all.core.profile import ProfileIn, import_profile
 from linkit_all.core.runs import current_run
 from linkit_all.core.search import import_search
-from linkit_all.core.tools import CHROMIUM_HINT, browser_path, soffice_path, tectonic_path
+from linkit_all.core.tools import (
+    BROWSER_NAMES,
+    CHROMIUM_HINT,
+    SOFFICE_NAMES,
+    browser_path,
+    snap_only,
+    soffice_path,
+    tectonic_path,
+)
 from linkit_all.providers import ProviderError, get_provider
 
 if TYPE_CHECKING:
@@ -114,6 +122,9 @@ def doctor() -> None:
     for c in checks:
         mark = "ok" if c.path else ("MISSING" if c.required else "optional")
         typer.echo(f"[{mark}] {c.name}: {c.path or c.hint}")
+        names = {"LibreOffice": SOFFICE_NAMES, "Chromium browser": BROWSER_NAMES}.get(c.name)
+        if names and not c.path and snap_only(names):
+            typer.echo("       Snap builds cannot be used: install the .deb or apt package.")
     if any(c.required and not c.path for c in checks):
         raise typer.Exit(1)
 

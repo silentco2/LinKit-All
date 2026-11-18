@@ -62,7 +62,14 @@ _identity_cache: dict[str, Identity] = {}  # per Chrome binary path
 
 
 class ChromeError(RuntimeError):
-    """Chrome is not installed, did not start, or did not open its debugging port."""
+    """Chrome is not installed, did not start, or did not open its debugging port.
+    `code` (no_browser | no_screen) is the run's pause reason when the UI has words for it."""
+
+    code: str | None = None
+
+    def __init__(self, message: str, code: str | None = None) -> None:
+        super().__init__(message)
+        self.code = code
 
 
 class Cdp:
@@ -352,11 +359,13 @@ async def launch_chrome(
 ) -> RunningChrome:
     exe = browser_path()
     if exe is None:
-        raise ChromeError(f"No Chromium browser is installed: {CHROMIUM_HINT}")
+        raise ChromeError(f"No Chromium browser is installed: {CHROMIUM_HINT}", "no_browser")
     if not headless and not has_screen():
         raise ChromeError(
-            "No screen to show the browser on: turn off Settings > Applying > "
-            "Show the browser window"
+            "No screen (no DISPLAY or WAYLAND_DISPLAY): open LinKit All in a desktop session. "
+            "For automatic applying you can turn off Settings > Applying > "
+            "Show the browser window.",
+            "no_screen",
         )
     identity = await _headless_identity(exe, timeout) if headless else None
     proc, port, info = await _start(exe, profile_dir, headless=headless, timeout=timeout)

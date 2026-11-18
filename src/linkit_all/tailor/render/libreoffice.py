@@ -1,16 +1,23 @@
 """LibreOffice headless conversions: DOCX -> PDF (what gets submitted), ODT -> DOCX (CV input)."""
 
 import subprocess
-import tempfile
 import threading
 from pathlib import Path
 
+from linkit_all.core.config import get_settings
 from linkit_all.core.tools import soffice_path
 
 # ponytail: one soffice at a time (instances sharing a profile collide); per-call profiles
 # if rendering ever becomes the bottleneck.
 _lock = threading.Lock()
-_PROFILE = Path(tempfile.gettempdir()) / "linkit-libreoffice-profile"
+
+
+def profile_dir() -> Path:
+    """LibreOffice's profile: in the user's own data folder, never a shared /tmp name another
+    local user could pre-create."""
+    path = get_settings().data_dir / "tools" / "lo-profile"
+    path.mkdir(parents=True, exist_ok=True, mode=0o700)
+    return path
 
 
 class RenderError(RuntimeError):
@@ -27,7 +34,7 @@ def convert(src: Path, fmt: str, out_dir: Path, timeout_s: float = 180) -> Path:
     out.unlink(missing_ok=True)
     cmd = [
         exe,
-        f"-env:UserInstallation={_PROFILE.as_uri()}",
+        f"-env:UserInstallation={profile_dir().as_uri()}",
         "--headless",
         "--norestore",
         "--convert-to", fmt,
