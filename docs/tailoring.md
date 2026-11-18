@@ -1,11 +1,11 @@
 ---
-title: "Tailor your CV to each job with AI, without inventing"
-description: "Small word-level CV edits per job that keep your layout and never invent employers, titles, dates, degrees or numbers. Word, LaTeX, ODT and PDF CVs."
+title: "Tailor your resume (CV) to each job description with AI"
+description: "Small word-level resume edits per job that keep your layout and never invent employers, titles, dates, degrees or numbers. Word, LaTeX, ODT and PDF CVs."
 ---
 
-# Tailoring your CV
+# Tailoring your resume (CV)
 
-For each job it is going to apply to, LinKit All makes a version of your CV that fits the
+For each job it is going to apply to, LinKit All makes a version of your resume (your CV) that fits the
 posting a little better. The edits are small and strictly checked. The layout is never touched.
 
 Tailoring happens just before applying, and only for jobs that will really be applied to. A
