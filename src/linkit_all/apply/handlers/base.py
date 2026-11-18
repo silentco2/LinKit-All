@@ -74,7 +74,7 @@ class JobInfo:
 # A connection the site dropped or reset mid-load (seen on Ashby): worth one more try. Anything
 # else (a 404, a DNS failure, a timeout) is the site's answer and is not retried.
 _DROPPED = re.compile(
-    r"ERR_(CONNECTION_(CLOSED|RESET|ABORTED)|EMPTY_RESPONSE|NETWORK_CHANGED|HTTP2_)"
+    r"ERR_(CONNECTION_(CLOSED|RESET|ABORTED|TIMED_OUT)|EMPTY_RESPONSE|NETWORK_CHANGED|HTTP2_)"
 )
 
 

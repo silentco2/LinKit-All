@@ -81,6 +81,29 @@ def test_a_signup_dialog_inside_a_hidden_body_is_seen() -> None:
     assert asyncio.run(go()) == ["firstname", "password"]
 
 
+def test_the_apply_inside_a_popup_beats_the_ads_own_apply_behind_it() -> None:
+    """Workday (2026-11-17): the ad's Apply opens "Start Your Application" (role=dialog, no
+    aria-modal). The ad's Apply behind it only opens the popup again: pressing it went nowhere."""
+    html = """<div aria-hidden="true"><button>Apply</button></div>
+    <div role="dialog"><button>Autofill with Resume</button><a role="button" href="https://wd.test/apply/applyManually">Apply Manually</a></div>"""
+
+    async def go() -> list[tuple[str, str]]:
+        async with _page(html) as page:
+            return [(c.name, c.href) for c in await snapshot(page) if c.apply]
+
+    # its address is kept: the popup redraws while a click waits, so the address is opened
+    assert asyncio.run(go()) == [("Apply Manually", "https://wd.test/apply/applyManually")]
+
+
+def test_a_register_first_popup_goes_to_the_account_flow(tmp_path: Path) -> None:
+    """FlairsTech (2026-11-17): Apply opens "You need to register before applying" over the ad.
+    Pressing the ad's Apply again timed out behind the popup and crashed the application."""
+    html = """<div aria-hidden="true"><button>Apply</button><p>Sr Java developer</p></div>
+    <div role="dialog" aria-modal="true"><p>You need to register before applying</p>
+    <button>Cancel</button><button>REGISTER</button></div>"""
+    assert _ad(html, tmp_path).code == "login"
+
+
 def test_an_upload_hidden_behind_its_label_button_is_read() -> None:
     # Henkel's careers site (Cornerstone), 2026-11-13: the input is aria-hidden, its label shows
     html = """<label for="cv"><input id="cv" name="resumeFileUpload" type="file" class="hidden"

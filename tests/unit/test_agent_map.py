@@ -299,3 +299,33 @@ def test_step_seeds_the_secrets_from_the_profile_and_the_answer_bank(
         )
     )  # fmt: skip
     assert seen == [{"Zorbian", "777000"}]
+
+
+def test_a_sentence_never_goes_into_a_link_or_handle_box() -> None:
+    """SmartRecruiters (2026-11-17) refused "No, I do not have an X profile" in its X box."""
+    from linkit_all.apply.answers import Question
+    from linkit_all.apply.assist import Draft, Drafts, ai_drafts
+
+    class AI:
+        async def complete(self, prompt: str, schema: Any) -> Any:
+            return Drafts(answers=[
+                Draft(key="x", known=True, answer="No, I do not have an X profile to share."),
+                Draft(key="gh", known=True, answer="https://github.com/jane"),
+                Draft(key="why", known=True, answer="I like the team."),
+            ])  # fmt: skip
+
+    qs = [Question(key="x", label="X (fka Twitter)", kind="text"),
+          Question(key="gh", label="GitHub", kind="text"),
+          Question(key="why", label="Why us?", kind="text")]  # fmt: skip
+    got = asyncio.run(ai_drafts(AI(), qs, "cv", "profile", {"title": "t", "company": "c"}))  # type: ignore[arg-type]
+    assert got == {"gh": "https://github.com/jane", "why": "I like the team."}
+
+
+def test_a_saved_sentence_is_not_reused_in_a_link_box() -> None:
+    """The bank kept last run's "No, I do not have a Facebook profile" draft: it must not fit."""
+    from linkit_all.apply.answers import Question
+    from linkit_all.apply.assist import _fit
+
+    box = Question(key="fb", label="Facebook", kind="text")
+    assert _fit(box, "No, I do not have a Facebook profile to share.") is None
+    assert _fit(box, "https://facebook.com/jane") == "https://facebook.com/jane"

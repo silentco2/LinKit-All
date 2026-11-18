@@ -530,6 +530,15 @@ async def step(
         return StepResult(
             "login", "stop", reason="sign-in or sign-up page: needs the account flow", code="login"
         )
+    if (
+        password is None
+        and len(controls) <= 6  # ponytail: a popup's few buttons, not a whole ad page
+        and all(c.kind in ("button", "link") and not c.apply for c in controls)
+        and any(_SIGNUP.search(c.name) for c in controls)
+    ):  # "You need to register before applying": only Register leads on
+        return StepResult(
+            "login", "stop", reason="the site asks you to register first", code="login"
+        )
     remember_secrets(ctx.answers)
     remember_bank_secrets(bank.db)
     fmap = await field_map(provider, controls, await page.title(), await page_text(page, 2000))

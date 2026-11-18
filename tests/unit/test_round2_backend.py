@@ -133,10 +133,22 @@ def test_nationality_from_the_profile_only() -> None:
 
 
 def test_date_of_birth_and_age() -> None:
+    from datetime import date
+
+    from linkit_all.apply.answers import _age_answer
+
     r = resolve_static([DOB, DOB_TEXT, AGE], ctx(date_of_birth="1995-03-07"))
-    assert r.answers == {"d": "1995-03-07", "d2": "1995-03-07"}  # as stored
-    assert [m.question.key for m in r.missing] == ["a"]  # an age question is always asked
-    assert [m.question.key for m in resolve_static([DOB], ctx()).missing] == ["d"]
+    today = date.today()
+    age = today.year - 1995 - ((today.month, today.day) < (3, 7))
+    # as stored; the age comes from the date of birth
+    assert r.answers == {"d": "1995-03-07", "d2": "1995-03-07", "a": str(age)}
+    assert [m.question.key for m in resolve_static([DOB, AGE], ctx()).missing] == ["d", "a"]
+    on = date(2026, 11, 18)
+    over = Question("o", "Are you over the age of 18?", "yesno", True, ["Yes", "No"])
+    assert _age_answer(over, "2010-01-01", on) == ("No", "")
+    assert _age_answer(over, "1995-03-07", on) == ("Yes", "")
+    ranges = Question("r", "Age", "select", True, ["18-24", "25-34", "35-44"])
+    assert _age_answer(ranges, "1995-03-07", on) == ("25-34", "")
     with pytest.raises(ValueError, match="date"):
         ApplicationAnswers(date_of_birth="07/03/1995")
 

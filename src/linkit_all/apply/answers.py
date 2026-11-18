@@ -151,7 +151,9 @@ _SENSITIVE: list[tuple[str, re.Pattern[str]]] = [
                         r"country of (your )?passport|الجنسية"),
         ("date_of_birth", r"date of birth|birth ?date|\bdob\b|تاريخ الميلاد|\bage\b|how old|عمرك"),
         ("marital_status", r"marital|تعيش|الحالة الاجتماعية"),
-        ("eeo_disability", r"disabilit"),
+        # A health or chronic-disease question takes the profile's disability answer
+        ("eeo_disability", r"disabilit|health (issues?|conditions?|problems?)|chronic (disease|illness|condition)"
+                           r"|medical condition"),
         ("eeo_other", r"sexual orientation|transgender|\bpronouns?\b|lgbt|religio"),
         # Being recorded or transcribed (AI notetakers) is its own decision, never a default.
         ("recording_consent", r"notetaker|\brecord(ing|ed)?\b.*\b(interview|call|conversation)|transcri"),
@@ -462,6 +464,26 @@ def _pick_range(options: list[str], years: int) -> str | None:
     return None
 
 
+def _age_answer(q: Question, dob: str, today: date | None = None) -> tuple[Any, str]:
+    """An age question from the profile's date of birth: "Are you over 18?", "How old are you?",
+    or an age range."""
+    born, now = date.fromisoformat(dob), today or date.today()
+    age = now.year - born.year - ((now.month, now.day) < (born.month, born.day))
+    limit = re.search(r"\d+", q.label)
+    if q.kind == "checkbox" or (
+        q.kind in CHOICE_KINDS and limit and not _pick_range(q.options, age)
+    ):
+        if limit is None:
+            return None, "age question: only you can answer"
+        under = re.search(r"\b(under|younger|below|less than)\b", q.label, re.I)
+        n = int(limit.group())
+        return yes_no(q, age < n if under else age >= n), ""
+    if q.options:
+        picked = _pick_range(q.options, age)
+        return (picked, "") if picked else (None, f"no option matches your age ({age})")
+    return str(age), ""
+
+
 def sensitive_answer(q: Question, category: str, ctx: Context) -> tuple[Any, str]:
     """(value, "") or (None, why the user must answer)."""
     a = ctx.answers
@@ -517,10 +539,10 @@ def sensitive_answer(q: Question, category: str, ctx: Context) -> tuple[Any, str
             return ([picked] if q.kind == "multi" else picked), ""
         return name, ""
     if category == "date_of_birth":
-        if re.search(r"\bage\b|how old|عمرك", q.label, re.I):
-            return None, "age question: only you can answer"
         if not a.date_of_birth:
             return None, "date of birth not set in your profile"
+        if re.search(r"\bage\b|how old|عمرك", q.label, re.I):
+            return _age_answer(q, a.date_of_birth)
         return a.date_of_birth, ""  # a date input takes ISO; a text field gets it as stored
     if category == "salary":
         if re.search(r"currency", q.label, re.I) and a.salary_currency:

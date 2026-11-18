@@ -26,7 +26,7 @@ from linkit_all.apply.runner import Applier, ApplyBlocked, _web_url
 from linkit_all.core.config import Settings
 from linkit_all.core.models import ActionItem, ActionStatus, Job, JobEvent, JobState, utcnow
 from linkit_all.core.search import SearchConfig
-from linkit_all.core.state import transition
+from linkit_all.core.state import TERMINAL, transition
 from linkit_all.matching.rank import Embed
 from linkit_all.matching.trash import not_trash
 from linkit_all.providers.base import LLMProvider
@@ -45,7 +45,8 @@ SIGNUP = "dry_run_signup"  # reached a sign-up page: as far as practice mode goe
 CLOSED = ("posting_gone", "job_closed")  # the ad was gone: trashed, nothing to apply to
 # Never the app's to finish alone: LinkedIn (the user applies in their own browser) and a
 # question only the user can answer. Listed, but left out of the pass rate.
-YOURS = ("apply_in_browser", "apply_in_browser_offsite", "unknown_question")
+# knockout: the form would reject you (e.g. 9 years asked, 8 given): "Apply anyway" is your call
+YOURS = ("apply_in_browser", "apply_in_browser_offsite", "unknown_question", "knockout")
 # picked only for the test: put back afterwards
 _GIVE_BACK = {JobState.awaiting_review, JobState.scored, JobState.below_threshold}
 
@@ -198,6 +199,11 @@ async def probe(
     rows = []
     async with Applier(db, settings, test, provider, embed) as applier:
         for job_id in job_ids:
+            with db() as s:
+                done = s.get_one(Job, job_id).state
+            if done in TERMINAL:  # e.g. an ad an earlier test found closed: it stays in the trash
+                rows.append(_row(db, job_id, done.value, "finished earlier, not tried again"))
+                continue
             before = _queue(db, job_id)
             start = time.perf_counter()
             try:
@@ -297,13 +303,13 @@ def passed(r: ProbeRow) -> bool:
 def rate_line(rows: list[ProbeRow]) -> str:
     counted = [r for r in rows if r.code not in YOURS]
     browser = sum(r.code in YOURS[:2] for r in rows)
-    asked = sum(r.code == "unknown_question" for r in rows)
+    asked = sum(r.code in YOURS[2:] for r in rows)
     ok = sum(passed(r) for r in counted)
     share = f"{ok / len(counted):.0%}" if counted else "-"
     return (
         f"**Pass rate: {ok} of {len(counted)} ({share})** of the jobs the app may finish on its "
         f"own. Not counted: {browser} LinkedIn (you apply in your own browser) and {asked} "
-        "waiting for an answer only you can give."
+        "waiting for an answer or a decision only you can give."
     )
 
 

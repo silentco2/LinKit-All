@@ -112,3 +112,34 @@ def test_restore_puts_back_what_an_old_test_left_parked(tmp_path: Path) -> None:
     with db() as s:
         assert s.get_one(Job, 1).state == JobState.below_threshold
         assert s.get_one(Job, 2).state == JobState.failed
+
+
+def test_a_job_an_earlier_test_finished_is_listed_not_retried(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    import asyncio
+
+    from linkit_all.apply import probe as probe_mod
+    from linkit_all.core.config import Settings
+    from linkit_all.core.models import JobEvent
+    from linkit_all.core.search import SearchConfig
+
+    class NoApply:
+        def __init__(self, *a: object) -> None: ...
+        async def __aenter__(self) -> "NoApply":
+            return self
+
+        async def __aexit__(self, *a: object) -> None: ...
+        async def apply(self, job_id: int) -> None:
+            raise AssertionError("a closed ad must not be tried again")
+
+    monkeypatch.setattr(probe_mod, "Applier", NoApply)
+    db = init_db(tmp_path / "db.sqlite")
+    with db.begin() as s:
+        job = Job(source="x", url="https://x.test/1", title="t", company="c", location="",
+                  description="", dedupe_hash="1", state=JobState.skipped, data={"trash": "closed"})  # fmt: skip
+        s.add(job)
+        s.add(JobEvent(job=job, from_state=JobState.applying, to_state=JobState.skipped,
+                       message="gone", code="posting_gone"))  # fmt: skip
+    rows = asyncio.run(
+        probe_mod.probe(db, Settings(data_dir=tmp_path), SearchConfig(), None, None, [1])
+    )  # type: ignore[arg-type]
+    assert [(r.status, r.code) for r in rows] == [("skipped", "posting_gone")]

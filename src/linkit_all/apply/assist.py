@@ -184,8 +184,24 @@ def remember_bank_secrets(db: sessionmaker[Session]) -> None:
                 secrets_seen.update(a if isinstance(a, list) else [str(a)])
 
 
+# A box for a link or handle (SmartRecruiters' "X (fka Twitter)", "Facebook"): a sentence never fits
+_LINK_Q = re.compile(
+    r"\b(x|twitter|facebook|instagram|github|gitlab|linkedin|portfolio|website|url|link|handle"
+    r"|username|profile url|behance|dribbble|stack ?overflow|tiktok|youtube)\b",
+    re.I,
+)
+
+
 def _fit(q: Question, answer: Any) -> Any:
     """A saved answer reshaped for this form's options, or None if it does not fit."""
+    if (
+        q.kind not in CHOICE_KINDS
+        and isinstance(answer, str)
+        and len(q.label) <= 40
+        and _LINK_Q.search(q.label)
+        and " " in answer.strip()
+    ):
+        return None  # "No, I do not have an X profile" in an X handle box: the site rejects it
     if valid_for(q, answer):
         return answer
     if q.kind in CHOICE_KINDS and isinstance(answer, str):

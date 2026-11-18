@@ -9,7 +9,7 @@
   const SIGNUP = /^(sign ?up|create (an |your |a free )?account|register|join( now| free| us)?|new (user|here)|don.?t have an account)/i;
   const clean = (t) => (t || '').replace(/[*✱]/g, '').replace(/\s+/g, ' ').trim();
   const parent = (n) => n.parentElement || (n.getRootNode() instanceof ShadowRoot ? n.getRootNode().host : null);
-  const all = [];
+  const all = [], els = [];  // els: the element of each control in out
   const walk = (root) => { for (const e of root.querySelectorAll('*')) { all.push(e); if (e.shadowRoot) walk(e.shadowRoot); } };
   walk(document);
 
@@ -187,10 +187,17 @@
       required: kind !== 'button' && kind !== 'link' && (reqOf(u.els, nameEl, raw)
         || (kind === 'checkbox' && /required/i.test(nearText(first, u.els)[1].className || ''))),  // Ashby: asterisk on the fieldset title
       html_name: first.name || first.id || '',
-      href: kind === 'link' ? first.href : '',
+      href: first.tagName === 'A' ? first.href : '',  // also a link styled as a button (Workday's Apply Manually)
       apply: (kind === 'button' || kind === 'link') && APPLY.test(name) && !first.closest('header, nav'),  // a site menu's own Apply is something else
       type: kind === 'button' ? (first.getAttribute('type') || (first.tagName === 'BUTTON' ? 'submit' : '')).toLowerCase() : u.type,
     });
+    els.push(first);
   }
+  // A popup that Apply opened covers the ad: Workday's "Start Your Application" (Apply Manually),
+  // FlairsTech's "register before applying" (REGISTER). The ad's own Apply behind it only opens
+  // the popup again, so nothing behind it is listed. A cookie popup holds neither: Apply stays.
+  const inModal = (e) => { for (let n = e; n; n = parent(n)) if (n.getAttribute('aria-modal') === 'true' || /^(alert)?dialog$/.test(n.getAttribute('role') || '') || (n.tagName === 'DIALOG' && n.open)) return true; return false; };
+  const ways = (c) => (c.kind === 'button' || c.kind === 'link') && (c.apply || SIGNUP.test(c.name));
+  if (out.some((c, i) => ways(c) && inModal(els[i]))) return out.filter((c, i) => inModal(els[i]));
   return out;
 }
