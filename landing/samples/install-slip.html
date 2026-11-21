@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LinKit All: the install slip</title>
+<meta name="description" content="Your job search, done on your own computer. Free, open source, no account.">
+<link rel="stylesheet" href="../desk.css">
+<style>
+  .hero { display: grid; gap: clamp(2rem, 5vw, 4rem); align-items: start; padding-block: clamp(1.5rem, 5vw, 4rem) clamp(2rem, 5vw, 4rem); }
+  @media (min-width: 62rem) { .hero { grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr); } }
+  .hero h1 { margin-bottom: 1.25rem; }
+  .hero .lede { margin-bottom: 2rem; }
+
+  /* the install slip: a torn strip of paper with three steps */
+  .slip { position: relative; max-width: 34rem; margin-top: 12px; padding-top: 1.25rem; }
+  .slip::before { content: ""; position: absolute; inset-inline: 0; top: -9px; height: 10px; background: var(--paper);
+    mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / 14px 100%;
+    -webkit-mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / 14px 100%; }
+  .steps { list-style: none; padding: 0; display: grid; gap: 1rem; }
+  .steps li { display: grid; grid-template-columns: 1.5rem minmax(0, 1fr); gap: 0.25rem 0.5rem; align-items: start; }
+  .steps .n { font-weight: 600; color: var(--ink-3); line-height: 2.5rem; }
+  .steps p { line-height: 2.5rem; font-weight: 500; }
+  .slip-note { margin-top: 1rem; max-width: 34rem; }
+
+  .demo .sheet { padding: 0.75rem; }
+  .demo img { width: 100%; border-radius: 2px; border: 1px solid var(--line); }
+  .demo figcaption { margin-top: 1.25rem; text-align: center; }
+
+  .stages { padding-block: clamp(1.5rem, 4vw, 3rem) clamp(3rem, 8vw, 6rem); }
+  .stages .folder-tabs { max-width: 52rem; }
+  .stages .folder-tab { text-align: center; padding-inline: 0.5rem; }
+  .stages .folder-tab strong { font-size: clamp(1rem, 0.85rem + 0.7vw, 1.375rem); }
+  .stages .folder-tab.is-selected { background: var(--folder); }
+  .stages .folder-tab.is-selected strong { color: var(--stamp); }
+  .stages .folder { max-width: 52rem; padding: clamp(1.25rem, 4vw, 2.5rem); }
+  .stages .folder p { max-width: 36ch; font-size: clamp(1.25rem, 1rem + 1.2vw, 1.75rem); line-height: 1.35; font-weight: 500; letter-spacing: -0.015em; text-wrap: balance; }
+  @media (max-width: 640px) {
+    .stages .folder-tabs { flex-wrap: nowrap; }
+    .stages .folder-tab { flex: 1 1 0; padding: 0.625rem 0.125rem 0.625rem !important; }
+    .stages .folder-tab:nth-child(2) { padding-bottom: 0.875rem !important; } .stages .folder-tab:nth-child(3) { padding-bottom: 1.125rem !important; }
+    .stages .folder-tab:nth-child(4) { padding-bottom: 1.375rem !important; } .stages .folder-tab:nth-child(5) { padding-bottom: 1.625rem !important; }
+    .stages .folder-tab strong { font-size: 0.875rem; }
+  }
+</style>
+</head>
+<body>
+<header class="desk-top">
+  <a class="wordmark" href="#">LinKit All</a>
+  <nav aria-label="Project links">
+    <a class="nav-link" href="../docs/">Docs</a>
+    <a class="nav-link" href="https://github.com/silentco2/LinKit-All">GitHub</a>
+    <a class="nav-link" href="https://pypi.org/project/linkit-all/">PyPI</a>
+  </nav>
+</header>
+
+<main>
+  <section class="wrap hero">
+    <div>
+      <h1>Your job search, done on your own computer.</h1>
+      <p class="lede">LinKit All finds jobs on 295 sources, ranks them against your CV, tailors it without inventing anything, and fills in the applications. You keep the final say.</p>
+      <div class="actions" style="margin-bottom: 2.5rem">
+        <a class="btn btn-primary" href="../docs/install/">Install</a>
+        <a class="btn" href="../docs/">Read the docs</a>
+      </div>
+
+      <div class="sheet slip">
+        <ol class="steps">
+          <li>
+            <span class="n">1</span>
+            <div class="codeline">
+              <code id="cmd">uv tool install linkit-all</code>
+              <button class="btn copy" type="button" data-copy="cmd" aria-label="Copy the install command">Copy</button>
+            </div>
+          </li>
+          <li>
+            <span class="n">2</span>
+            <div class="codeline"><code>linkit</code></div>
+          </li>
+          <li>
+            <span class="n">3</span>
+            <p>Upload your CV, pick your AI, press Find jobs now.</p>
+          </li>
+        </ol>
+      </div>
+      <p class="small slip-note">Windows, macOS and Linux · Free and open source (AGPL-3.0) · No account, no telemetry</p>
+    </div>
+
+    <figure class="demo">
+      <div class="sheets">
+        <div class="under"></div><div class="under"></div>
+        <div class="sheet"><img src="../assets/demo.gif" width="1280" height="720" alt="A 30-second screen recording: LinKit All finds, ranks and fills in applications on a practice job board in Practice mode."></div>
+      </div>
+      <figcaption class="small">Demo on a practice job board. Nothing was sent.</figcaption>
+    </figure>
+  </section>
+
+  <section class="wrap stages" aria-labelledby="stages-h">
+    <h2 id="stages-h" class="small" style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)">The five steps of a run</h2>
+    <div class="folder-tabs" aria-hidden="true">
+      <div class="folder-tab"><strong>Find</strong></div>
+      <div class="folder-tab"><strong>Rank</strong></div>
+      <div class="folder-tab is-selected"><strong>Tailor</strong></div>
+      <div class="folder-tab"><strong>Apply</strong></div>
+      <div class="folder-tab"><strong>Report</strong></div>
+    </div>
+    <div class="folder">
+      <p>A few words change per job. Your layout, employers, titles, dates and numbers never do.</p>
+    </div>
+  </section>
+</main>
+
+<script>
+  document.querySelectorAll('[data-copy]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var t = document.getElementById(b.dataset.copy).textContent;
+      navigator.clipboard.writeText(t).then(function () {
+        b.textContent = 'Copied'; b.setAttribute('data-copied', '');
+        setTimeout(function () { b.textContent = 'Copy'; b.removeAttribute('data-copied'); }, 1800);
+      }).catch(function () { b.textContent = 'Press Ctrl+C'; });
+    });
+  });
+</script>
+</body>
+</html>

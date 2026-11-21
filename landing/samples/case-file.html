@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LinKit All: one job's case file</title>
+<meta name="description" content="Your job search, done on your own computer. Free, open source, no account.">
+<link rel="stylesheet" href="../desk.css">
+<style>
+  .hero { display: grid; gap: clamp(2rem, 5vw, 4rem); align-items: center; padding-block: clamp(1.5rem, 5vw, 4rem) clamp(2.5rem, 6vw, 5rem); }
+  @media (min-width: 62rem) { .hero { grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); } }
+  .hero h1 { margin-bottom: 1.25rem; }
+  .hero .lede { margin-bottom: 2rem; }
+
+  .posting { max-width: 28rem; margin-inline: auto; width: 100%; transform: rotate(1deg); }
+  .posting .tag { margin-bottom: 1rem; }
+  .posting h2 { font-size: 1.375rem; letter-spacing: -0.015em; margin-bottom: 0.25rem; }
+  .posting .meta { color: var(--ink-2); margin-bottom: 0.875rem; }
+  .posting .excerpt { color: var(--ink-2); font-size: 0.9375rem; padding-bottom: 1rem; margin-bottom: 0.875rem; border-bottom: 1px solid var(--line); }
+  .log { list-style: none; padding: 0; display: grid; gap: 0.375rem; font-size: 0.8125rem; line-height: 1.4; color: var(--ink-2); }
+  .log li { display: flex; flex-wrap: wrap; gap: 0 0.75rem; align-items: center; }
+  .log time { color: var(--ink-3); }
+
+  /* the next sheets slide over the first */
+  .pile { padding-bottom: clamp(3rem, 8vw, 6rem); }
+  .pile .col { max-width: 46rem; margin-inline: auto; display: grid; }
+  .pile .sheet { position: relative; }
+  .pile .cv { margin-top: -2.5rem; transform: rotate(-0.8deg); margin-inline-end: 1.5rem; display: grid; gap: 1.25rem; z-index: 2; }
+  .pile .ask { margin-top: -1.5rem; transform: rotate(0.7deg); margin-inline-start: 1.5rem; z-index: 3; padding-bottom: 2.5rem; }
+  .pile .cv .tag, .pile .ask .tag { margin-bottom: 0.75rem; }
+  .cv-line { font-size: 1.0625rem; line-height: 1.7; max-width: 52ch; }
+  del, ins { text-decoration: none; border-radius: 2px; padding: 0.0625rem 0.25rem; }
+  del { text-decoration: line-through; text-decoration-thickness: 1.5px; color: var(--stop); background: color-mix(in srgb, var(--stop) 14%, transparent); }
+  ins { color: var(--go); font-weight: 600; background: color-mix(in srgb, var(--go) 16%, transparent); }
+  .pile .cv .note { position: absolute; width: 13.5rem; inset-inline-end: -4.5rem; bottom: -1.75rem; transform: rotate(2deg); }
+  @media (max-width: 62rem) {
+    .pile .cv { margin-inline-end: 0; }
+    .pile .cv .note { position: static; width: auto; transform: rotate(1deg); margin-top: 0.25rem; }
+  }
+  .ask h3 { font-size: 1.25rem; line-height: 1.3; font-weight: 500; letter-spacing: -0.01em; margin-bottom: 0.375rem; }
+  .ask .sub { color: var(--ink-2); max-width: 44ch; }
+  .done { display: flex; align-items: center; gap: 0.75rem; justify-content: flex-end; margin-top: 1.25rem; }
+  .done time { color: var(--ink-3); font-size: 0.8125rem; }
+  .done .stamp { font-size: 1.125rem; line-height: 1.5rem; padding: 0.25rem 0.875rem; }
+  @media (max-width: 640px) { .pile .cv, .pile .ask { margin-inline: 0; } .pile .cv .note { margin-top: 0; } }
+</style>
+</head>
+<body>
+<header class="desk-top">
+  <a class="wordmark" href="#">LinKit All</a>
+  <nav aria-label="Project links">
+    <a class="nav-link" href="../docs/">Docs</a>
+    <a class="nav-link" href="https://github.com/silentco2/LinKit-All">GitHub</a>
+    <a class="nav-link" href="https://pypi.org/project/linkit-all/">PyPI</a>
+  </nav>
+</header>
+
+<main>
+  <section class="wrap hero">
+    <div>
+      <h1>Your job search, done on your own computer.</h1>
+      <p class="lede">LinKit All finds jobs on 295 sources, ranks them against your CV, tailors it without inventing anything, and fills in the applications. You keep the final say.</p>
+      <div class="actions">
+        <a class="btn btn-primary" href="../docs/install/">Install</a>
+        <a class="btn" href="../docs/">Read the docs</a>
+      </div>
+    </div>
+
+    <article class="sheet posting" aria-label="Sample job">
+      <p class="small tag">Sample job</p>
+      <h2>Product Analyst</h2>
+      <p class="meta">Northwind Health (sample) · Remote, EU</p>
+      <p class="excerpt">Own the weekly product metrics review and turn funnel data into clear recommendations for a small, remote product team.</p>
+      <ul class="log">
+        <li><time>09:02</time> Found on Greenhouse</li>
+        <li><time>09:03</time> Ranked: <span class="badge tier-high">Strong match</span></li>
+      </ul>
+    </article>
+  </section>
+
+  <section class="wrap pile" aria-label="What happens to that job">
+    <div class="col">
+      <article class="sheet cv">
+        <div>
+          <p class="small tag">Your CV, one line for this job</p>
+          <p class="cv-line">Analytics lead who <del>managed</del> <ins>led</ins> a team of 4 and cut reporting time by 30% at Acme Corp, 2021 to 2024.</p>
+        </div>
+        <p class="note">Changed: 1 word. Locked: employers, dates, numbers.</p>
+      </article>
+
+      <article class="sheet ask">
+        <p class="small tag">Application question</p>
+        <h3>Do you need visa sponsorship?</h3>
+        <p class="sub">Left for you. The AI never answers this.</p>
+        <div class="done">
+          <time>09:41</time>
+          <span class="stamp">Applied</span>
+        </div>
+      </article>
+    </div>
+  </section>
+</main>
+</body>
+</html>
