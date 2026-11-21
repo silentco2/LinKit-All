@@ -20,7 +20,7 @@ Users bring their own AI: ChatGPT plan via Codex CLI, API keys, and later local 
   sponsorship, salary, EEO/demographics, disability, veteran status, criminal record,
   legal declarations. Answer only from the profile or queue for the user.
 - All user data stays local. Only the chosen model provider receives CV/job text. Suggestions (places, titles, FX rates) come from bundled offline datasets; two refreshes send no personal data: FX rates, and the official visa sponsor lists of the user's visa countries (UK, NL, US H-1B, CA LMIA; at most weekly, core/sponsors.py).
-- - No telemetry: problems go to GitHub issues the user opens and submits (footer links, pre-filled with version/OS/mode/AI/error code, nothing personal). No hard-coded secrets. Never log passwords, tokens or full CV text.
+- No telemetry: problems go to GitHub issues the user opens and submits (footer links, pre-filled with version/OS/mode/AI/error code, nothing personal). No hard-coded secrets. Never log passwords, tokens or full CV text.
 - Never click a final Submit in dry-run mode.
 
 ## 3. Tech stack (do not swap without approval)
@@ -80,11 +80,11 @@ Tailoring happens just before applying, After applied, jobs.outcome (no_reply, r
 - LinkedIn hiring posts (`sources/linkedin_posts/`): opt-in, off by default (ToS risk noted, no acknowledgement checkbox), no LinkedIn account (maintainer 2026-10-31); a row in the Sources list, keywords = the job titles (maintainer 2026-11-05). Google
   `site:linkedin.com/posts` in the app browser on a `google` profile (≤5 keywords × ≤5 pages, paced); a Google check -> stop the source, flag it, a Needs you
   card opens it in the app browser. Post text = public page JSON-LD only (never comments). ATS links -> that ATS; else by script, no AI (`sources/posts.py`, maintainer 2026-11-08): email -> mailto job, other link -> careers scraper, neither -> dropped.
-- Per-domain rate limits, page checkpoints, dedupe by normalized URL + hash(title, company, location) + rapidfuzz Source health per switched-on source and company entry, from runs and linkit source-check (sources/health.py; marks only).
+- Per-domain rate limits, page checkpoints, dedupe by normalized URL + hash(title, company, location) + rapidfuzz. Source health per switched-on source and company entry, from runs and linkit source-check (sources/health.py; marks only).
 
 ### 5.3 Matching (`matching/`)
 1. Hard rules: titles include/exclude, location (if not remote; a place's city, or a city within filters.radius_km, default 40), remote mode, seniority, posted date,
-   salary floor, company blacklist, one application per company (default on), years asked in the JD body (label or drop), dealbreaker phrases. Jobs added by hand (sources/manual.py) skip them, not the trust check
+   salary floor, company blacklist, one application per company (default on), years asked in the JD body (label or drop), dealbreaker phrases. Jobs added by hand (sources/manual.py) skip them, not the trust check.
 2. Local rank: 0.8 cosine(CV, JD) + 0.2 skills overlap; fastembed multilingual MiniLM-L12
    (Arabic + English, chunked). Free, no AI calls. A listed visa sponsor in a visa country: label + 0.05 (core/sponsors.py).
 3. Trust check (offline, no AI): scam score (fees, off-platform contact, mule/crypto/ID requests,
