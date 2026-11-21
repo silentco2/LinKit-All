@@ -81,6 +81,8 @@ build-backend = "hatchling.build"
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+# brand/: one-off logo scripts (shapely, fonttools), not part of the app
+extend-exclude = ["brand"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF", "S"]

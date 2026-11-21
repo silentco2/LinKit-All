@@ -96,7 +96,9 @@ def test_lists_never_show_applied_or_off_title_jobs_and_the_rows_stay(tmp_path: 
         assert [j["title"] for j in found] == ["near fit"]
         both = client.get("/api/jobs?applied=true").json()
         assert sorted(j["title"] for j in both) == ["near applied", "near fit"]
-        assert client.get("/api/jobs?applied=true&state=applied").json()[0]["title"] == "near applied"
+        assert (
+            client.get("/api/jobs?applied=true&state=applied").json()[0]["title"] == "near applied"
+        )
         assert client.get("/api/jobs?limit=0").status_code == 422
     with db() as s:
         assert len(list(s.scalars(select(Job)))) == 3
