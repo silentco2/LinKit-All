@@ -62,7 +62,19 @@ const SOURCES: Record<string, string> = {
     <p class="text-sm text-slate-500">{{ 'actions.intro' | t }}</p>
 
     <!-- One answer control, drawn for a single item or for a group; k is the key of its typed answer in the draft. -->
-    <ng-template #ctl let-k="k" let-q="q" let-i="i">
+
+    <!-- "Rewrite with AI" under a free-text answer or the email body: an optional wish, the button, Undo. Never on sensitive questions. -->
+    <ng-template #rw let-item="item" let-k="k" let-label="label" let-a="a">
+      @let id = rwId(k, label);
+      @let now = label === null ? bodyOf(a) : text(k, label);
+      <div class="mt-2 flex flex-wrap items-center gap-2">
+        <input class="input h-9 min-w-40 max-w-xs flex-1 py-1 text-sm" dir="auto" maxlength="300" [placeholder]="'actions.rw.wish' | t" [attr.aria-label]="'actions.rw.wish' | t" [value]="wish()[id] ?? ''" (input)="setWish(id, val($event))">
+        <button type="button" class="btn text-sm" [disabled]="rewriting() !== null" (click)="rewrite(item, k, label, a)">{{ (rewriting() === id ? 'actions.rw.working' : (now.trim() ? 'actions.rw.rewrite' : 'actions.rw.draft')) | t }}</button>
+        @if (undo()[id] !== undefined) { <button type="button" class="text-sm text-brand-700 underline dark:text-brand-100" (click)="undoRewrite(k, label, a)">{{ 'actions.rw.undo' | t }}</button> }
+      </div>
+      @if (rwError()[id]; as e) { <p class="mt-1 text-sm text-rose-700 dark:text-rose-400" role="alert" dir="auto">{{ e }}</p> }
+    </ng-template>
+    <ng-template #ctl let-k="k" let-q="q" let-i="i" let-item="item">
       <label class="label" [attr.for]="'q' + k + '-' + i" dir="auto">
         {{ q.label }} @if (q.required) { <span class="text-rose-600 dark:text-rose-400" [title]="'actions.required' | t">*</span> }
       </label>
@@ -70,6 +82,7 @@ const SOURCES: Record<string, string> = {
         @case ('textarea') {
           <textarea class="input" rows="4" [id]="'q' + k + '-' + i" [value]="text(k, q.label)"
                     (input)="set(k, q.label, val($event))"></textarea>
+          @if (!q.sensitive && !q.category) { <ng-container *ngTemplateOutlet="rw; context: { item: item, k: k, label: q.label, a: null }" /> }
         }
         @case ('multi') {
           <div class="space-y-1" role="group" [attr.aria-label]="q.label">
@@ -107,6 +120,7 @@ const SOURCES: Record<string, string> = {
         @default {
           <input class="input" [type]="inputType(q.kind)" [id]="'q' + k + '-' + i" [value]="text(k, q.label)"
                  (input)="set(k, q.label, val($event))">
+          @if (q.kind === 'text' && !q.sensitive && !q.category) { <ng-container *ngTemplateOutlet="rw; context: { item: item, k: k, label: q.label, a: null }" /> }
         }
       }
       @if (q.reason) { <p class="hint" dir="auto">{{ why(q) }}</p> }
@@ -184,7 +198,7 @@ const SOURCES: Record<string, string> = {
           <h2><span>{{ plural('fin.group.asks', c.g.count) }}</span>&ngsp;<bdi dir="auto" class="font-semibold">{{ c.g.label }}</bdi></h2>
           @if (companies(c.g); as co) { <p class="mt-1 text-sm text-slate-500" dir="auto">{{ co }}</p> }
           <div class="mt-4">
-            <ng-container *ngTemplateOutlet="ctl; context: { k: c.key, q: c.q, i: 0 }" />
+            <ng-container *ngTemplateOutlet="ctl; context: { k: c.key, q: c.q, i: 0, item: c.g.item_ids[0] }" />
             <ng-container *ngTemplateOutlet="extras; context: { k: c.key, q: c.q, a: null, c: c }" />
           </div>
           @if (errors()[c.key]; as err) { <div class="alert alert-error mt-4" role="alert" dir="auto">{{ err }}</div> }
@@ -228,7 +242,7 @@ const SOURCES: Record<string, string> = {
             <div class="mt-4 space-y-5">
               @for (q of a.questions; track q.label; let i = $index) {
                 <div>
-                  <ng-container *ngTemplateOutlet="ctl; context: { k: a.id, q: q, i: i }" />
+                  <ng-container *ngTemplateOutlet="ctl; context: { k: a.id, q: q, i: i, item: a.id }" />
                   <ng-container *ngTemplateOutlet="extras; context: { k: a.id, q: q, a: a, c: null }" />
                 </div>
               }
@@ -269,6 +283,7 @@ const SOURCES: Record<string, string> = {
               <div>
                 <label class="label" [attr.for]="'eb' + a.id">{{ 'actions.email.body' | t }}</label>
                 <textarea class="input" rows="10" dir="auto" maxlength="10000" [id]="'eb' + a.id" [value]="bodyOf(a)" (input)="editEmail(a, 'body', val($event))"></textarea>
+                <ng-container *ngTemplateOutlet="rw; context: { item: a.id, k: a.id, label: null, a: a }" />
               </div>
             </div>
             @if (emailSaved()[a.id]) { <div class="alert alert-ok mt-3" role="status">{{ 'actions.email.saved' | t }}</div> }
@@ -566,6 +581,49 @@ export class ActionsPage {
   protected companies(g: ActionGroup): string {
     const names = g.item_ids.map((id) => this.items().find((a) => a.id === id)?.job.company).filter((n): n is string => !!n);
     return names.slice(0, 3).join(', ') + (names.length > 3 ? ` +${this.num(names.length - 3)}` : '');
+  }
+
+  // ---- "Rewrite with AI" -------------------------------------------------------------------------------------
+
+  protected readonly rewriting = signal<string | null>(null);
+  protected readonly wish = signal<Partial<Record<string, string>>>({});
+  /** The text before the last rewrite, per field: Undo puts it back. */
+  protected readonly undo = signal<Partial<Record<string, string>>>({});
+  protected readonly rwError = signal<Record<string, string>>({});
+
+  protected rwId(k: string | number, label: string | null): string {
+    return `${k}|${label ?? '@email'}`;
+  }
+
+  protected setWish(id: string, value: string): void {
+    this.wish.update((w) => ({ ...w, [id]: value }));
+  }
+
+  /** Rewrite the typed answer for this job (or draft one when the box is empty); nothing is saved until the card's own button. */
+  protected async rewrite(item: number, k: string | number, label: string | null, a: ActionItem | null): Promise<void> {
+    const id = this.rwId(k, label);
+    const before = label === null ? this.bodyOf(a!) : this.text(k, label);
+    this.rewriting.set(id);
+    this.rwError.update(({ [id]: _drop, ...rest }) => rest);
+    try {
+      const r = await this.api.post<{ text: string }>(`/actions/${item}/rewrite`, { label, text: before, wish: this.wish()[id] ?? '' });
+      this.undo.update((u) => ({ ...u, [id]: before }));
+      if (label === null) this.editEmail(a!, 'body', r.text);
+      else this.set(k, label, r.text);
+    } catch (e) {
+      this.rwError.update((m) => ({ ...m, [id]: (e as Error).message }));
+    } finally {
+      this.rewriting.set(null);
+    }
+  }
+
+  protected undoRewrite(k: string | number, label: string | null, a: ActionItem | null): void {
+    const id = this.rwId(k, label);
+    const before = this.undo()[id];
+    if (before === undefined) return;
+    if (label === null) this.editEmail(a!, 'body', before);
+    else this.set(k, label, before);
+    this.undo.update(({ [id]: _drop, ...rest }) => rest);
   }
 
   // ---- email drafts ----------------------------------------------------------------------------------------

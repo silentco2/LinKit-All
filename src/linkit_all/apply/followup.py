@@ -24,6 +24,7 @@ from linkit_all.apply.email_send import (
     send,
     valid_address,
 )
+from linkit_all.apply.prose import clean
 from linkit_all.apply.vault import Vault
 from linkit_all.core.config import Settings
 from linkit_all.core.models import Job, JobEvent, JobState, Outcome, Profile, utcnow
@@ -128,7 +129,7 @@ async def send_followups(
         draft = data.get("email_draft") or {}
         subject = f"Re: {draft.get('subject') or title}"
         sign = signature(profile.full_name, profile.phone, answers.linkedin)
-        body = f"{greeting(None)}\n\n{reply.body}\n\n{sign}"
+        body = f"{greeting(None)}\n\n{clean(reply.body)}\n\n{sign}"
         msg = build_message(
             profile.full_name,
             sender,

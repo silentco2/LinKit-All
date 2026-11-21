@@ -4,9 +4,9 @@ import re
 from datetime import datetime, timedelta
 from typing import Any
 
-from linkit_all.core import fx
+from linkit_all.core import fx, geo
 from linkit_all.core.models import Job
-from linkit_all.core.search import SearchConfig, Seniority
+from linkit_all.core.search import Place, SearchConfig, Seniority
 from linkit_all.matching.years import sentences, years_required
 from linkit_all.sources.base import remote_from_text
 from linkit_all.sources.text import norm_company
@@ -29,6 +29,31 @@ def seniority(title: str) -> Seniority | None:
     """The level a title states, or None when it names none ("Frontend Developer")."""
     t = title.lower()
     return next((level for pattern, level in _SENIORITY if pattern.search(t)), None)
+
+
+def at_place(location: str, places: list[Place], radius_km: int = 0) -> bool:
+    """The job location names one of `places`: the place's city as a whole word ("New Cairo,
+    Cairo Governorate" and "القاهرة" count for Cairo), a city within `radius_km` of it
+    ("Giza" for Cairo), or for a country-only place any city of that country ("Dubai" for
+    the UAE). A country the location states must be the place's. Places without a country
+    (old free-text ones) are left to the substring check."""
+    city, iso2 = geo.locate(location)
+    words = f" {geo.norm(location)} "
+    for p in places:
+        if not p.country or (iso2 and iso2 != p.country.upper()):
+            continue
+        if not p.city:
+            if iso2:
+                return True
+            continue
+        names = {geo.norm(p.city), geo.arabic_name(p.city)} - {""}
+        if geo.norm(city) in names or any(f" {n} " in words for n in names):
+            return True
+        if radius_km and city:
+            km = geo.distance_km(city, iso2, p.city, p.country.upper())
+            if km is not None and km <= radius_km:
+                return True
+    return False
 
 
 def expectation_of(answers: dict[str, Any], cfg: SearchConfig) -> tuple[float, str] | None:
@@ -61,7 +86,11 @@ def rule_violation(
     if remote and remote not in f.work_modes:
         return f"work mode {remote} is not one you chose"
     where = f"{job.location} {job.data.get('remote') or ''}".lower()
-    if f.locations and not any(loc.lower() in where for loc in f.locations):
+    if (
+        f.locations
+        and not any(loc.lower() in where for loc in f.locations)
+        and not at_place(job.location, cfg.search.places, f.radius_km)
+    ):
         return f"location {job.location!r} not in your locations"
     if f.seniority and (level := seniority(job.title)) and level not in f.seniority:
         return f"seniority {level} not wanted"

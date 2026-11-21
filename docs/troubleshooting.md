@@ -124,4 +124,6 @@ linkit ai-check
 
 Run the failing step on its own, for example `linkit run rank`, and read the message. When you ask
 for help, include the output of `linkit doctor` and the relevant lines of `logs/linkit.log`.
+**Report a problem** in the app's footer opens a GitHub issue already filled with your version
+and setup (nothing is sent until you submit it).
 Passwords and tokens are masked in logs, but check before you share.

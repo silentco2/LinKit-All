@@ -15,6 +15,7 @@ from linkit_all.sources.ats_detector import detect
 from linkit_all.sources.base import JobStub, Source, Task
 from linkit_all.sources.careers import Unsupported
 from linkit_all.sources.discovery import board_tasks, note_crawl, upsert_boards
+from linkit_all.sources.health import COMPANY, Result, key_of, record
 from linkit_all.sources.http import Http
 from linkit_all.sources.store import Deduper, mark_task, route_ats, store_page
 from linkit_all.sources.text import normalize_url
@@ -56,7 +57,9 @@ async def company_tasks(
             except httpx.HTTPError:
                 found = None
         if found is None and entry.startswith("http") and "careers" in registry:
-            tasks.setdefault(f"careers:{entry}", Task("careers", f"careers:{entry}", board=entry))
+            tasks.setdefault(
+                f"careers:{entry}", Task("careers", f"careers:{entry}", board=entry, entry=entry)
+            )
         elif found is None:
             unsupported.append(f"{entry} (no known ATS found)")
         elif found[0] not in registry:
@@ -65,7 +68,9 @@ async def company_tasks(
             ats, board = found
             if db is not None:
                 upsert_boards(db, ats, [board], source)
-            tasks.setdefault(f"{ats}:{board}", Task(ats, f"{ats}:{board}", board=board))
+            tasks.setdefault(
+                f"{ats}:{board}", Task(ats, f"{ats}:{board}", board=board, entry=entry)
+            )
     return list(tasks.values()), unsupported
 
 
@@ -82,6 +87,13 @@ async def discover(
     mine = {t.key for t in tasks}  # the user's companies always run
     stored = board_tasks(db, cfg, registry, mine)
     board_keys = {t.key for t in stored}
+    # Source health (sources/health.py): jobs and errors per source and company entry this run.
+    results: dict[str, Result] = {}
+    covered = {t.entry for t in tasks}
+    for entry in cfg.sources.companies:
+        if entry not in covered:  # no task: say why, so its row in Settings shows it
+            why = next((u for u in stats.unsupported if u.startswith(entry)), None)
+            results[COMPANY + entry] = Result(error=why or "same job board as another entry")
     tasks += stored
     tasks += [t for src in registry.values() if src.is_enabled(cfg) for t in src.tasks(cfg)]
     with db() as s:
@@ -102,6 +114,12 @@ async def discover(
 
     timed_out: set[str] = set()  # sources that stalled once in this run
 
+    def note(task: Task, jobs: int, error: str | None) -> None:
+        if (key := key_of(task, board_keys)) is not None:
+            r = results.setdefault(key, Result())
+            r.jobs += jobs
+            r.error = r.error or error
+
     async def run(task: Task) -> None:
         start, done = checkpoints.get(task.key, (0, False))
         if done:
@@ -111,6 +129,7 @@ async def discover(
                 # A stalled site would otherwise cost its full limit once per task. Left undone,
                 # so the next run or a resume tries it again.
                 stats.errors[task.key] = f"skipped: {task.source} timed out earlier in this run"
+                note(task, 0, stats.errors[task.key])
                 if task.key in board_keys:
                     note_crawl(db, task.source, task.board, 0, False)
                 return
@@ -118,6 +137,7 @@ async def discover(
             seen = 0
             ok = True
             status: int | None = None
+            unreadable: str | None = None  # Unsupported: no jobs, and why (for source health)
             try:
                 pages = registry[task.source].search(http, task, start)
                 limit = registry[task.source].page_timeout(task)
@@ -145,6 +165,7 @@ async def discover(
             except Unsupported as e:  # not an error: tell the user why nothing came of it
                 stats.unsupported.append(f"{task.board} ({e})")
                 mark_task(db, run_id, task.key, str(e))
+                unreadable = str(e)
             except httpx.HTTPStatusError as e:  # e.g. board removed: retrying will not help
                 ok = False
                 # a 404 after a page of jobs is not a missing board
@@ -163,6 +184,7 @@ async def discover(
             else:
                 stats.tasks_done += 1
                 mark_task(db, run_id, task.key, None)
+            note(task, seen, unreadable if ok else stats.errors.get(task.key))
             if task.key in board_keys:
                 note_crawl(db, task.source, task.board, seen, ok, status)
 
@@ -170,6 +192,7 @@ async def discover(
     # higher-priority source's copy whenever that arrives.
     try:
         await asyncio.gather(*(run(t) for t in tasks))
+        record(db, results, "run")  # a cancelled run records nothing: half a run says little
     finally:
         await asyncio.gather(*(src.aclose() for src in registry.values()))
     return stats

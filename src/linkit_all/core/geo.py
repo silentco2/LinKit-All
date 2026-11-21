@@ -1,6 +1,7 @@
 """Offline place, country and job-title suggestions from the lists in `data/` (no lookups)."""
 
 import json
+import math
 import re
 import unicodedata
 from collections.abc import Sequence
@@ -42,7 +43,7 @@ _ALIASES = {
     "uae": "AE", "emirates": "AE", "ksa": "SA", "uk": "GB", "great britain": "GB",
     "britain": "GB", "england": "GB", "usa": "US", "u.s.": "US", "u.s.a.": "US",
     "america": "US", "korea": "KR", "russia": "RU", "czech republic": "CZ",
-    "palestinian territory": "PS", "الإمارات العربية المتحدة": "AE",
+    "palestinian territory": "PS", "holland": "NL", "الإمارات العربية المتحدة": "AE",
     "المملكة العربية السعودية": "SA", "السعودية العربية": "SA",
 }  # fmt: skip
 
@@ -59,7 +60,7 @@ def _norm(text: str) -> str:
 def _by_key() -> dict[str, Country]:
     keys: dict[str, Country] = {}
     for c in _countries():
-        for k in (c.iso2, c.name, c.name_ar):
+        for k in (c.iso2, c.name, c.name_ar, c.name.removeprefix("The ")):  # "Netherlands"
             if k:
                 keys.setdefault(_norm(k), c)
     by_iso = {c.iso2: c for c in _countries()}
@@ -80,6 +81,9 @@ def country(code_or_name: str) -> Country | None:
     return None
 
 
+norm = _norm  # public: matching compares job locations the same way
+
+
 @dataclass(frozen=True)
 class _Place:
     en: str  # normalized English name
@@ -89,6 +93,7 @@ class _Place:
     country: Country
     pop: int  # 0 for a country row
     kind: str  # "city" | "country"
+    at: tuple[float, float] | None = None  # (latitude, longitude) of a city
 
 
 @lru_cache(maxsize=1)
@@ -100,7 +105,8 @@ def _places() -> tuple[_Place, ...]:
         if (c := by_iso.get(r["c"])) is None or (r["n"], r["c"]) in seen:
             continue
         seen.add((r["n"], r["c"]))
-        out.append(_Place(_norm(r["n"]), _norm(r["ar"]), r["n"], r["ar"], c, r["p"], "city"))
+        at = (r["g"][0], r["g"][1]) if r.get("g") else None
+        out.append(_Place(_norm(r["n"]), _norm(r["ar"]), r["n"], r["ar"], c, r["p"], "city", at))
     return tuple(out)
 
 
@@ -117,19 +123,21 @@ def _tier(names: Sequence[str], q: str) -> int | None:
     return min(tiers, default=None)
 
 
+@lru_cache(maxsize=1)
+def _city_index() -> dict[str, tuple[_Place, ...]]:
+    """Normalized English or Arabic city name -> its cities, biggest first."""
+    index: dict[str, list[_Place]] = {}
+    for p in _places():
+        if p.kind == "city":
+            for key in {p.en, p.ar} - {""}:
+                index.setdefault(key, []).append(p)
+    return {k: tuple(v) for k, v in index.items()}
+
+
 def _city(name: str, iso2: str = "") -> _Place | None:
     """The biggest city called `name`, in that country when one is given."""
-    key = _norm(name)
-    if not key:
-        return None
-    return next(
-        (
-            p
-            for p in _places()
-            if p.kind == "city" and key in (p.en, p.ar) and (not iso2 or p.country.iso2 == iso2)
-        ),
-        None,
-    )
+    found = _city_index().get(_norm(name), ())
+    return next((p for p in found if not iso2 or p.country.iso2 == iso2), None)
 
 
 _SEPARATOR = re.compile(r"[,،/–—]|\s-+|-+\s")  # noqa: RUF001
@@ -207,6 +215,30 @@ def _country_part(part: str, others: list[str]) -> Country | None:
     if found and part.upper() in _US_STATES and not any(_city(o, found.iso2) for o in others):
         return None  # "Denver, CO" is Colorado; "Bogota, CO" is Colombia
     return found
+
+
+def distance_km(a: str, a_iso2: str, b: str, b_iso2: str) -> float | None:
+    """Great-circle distance between two cities named in English or Arabic, each in the
+    given country when one is given; None when either is not in the bundled list."""
+    pa, pb = _city(a, a_iso2), _city(b, b_iso2)
+    if not (pa and pb and pa.at and pb.at):
+        return None
+    (lat1, lon1), (lat2, lon2) = (tuple(map(math.radians, p)) for p in (pa.at, pb.at))
+    h = math.sin((lat2 - lat1) / 2) ** 2
+    h += math.cos(lat1) * math.cos(lat2) * math.sin((lon2 - lon1) / 2) ** 2
+    return 2 * 6371.0 * math.asin(math.sqrt(h))
+
+
+@lru_cache(maxsize=4096)
+def locate(text: str) -> tuple[str, str]:
+    """(city, ISO2) a job location names, each "" when unknown: "Cairo, EG" -> ("Cairo", "EG"),
+    "Dubai" -> ("Dubai", "AE"), "Egypt" -> ("", "EG"). The city is in English when the
+    bundled list knows it, else as written."""
+    if parsed := typed_place(text):
+        return parsed["city"], parsed["iso2"]
+    if found := _city(text):
+        return found.city, found.country.iso2
+    return "", c.iso2 if (c := country(text)) else ""
 
 
 def typed_place(text: str) -> dict[str, str] | None:

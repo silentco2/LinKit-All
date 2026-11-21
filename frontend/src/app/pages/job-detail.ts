@@ -47,9 +47,20 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
             }
             <span class="badge tier-low"><bdi>{{ j.source | src }}</bdi></span>
             @if (j.rank !== null) { <span class="badge tier-low">{{ 'detail.match' | t: { pct: num(j.rank, { style: 'percent', maximumFractionDigits: 0 }) } }}</span> }
+            @if (j.sponsor) { <span class="badge tier-high" [title]="'sponsor.hint' | t">{{ 'sponsor.' + j.sponsor | t }}</span> }
             @if (j.years_required; as y) { <span class="badge {{ y.above ? 'tier-mid' : 'tier-low' }}">{{ 'detail.years.' + y.kind | t: { years: '⁦' + y.label + '⁩' } }}@if (y.above) { <span class="gap-dot"></span>{{ 'detail.years.above' | t }} }</span> }
             @if (j.posted_at) { <span class="text-slate-500">{{ 'detail.posted' | t }} {{ j.posted_at | dt: 'date' }}</span> }
           </div>
+          @if (j.applied_before?.length) {
+            <div class="alert alert-info mt-3 text-sm" role="note">
+              <p class="font-medium" dir="auto">{{ 'detail.before' | t: { company: j.company } }}</p>
+              <ul class="mt-1 space-y-0.5">
+                @for (b of j.applied_before; track b.id) {
+                  <li dir="auto"><a [routerLink]="[]" [queryParams]="{ job: b.id }" queryParamsHandling="merge"><bdi>{{ b.title }}</bdi></a><span class="gap-dot"></span>{{ b.applied_at | dt: 'date' }}<span class="gap-dot"></span>{{ (b.outcome ? 'detail.outcome.' + b.outcome : 'detail.outcome.none') | t }}</li>
+                }
+              </ul>
+            </div>
+          }
           @if (why(j); as text) {
             <p class="mt-2 text-sm"><span class="font-medium">{{ (leftOut(j) ? 'detail.whyOut' : 'detail.why') | t }} </span><span dir="auto">{{ text }}</span></p>
             @if (target(j); as tg) {

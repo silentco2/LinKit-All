@@ -28,7 +28,7 @@ ONET_VERSION = "31_0"  # bump when O*NET publishes a new release; v31 calls the 
 ONET_ZIP = f"https://www.onetcenter.org/dl_files/database/db_{ONET_VERSION}_text.zip"
 FX_URL = "https://open.er-api.com/v6/latest/USD"
 
-MAX_CITIES_BYTES = 2_000_000
+MAX_CITIES_BYTES = 2_700_000  # coordinates added: keeps the same cities as the 2 MB cap did
 MAX_TITLES_BYTES = 1_500_000
 
 # Arab League (22): every city >= 15k there is kept whatever the size cap says.
@@ -150,7 +150,9 @@ def build_cities(raw: Path) -> list[dict[str, object]]:
         ar = CITY_AR.get((name, cc))
         if ar is None:
             ar = pick_arabic(f[3].split(","))
-        rows.append({"n": name, "ar": ar, "c": cc, "p": pop})
+        # "g": latitude, longitude to 2 decimals (about 1 km), for the location radius
+        rows.append({"n": name, "ar": ar, "c": cc, "p": pop,
+                     "g": [round(float(f[4]), 2), round(float(f[5]), 2)]})  # fmt: skip
     rows.sort(key=lambda r: (-int(r["p"]), str(r["n"])))  # type: ignore[call-overload]
     # Size cap: drop the smallest non-Arab-League towns first.
     while (

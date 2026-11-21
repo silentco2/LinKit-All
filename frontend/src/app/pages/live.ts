@@ -6,6 +6,8 @@ import { LibreOfficeCard } from '../components/libreoffice-card';
 import { I18n, TPipe } from '../i18n';
 import { Live } from '../live';
 import { DtPipe, fmtNum, labelOr, localeOf, runReason } from '../locale';
+import { issueUrl } from '../report';
+import { Shell } from '../shell';
 import { LiveEvent, RunState, runKind, ScheduleSection, SEARCH_STAGES, SearchConfig, Stage, STAGES } from '../types';
 
 const STAGE_KEY: Record<Exclude<Stage, 'apply'>, string> = {
@@ -76,7 +78,7 @@ function rememberedStages(): Set<Stage> {
       <div class="alert alert-warn mb-6 space-y-2" role="status">
         @let why = plainError(p.reason_code, p.reason_params, p.pause_reason ?? '', null);
         <p><strong>{{ runTitle(p.kind, p.id) }}</strong> {{ 'live.paused.is' | t }} <span dir="auto">{{ why.text }}</span></p>
-        @if (why.detail) { <ng-container *ngTemplateOutlet="details; context: { $implicit: why.detail }" /> }
+        @if (why.detail) { <ng-container *ngTemplateOutlet="details; context: { $implicit: why.detail }" /> <p><a [href]="report(p.reason_code, null)" target="_blank" rel="noopener">{{ 'live.report' | t }}</a></p> }
         @if (p.reason_code === 'ai_usage_limit') { <p><a [routerLink]="'/settings/ai'">{{ 'run.fix.ai' | t }}</a></p> }
         @if (p.reason_code === 'needs_libreoffice') { <app-libreoffice-card /> }
         <p class="text-xs">{{ 'live.paused.resume' | t }}</p>
@@ -121,7 +123,10 @@ function rememberedStages(): Set<Stage> {
               @let why = plainError(run?.reason_code, run?.reason_params, run?.error ?? '', failedStage());
               <div class="alert alert-error mt-3" role="alert">
                 <p dir="auto">{{ why.text }}</p>
-                @if (why.detail) { <ng-container *ngTemplateOutlet="details; context: { $implicit: why.detail }" /> }
+                @if (why.detail) {
+                  <ng-container *ngTemplateOutlet="details; context: { $implicit: why.detail }" />
+                  <p class="mt-1"><a [href]="report(run?.reason_code, failedStage())" target="_blank" rel="noopener">{{ 'live.report' | t }}</a></p>
+                }
               </div>
             }
           </section>
@@ -187,6 +192,7 @@ export class LivePage {
   protected readonly busy = signal(false);
   protected readonly error = signal('');
   private readonly i18n = inject(I18n);
+  private readonly shell = inject(Shell);
   protected readonly loc = computed(() => localeOf(this.i18n.lang()));
   protected readonly running = computed(() => !!this.live.run()?.running);
   private readonly log = viewChild<ElementRef<HTMLElement>>('log');
@@ -364,6 +370,11 @@ export class LivePage {
    * Why a run stopped, in plain words. A code we have words for is translated; anything else becomes "Something went
    * wrong in {stage}." with the raw text kept for a "Details" toggle.
    */
+  /** "Report this": a GitHub issue pre-filled with the stable code and step only, never the raw message. */
+  protected report(code: string | null | undefined, stage: Stage | null): string {
+    return issueUrl('bug', this.shell.status(), this.i18n.lang(), { code: code || 'pipeline_error', stage });
+  }
+
   protected plainError(code: string | null | undefined, params: Record<string, unknown> | undefined, raw: string, stage: Stage | null): { text: string; detail: string } {
     if (code && code !== 'pipeline_error' && this.i18n.has('run.reason.' + code)) return { text: this.reasonText(code, params, raw), detail: '' };
     return { text: stage ? this.i18n.t('live.err.in', { stage: this.label(stage) }) : this.i18n.t('live.err.generic'), detail: raw };

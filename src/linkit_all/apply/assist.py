@@ -25,6 +25,7 @@ from linkit_all.apply.answers import (
     secrets_seen,
     valid_for,
 )  # fmt: skip
+from linkit_all.apply.prose import clean, retry_note
 from linkit_all.core import timing
 from linkit_all.core.models import AnswerEntry
 from linkit_all.matching.rank import Embed
@@ -259,8 +260,39 @@ async def ai_drafts(
                 "AI draft for {} discarded: not English", q.key
             )  # goes to Needs you
             continue
+        if isinstance(value, str) and q.kind not in CHOICE_KINDS:  # options stay exact copies
+            value = clean(value)
         out[q.key] = value
     return out
+
+
+class Rewritten(BaseModel):
+    text: str
+
+
+async def rewrite_answer(
+    provider: LLMProvider,
+    question: str,
+    text: str,
+    wish: str,
+    cv: str,
+    profile: str,
+    job: dict[str, str],
+) -> str:
+    """The user's own answer to `question`, rewritten for this job ("Rewrite" in Needs you).
+    Never for a sensitive question (the caller checks). Fresh each time (no cache), English
+    only: one retry on Arabic or stock phrases, then `clean`."""
+    prompt = render(
+        "rewrite_answer.j2", question=scrub(question, secrets_seen, 4),
+        text=scrub(text, secrets_seen), wish=scrub(wish, secrets_seen),
+        cv=cv[:6000], profile=profile, job=_job_brief(job),
+    )  # fmt: skip
+    out = (await provider.complete(prompt, Rewritten, use_cache=False)).text
+    if note := (_ENGLISH_ONLY if has_arabic(out) else "") + retry_note(out):
+        out = (await provider.complete(prompt + note, Rewritten, use_cache=False)).text
+        if has_arabic(out):
+            raise NotEnglish("the AI wrote Arabic twice; edit the answer yourself")
+    return clean(out).strip()
 
 
 ARABIC_LETTER = "The AI wrote the cover letter in Arabic; write it yourself or retry"
@@ -279,12 +311,12 @@ async def write_cover_letter(
 
     prompt = render("cover_letter.j2", cv=cv[:6000], profile=profile, job=_job_brief(job))
     text = (await provider.complete(prompt, CoverLetter)).text.strip()
-    if has_arabic(text):  # retry once, uncached
-        text = (
-            await provider.complete(prompt + _ENGLISH_ONLY, CoverLetter, use_cache=False)
-        ).text.strip()
+    note = (_ENGLISH_ONLY if has_arabic(text) else "") + retry_note(text)
+    if note:  # retry once, uncached
+        text = (await provider.complete(prompt + note, CoverLetter, use_cache=False)).text.strip()
         if has_arabic(text):
             raise NotEnglish(ARABIC_LETTER)
+    text = clean(text)
     out_dir.mkdir(parents=True, exist_ok=True)
     pdf = out_dir / "cover_letter.pdf"
     doc = pymupdf.open()

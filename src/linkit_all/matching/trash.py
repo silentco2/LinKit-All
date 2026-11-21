@@ -148,7 +148,7 @@ def sweep(db: sessionmaker[Session], cfg: SearchConfig, embed: Any) -> int:
             why = data.get("trash")
             if why not in _KEPT:
                 why = ("company" if norm_company(job.company) in blocked else None) or (
-                    "off_title" if data["off_title"] else None
+                    "off_title" if data["off_title"] and not data.get("manual") else None
                 )
                 if why:
                     data["trash"] = why

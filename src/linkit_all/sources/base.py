@@ -52,6 +52,7 @@ class Task:
     posted_within_days: int = 14
     posted_within_hours: int | None = None  # jobspy only; None = any time
     country: str = ""  # for sites with per-country domains (Indeed, Glassdoor)
+    entry: str = ""  # the company-list entry it came from: its row in sources/health.py
 
 
 class Source(ABC):

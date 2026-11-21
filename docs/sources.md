@@ -83,12 +83,12 @@ It follows at most the careers page plus three "next page" links.
 | Setting | Sites |
 |---|---|
 | `jobspy` | `linkedin`, `indeed`, `glassdoor`, `google`, `zip_recruiter` |
-| `regional` | `wuzzuf`, `bayt`, `forasna` |
+| `regional` | `wuzzuf`, `bayt`, `forasna`, `naukri` |
 
 `jobspy_country` sets the country for Indeed (for example `egypt` or `united arab emirates`).
 Glassdoor is searched without a country.
 
-- **LinkedIn, Indeed, Glassdoor, Google, ZipRecruiter and Bayt** are read through the
+- **LinkedIn, Indeed, Glassdoor, Google, ZipRecruiter, Bayt and Naukri** (India) are read through the
   [python-jobspy](https://github.com/speedyapply/JobSpy) library. LinKit All runs one
   request stream per site. These sites limit automated searches fast, and LinkedIn
   especially. A search that fails is not marked done, so a resumed run tries it again.
@@ -117,6 +117,9 @@ families:
   APIs that list many employers. Some need a free API key (Adzuna, Reed, USAJobs, WhatJobs).
   Keys are stored in the vault, never in the config file.
 - **Job boards and RSS feeds** (for example Built In, The Hub, We Work Remotely).
+  **Gradcracker** (UK graduate STEM jobs) reads the discipline listings that match your titles
+  (its keyword search does not filter); **Jobindex** (Denmark) reads each search's result page.
+  Both use the listing card as the description, with no request per job.
 - **Single-company career sites** (for example Amazon, Google, Yandex, Sber).
 - **Telegram channels** (section 4 below) and **discovered boards** (next section).
 
@@ -204,6 +207,40 @@ telegram_channels = ["hrlunapark", "@job_python", "https://t.me/zrabota"]
 - **Politeness.** One channel at a time, at least 2 seconds between requests.
 - **Job address.** A job's address is its post (`https://t.me/<channel>/<id>`), which is what
   stops it being stored twice.
+
+## Add one job by hand
+
+Found a job yourself? **Jobs, Add a job** takes up to 25 links (one per line). Each page is read
+like a careers page (its structured job data, else its heading and text; no AI). A page that will
+not open, or shows no posting text, can be pasted instead: its link, the job title, the company
+and the text, or pick the posting saved as a PDF to fill the text. Jobs you add skip your filters
+(you picked them); the scam check, the match score and the tiers still apply. A job your filters
+dropped earlier comes back when you add it. If you already applied to that company, the result
+says so (with the earlier job and its date), and so does the job's page.
+
+## Is a source working?
+
+Every search run records, for each source you switched on and each company page in your list,
+how many jobs it found and any error. **Settings, Sources** shows a mark next to each one:
+
+| Mark | Means |
+|---|---|
+| Working | it found jobs last time |
+| Partly working | some of its searches failed, others found jobs |
+| No jobs found | it worked but found nothing (normal for a niche source) |
+| Broken | it failed with no jobs, or found nothing 3 runs in a row after finding jobs before |
+
+Hover a mark for the error and when it happened. **Check sources now** reads one page of each,
+live, without a full run (results under an hour old are reused). From a terminal:
+
+```bash
+linkit source-check                     # every switched-on source and company page
+linkit source-check remotive lever:acme # just these
+linkit source-check --force             # also recheck what was checked in the last hour
+```
+
+It exits with code 1 when something is broken. Marks never change what a run does: a broken
+source is still tried, so it recovers by itself when the site is fixed.
 
 ## Politeness: rate limits and Crawl-delay
 

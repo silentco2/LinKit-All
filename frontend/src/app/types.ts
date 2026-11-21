@@ -59,6 +59,8 @@ export interface SetupState {
 export const setupDone = (s: SetupState): number => [s.cv, s.ai, s.profile, s.roles && s.where].filter(Boolean).length;
 
 export interface Status {
+  /** Non-personal facts a bug report starts with (footer "Report a problem"). */
+  about?: { version: string; os: string; python: string; ai: string };
   setup: SetupState;
   profile_ready: boolean;
   cv_ready: boolean;
@@ -155,6 +157,8 @@ export interface SearchConfig {
     title_include: string[];
     title_exclude: string[];
     locations: string[];
+    /** A job in a city this many km from one of your cities counts as there; 0 = that city only. */
+    radius_km: number;
     work_modes: WorkMode[];
     seniority: string[];
     salary_floor_monthly: number;
@@ -173,6 +177,8 @@ export interface SearchConfig {
   apply: ApplySection;
   email: { imap_host: string; imap_user: string; timeout_s: number; poll_s: number; read_replies: boolean };
   schedule: ScheduleSection;
+  /** Daily database copies: '' = <data dir>/backups. */
+  backup: { folder: string };
 }
 
 /** GET /api/presets: the Pace and Pickiness presets and the field defaults (a whole SearchConfig). */
@@ -288,6 +294,8 @@ export interface JobRow {
   ai: AIScore | null;
   scam_score?: number | null;
   ghost_score?: number | null;
+  /** ISO2 of the visa sponsor list the employer is on (core/sponsors.py), when the job is in one of your visa countries. */
+  sponsor?: string | null;
   /** Plain-words why this job is where it is (filtered, low); null when there is nothing to say. */
   reason?: string | null;
   reason_code?: string | null;
@@ -331,8 +339,13 @@ export interface Tailoring {
   verify: { ok: boolean; pages: [number, number]; min_ssim: number; reason: string } | null;
 }
 
+/** An earlier application at the same company (same name rule as one-per-company). */
+export interface AppliedBefore { id: number; title: string; company: string; outcome: Outcome | null; applied_at: string }
+
 export interface JobDetail extends JobRow {
   tailoring: Tailoring | null;
+  /** Your earlier applications at this company, newest first (at most 5). */
+  applied_before?: AppliedBefore[];
   /** How far to trust the AI score; it never changes the tier. */
   confidence?: 'low' | 'medium' | 'high' | null;
   years_required?: YearsRequired | null;

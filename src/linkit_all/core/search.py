@@ -208,7 +208,7 @@ class SourcesSection(BaseModel):
     company_labels: dict[str, str] = {}  # companies entry -> "Stripe · Greenhouse" (display only)
     jobspy: list[Literal["linkedin", "indeed", "glassdoor", "google", "zip_recruiter"]] = []
     jobspy_country: str = "usa"  # Indeed only (Glassdoor gets none); e.g. "egypt", "qatar"
-    regional: list[Literal["wuzzuf", "bayt", "forasna"]] = []
+    regional: list[Literal["wuzzuf", "bayt", "forasna", "naukri"]] = []
     enabled: list[str] = []  # names of aggregator / board / company source plugins to run
     # Channels read when "telegram" is in `enabled`; "@name" and t.me links are accepted.
     telegram_channels: list[str] = Field(default_factory=lambda: list(DEFAULT_TELEGRAM_CHANNELS))
@@ -235,6 +235,8 @@ class FiltersSection(BaseModel):
     title_include: list[str] = []  # any of these words must be in the title (empty = all)
     title_exclude: list[str] = []
     locations: list[str] = []  # any substring match (empty = anywhere)
+    # A job in a city this close to one of your cities counts as there (0 = that city only)
+    radius_km: int = Field(40, ge=0, le=300)  # 40: Cairo takes in 6th of October (33 km)
     work_modes: list[WorkMode] = Field(default_factory=lambda: list(WORK_MODES))
     seniority: list[Seniority] = []  # empty = any
     salary_floor_monthly: int = Field(0, ge=0)  # only checked when the posting states a salary
@@ -352,6 +354,20 @@ class TrustSection(BaseModel):
     allow_companies: list[str] = []  # "Not a scam": these companies skip the scam rule
 
 
+class BackupSection(BaseModel):
+    """Daily database copies (core/backup.py)."""
+
+    folder: str = ""  # "" = <data dir>/backups; another disk or synced folder survives a lost disk
+
+    @field_validator("folder")
+    @classmethod
+    def _folder(cls, v: str) -> str:
+        v = v.strip()
+        if v and not Path(v).expanduser().is_absolute():
+            raise ValueError("the backup folder must be a full path, such as D:/Backups/LinKit")
+        return v
+
+
 class SearchConfig(BaseModel):
     search: SearchSection = SearchSection()
     sources: SourcesSection = SourcesSection()
@@ -362,6 +378,7 @@ class SearchConfig(BaseModel):
     ai: AISection = AISection()
     email: EmailSection = EmailSection()
     schedule: ScheduleSection = ScheduleSection()
+    backup: BackupSection = BackupSection()
 
 
 def save_search(db: sessionmaker[Session], cfg: SearchConfig) -> None:

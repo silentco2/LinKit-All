@@ -195,6 +195,9 @@ class TailoredCV(Base):
     applied: Mapped[list[dict[str, Any]]] = mapped_column(default=list)  # patches, for red-line UI
     rejected: Mapped[list[dict[str, Any]]] = mapped_column(default=list)  # patch + reason
     verify: Mapped[dict[str, Any]] = mapped_column(default=dict)
+    # SHA-256 of the CV file it was tailored from; a retry after a new CV tailors again.
+    # None on versions made before 2026-11-21: those are reused as before.
+    base_sha: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
 
 
@@ -238,6 +241,21 @@ class Board(Base):
     last_crawled_at: Mapped[datetime | None]
     last_jobs: Mapped[int] = mapped_column(default=0)
     failures: Mapped[int] = mapped_column(default=0)  # failed crawls in a row
+
+
+class SourceHealth(Base):
+    """How a source did last time, from a run or a live check (sources/health.py). `key` is a
+    plugin name ("remotive") or "company:" + an entry of your company list."""
+
+    __tablename__ = "source_health"
+
+    key: Mapped[str] = mapped_column(String(512), primary_key=True)
+    at: Mapped[datetime] = mapped_column(default=utcnow)
+    via: Mapped[str] = mapped_column(String(8))  # "run" | "check"
+    jobs: Mapped[int] = mapped_column(default=0)
+    error: Mapped[str | None] = mapped_column(Text)
+    zero_streak: Mapped[int] = mapped_column(default=0)  # error-free runs in a row with no jobs
+    ever_found: Mapped[bool] = mapped_column(default=False)
 
 
 class AnswerEntry(Base):

@@ -29,8 +29,15 @@ interface Row {
   needsKey?: string | null;
   toggle?: () => void;
   remove?: () => void;
+  /** Its row in `/sources/health`: a source name, or "company:" + a company-list entry. */
+  health?: string;
 }
 interface View { chips: ChipOption[]; rows: Row[]; on: number; total: number; sites: boolean }
+/** A source's last result (`/sources/health`): from a search run or a live check. */
+interface Health { status: 'ok' | 'warn' | 'broken' | 'empty'; jobs: number; error: string | null; at: string; via: 'run' | 'check' }
+const HEALTH_CLASS: Record<Health['status'], string> = {
+  ok: 'tier-high', warn: 'tier-mid', empty: 'tier-low', broken: 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300',
+};
 
 const GROUPS: GroupId[] = ['sites', 'regional', 'aggregator', 'board', 'company', 'suggested', 'telegram'];
 const GROUP_LABEL: Record<GroupId, string> = {
@@ -38,7 +45,7 @@ const GROUP_LABEL: Record<GroupId, string> = {
   board: 'setup.sources.group.board', company: 'setup.sources.group.company', suggested: 'src.group.suggested', telegram: 'src.group.telegram',
 };
 const JOBSPY = ['linkedin', 'indeed', 'glassdoor', 'google', 'zip_recruiter'];
-const REGIONAL = ['wuzzuf', 'bayt', 'forasna'];
+const REGIONAL = ['wuzzuf', 'bayt', 'forasna', 'naukri'];
 /** These two get their own hand-made row in the list, so they never appear as plugin rows. */
 const OWN_ROW = new Set(['telegram', 'linkedin_posts']);
 
@@ -52,6 +59,7 @@ const OWN_ROW = new Set(['telegram', 'linkedin_posts']);
         @if (r.remove) {
           <div class="flex items-center gap-2 text-sm">
             <bdi class="min-w-0 flex-1 break-all font-medium" [attr.dir]="r.title ? 'auto' : 'ltr'" [attr.title]="r.title || null">{{ r.label }}</bdi>
+            <ng-container *ngTemplateOutlet="healthTpl; context: { r: r }" />
             @if (group() === 'all') { <span class="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">{{ groupLabel(r.group) | t }}</span> }
             <button type="button" class="rounded-md px-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" [attr.aria-label]="'settings.jobs.remove' | t: { name: r.label }" (click)="r.remove()"><span aria-hidden="true">×</span></button>
           </div>
@@ -60,6 +68,7 @@ const OWN_ROW = new Set(['telegram', 'linkedin_posts']);
             <input type="checkbox" class="mt-1" [checked]="r.on" (change)="r.toggle()">
             <span class="min-w-0 flex-1">
               <span class="font-medium"><bdi>{{ r.plain ? r.label : (r.label | src) }}</bdi></span>
+              @if (r.on) { <ng-container *ngTemplateOutlet="healthTpl; context: { r: r }" /> }
               @if (r.region) { <span class="text-xs text-slate-500"> <span class="gap-dot"></span><bdi>{{ r.region }}</bdi></span> }
               @if (group() === 'all') { <span class="ms-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">{{ groupLabel(r.group) | t }}</span> }
               @if (r.rec) { <span class="badge alert-info ms-2">{{ 'settings.src.badge' | t }}</span> }
@@ -81,6 +90,12 @@ const OWN_ROW = new Set(['telegram', 'linkedin_posts']);
           }
         }
       </li>
+    </ng-template>
+
+    <ng-template #healthTpl let-r="r">
+      @if (healthOf(r); as h) {
+        <span class="badge ms-2 shrink-0 px-1.5 py-0 text-[11px] leading-4 {{ healthClass[h.status] }}" [attr.title]="healthTitle(h)">{{ 'src.health.' + h.status | t }}</span>
+      }
     </ng-template>
 
     <div class="space-y-6">
@@ -114,7 +129,11 @@ const OWN_ROW = new Set(['telegram', 'linkedin_posts']);
             </span>
           </div>
           <app-chip-select [options]="v.chips" [selected]="[group()]" [single]="true" [label]="'src.filter.group' | t" (changed)="setGroup($event)" />
-          <p class="text-xs text-slate-500">{{ 'setup.sources.count' | t: { on: v.on, n: v.total } }}</p>
+          <div class="flex flex-wrap items-center gap-3">
+            <p class="text-xs text-slate-500">{{ 'setup.sources.count' | t: { on: v.on, n: v.total } }}</p>
+            <button type="button" class="btn ms-auto text-sm" [disabled]="checking()" (click)="checkNow()">{{ (checking() ? 'src.health.checking' : 'src.health.check') | t }}</button>
+          </div>
+          @if (checkNote(); as n) { <p class="text-sm" [class]="n.kind === 'error' ? 'text-rose-700 dark:text-rose-400' : ''" role="status" dir="auto">{{ n.text }}</p> }
         </div>
 
         @if (v.sites && indeedCountry(); as c) {
@@ -157,11 +176,17 @@ export class SourcesSection implements OnInit {
   protected readonly suggested = signal<BoardHit[]>([]);
   /** Boards found for a company name typed in the Add box, waiting for the user to pick one. */
   protected readonly hits = signal<BoardHit[]>([]);
+  /** Each source's last result; a row shows it once it has run or been checked. */
+  protected readonly health = signal<Record<string, Health>>({});
+  protected readonly healthClass = HEALTH_CLASS;
+  protected readonly checking = signal(false);
+  protected readonly checkNote = signal<Note | null>(null);
 
   ngOnInit(): void {
     void this.countries.load();
     this.api.get<SourceList>('/sources').then((l) => this.list.set(l)).catch(() => this.loadFailed.set(true)).finally(() => this.loading.set(false));
     void this.loadKeys();
+    this.api.get<Record<string, Health>>('/sources/health').then((h) => this.health.set(h)).catch(() => undefined); // no marks; nothing else is lost
     this.api.get<BoardHit[]>('/suggest/companies').then((b) => this.suggested.set(b)).catch(() => undefined); // the list simply has no suggestions
     // no CV or country yet: nothing is recommended, which is fine
     this.api.get<InferPayload>('/infer').then((p) => this.rec.set(new Set([...p.sources.enabled, ...p.sources.jobspy, ...p.sources.regional]))).catch(() => undefined);
@@ -189,7 +214,7 @@ export class SourcesSection implements OnInit {
 
   private plugin(s: JobSource): Row {
     return {
-      id: s.name, group: s.kind as GroupId, label: s.label, plain: true, region: s.region, description: s.description, rec: this.rec().has(s.name), on: this.has('sources.enabled', s.name),
+      id: s.name, health: s.name, group: s.kind as GroupId, label: s.label, plain: true, region: s.region, description: s.description, rec: this.rec().has(s.name), on: this.has('sources.enabled', s.name),
       needsKey: s.needs_key,
       toggle: () => {
         this.toggle('sources.enabled', s.name);
@@ -204,19 +229,19 @@ export class SourcesSection implements OnInit {
     const c = this.store.cfg.sources;
     const plugins = this.list().sources.filter((s) => !OWN_ROW.has(s.name));
     const fixed = (group: GroupId, key: string, ids: string[]): Row[] =>
-      ids.map((id) => ({ id: `${key}:${id}`, group, label: id, rec: this.rec().has(id), on: this.has(key, id), toggle: () => this.toggle(key, id) }));
+      ids.map((id) => ({ id: `${key}:${id}`, health: id, group, label: id, rec: this.rec().has(id), on: this.has(key, id), toggle: () => this.toggle(key, id) }));
     const kind = (k: GroupId) => plugins.filter((s) => s.kind === k).map((s) => this.plugin(s));
     const offered = new Set(this.suggested().map((b) => b.value)); // a ticked suggestion shows as its switch, not twice
     const all: Row[] = [
       ...fixed('sites', 'sources.jobspy', JOBSPY),
-      { id: 'linkedin_posts', group: 'sites', label: this.i18n.t('setup.linkedin.title'), plain: true, description: this.i18n.t('src.linkedin.desc'), on: this.has('sources.enabled', 'linkedin_posts'), toggle: () => this.toggle('sources.enabled', 'linkedin_posts') },
+      { id: 'linkedin_posts', health: 'linkedin_posts', group: 'sites', label: this.i18n.t('setup.linkedin.title'), plain: true, description: this.i18n.t('src.linkedin.desc'), on: this.has('sources.enabled', 'linkedin_posts'), toggle: () => this.toggle('sources.enabled', 'linkedin_posts') },
       ...fixed('regional', 'sources.regional', REGIONAL),
       ...kind('aggregator'),
       ...kind('board'),
       ...kind('company'),
-      ...c.companies.filter((u) => !offered.has(u)).map((u): Row => ({ id: `url:${u}`, group: 'company', label: this.companyLabel(u), title: u, remove: () => this.drop('sources.companies', u) })),
-      ...this.suggested().map((b): Row => ({ id: `sug:${b.value}`, group: 'suggested', label: b.label, plain: true, on: c.companies.includes(b.value), toggle: () => this.tick(b) })),
-      { id: 'telegram', group: 'telegram', label: this.i18n.t('setup.search.telegram'), plain: true, description: this.i18n.t('setup.search.telegramHint'), on: this.has('sources.enabled', 'telegram'), toggle: () => this.toggle('sources.enabled', 'telegram') },
+      ...c.companies.filter((u) => !offered.has(u)).map((u): Row => ({ id: `url:${u}`, health: `company:${u}`, group: 'company', label: this.companyLabel(u), title: u, remove: () => this.drop('sources.companies', u) })),
+      ...this.suggested().map((b): Row => ({ id: `sug:${b.value}`, health: `company:${b.value}`, group: 'suggested', label: b.label, plain: true, on: c.companies.includes(b.value), toggle: () => this.tick(b) })),
+      { id: 'telegram', health: 'telegram', group: 'telegram', label: this.i18n.t('setup.search.telegram'), plain: true, description: this.i18n.t('setup.search.telegramHint'), on: this.has('sources.enabled', 'telegram'), toggle: () => this.toggle('sources.enabled', 'telegram') },
       ...c.telegram_channels.map((ch): Row => ({ id: `tg:${ch}`, group: 'telegram', label: /^\w+$/.test(ch) ? `@${ch}` : ch, remove: () => this.drop('sources.telegram_channels', ch) })),
     ];
     const q = this.query().trim().toLowerCase();
@@ -271,6 +296,34 @@ export class SourcesSection implements OnInit {
     const raw = this.store.cfg.sources.jobspy_country;
     const c = this.countries.list().find((x) => x.jobspy.toLowerCase() === raw.toLowerCase() || x.name.toLowerCase() === raw.toLowerCase());
     return c ? this.countries.name(c) : raw;
+  }
+
+  protected healthOf(r: Row): Health | undefined {
+    return r.health ? this.health()[r.health] : undefined;
+  }
+
+  /** The mark's hover text: what happened, how it was learned, and when. */
+  protected healthTitle(h: Health): string {
+    const when = new Date(h.at).toLocaleString(this.i18n.lang());
+    const what = h.error ?? this.i18n.t('src.health.jobs', { n: h.jobs });
+    return `${what} (${this.i18n.t('src.health.via.' + h.via)}, ${when})`;
+  }
+
+  /** Probe every switched-on source and company page now (one page each); checks under an hour old are kept. */
+  protected async checkNow(): Promise<void> {
+    this.checking.set(true);
+    this.checkNote.set(null);
+    try {
+      const checked = await this.api.post<Record<string, Health>>('/sources/check', {});
+      this.health.set({ ...this.health(), ...checked });
+      const all = Object.values(checked);
+      const broken = all.filter((h) => h.status === 'broken').length;
+      this.checkNote.set({ kind: broken ? 'error' : 'ok', text: this.i18n.t('src.health.done', { n: all.length, broken }) });
+    } catch (err) {
+      this.checkNote.set({ kind: 'error', text: (err as Error).message });
+    } finally {
+      this.checking.set(false);
+    }
   }
 
   // ---- add one source -----------------------------------------------------------------------

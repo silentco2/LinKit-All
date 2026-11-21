@@ -10,7 +10,9 @@ posting a little better. The edits are small and strictly checked. The layout is
 
 Tailoring happens just before applying, and only for jobs that will really be applied to. A
 job that comes back from the [Action Center](action-center.md) reuses its tailored CV, so
-you do not pay for it twice.
+you do not pay for it twice. Each tailored version remembers a fingerprint of the CV file it
+was made from: if you uploaded or edited your CV since, the job is tailored again from the new
+one (one more AI call) instead of sending a CV built from the old one.
 
 ## How it works
 

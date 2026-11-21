@@ -10,8 +10,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 from test_tailor import make_cv
 
+from linkit_all.core import geo
 from linkit_all.core.db import init_db
 from linkit_all.core.models import Job, JobEvent, JobState, Profile, Run, RunStatus, Tier, utcnow
+from linkit_all.core.places import apply_places
 from linkit_all.core.profile import ProfileIn, import_profile
 from linkit_all.core.runs import current_run
 from linkit_all.core.search import SearchConfig
@@ -90,6 +92,67 @@ def test_remote_filter() -> None:
     )
     assert rule_violation(job(location="Remote, Egypt"), cfg, utcnow()) is None
     assert rule_violation(job(), cfg, utcnow()) is None  # unknown work mode is not a mismatch
+
+
+def _placed(*places: dict[str, str], radius_km: int = 0) -> SearchConfig:
+    cfg = SearchConfig.model_validate(
+        {"search": {"places": list(places)}, "filters": {"radius_km": radius_km}}
+    )
+    return apply_places(cfg, [])
+
+
+@pytest.mark.parametrize(
+    ("location", "radius", "ok"),
+    [
+        ("Giza, Egypt", 40, True),  # 7 km
+        ("6th of October City", 40, True),  # 33 km
+        ("Alexandria, Egypt", 40, False),  # 180 km
+        ("Giza, Egypt", 0, False),  # radius off: the city itself only
+        ("Giza, Egypt", 5, False),
+    ],
+)
+def test_location_radius(location: str, radius: int, ok: bool) -> None:
+    cfg = _placed({"label": "Cairo, Egypt", "city": "Cairo", "country": "EG"}, radius_km=radius)
+    got = rule_violation(job(location=location), cfg, utcnow())
+    assert (got is None) is ok, got
+
+
+def test_radius_default_and_distance() -> None:
+    assert SearchConfig().filters.radius_km == 40
+    km = geo.distance_km("Sharjah", "AE", "Dubai", "AE")
+    assert km is not None and 25 < km < 35
+    assert geo.distance_km("Nowhereville", "", "Dubai", "AE") is None
+
+
+@pytest.mark.parametrize(
+    ("location", "ok"),
+    [
+        ("Cairo, Egypt", True),
+        ("Cairo", True),
+        ("Cairo, EG", True),
+        ("New Cairo, Cairo Governorate, Egypt", True),
+        ("القاهرة، مصر", True),
+        ("Cairo (Hybrid)", True),
+        ("Cairo, IL", False),  # Illinois, not Israel or Egypt
+        ("Cairo, Illinois, United States", False),
+        ("Alexandria, Egypt", False),
+        ("Berlin, Germany", False),
+    ],
+)
+def test_location_matches_city_place(location: str, ok: bool) -> None:
+    cfg = _placed({"label": "Cairo, Egypt", "city": "Cairo", "country": "EG"})
+    got = rule_violation(job(location=location), cfg, utcnow())
+    assert (got is None) is ok, got
+
+
+@pytest.mark.parametrize(
+    ("location", "ok"),
+    [("Dubai", True), ("Abu Dhabi, UAE", True), ("Dubai, AE", True), ("Doha, Qatar", False)],
+)
+def test_location_matches_country_place(location: str, ok: bool) -> None:
+    cfg = _placed({"label": "United Arab Emirates", "country": "AE"})
+    got = rule_violation(job(location=location), cfg, utcnow())
+    assert (got is None) is ok, got
 
 
 def test_work_modes_subset_and_default() -> None:

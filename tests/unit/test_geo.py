@@ -19,11 +19,12 @@ def data(name: str) -> Any:
 
 def test_dataset_sizes_and_rows() -> None:
     sizes = {n: (geo.DATA / n).stat().st_size for n in ("cities.json", "titles.json", "fx.json")}
-    assert sizes["cities.json"] < 2_000_000 and sizes["titles.json"] < 1_500_000
+    assert sizes["cities.json"] < 2_700_000 and sizes["titles.json"] < 1_500_000
     cities, titles = data("cities.json"), data("titles.json")
     assert isinstance(cities, list) and len(cities) > 20_000
     assert cities == sorted(cities, key=lambda c: -c["p"])
-    assert {"n", "ar", "c", "p"} == set(cities[0])
+    assert {"n", "ar", "c", "p", "g"} == set(cities[0])
+    assert all(-90 <= c["g"][0] <= 90 and -180 <= c["g"][1] <= 180 for c in cities)
     assert isinstance(titles, list) and len(titles) > 20_000
     assert len(geo.countries()) > 200
 

@@ -3,18 +3,19 @@
 import asyncio
 import hashlib
 import json
+import platform
 import re
 import shutil
 import sys
 from dataclasses import asdict
-from datetime import date
+from datetime import UTC, date, datetime
 from functools import partial
 from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlparse
 
 import httpx
-from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse, Response
 from loguru import logger
 from pydantic import BaseModel, Field, ValidationError, field_validator
@@ -38,6 +39,9 @@ from linkit_all.apply.email_verify import EmailLoginError, check_login, credenti
 from linkit_all.apply.runner import is_pickable
 from linkit_all.apply.vault import Vault, VaultError, VaultLocked, WrongPassphrase
 from linkit_all.core.api_keys import KNOWN, delete_keys, get_keys, set_keys
+from linkit_all.core.backup import backup as make_backup
+from linkit_all.core.backup import copies as backup_copies
+from linkit_all.core.backup import folder_for as backup_folder_for
 from linkit_all.core.config import Settings
 from linkit_all.core.infer import InferredValue, infer, read_cv
 from linkit_all.core.lo_install import LibreOfficeInstaller
@@ -99,12 +103,17 @@ from linkit_all.core.state import (
 from linkit_all.core.tools import soffice_path, tectonic_path
 from linkit_all.matching.reasons import FilterEvent, job_reason
 from linkit_all.matching.trash import UNKNOWN, not_trash, visible
-from linkit_all.pipeline import STAGES, PipelineError, ai_settings
+from linkit_all.pipeline import STAGES, PipelineError, ai_settings, check_sources
 from linkit_all.reports import build_report, export_csv, export_pdf
 from linkit_all.sources import registry
 from linkit_all.sources.ats_detector import detect
-from linkit_all.sources.base import OPT_IN_KINDS, Source
+from linkit_all.sources.base import OPT_IN_KINDS, JobStub, Source
+from linkit_all.sources.health import summary as source_health_summary
+from linkit_all.sources.http import Http, make_client
 from linkit_all.sources.labels import label_for, offline_label
+from linkit_all.sources.manual import MAX_LINKS, pasted, pdf_text
+from linkit_all.sources.manual import read as read_job
+from linkit_all.sources.manual import store as store_job
 from linkit_all.sources.resolve import resolve as resolve_boards
 from linkit_all.sources.text import norm_company
 
@@ -156,6 +165,19 @@ def _data_file(
 # --- status -------------------------------------------------------------------
 
 
+def _about(request: Request, cfg: SearchConfig | None) -> dict[str, str]:
+    """Facts a bug report starts with (footer "Report a problem"): nothing personal."""
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        app = version("linkit-all")
+    except PackageNotFoundError:
+        app = "dev"
+    provider = (cfg.ai.provider if cfg else None) or _settings(request).provider
+    return {"version": app, "os": f"{platform.system()} {platform.release()}".strip(),
+            "python": platform.python_version(), "ai": str(provider)}  # fmt: skip
+
+
 @router.get("/status")
 def status(request: Request) -> dict[str, Any]:
     db = _db(request)
@@ -203,6 +225,7 @@ def status(request: Request) -> dict[str, Any]:
         "apply_live": bool(cfg and cfg.apply.live),
         "ready_to_apply": ready,
         "practiced": practiced or 0,
+        "about": _about(request, cfg),
         "run": _runner(request).state.as_dict(),
         "app_browser": {
             "open": _user_browser(request).is_open,
@@ -791,7 +814,7 @@ def _row(j: Job, filter_event: FilterEvent | None = None) -> dict[str, Any]:
             "source": j.source, "state": j.state, "tier": j.tier, "score": j.score,
             "rank": j.data.get("rank"), "remote": j.data.get("remote"), "ai": j.data.get("ai"),
             "posted_at": j.posted_at.isoformat() if j.posted_at else None,
-            "outcome": j.outcome}  # fmt: skip
+            "outcome": j.outcome, "sponsor": j.data.get("sponsor")}  # fmt: skip
 
 
 def _last_drops(s: Session) -> dict[int, FilterEvent]:
@@ -817,8 +840,10 @@ def list_jobs(
     tier: Tier | None = None,
     source: str | None = None,
     q: str | None = None,
+    applied: bool = False,  # quick jump: applied jobs too (the trash stays hidden)
+    limit: int | None = Query(None, ge=1, le=200),
 ) -> list[dict[str, Any]]:
-    query = select(Job).where(visible())
+    query = select(Job).where(not_trash() if applied else visible())
     if state:
         query = query.where(Job.state == state)
     if tier:
@@ -834,7 +859,7 @@ def list_jobs(
         jobs = list(s.scalars(query.limit(20000)))
         drops = _last_drops(s) if any(j.state == JobState.filtered_out for j in jobs) else {}
     jobs.sort(key=lambda j: (-(j.score or 0), -(j.data.get("rank") or 0)))
-    return [_row(j, drops.get(j.id)) for j in jobs]
+    return [_row(j, drops.get(j.id)) for j in jobs[:limit]]
 
 
 def _tailoring(cv: TailoredCV | None) -> dict[str, Any] | None:
@@ -853,6 +878,27 @@ def _tailoring(cv: TailoredCV | None) -> dict[str, Any] | None:
         "rejected": cv.rejected,
         "verify": cv.verify or None,
     }
+
+
+def _applied_before(s: Session, company: str, exclude: int | None = None) -> list[dict[str, Any]]:
+    """Your earlier applications at this company (same name rule as one-per-company; never for
+    "Unknown"), newest first: what the job page and "Add a job" warn about."""
+    key = norm_company(company)
+    if key == UNKNOWN:
+        return []
+    applied = select(Job).where(Job.state == JobState.applied, Job.id != (exclude or 0))
+    jobs = [j for j in s.scalars(applied) if norm_company(j.company) == key]
+    when = {
+        job_id: at
+        for job_id, at in s.execute(
+            select(JobEvent.job_id, func.max(JobEvent.at))
+            .where(JobEvent.job_id.in_([j.id for j in jobs]), JobEvent.to_state == JobState.applied)
+            .group_by(JobEvent.job_id)
+        )
+    }
+    out = [{"id": j.id, "title": j.title, "company": j.company, "outcome": j.outcome,
+            "applied_at": (when.get(j.id) or j.updated_at).isoformat()} for j in jobs]  # fmt: skip
+    return sorted(out, key=lambda x: str(x["applied_at"]), reverse=True)[:5]
 
 
 @router.get("/jobs/{job_id}")
@@ -875,6 +921,7 @@ def job_detail(request: Request, job_id: int) -> dict[str, Any]:
         ).first()
         return {
             **_row(job, (drop.message, drop.code, drop.params) if drop else None),
+            "applied_before": _applied_before(s, job.company, job.id),
             "tailoring": _tailoring(tailored),
             "url": job.url,
             "description": job.description,
@@ -1605,6 +1652,82 @@ def edit_email_draft(request: Request, item_id: int, body: EmailDraftEdit) -> di
         return draft
 
 
+class RewriteIn(BaseModel):
+    label: str | None = None  # the question; None: the body of a confirm-email card
+    text: str = Field("", max_length=10000)
+    wish: str = Field("", max_length=300)  # "shorter", "more formal", "mention my Django work"
+
+
+_REWRITABLE = {"text", "textarea"}
+EMAIL_BODY = "The body of a short email applying for this job (no greeting, no signature)"
+
+
+@router.post("/actions/{item_id}/rewrite")
+async def rewrite_action_answer(request: Request, item_id: int, body: RewriteIn) -> dict[str, str]:
+    """Rewrite the user's answer to a parked question (or the application email body) for this
+    job, or draft one from the CV when the box is empty. Nothing is saved: the text goes back to
+    the box. Never for a sensitive question (CLAUDE.md §2)."""
+    from linkit_all.apply.answers import remember_secrets
+    from linkit_all.apply.assist import (
+        NotEnglish,
+        ai_drafts,
+        profile_summary,
+        remember_bank_secrets,
+        rewrite_answer,
+    )
+    from linkit_all.apply.runner import job_context
+    from linkit_all.matching.rank import cv_text
+    from linkit_all.providers import ProviderError, UsageLimitError, get_provider
+    from linkit_all.providers.base import tidy
+
+    db, settings = _db(request), _settings(request)
+    with db() as s:
+        item = s.get(ActionItem, item_id)
+        if item is None or item.status != ActionStatus.open:
+            raise HTTPException(404, "No open item with that id")
+        job, profile = s.get_one(Job, item.job_id), s.get(Profile, 1)
+        s.expunge_all()
+    if profile is None:
+        raise HTTPException(409, "Add your CV first")
+    if body.label is None:
+        if item.kind != "confirm_email" or not body.text.strip():
+            raise HTTPException(422, "Only an email draft can be rewritten without a question")
+        question, kind = EMAIL_BODY, "textarea"
+    else:
+        q = next((q for q in item.questions if q.get("label") == body.label), None)
+        if q is None:
+            raise HTTPException(404, "That question is not on this item")
+        if q.get("sensitive") or q.get("category") or q.get("kind") not in _REWRITABLE:
+            raise HTTPException(422, "The AI does not write this kind of answer")
+        question, kind = body.label, q["kind"]
+    cfg = load_search(db) or SearchConfig()
+    remember_secrets(ApplicationAnswers.model_validate(profile.answers))
+    remember_bank_secrets(db)
+    cv = str(job.data.get("cv_pdf") or profile.cv_path or "")
+    facts = profile_summary(job_context(profile, job, cv, cfg.search.remote))
+    brief = {"title": job.title, "company": job.company, "description": job.description}
+    try:
+        provider = get_provider(ai_settings(settings, cfg), cache=db)
+        if body.text.strip():
+            text = await rewrite_answer(
+                provider, question, body.text, body.wish, cv_text(profile), facts, brief
+            )
+        else:
+            asked = Question("q", question, kind, required=True)  # type: ignore[arg-type]
+            text = str(
+                (await ai_drafts(provider, [asked], cv_text(profile), facts, brief)).get("q") or ""
+            )
+            if not text:
+                raise HTTPException(
+                    422, "Your CV and profile do not answer this; write it yourself"
+                )
+    except UsageLimitError as e:
+        raise HTTPException(409, e.message) from e
+    except (ProviderError, PipelineError, NotEnglish) as e:
+        raise HTTPException(502, tidy(str(e))) from e
+    return {"text": text}
+
+
 @router.post("/actions/{item_id}")
 def resolve_action(request: Request, item_id: int, body: ActionDecision) -> dict[str, Any]:
     """answer: save to the answer bank and requeue; confirm: submit on the next apply run;
@@ -1975,6 +2098,26 @@ def _careers_url(raw: str) -> str:
     return url
 
 
+@router.get("/sources/health")
+def sources_health(request: Request) -> dict[str, Any]:
+    """{key: {status, jobs, error, at, via}}: each source's and company page's last result, from
+    runs and live checks (sources/health.py). A key with no row has not run or been checked."""
+    return source_health_summary(_db(request))
+
+
+class SourceCheck(BaseModel):
+    keys: list[str] | None = None  # None: everything switched on
+    force: bool = False  # also recheck what was checked in the last hour
+
+
+@router.post("/sources/check")
+async def sources_check(request: Request, body: SourceCheck) -> dict[str, Any]:
+    """Live one-page probes; returns the health of what was checked."""
+    return await check_sources(
+        _db(request), _settings(request), body.keys, body.force, _vault(request)
+    )
+
+
 @router.post("/sources/find")
 async def find_source(request: Request, body: AddSource) -> dict[str, Any]:
     """Boards a company name has on the ATSs we can ask (`sources/resolve.py`). Saves nothing:
@@ -2027,6 +2170,87 @@ def add_source(request: Request, body: AddSource) -> dict[str, Any]:
         raise HTTPException(422, str(e)) from e
     save_search(db, cfg)
     return {"kind": kind, "label": label, "config": config}
+
+
+class AddJobs(BaseModel):
+    links: list[str] = Field(min_length=1, max_length=MAX_LINKS)
+    text: str = ""  # the posting's text, when its page cannot be read (one link only)
+    title: str = ""
+    company: str = ""
+
+
+@router.post("/jobs/add")
+async def add_jobs(request: Request, body: AddJobs) -> dict[str, Any]:
+    """Add jobs by hand (`sources/manual.py`): each link is read without AI, or the pasted text
+    is used for one link. Returns {results: [{url, status, job_id, title}]}; status is added,
+    brought_back, duplicate, unreadable or needs_text. 422 for a bad link or missing field."""
+    try:
+        links = list(dict.fromkeys(_careers_url(raw.strip()) for raw in body.links if raw.strip()))
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
+    text = body.text.strip()
+    if not links:
+        raise HTTPException(422, "add a link to the job")
+    if text and (len(links) != 1 or not body.title.strip() or not body.company.strip()):
+        raise HTTPException(422, "pasted text needs one link, the job title and the company")
+    found: list[tuple[str, JobStub | str]] = []
+    if text:
+        found = [(links[0], pasted(links[0], body.title, body.company, text))]
+    else:
+        async with make_client() as client:
+            http = Http(client, attempts=1)  # a person is waiting: one try per link
+            found = [(url, await read_job(http, url)) for url in links]
+    results: list[dict[str, Any]] = []
+    for url, got in found:
+        if isinstance(got, str):
+            results.append({"url": url, "status": got, "job_id": None, "title": ""})
+            continue
+        status, job_id = store_job(_db(request), got)
+        with _db(request)() as s:
+            before = _applied_before(s, got.company, job_id)
+        results.append({"url": url, "status": status, "job_id": job_id, "title": got.title,
+                        "company": got.company, "applied_before": before})  # fmt: skip
+    return {"results": results}
+
+
+@router.post("/jobs/pdf-text")
+async def job_pdf_text(request: Request) -> dict[str, str]:
+    """A posting saved as PDF (raw bytes in the body) -> {text, title} for the paste fields.
+    Nothing is stored; `title` is the first line, a guess the user can correct."""
+    try:
+        text = await asyncio.to_thread(pdf_text, await request.body())
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
+    return {"text": text, "title": text.split("\n", 1)[0][:120]}
+
+
+def _backup_folder(request: Request) -> Path:
+    cfg = load_search(_db(request)) or SearchConfig()
+    return backup_folder_for(_settings(request).data_dir, cfg.backup.folder)
+
+
+def _backups(folder: Path) -> dict[str, Any]:
+    have = backup_copies(folder)
+    last = have[-1] if have else None
+    at = datetime.fromtimestamp(last.stat().st_mtime, UTC).isoformat() if last else None
+    return {"folder": str(folder), "count": len(have), "last": last.name if last else None,
+            "last_at": at}  # fmt: skip
+
+
+@router.get("/backup")
+def backup_status(request: Request) -> dict[str, Any]:
+    """Where the daily database copies go and the newest one (core/backup.py)."""
+    return _backups(_backup_folder(request))
+
+
+@router.post("/backup")
+async def backup_now(request: Request) -> dict[str, Any]:
+    folder = _backup_folder(request)
+    try:
+        await asyncio.to_thread(make_backup, _settings(request).db_path, folder)
+    except OSError as e:  # a folder that cannot be written: say so, the app keeps running
+        raise HTTPException(422, f"could not write to {folder}: {e.strerror or e}") from e
+    return _backups(folder)
 
 
 @router.put("/keys/{name}")

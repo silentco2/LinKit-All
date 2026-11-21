@@ -1,4 +1,4 @@
-"""D4: 20 made-up job + CV pairs keep the tier a person expects (at most 2 may move).
+"""D4: 24 made-up job + CV pairs keep the tier a person expects (at most 2 may move).
 
 The model's answers are recorded in tests/fixtures/golden/recorded.json; after a change to the
 score prompt, record them again with a real model (see `linkit_all.bench.ai`)."""
@@ -9,7 +9,14 @@ from pathlib import Path
 
 import pytest
 
-from linkit_all.bench.ai import RecordedAI, golden_tiers, load_golden, moved, prompt_sha
+from linkit_all.bench.ai import (
+    RecordedAI,
+    golden_tiers,
+    load_golden,
+    moved,
+    prompt_sha,
+    record_golden,
+)
 from linkit_all.core.search import SearchConfig
 
 GOLDEN = Path(__file__).parents[1] / "fixtures" / "golden"
@@ -18,10 +25,11 @@ MAX_MOVED = 2
 
 def test_golden_set_keeps_its_tiers() -> None:
     golden, ai = load_golden(GOLDEN)
-    assert len(golden["cases"]) == 20
+    assert len(golden["cases"]) == 24
     assert {c["expected"] for c in golden["cases"]} == {"high", "mid", "low"}
     off = moved(golden, asyncio.run(golden_tiers(golden, ai)))
-    assert len(off) <= MAX_MOVED, "more than 2 of 20 golden jobs changed tier:\n" + "\n".join(off)
+    listed = "\n".join(off)
+    assert len(off) <= MAX_MOVED, f"more than {MAX_MOVED} golden jobs changed tier:\n{listed}"
 
 
 def test_the_set_catches_a_change_that_moves_tiers() -> None:
@@ -45,3 +53,22 @@ def test_a_recording_from_another_prompt_warns(tmp_path: Path) -> None:
     (tmp_path / "recorded.json").write_text(json.dumps({**recorded, "prompt_sha": "old"}), "utf-8")
     with pytest.warns(UserWarning, match="record them again"):
         load_golden(tmp_path)
+
+
+def test_recording_only_new_cases_keeps_the_saved_answers(tmp_path: Path) -> None:
+    for name in ("cases.json", "recorded.json"):
+        (tmp_path / name).write_bytes((GOLDEN / name).read_bytes())
+    golden, saved = load_golden(tmp_path)
+    kept = {k: v for k, v in saved.answers.items() if k != "24"}
+    (tmp_path / "recorded.json").write_text(json.dumps({"answers": kept}), "utf-8")
+    asked: list[str] = []
+
+    class Model(RecordedAI):
+        async def _call(self, prompt: str) -> str:
+            asked.append(prompt)
+            return await super()._call(prompt)
+
+    asyncio.run(record_golden(tmp_path, Model(saved.answers), only_new=True))
+    assert len(asked) == 1 and "=== job_id 24 ===" in asked[0]
+    again = json.loads((tmp_path / "recorded.json").read_text("utf-8"))
+    assert again["answers"] == saved.answers and again["prompt_sha"] == prompt_sha(golden)

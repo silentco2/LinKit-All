@@ -8,9 +8,10 @@ from loguru import logger
 from sqlalchemy.orm import Session, sessionmaker
 
 from linkit_all.api.events import EventBus
+from linkit_all.apply.answers import ApplicationAnswers
 from linkit_all.apply.runner import NEEDS_TOOL
 from linkit_all.apply.vault import Vault
-from linkit_all.core import fx
+from linkit_all.core import fx, sponsors
 from linkit_all.core.config import Settings
 from linkit_all.core.models import Profile, utcnow
 from linkit_all.core.runs import (
@@ -67,6 +68,7 @@ class PipelineRunner:
         self.state = RunState()
         self._task: asyncio.Task[None] | None = None
         self._fx_task: asyncio.Task[bool] | None = None  # kept so it is not collected mid-flight
+        self._sponsor_task: asyncio.Task[list[str]] | None = None
 
     def start(self, stages: list[str], new: bool = False, skip_earlier: bool = False) -> RunState:
         if self.state.running:
@@ -88,6 +90,12 @@ class PipelineRunner:
         self._task = asyncio.create_task(self._run(run_id, ordered))
         # Fresh exchange rates for the salary rule: never blocks or fails the run, no personal data.
         self._fx_task = asyncio.create_task(fx.refresh(self.settings.data_dir))
+        # Visa sponsor lists of the user's visa countries, at most weekly: public files, no
+        # personal data, never blocks the run (core/sponsors.py). Ready before rank in most runs.
+        with self.db() as s:
+            profile = s.get(Profile, 1)
+        visa = ApplicationAnswers.model_validate(profile.answers).visa_countries if profile else []
+        self._sponsor_task = asyncio.create_task(sponsors.refresh(self.settings.data_dir, visa))
         return self.state
 
     def _preflight(self) -> None:

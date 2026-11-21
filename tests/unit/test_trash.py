@@ -91,6 +91,13 @@ def test_lists_never_show_applied_or_off_title_jobs_and_the_rows_stay(tmp_path: 
         assert client.get("/api/jobs?state=applied").json() == []
         assert client.get("/api/jobs?q=Welder").json() == []
         assert client.get("/api/status").json()["states"] == {"below_threshold": 1, "applied": 1}
+        # quick jump (Ctrl+K) finds applied jobs too, never the trash, and asks for a few rows
+        found = client.get("/api/jobs?q=near&applied=true&limit=1").json()
+        assert [j["title"] for j in found] == ["near fit"]
+        both = client.get("/api/jobs?applied=true").json()
+        assert sorted(j["title"] for j in both) == ["near applied", "near fit"]
+        assert client.get("/api/jobs?applied=true&state=applied").json()[0]["title"] == "near applied"
+        assert client.get("/api/jobs?limit=0").status_code == 422
     with db() as s:
         assert len(list(s.scalars(select(Job)))) == 3
 

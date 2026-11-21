@@ -7,10 +7,11 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Api } from '../api';
 import { I18n, SourcePipe, TPipe } from '../i18n';
 import { Live } from '../live';
-import { fmtNum, localeOf } from '../locale';
-import { GHOST_HIGH, GHOST_MEDIUM, JobRow, reasonSetting, reasonText, SCAM_HIGH, SCAM_MEDIUM } from '../types';
+import { DtPipe, fmtNum, localeOf } from '../locale';
+import { AppliedBefore, GHOST_HIGH, GHOST_MEDIUM, JobRow, reasonSetting, reasonText, SCAM_HIGH, SCAM_MEDIUM } from '../types';
 
 interface Risk { key: string; cls: string }
+interface AddResult { url: string; status: 'added' | 'brought_back' | 'duplicate' | 'unreadable' | 'needs_text'; job_id: number | null; title: string; company?: string; applied_before?: AppliedBefore[] }
 const RISK_RED = 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300';
 const RISK_AMBER = 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300';
 const RISK_GREY = 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
@@ -42,12 +43,55 @@ const STATES = ['filtered_out', 'below_threshold', 'awaiting_review', 'queued_ap
 @Component({
   selector: 'app-jobs',
   host: { '(document:keydown.escape)': 'select(null)' },
-  imports: [ScrollingModule, FormsModule, NgTemplateOutlet, RouterLink, JobDetailPanel, SourcePipe, TPipe],
+  imports: [ScrollingModule, FormsModule, NgTemplateOutlet, RouterLink, JobDetailPanel, SourcePipe, TPipe, DtPipe],
   template: `
-    <div class="flex items-baseline justify-between">
+    <div class="flex items-baseline gap-3">
       <h1>{{ 'jobs.title' | t }}</h1>
-      <span class="text-sm text-slate-500">{{ 'jobs.shown' | t: { n: num(rows().length) } }}</span>
+      <span class="ms-auto text-sm text-slate-500">{{ 'jobs.shown' | t: { n: num(rows().length) } }}</span>
+      <button type="button" class="btn" aria-controls="add-job" [attr.aria-expanded]="adding()" (click)="adding.set(!adding())">{{ 'jobs.add.open' | t }}</button>
     </div>
+
+    @if (adding()) {
+      <form id="add-job" class="card mt-4 space-y-3" (submit)="addJobs($event)">
+        <div>
+          <label class="label" for="add-links">{{ 'jobs.add.links' | t }}</label>
+          <textarea id="add-links" name="links" dir="ltr" class="input" rows="3" autocomplete="off" [ngModel]="links()" (ngModelChange)="links.set($event)"></textarea>
+          <p class="hint">{{ 'jobs.add.hint' | t }}</p>
+        </div>
+        <details [open]="pasteOpen()">
+          <summary class="cursor-pointer text-sm">{{ 'jobs.add.paste' | t }}</summary>
+          <label class="label mt-2" for="add-pdf">{{ 'jobs.add.pdf' | t }}</label>
+          <input id="add-pdf" type="file" accept="application/pdf,.pdf" class="text-sm" [disabled]="busy()" (change)="readPdf($event)">
+          <div class="mt-2 grid gap-3 sm:grid-cols-2">
+            <div><label class="label" for="add-title">{{ 'jobs.add.jobTitle' | t }}</label><input id="add-title" name="title" class="input" dir="auto" [ngModel]="title()" (ngModelChange)="title.set($event)"></div>
+            <div><label class="label" for="add-company">{{ 'jobs.add.company' | t }}</label><input id="add-company" name="company" class="input" dir="auto" [ngModel]="company()" (ngModelChange)="company.set($event)"></div>
+          </div>
+          <label class="label mt-3" for="add-text">{{ 'jobs.add.text' | t }}</label>
+          <textarea id="add-text" name="text" class="input" dir="auto" rows="6" [ngModel]="text()" (ngModelChange)="text.set($event)"></textarea>
+        </details>
+        @if (addError()) { <div class="alert alert-error" role="alert" dir="auto">{{ addError() }}</div> }
+        @if (added().length) {
+          <ul class="space-y-1 text-sm" role="status">
+            @for (r of added(); track r.url) {
+              <li class="flex flex-wrap gap-x-2"><bdi class="min-w-0 break-all font-medium">{{ r.title || r.url }}</bdi><span class="text-slate-600 dark:text-slate-400">{{ 'jobs.add.status.' + r.status | t }}</span>
+                @if (r.applied_before?.length) {
+                  <span class="w-full text-amber-800 dark:text-amber-300" dir="auto">{{ 'jobs.add.before' | t: { company: r.company ?? '', title: r.applied_before![0].title } }} {{ r.applied_before![0].applied_at | dt: 'date' }}</span>
+                }
+              </li>
+            }
+          </ul>
+          @if (fresh()) {
+            <p class="flex flex-wrap items-center gap-2 text-sm">{{ (scoring() ? 'jobs.add.scoring' : 'jobs.add.next') | t }}
+              @if (!scoring()) { <button type="button" class="btn" (click)="scoreNow()">{{ 'jobs.add.scoreNow' | t }}</button> }
+            </p>
+          }
+        }
+        <div class="flex gap-2">
+          <button type="submit" class="btn btn-primary" [disabled]="busy()">{{ 'jobs.add.submit' | t }}</button>
+          <button type="button" class="btn" (click)="adding.set(false)">{{ 'jobs.add.cancel' | t }}</button>
+        </div>
+      </form>
+    }
 
     <div class="mt-4 flex flex-wrap gap-3" role="search">
       <input class="input max-w-xs" type="search" [placeholder]="'jobs.searchPh' | t" [attr.aria-label]="'jobs.searchLabel' | t"
@@ -93,7 +137,7 @@ const STATES = ['filtered_out', 'below_threshold', 'awaiting_review', 'queued_ap
                 @if (!wide() && reasonOf(j); as why) {
                   <span class="mt-0.5 block"><ng-container *ngTemplateOutlet="chip; context: { $implicit: j, why: why, wrap: true }" /></span>
                 }
-                <span class="block truncate text-xs text-slate-500" dir="auto">@if (wide() && reasonOf(j); as why) { <ng-container *ngTemplateOutlet="chip; context: { $implicit: j, why: why, wrap: false }" /> }@if (risk(j); as r) { <span class="badge me-1.5 px-1.5 py-0 text-[11px] leading-4 {{ r.cls }}">{{ 'trust.badge.' + r.key | t }}</span> }@if (compact()) { <span>{{ 'common.state.' + j.state | t }}<span class="gap-dot"></span></span> }<bdi>{{ j.company }}</bdi><span class="gap-dot"></span><bdi>{{ j.location }}</bdi><span class="gap-dot"></span><bdi>{{ j.source | src }}</bdi></span>
+                <span class="block truncate text-xs text-slate-500" dir="auto">@if (wide() && reasonOf(j); as why) { <ng-container *ngTemplateOutlet="chip; context: { $implicit: j, why: why, wrap: false }" /> }@if (risk(j); as r) { <span class="badge me-1.5 px-1.5 py-0 text-[11px] leading-4 {{ r.cls }}">{{ 'trust.badge.' + r.key | t }}</span> }@if (j.sponsor) { <span class="badge tier-high me-1.5 px-1.5 py-0 text-[11px] leading-4">{{ 'sponsor.short' | t }}</span> }@if (compact()) { <span>{{ 'common.state.' + j.state | t }}<span class="gap-dot"></span></span> }<bdi>{{ j.company }}</bdi><span class="gap-dot"></span><bdi>{{ j.location }}</bdi><span class="gap-dot"></span><bdi>{{ j.source | src }}</bdi></span>
               </span>
               @if (!compact()) {
                 <span class="min-w-0 text-xs text-slate-600 dark:text-slate-400">@if (stampOf[j.state]; as cls) { <span [class]="cls">{{ 'common.state.' + j.state | t }}</span> } @else { <span class="block truncate">{{ 'common.state.' + j.state | t }}</span> }</span>
@@ -163,6 +207,19 @@ export class JobsPage {
   /** A phone row has room for the reason chip on its own line, wrapped over two lines at most. */
   protected readonly rowHeight = computed(() => (this.compact() ? (!this.wide() && this.rows().some(this.reasonOf) ? 116 : 76) : 60));
   private timer?: ReturnType<typeof setTimeout>;
+  /** "Add a job" (`POST /jobs/add`): links, or one link plus the pasted posting. */
+  protected readonly adding = signal(false);
+  protected readonly links = signal('');
+  protected readonly title = signal('');
+  protected readonly company = signal('');
+  protected readonly text = signal('');
+  protected readonly busy = signal(false);
+  protected readonly addError = signal('');
+  protected readonly added = signal<AddResult[]>([]);
+  protected readonly scoring = signal(false);
+  /** Some links could not be read: the paste fields open by themselves. */
+  protected readonly pasteOpen = computed(() => this.added().some((r) => r.status === 'unreadable' || r.status === 'needs_text'));
+  protected readonly fresh = computed(() => this.added().some((r) => r.status === 'added' || r.status === 'brought_back'));
 
   constructor() {
     if (typeof matchMedia === 'function') {
@@ -205,6 +262,56 @@ export class JobsPage {
 
   protected setFilter(key: 'q' | 'state' | 'tier' | 'source', value: string): void {
     void this.router.navigate([], { queryParams: { [key]: value || null }, queryParamsHandling: 'merge', replaceUrl: true });
+  }
+
+  async addJobs(e: Event): Promise<void> {
+    e.preventDefault();
+    const links = this.links().split(/\s+/).filter(Boolean);
+    this.busy.set(true);
+    this.addError.set('');
+    try {
+      const r = await this.api.post<{ results: AddResult[] }>('/jobs/add', { links, text: this.text(), title: this.title(), company: this.company() });
+      this.added.set(r.results);
+      this.scoring.set(false);
+      if (this.fresh()) {
+        this.links.set(r.results.filter((x) => x.status === 'unreadable' || x.status === 'needs_text').map((x) => x.url).join('\n'));
+        if (this.text()) for (const s of [this.title, this.company, this.text]) s.set('');
+        void this.load();
+      }
+    } catch (err) {
+      this.addError.set((err as Error).message);
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  /** A posting saved as PDF: its text (and first line as the title) goes into the paste fields to check. */
+  async readPdf(e: Event): Promise<void> {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    this.busy.set(true);
+    this.addError.set('');
+    try {
+      const r = await this.api.upload<{ text: string; title: string }>('/jobs/pdf-text', file);
+      this.text.set(r.text);
+      if (!this.title()) this.title.set(r.title);
+    } catch (err) {
+      this.addError.set((err as Error).message);
+    } finally {
+      this.busy.set(false);
+      input.value = '';
+    }
+  }
+
+  /** Rank and score now instead of on the next search. */
+  async scoreNow(): Promise<void> {
+    try {
+      await this.api.post('/runs', { stages: ['rank', 'score'] });
+      this.scoring.set(true);
+    } catch (err) {
+      this.addError.set((err as Error).message);
+    }
   }
 
   async load(): Promise<void> {

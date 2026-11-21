@@ -1,6 +1,7 @@
 """Tailor stage: AI proposes patches, code validates, applies, renders and verifies."""
 
 import asyncio
+import hashlib
 import shutil
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -279,6 +280,14 @@ def load_profile(db: sessionmaker[Session]) -> tuple[Profile, list[str]]:
         return profile, list(s.scalars(select(LockedFact.text)))
 
 
+def file_sha(path: str | None) -> str | None:
+    """SHA-256 of a file, None when it cannot be read (then nothing is called stale)."""
+    try:
+        return hashlib.sha256(Path(path or "").read_bytes()).hexdigest()
+    except OSError:
+        return None
+
+
 async def tailor_job(
     db: sessionmaker[Session],
     job_id: int,
@@ -287,8 +296,11 @@ async def tailor_job(
     render: Renderer | None = None,
 ) -> TailoredCV:
     """Pipeline stage queued_apply -> tailored. Idempotent: an existing tailored CV is reused
-    (a job coming back from the Action Center is not tailored, and paid for, twice)."""
+    (a job coming back from the Action Center is not tailored, and paid for, twice), unless your
+    CV file changed since it was made: then it is tailored again from the new one."""
     profile, facts = load_profile(db)
+    base = file_sha(profile.cv_path)
+    again = False
     with db.begin() as s:
         job = s.get(Job, job_id)
         if job is None:
@@ -297,8 +309,10 @@ async def tailor_job(
             select(TailoredCV).filter_by(job_id=job_id).order_by(TailoredCV.id.desc())
         ).first()
         if latest is not None and Path(latest.pdf_path).exists():
-            transition(s, job, JobState.tailored, "reusing the tailored CV")
-            return latest
+            if None in (latest.base_sha, base) or latest.base_sha == base:
+                transition(s, job, JobState.tailored, "reusing the tailored CV")
+                return latest
+            again = True  # your CV changed after this version was made
         title, company, description = job.title, job.company, job.description
 
     out_dir = settings.data_dir / "tailored" / f"job_{job_id}"
@@ -314,13 +328,15 @@ async def tailor_job(
             applied=[p.model_dump() for p in result.applied],
             rejected=[{**p.model_dump(), "reason": r} for p, r in result.rejected],
             verify=result.verify.as_dict() if result.verify else {},
+            base_sha=base,
         )
         s.add(row)
+        note = "your CV changed since the last tailoring: tailored again; " if again else ""
         transition(
             s,
             job,
             JobState.tailored,
-            f"{len(result.applied)} patches applied, {len(result.rejected)} rejected",
+            f"{note}{len(result.applied)} patches applied, {len(result.rejected)} rejected",
             [str(result.docx), str(result.pdf)],
             code="tailor_fact_check_failed" if result.invented else None,
             params={"new": result.invented[:10]} if result.invented else None,

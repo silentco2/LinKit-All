@@ -229,6 +229,67 @@ def test_tailor_job_stores_version_and_transitions(tmp_path: Path) -> None:
         assert event.artifacts == [row.docx_path, row.pdf_path]
     again = asyncio.run(tailor_job(db, job.id, FakeProvider("{}"), settings, render=fake_render))
     assert again.id == row.id  # idempotent: no second AI call result stored
+    assert row.base_sha and len(row.base_sha) == 64
+
+
+NONE = json.dumps({"patches": []})
+
+
+def test_a_retry_after_a_new_cv_tailors_again(tmp_path: Path) -> None:
+    from docx import Document
+
+    from linkit_all.core.models import Profile, TailoredCV
+
+    settings = Settings(data_dir=tmp_path / "data")
+    db = init_db(settings.db_path)
+    import_profile(db, ProfileIn(full_name="Jane", email="j@x.io", cv_path=make_cv(tmp_path / "cv.docx"),
+                                 locked_facts=["Acme"]), settings.data_dir)  # fmt: skip
+    with db.begin() as s:
+        job = Job(source="t", url="u", title="Backend", company="Initech", dedupe_hash="h",
+                  state=JobState.queued_apply)  # fmt: skip
+        s.add(job)
+        base = s.get_one(Profile, 1).cv_path
+    first = asyncio.run(tailor_job(db, job.id, FakeProvider(NONE), settings, render=fake_render))
+
+    doc = Document(base)  # you edit your CV (a new upload lands at the same path)
+    doc.add_paragraph("Led the payments migration")
+    doc.save(base)
+    with db.begin() as s:  # the job comes back from Needs you: queued again
+        s.get_one(Job, job.id).state = JobState.queued_apply
+    second = asyncio.run(tailor_job(db, job.id, FakeProvider(NONE), settings, render=fake_render))
+    assert second.id != first.id and second.base_sha != first.base_sha
+    with db() as s:
+        notes = [e.message for e in s.query(JobEvent).filter_by(job_id=job.id)]
+    assert any(m.startswith("your CV changed since the last tailoring") for m in notes)
+    assert (
+        asyncio.run(tailor_job(db, job.id, FakeProvider(NONE), settings, render=fake_render)).id
+        == second.id
+    )
+
+    with db.begin() as s:  # a version from before fingerprints is reused, as before
+        s.get_one(TailoredCV, second.id).base_sha = None
+    doc.add_paragraph("Another line")
+    doc.save(base)
+    assert (
+        asyncio.run(tailor_job(db, job.id, FakeProvider(NONE), settings, render=fake_render)).id
+        == second.id
+    )
+
+
+def test_tailored_base_sha_migration(tmp_path: Path) -> None:
+    from alembic import command
+    from sqlalchemy import inspect
+
+    from linkit_all.core.db import alembic_config, make_engine
+
+    cfg = alembic_config()
+    with make_engine(tmp_path / "old.db").begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "e1b8d2f4a679")
+        command.upgrade(cfg, "f2c9e3a5b78a")
+        assert "base_sha" in {c["name"] for c in inspect(conn).get_columns("tailored_cvs")}
+        command.downgrade(cfg, "e1b8d2f4a679")
+        assert "base_sha" not in {c["name"] for c in inspect(conn).get_columns("tailored_cvs")}
 
 
 # --- facts and claims in plain words --------------------------------------------

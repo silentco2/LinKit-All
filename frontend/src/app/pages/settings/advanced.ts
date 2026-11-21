@@ -1,5 +1,6 @@
 import { Component, inject, input, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { DtPipe } from '../../locale';
 import { Api } from '../../api';
 import { I18n, TPipe } from '../../i18n';
 import { lines, unlines } from '../../types';
@@ -9,6 +10,7 @@ import { cardClass, Tuning } from './tuning';
 
 const MATCHING = ['matching.tier_high', 'matching.tier_mid', 'matching.ai_max_jobs', 'matching.batch_size', 'matching.auto_apply_low', 'filters.one_per_company', 'search.max_results_per_query', 'sources.linkedin_window', 'sources.linkedin_max_posts'];
 const APPLYING = ['apply.min_pause_s', 'apply.max_pause_s', 'apply.parallel_sites', 'apply.submit_without_asking'];
+interface BackupStatus { folder: string; count: number; last: string | null; last_at: string | null }
 const TRUST = ['trust.enabled', 'trust.scam_threshold', 'trust.ghost_threshold', 'trust.filter_ghost', 'trust.allow_companies'];
 
 /** "Changed" and "Reset to preset / default" under one field, when its value is not the preset's or the default. */
@@ -43,7 +45,7 @@ export class Changed {
 /** Settings > Advanced: the raw numbers behind the presets, in collapsed groups. Changed values are marked and can be reset. */
 @Component({
   selector: 'app-settings-advanced',
-  imports: [Field, Changed, RouterLink, TPipe],
+  imports: [Field, Changed, RouterLink, TPipe, DtPipe],
   template: `
     <div class="space-y-4">
       <p class="text-sm text-slate-600 dark:text-slate-400">{{ 'settings.adv.intro' | t }}</p>
@@ -220,6 +222,26 @@ export class Changed {
             </div>
           </div>
         </details>
+
+        <details class="card" (toggle)="loadBackup()">
+          <summary [class]="summary">{{ 'settings.adv.backup' | t }}</summary>
+          <div class="mt-4 space-y-4">
+            <p class="text-sm text-slate-600 dark:text-slate-400">{{ 'settings.adv.backupIntro' | t }}</p>
+            <app-field key="backup.folder" for="adv-bfolder" [label]="'settings.adv.backupFolder' | t" [hint]="'settings.adv.backupFolderHint' | t">
+              <input id="adv-bfolder" dir="ltr" class="input" autocomplete="off" [placeholder]="backup()?.folder ?? ''" [value]="store.cfg.backup.folder" (change)="store.update('backup.folder', val($event).trim()); loadBackup()">
+            </app-field>
+            <div class="space-y-2" aria-live="polite">
+              @if (backup(); as b) {
+                <p class="text-sm" dir="auto">
+                  @if (b.last_at) { {{ i18n.plural('settings.adv.backupLast', b.count) }} {{ b.last_at | dt }} } @else { {{ 'settings.adv.backupNone' | t }} }
+                </p>
+              }
+              <button type="button" class="btn" [disabled]="busy()" (click)="backupNow()">{{ 'settings.adv.backupNow' | t }}</button>
+              @if (backupError(); as e) { <p class="text-sm text-rose-700 dark:text-rose-400" role="alert" dir="auto">{{ e }}</p> }
+              <p class="hint">{{ 'settings.adv.backupRestore' | t }} <code dir="ltr">linkit restore &lt;file&gt;</code></p>
+            </div>
+          </div>
+        </details>
       } @else if (tuning.error(); as e) {
         <div class="alert alert-error" role="alert" dir="auto">{{ e }}
           <button type="button" class="btn ms-2" (click)="tuning.load()">{{ 'welcome.retry' | t }}</button>
@@ -234,7 +256,7 @@ export class AdvancedSection implements OnInit {
   protected readonly store = inject(SettingsStore);
   protected readonly tuning = inject(Tuning);
   private readonly api = inject(Api);
-  private readonly i18n = inject(I18n);
+  protected readonly i18n = inject(I18n);
   protected readonly lines = lines;
   protected readonly unlines = unlines;
   protected readonly card = cardClass;
@@ -244,6 +266,8 @@ export class AdvancedSection implements OnInit {
   protected readonly trust = TRUST;
   protected readonly busy = signal(false);
   protected readonly result = signal<{ ok: boolean; text: string } | null>(null);
+  protected readonly backup = signal<BackupStatus | null>(null);
+  protected readonly backupError = signal('');
 
   ngOnInit(): void {
     void this.tuning.load();
@@ -278,6 +302,26 @@ export class AdvancedSection implements OnInit {
   protected pauseInvalid(): boolean {
     const a = this.store.cfg.apply;
     return a.min_pause_s > a.max_pause_s;
+  }
+
+  protected async loadBackup(): Promise<void> {
+    try {
+      this.backup.set(await this.api.get<BackupStatus>('/backup'));
+    } catch {
+      // the status line stays empty; "Back up now" still works and reports its own error
+    }
+  }
+
+  protected async backupNow(): Promise<void> {
+    this.busy.set(true);
+    this.backupError.set('');
+    try {
+      this.backup.set(await this.api.post<BackupStatus>('/backup'));
+    } catch (e) {
+      this.backupError.set((e as Error).message);
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   /** Ticking asks first; a "no" puts the box back as it was. */

@@ -1,4 +1,5 @@
-"""Job sites through python-jobspy: LinkedIn, Indeed, Glassdoor, Google, ZipRecruiter, Bayt."""
+"""Job sites through python-jobspy: LinkedIn, Indeed, Glassdoor, Google, ZipRecruiter, Bayt,
+Naukri (India; its own API asks for a reCAPTCHA, jobspy sends what its pages send)."""
 
 import asyncio
 import json
@@ -31,7 +32,8 @@ from linkit_all.sources.text import html_to_text
 Scraper = Callable[..., Any]
 
 _LOGGERS = {"linkedin": "LinkedIn", "indeed": "Indeed", "glassdoor": "Glassdoor",
-            "google": "Google", "zip_recruiter": "ZipRecruiter", "bayt": "Bayt"}  # fmt: skip
+            "google": "Google", "zip_recruiter": "ZipRecruiter", "bayt": "Bayt",
+            "naukri": "Naukri"}  # fmt: skip
 
 
 def _child(conn: Connection, fn: Scraper, kwargs: dict[str, Any]) -> None:
@@ -226,7 +228,7 @@ def linkedin_apply(html: str) -> str | None:
     return "offsite" if m.group(1) == "offsite" else "easy_apply"
 
 
-JOBSPY_SITES = ("linkedin", "indeed", "glassdoor", "google", "zip_recruiter", "bayt")
+JOBSPY_SITES = ("linkedin", "indeed", "glassdoor", "google", "zip_recruiter", "bayt", "naukri")
 
 
 def jobspy_sources(scrape: Scraper = _scrape_jobs) -> list[JobSpySite]:

@@ -13,6 +13,7 @@ from urllib.parse import unquote, urlparse
 from pydantic import BaseModel, field_validator
 
 from linkit_all.apply.email_send import valid_address
+from linkit_all.apply.prose import clean, retry_note
 from linkit_all.providers.base import LLMProvider, render
 from linkit_all.tailor.patches import has_arabic
 
@@ -114,12 +115,14 @@ async def compose(
     prompt = render("application_email.j2", cv=cv[:6000], profile=profile_facts, job=brief)
     mail = await provider.complete(prompt, ApplicationEmail)
     problem = None
-    if has_arabic(mail.body) or has_arabic(mail.subject_suffix or ""):  # retry once, uncached
-        retry = prompt + "\n\nYour previous answer contained Arabic script. Write in English only."
-        mail = await provider.complete(retry, ApplicationEmail, use_cache=False)
+    note = retry_note(mail.body)
+    if has_arabic(mail.body) or has_arabic(mail.subject_suffix or ""):
+        note = "\n\nYour previous answer contained Arabic script. Write in English only." + note
+    if note:  # retry once, uncached
+        mail = await provider.complete(prompt + note, ApplicationEmail, use_cache=False)
         if has_arabic(mail.body) or has_arabic(mail.subject_suffix or ""):
             mail, problem = ApplicationEmail.model_construct(body="", subject_suffix=None), "arabic"
-    body = f"{greeting(author)}\n\n{mail.body}\n\n{signature(full_name, phone, linkedin)}"
+    body = f"{greeting(author)}\n\n{clean(mail.body)}\n\n{signature(full_name, phone, linkedin)}"
     subject = subject_for(job.get("title", ""), full_name, mail.subject_suffix)
     return Draft(to, subject, body, problem)
 

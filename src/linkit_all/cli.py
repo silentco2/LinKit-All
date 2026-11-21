@@ -129,6 +129,48 @@ def doctor() -> None:
         raise typer.Exit(1)
 
 
+def _backup_folder(settings: Settings) -> Path:
+    from linkit_all.core.backup import folder_for, saved_folder
+
+    return folder_for(settings.data_dir, saved_folder(settings.db_path))
+
+
+@app.command()
+def backup() -> None:
+    """Copy the database now (the app also makes one a day and keeps 7)."""
+    from linkit_all.core.backup import backup as make_backup
+
+    settings = get_settings()
+    if not settings.db_path.exists():
+        typer.echo(f"No database at {settings.db_path}", err=True)
+        raise typer.Exit(1)
+    typer.echo(f"Backed up to {make_backup(settings.db_path, _backup_folder(settings))}")
+
+
+@app.command()
+def restore(
+    path: Path,
+    yes: Annotated[bool, typer.Option("--yes", help="Do not ask first.")] = False,
+) -> None:
+    """Put a database copy back. Close LinKit All first; the current database is saved beside
+    the backups as linkit-before-restore-<time>.db."""
+    from linkit_all.core.backup import check
+    from linkit_all.core.backup import restore as put_back
+
+    settings = get_settings()
+    try:
+        check(path)
+    except ValueError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1) from None
+    if not yes and not typer.confirm(
+        f"Replace {settings.db_path} with {path.name}? Close LinKit All first.", default=False
+    ):
+        raise typer.Exit(1)
+    saved = put_back(settings.db_path, path, _backup_folder(settings))
+    typer.echo(f"Restored {path.name}." + (f" The previous one is in {saved}" if saved else ""))
+
+
 @app.command("install-libreoffice")
 def install_libreoffice(
     source: Annotated[Path, typer.Argument(help="Minimal LibreOffice zip or folder.")],
@@ -302,6 +344,34 @@ def seed_boards_cmd() -> None:
     from linkit_all.sources.discovery import seed_boards, seed_list
 
     typer.echo(f"{seed_boards(_stage_db())} new boards stored (of {len(seed_list())} in the list)")
+
+
+@app.command("source-check")
+def source_check_cmd(
+    keys: Annotated[
+        list[str] | None,
+        typer.Argument(help="Source names or company entries; default: all switched on."),
+    ] = None,
+    force: Annotated[
+        bool, typer.Option("--force", help="Ignore checks under an hour old.")
+    ] = False,
+) -> None:
+    """Probe each switched-on source and company page live (one page each) and say which work."""
+    from linkit_all.pipeline import check_sources
+    from linkit_all.sources.health import COMPANY
+
+    found = asyncio.run(check_sources(_stage_db(), get_settings(), keys or None, force))
+    broken = 0
+    for key, h in sorted(found.items()):
+        mark = {"ok": "ok", "warn": "partly", "empty": "no jobs", "broken": "BROKEN"}[
+            str(h["status"])
+        ]
+        broken += h["status"] == "broken"
+        why = f": {h['error']}" if h["error"] else ""
+        typer.echo(f"[{mark}] {key.removeprefix(COMPANY)} ({h['jobs']} jobs){why}")
+    if not found:
+        typer.echo("Nothing switched on to check.")
+    raise typer.Exit(1 if broken else 0)
 
 
 @app.command("find-board")

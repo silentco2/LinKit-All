@@ -13,7 +13,9 @@ import warnings
 from pathlib import Path
 from typing import Any
 
+from linkit_all.core.models import Job
 from linkit_all.core.search import SearchConfig
+from linkit_all.matching.facts import missing
 from linkit_all.matching.score import CV_CHARS, JD_CHARS, ScoreBatch, tier_for
 from linkit_all.providers.base import LLMProvider, render
 
@@ -76,10 +78,11 @@ class ScriptedAI(LLMProvider):
         return {"page_kind": "form", "fields": fields, "next_button": nxt, "submit_button": sub}
 
 
-# --- golden score set: 20 made-up job + CV pairs with the tier a person expects (plan D4) ------
+# --- golden score set: 24 made-up job + CV pairs with the tier a person expects (plan D4) ------
 # The model's answers are recorded once, so the set runs offline and free in CI. After a change
 # to the score prompt, record again with a real model and look at what moved:
 #   uv run python -m linkit_all.bench.ai tests/fixtures/golden
+# After adding cases only, add --new to ask just those.
 GoldenSet = dict[str, Any]  # cases.json: {"cvs": {key: {cv, prefs}}, "cases": [...]}
 
 
@@ -91,6 +94,9 @@ def golden_prompts(golden: GoldenSet) -> dict[int, str]:
         person = golden["cvs"][c["cv"]]
         job = {k: c.get(k) for k in ("id", "title", "company", "location", "remote")}
         job["description"] = c["description"][:JD_CHARS]
+        where = c.get("location") or ""
+        row = Job(title=c["title"], location=where, data={"remote": job["remote"]})
+        job["missing"] = missing(row)  # as the score stage asks it
         out[c["id"]] = render(
             "score.j2", cv=person["cv"][:CV_CHARS], prefs=person["prefs"], jobs=[job]
         )
@@ -149,19 +155,23 @@ def load_golden(folder: Path) -> tuple[GoldenSet, RecordedAI]:
     return golden, RecordedAI(recorded["answers"])
 
 
-async def record_golden(folder: Path, provider: LLMProvider) -> list[str]:
-    """Ask a real model every golden case, save its answers and return the cases that moved."""
+async def record_golden(folder: Path, provider: LLMProvider, only_new: bool = False) -> list[str]:
+    """Ask a real model the golden cases, save its answers and return the cases that moved.
+    `only_new`: ask only cases with no saved answer and keep the others as they are (a case
+    added to the set; after a score-prompt change, record them all)."""
     golden = json.loads((folder / "cases.json").read_text("utf-8"))
-    answers = {}
+    saved = folder / "recorded.json"
+    answers: dict[str, str] = json.loads(saved.read_text("utf-8"))["answers"] if only_new else {}
     for cid, prompt in golden_prompts(golden).items():
+        if str(cid) in answers:
+            continue
         batch = await provider.complete(prompt, ScoreBatch, use_cache=False)
         answers[str(cid)] = batch.model_dump_json(
             include={"results": {"__all__": {"job_id", "score", "reasons", "missing_skills"}}}
         )
-    (folder / "recorded.json").write_text(
-        json.dumps({"prompt_sha": prompt_sha(golden), "answers": answers}, indent=1) + "\n",
-        "utf-8",
-    )
+    body = json.dumps({"prompt_sha": prompt_sha(golden), "answers": answers}, indent=1)
+    with saved.open("w", encoding="utf-8", newline="\n") as f:  # LF, as committed
+        f.write(body + "\n")
     return moved(golden, await golden_tiers(golden, RecordedAI(answers)))
 
 
@@ -172,5 +182,7 @@ if __name__ == "__main__":
     from linkit_all.core.config import Settings
     from linkit_all.providers import get_provider
 
-    for line in asyncio.run(record_golden(Path(sys.argv[1]), get_provider(Settings()))):
+    # python -m linkit_all.bench.ai tests/fixtures/golden [--new]
+    record = record_golden(Path(sys.argv[1]), get_provider(Settings()), "--new" in sys.argv)
+    for line in asyncio.run(record):
         print("moved:", line)

@@ -28,9 +28,28 @@ place with `LINKIT_DATA_DIR`.
 | `models/` | The downloaded ranking model |
 | `tools/` | The minimal LibreOffice, if you installed it |
 | `logs/` | `linkit.log` (rotated at 10 MB, 5 files kept) |
+| `backups/` | Daily copies of `linkit.db`, the newest 7 (see below) |
+| `sponsors/` | Official visa sponsor lists of your visa countries, if any |
 
 Screenshots of filled forms contain your personal details. They never leave the folder, but
 treat the folder as private. To remove everything, close the app and delete it.
+
+### Backups
+
+While the app is open it copies `linkit.db` once a day (also right after it starts when the last
+copy is a day old) and keeps the newest 7 as `backups/linkit-<date>-<time>.db`. CV files are not
+copied. **Settings, Advanced, Backups** shows the newest copy, has a **Back up now** button and a
+**Backup folder** setting: another disk survives a disk failure, and a synced folder (OneDrive,
+Dropbox) uploads the copies, which hold your personal data, to that service. The vault stays
+encrypted inside each copy.
+
+```bash
+linkit backup                          # a copy now
+linkit restore <path-to-copy.db>       # close the app first; asks before replacing
+```
+
+`linkit restore` checks the file first and saves the current database as
+`linkit-before-restore-<date>-<time>.db` in the backup folder, so a restore can be undone.
 
 ## What your AI provider sees
 
@@ -83,6 +102,10 @@ LinKit All talks to:
   job's history notes that it is due.
 - Hugging Face, once, to download the ranking model.
 - An exchange-rate service, to refresh rates. It sends no personal data.
+- Official visa sponsor lists, at most once a week and only for the countries where you said
+  you need a visa: the UK Home Office (gov.uk), the Dutch IND (ind.nl), USCIS (uscis.gov) and
+  open.canada.ca. These are public file downloads; they send no personal data, though the
+  government site can see which country's list was fetched.
 - Only if you turn the feature on: the one-click LibreOffice download from the project's GitHub
   release, Google search in the app browser for the LinkedIn hiring posts source, Google's
   sign-in pages for "Sign in with Google", Telegram
@@ -95,7 +118,12 @@ command-line tool you pick, and Tectonic (which downloads TeX files the first ti
 a LaTeX CV) make their own connections, which the app does not control.
 
 **There is no telemetry, analytics or crash reporting.** These docs use system fonts and no
-trackers either.
+trackers either. Problems and ideas reach the project only when you send them: **Report a
+problem** and **Suggest a feature** in the app's footer (and **Report this** on a run that stopped
+for an unknown reason) open a new GitHub issue in your browser. The form is pre-filled with the
+app version, operating system, Python version, mode, AI provider name, UI language and, from a
+run, the error's code; never a message, file path, job, company or CV. Nothing is sent until you
+read it and submit it on GitHub.
 
 ## The local web page
 

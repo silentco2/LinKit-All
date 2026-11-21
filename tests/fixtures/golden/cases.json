@@ -126,7 +126,7 @@
    "location": "Dubai",
    "remote": "onsite",
    "description": "Train ML models, deep learning with PyTorch, MLOps. PhD preferred.",
-   "expected": "mid"
+   "expected": "low"
   },
   {
    "id": 10,
@@ -146,7 +146,7 @@
    "location": "Dubai",
    "remote": "onsite",
    "description": "Excel and SQL reporting for finance, some Tableau.",
-   "expected": "mid"
+   "expected": "high"
   },
   {
    "id": 12,
@@ -186,7 +186,7 @@
    "location": "Riyadh",
    "remote": "onsite",
    "description": "Lead a 40-bed unit, budgets, staffing, 5+ years management.",
-   "expected": "mid"
+   "expected": "low"
   },
   {
    "id": 16,
@@ -216,7 +216,7 @@
    "location": "Remote",
    "remote": "remote",
    "description": "Mobile app UX, prototyping, usability testing.",
-   "expected": "mid"
+   "expected": "high"
   },
   {
    "id": 19,
@@ -237,6 +237,46 @@
    "remote": "remote",
    "description": "React and TypeScript, implement designs from Figma.",
    "expected": "low"
+  },
+  {
+   "id": 21,
+   "cv": "backend",
+   "title": "Backend Engineer (Node.js)",
+   "company": "Notreal Logistics",
+   "location": "Remote",
+   "remote": "remote",
+   "description": "Build REST APIs in Node.js and TypeScript on PostgreSQL. Must have 2+ years of production Node.js. Docker and AWS experience a plus.",
+   "expected": "mid"
+  },
+  {
+   "id": 22,
+   "cv": "data",
+   "title": "Marketing Analyst",
+   "company": "Sample Media",
+   "location": "Dubai",
+   "remote": "onsite",
+   "description": "Analyse campaign results with SQL and Excel and build Tableau dashboards. Google Analytics and A/B testing experience required.",
+   "expected": "mid"
+  },
+  {
+   "id": 23,
+   "cv": "nurse",
+   "title": "Paediatric Emergency Nurse",
+   "company": "Fictive Children's Hospital",
+   "location": "Jeddah",
+   "remote": "onsite",
+   "description": "Registered nurse for a paediatric emergency department. PALS certification and 2+ years of paediatric experience required.",
+   "expected": "mid"
+  },
+  {
+   "id": 24,
+   "cv": "designer",
+   "title": "UI and Brand Designer",
+   "company": "Mock Agency",
+   "location": "Remote",
+   "remote": "remote",
+   "description": "Design web screens in Figma and keep our brand guidelines; also social posts and print. Adobe Illustrator and InDesign required.",
+   "expected": "mid"
   }
  ]
 }

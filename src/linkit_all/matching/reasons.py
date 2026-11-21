@@ -78,6 +78,8 @@ def job_reason(job: Job, filter_event: FilterEvent | None = None) -> Reason | No
         return filter_reason(job, filter_event)
     if job.state == JobState.below_threshold:
         trust = job.data.get("trust") or {}
+        if rule := job.data.get("fact_rule"):  # a checked fact from the posting broke a rule
+            return filter_reason(job, (rule, None, {}))
         if trust.get("ghost_demoted"):
             score = (trust.get("ghost") or {}).get("score")
             return f"Possibly stale posting (score {score})", "ghost", {"score": score}

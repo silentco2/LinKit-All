@@ -19,6 +19,7 @@ from linkit_all.api.security import LocalOnly
 from linkit_all.api.suggest import router as suggest_router
 from linkit_all.apply.browser import UserBrowser
 from linkit_all.apply.vault import vault_for
+from linkit_all.core.backup import keep_backing_up
 from linkit_all.core.config import Settings, get_settings
 from linkit_all.core.db import init_db
 from linkit_all.core.lo_install import LibreOfficeInstaller
@@ -43,7 +44,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         register_runner(app.state.runner, app.state.user_browser)
         app.state.scheduler.start()
         apply_schedule(app.state.scheduler, load_search(app.state.db) or SearchConfig())
+        backups = asyncio.create_task(
+            keep_backing_up(app.state.db, settings.db_path, settings.data_dir)
+        )
         yield
+        backups.cancel()
         app.state.scheduler.shutdown(wait=False)
         register_runner(None)
         app.state.runner.cancel()

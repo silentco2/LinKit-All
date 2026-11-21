@@ -9,6 +9,8 @@ import numpy as np
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from linkit_all.apply.answers import ApplicationAnswers
+from linkit_all.core import geo, sponsors
 from linkit_all.core.models import Job, JobState, Profile, Tier, utcnow
 from linkit_all.core.search import SearchConfig
 from linkit_all.core.state import transition
@@ -129,8 +131,12 @@ def _apply_trust(
     return survivors
 
 
-def rank_jobs(db: sessionmaker[Session], cfg: SearchConfig, embed: Embed) -> dict[str, int]:
-    """enriched -> filtered_out | ranked (data["rank"] in 0..1), one best job per company."""
+def rank_jobs(
+    db: sessionmaker[Session], cfg: SearchConfig, embed: Embed, data_dir: Path | None = None
+) -> dict[str, int]:
+    """enriched -> filtered_out | ranked (data["rank"] in 0..1), one best job per company.
+    With `data_dir`, a job in one of the user's visa countries whose employer is on that
+    country's sponsor list (core/sponsors.py) gets data["sponsor"] and a small rank boost."""
     with db() as s:
         profile = s.get(Profile, 1)
         if profile is None:
@@ -140,6 +146,8 @@ def rank_jobs(db: sessionmaker[Session], cfg: SearchConfig, embed: Embed) -> dic
         }
     cv = cv_text(profile)
     expect = expectation_of(profile.answers, cfg)
+    visa = ApplicationAnswers.model_validate(profile.answers).visa_countries
+    lists = sponsors.visa_iso2(visa) & set(sponsors.REGISTERS) if data_dir else set()
     counts = {"ranked": 0, "filtered_out": 0}
     if dropped := sweep(db, cfg, embed):
         counts["trashed"] = dropped
@@ -166,7 +174,8 @@ def rank_jobs(db: sessionmaker[Session], cfg: SearchConfig, embed: Embed) -> dic
         jobs = list(s.scalars(select(Job).filter_by(state=JobState.enriched)))
         keep = []
         for job in jobs:
-            if reason := rule_violation(job, cfg, now, expect):
+            manual = job.data.get("manual")  # added by the user: no hard rules (sources/manual.py)
+            if not manual and (reason := rule_violation(job, cfg, now, expect)):
                 transition(s, job, JobState.filtered_out, reason)
                 counts["filtered_out"] += 1
             elif job.data.get("trash"):
@@ -184,13 +193,21 @@ def rank_jobs(db: sessionmaker[Session], cfg: SearchConfig, embed: Embed) -> dic
         for job, cos in zip(keep, cosine, strict=True):
             overlap = skill_overlap(profile.skills, f"{job.title} {job.description}")
             score = 0.8 * float(cos) + 0.2 * overlap if profile.skills else float(cos)
-            job.data = {**job.data, "rank": round(score, 4), "skill_overlap": round(overlap, 3)}
+            iso2 = geo.locate(job.location)[1] if lists else ""
+            sponsor = (
+                iso2
+                if iso2 in lists and data_dir and sponsors.on_list(data_dir, job.company, iso2)
+                else None
+            )
+            score += sponsors.BOOST if sponsor else 0.0
+            job.data = {**job.data, "rank": round(score, 4), "skill_overlap": round(overlap, 3),
+                        "sponsor": sponsor}  # fmt: skip
 
         best: dict[str, Job] = {}
         for job in sorted(keep, key=lambda j: -j.data["rank"]):
             company = norm_company(job.company)
             # "Unknown" is many companies (posts that name none), so the rule cannot apply
-            named = company != norm_company("Unknown")
+            named = company != norm_company("Unknown") and not job.data.get("manual")
             if named and cfg.filters.one_per_company and (company in taken or company in best):
                 why = (
                     "already in your pipeline for this company"

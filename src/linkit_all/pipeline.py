@@ -81,6 +81,37 @@ async def _get_embedder(settings: Settings) -> Any:
     return _embedder
 
 
+async def check_sources(
+    db: sessionmaker[Session],
+    settings: Settings,
+    keys: list[str] | None = None,
+    force: bool = False,
+    vault: "Vault | None" = None,
+) -> dict[str, Any]:
+    """Live one-page probes of the switched-on sources and company pages (or `keys`), built
+    exactly as discovery builds them; returns `health.summary` of what was checked."""
+    from linkit_all.providers import get_provider
+    from linkit_all.sources import health, registry
+    from linkit_all.sources.http import Http, make_client
+
+    cfg = load_search(db) or SearchConfig()
+    provider = get_provider(ai_settings(settings, cfg), cache=db)
+    sources = registry(provider, settings.data_dir, api_key_getter(db, settings, vault))
+    wanted = (
+        health.wanted(cfg, sources)
+        if keys is None
+        else [
+            k if k in sources or k.startswith(health.COMPANY) else health.COMPANY + k for k in keys
+        ]
+    )  # anything but a source name is a company entry (a link or "greenhouse:stripe")
+    try:
+        async with make_client() as client:
+            await health.check(db, Http(client, attempts=1), sources, cfg, wanted, force)
+    finally:
+        await asyncio.gather(*(src.aclose() for src in sources.values()))
+    return health.summary(db, wanted)
+
+
 async def run_stage(
     stage: str,
     db: sessionmaker[Session],
@@ -144,7 +175,7 @@ async def _run_stage(
 
         embedder = await _get_embedder(settings)
         try:
-            stats = await asyncio.to_thread(rank_jobs, db, cfg, embedder)
+            stats = await asyncio.to_thread(rank_jobs, db, cfg, embedder, settings.data_dir)
         except ValueError as e:
             raise PipelineError(str(e)) from e
     elif stage == "score":

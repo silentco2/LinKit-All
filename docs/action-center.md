@@ -36,11 +36,18 @@ Each item shows the job, a message, and screenshots of the page when it stopped.
 - **Mark as closed/expired** (under **More**): drops the job because the posting is gone. It
   counts as skipped, and the job's history says you marked it closed.
 - **Skip**: drops the job.
+- **Rewrite with AI** (under a free-text answer and under an application email's body): the AI
+  rewrites what you typed for this job, using your CV and the posting; type an optional wish
+  first ("shorter", "more formal", "mention my Django work"). With an empty box it reads
+  **Draft with AI** and writes a first answer from your CV. The text only fills the box: **Undo**
+  puts yours back, and nothing is saved until you press the card's own button. English only, no
+  facts your CV or profile do not state, and never on a sensitive question.
 
 !!! note "After you answer"
     Resolving an item does not apply right away. It puts the job back in the queue. Start
     **Apply** from the **Live run** page (or `linkit run apply`) to continue. The tailored CV
-    is reused, so nothing is paid for twice.
+    is reused, so nothing is paid for twice, unless you uploaded or edited your CV since: then
+    the job is tailored again from the new CV, and its history says so.
 
 ## Sensitive questions
 

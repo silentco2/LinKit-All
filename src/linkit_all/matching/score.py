@@ -13,11 +13,13 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from linkit_all.core.models import Job, JobState, Profile, Tier
+from linkit_all.core.models import Job, JobState, Profile, Tier, utcnow
 from linkit_all.core.runs import pause_run
 from linkit_all.core.search import SearchConfig
 from linkit_all.core.state import transition
+from linkit_all.matching.facts import JobFacts, checked, fill, missing
 from linkit_all.matching.rank import LOW_OPT_IN, cv_text
+from linkit_all.matching.rules import expectation_of, rule_violation
 from linkit_all.matching.trash import not_trash
 from linkit_all.matching.trust_stage import add_ai_flag
 from linkit_all.providers.base import LLMProvider, UsageLimitError, render
@@ -81,6 +83,7 @@ class JobScore(BaseModel):
     # still validate; an unknown `legit` value is read as "ok" rather than failing the batch.
     legit: Literal["ok", "suspicious", "scam"] = "ok"
     trust_flags: list[str] = []
+    facts: JobFacts | None = None  # blanks the posting fills; kept only when checked (facts.py)
 
     @field_validator("legit", mode="before")
     @classmethod
@@ -131,7 +134,11 @@ async def score_jobs(
             raise ValueError("No profile yet: run `linkit profile import profile.json`")
         if opt_in:  # opt-in turned on later: pick up earlier lows too
             old_lows = list(
-                s.scalars(select(Job).filter_by(state=JobState.below_threshold).where(not_trash()))
+                s.scalars(
+                    select(Job)
+                    .filter_by(state=JobState.below_threshold)
+                    .where(not_trash(), Job.data["fact_rule"].as_string().is_(None))
+                )
             )
             for job in old_lows:
                 transition(s, job, JobState.queued_apply, LOW_OPT_IN, code="low_opt_in")
@@ -149,7 +156,8 @@ async def score_jobs(
         counts["low"] += len(rest)
         batches = [
             [{"id": j.id, "title": j.title, "company": j.company, "location": j.location,
-              "remote": j.data.get("remote"), "description": j.description[:JD_CHARS]}
+              "remote": j.data.get("remote"), "description": j.description[:JD_CHARS],
+              "missing": [] if j.data.get("manual") else missing(j)}
              for j in top[i : i + cfg.matching.batch_size]]
             for i in range(0, len(top), cfg.matching.batch_size)
         ]  # fmt: skip
@@ -158,6 +166,7 @@ async def score_jobs(
              "work_modes": ", ".join(f.work_modes),
              "seniority": ", ".join(f.seniority)}  # fmt: skip
     cv = cv_text(profile)[:CV_CHARS]
+    expect = expectation_of(profile.answers, cfg)
 
     for n, batch in enumerate(batches, 1):
         try:
@@ -182,7 +191,8 @@ async def score_jobs(
                 if (r := scores.get(job.id)) is None:
                     counts["not_scored"] += 1  # stays ranked; the next score run retries it
                     continue
-                ai: dict[str, Any] = r.model_dump(exclude={"job_id"})
+                ai: dict[str, Any] = r.model_dump(exclude={"job_id", "facts"})
+                broken = _check_facts(job, r.facts, cfg, expect) if item["missing"] else None
                 job.score, job.tier, job.data = (
                     r.score,
                     tier_for(r.score, cfg),
@@ -196,7 +206,10 @@ async def score_jobs(
                     s, job, JobState.scored, f"AI score {r.score}",
                     code="ai_scored", params={"score": r.score},
                 )  # fmt: skip
-                if job.tier == Tier.low and opt_in:
+                if broken:  # a checked fact breaks a hard rule: low tier, never applied by itself
+                    job.tier = Tier.low
+                    transition(s, job, JobState.below_threshold, broken, code="fact_rule")
+                elif job.tier == Tier.low and opt_in:
                     transition(s, job, JobState.queued_apply, LOW_OPT_IN, code="low_opt_in")
                 else:
                     transition(
@@ -208,3 +221,16 @@ async def score_jobs(
             "scored batch {}/{}", n, len(batches)
         )
     return counts
+
+
+def _check_facts(
+    job: Job, facts: JobFacts | None, cfg: SearchConfig, expect: tuple[float, str] | None
+) -> str | None:
+    """Fill the job's blanks with the checked facts; the hard rule they now break, if any
+    (kept in data["fact_rule"], so the low opt-in never queues it)."""
+    if not (kept := checked(job, facts)):
+        return None
+    fill(job, kept)
+    if reason := rule_violation(job, cfg, utcnow(), expect):
+        job.data = {**job.data, "fact_rule": reason}
+    return reason

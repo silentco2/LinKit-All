@@ -44,6 +44,7 @@ _COUNTRIES: dict[str, tuple[str, str, Region]] = {
     "netherlands": ("netherlands", "EUR", "other"),
     "france": ("france", "EUR", "other"),
     "spain": ("spain", "EUR", "other"),
+    "denmark": ("denmark", "DKK", "other"),
     "india": ("india", "INR", "other"),
     "pakistan": ("pakistan", "PKR", "other"),
     "singapore": ("singapore", "SGD", "other"),
@@ -73,6 +74,8 @@ _TECH_BY_COUNTRY = {
     "germany": ["instaffo"],
     "spain": ["getmanfred", "joppy"],
     "japan": ["japandev"],
+    "united kingdom": ["gradcracker"],  # graduate STEM roles
+    "denmark": ["jobindex"],
 }
 _GENERAL_BY_COUNTRY = {
     "germany": ["arbeitnow", "arbeitsagentur"],
@@ -80,6 +83,7 @@ _GENERAL_BY_COUNTRY = {
     "australia": ["seek"],
     "united states": ["themuse"],
     "france": ["wttj"],
+    "denmark": ["jobindex"],
 }
 _REGIONAL: dict[Region, list[str]] = {
     "egypt": ["wuzzuf", "forasna", "bayt"],
@@ -87,6 +91,7 @@ _REGIONAL: dict[Region, list[str]] = {
     "mena": ["bayt"],
     "other": [],
 }
+_REGIONAL_BY_COUNTRY = {"india": ["naukri"]}
 
 
 # MENA tech Telegram channels, names only (the shape DEFAULT_TELEGRAM_CHANNELS uses).
@@ -104,9 +109,10 @@ def source_preset(country: CountryPreset, track: Track) -> dict[str, list[str]]:
     if country.name in ("United States", "Canada"):
         jobspy.append("zip_recruiter")
     by_country = _TECH_BY_COUNTRY if track == "tech" else _GENERAL_BY_COUNTRY
+    name = country.name.lower()
     enabled = [
         *(_TECH_GLOBAL if track == "tech" else _GENERAL_GLOBAL),
-        *by_country.get(country.name.lower(), []),
+        *by_country.get(name, []),
     ]
     channels: list[str] = []
     if track == "tech":
@@ -115,7 +121,7 @@ def source_preset(country: CountryPreset, track: Track) -> dict[str, list[str]]:
         )
     return {
         "jobspy": jobspy,
-        "regional": list(_REGIONAL[country.region]),
+        "regional": [*_REGIONAL[country.region], *_REGIONAL_BY_COUNTRY.get(name, [])],
         "enabled": enabled,
         "telegram_channels": channels,
     }

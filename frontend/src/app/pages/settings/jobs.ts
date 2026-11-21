@@ -36,6 +36,13 @@ const FALLBACK_CURRENCIES = ['EGP', 'SAR', 'AED', 'QAR', 'KWD', 'BHD', 'OMR', 'J
           <app-places-list [places]="shown()" (changed)="setPlaces($event)" />
         </app-field>
 
+        <app-field key="filters.radius_km" for="radius" [label]="'settings.jobs.radius' | t" [hint]="'settings.jobs.radiusHint' | t">
+          <div class="flex items-center gap-2">
+            <input id="radius" type="number" min="0" max="300" step="5" dir="ltr" class="input !w-24" [value]="store.cfg.filters.radius_km" (change)="setRadius($event)">
+            <span class="text-sm text-slate-600 dark:text-slate-400">{{ 'settings.jobs.radiusUnit' | t }}</span>
+          </div>
+        </app-field>
+
         <app-field id="fld-modes" key="filters.work_modes" [label]="'welcome.jobs.modes' | t">
           <app-chip-select [options]="modeOptions()" [selected]="store.cfg.filters.work_modes" [label]="'welcome.jobs.modes' | t" (changed)="setModes($event)" />
           @if (modesNote()) { <p class="mt-1 text-xs text-rose-700 dark:text-rose-400" role="alert">{{ 'settings.jobs.modesNeed' | t }}</p> }
@@ -151,6 +158,12 @@ export class JobsSection implements OnInit {
   protected setMaxYears(e: Event): void {
     const n = Math.round((e.target as HTMLInputElement).valueAsNumber);
     this.store.update('filters.max_years_required', n >= 0 && n <= 60 ? n : null);
+  }
+
+  /** A whole number of km from 0 to 300; anything else is ignored. */
+  protected setRadius(e: Event): void {
+    const n = Math.round((e.target as HTMLInputElement).valueAsNumber);
+    if (n >= 0 && n <= 300) this.store.update('filters.radius_km', n);
   }
 
   // ---- places ------------------------------------------------------------------------------

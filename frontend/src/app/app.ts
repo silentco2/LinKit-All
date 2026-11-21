@@ -4,6 +4,8 @@ import { Api } from './api';
 import { I18n, Lang, TPipe } from './i18n';
 import { Live } from './live';
 import { fmtNum, localeOf, runReason } from './locale';
+import { QuickJump } from './components/quick-jump';
+import { issueUrl } from './report';
 import { Shell } from './shell';
 import { LiveEvent, setupDone } from './types';
 
@@ -11,7 +13,7 @@ const FRESH_MS = 60_000; // a run that ended longer ago than this is replayed hi
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, TPipe],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, TPipe, QuickJump],
   template: `
     <div class="flex min-h-screen flex-col">
       @if (!welcome()) {
@@ -35,6 +37,10 @@ const FRESH_MS = 60_000; // a run that ended longer ago than this is replayed hi
           }
         </nav>
         <div class="ms-auto flex min-w-0 items-center gap-3 text-sm">
+          <button type="button" class="btn min-h-10 min-w-10 gap-2 max-md:px-2" [attr.aria-keyshortcuts]="mac ? 'Meta+K' : 'Control+K'" (click)="jump.open()">
+            <svg class="icon md:hidden" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6" /><path d="M20 20l-4.5-4.5" /></svg>
+            <span class="max-md:sr-only">{{ 'jump.open' | t }}</span><kbd class="hidden rounded border border-slate-300 px-1 text-[11px] text-slate-500 md:inline dark:border-slate-700" dir="ltr">{{ mac ? '⌘K' : 'Ctrl K' }}</kbd>
+          </button>
           @if (!live.connected()) { <span class="text-rose-600 dark:text-rose-400" role="status">{{ 'shell.reconnecting' | t }}</span> }
           @if (shell.status(); as s) {
             <span class="whitespace-nowrap" [class]="s.apply_live ? 'font-medium text-rose-600 dark:text-rose-400' : 'text-slate-500'" [title]="(s.apply_live ? 'shell.liveTitle' : 'shell.dryTitle') | t">
@@ -53,6 +59,7 @@ const FRESH_MS = 60_000; // a run that ended longer ago than this is replayed hi
       <main class="mx-auto w-full max-w-[76rem] min-w-0 flex-1 overflow-x-auto px-4 pt-4 pb-12 md:px-8" [class.pt-8]="welcome()">
         <router-outlet />
       </main>
+      <app-quick-jump #jump />
       @if (!welcome()) {
       <footer class="mx-auto flex w-full max-w-[76rem] flex-wrap items-center gap-x-6 gap-y-1 px-4 pb-6 text-xs text-slate-500 md:px-8">
         <div class="flex items-center gap-3" role="group" [attr.aria-label]="'shell.language' | t">
@@ -66,6 +73,10 @@ const FRESH_MS = 60_000; // a run that ended longer ago than this is replayed hi
           @if (shell.notifyHint()) { <p class="text-amber-700 dark:text-amber-400">{{ shell.notifyHint() }}</p> }
         }
         @if (live.connected()) { <span>{{ 'shell.connected' | t }}</span> }
+        <span class="flex gap-4 md:ms-auto">
+          <a [href]="issue('bug')" target="_blank" rel="noopener">{{ 'shell.report' | t }}</a>
+          <a [href]="issue('feature')" target="_blank" rel="noopener">{{ 'shell.suggest' | t }}</a>
+        </span>
       </footer>
       }
     </div>
@@ -81,6 +92,7 @@ export class App {
   /** First-run flow: no side nav, the page is its own guide. */
   protected readonly welcome = computed(() => this.path().startsWith('/welcome'));
   protected readonly menuOpen = signal(false);
+  protected readonly mac = /Mac|iPhone|iPad/.test(navigator.platform);
   protected readonly num = (n: number): string => fmtNum(localeOf(this.i18n.lang()), n);
   /** The "Setup N/4" chip on Settings, until the required steps are done. */
   protected readonly setupLeft = computed(() => {
@@ -116,6 +128,11 @@ export class App {
       this.lastRunEnd = end.at;
       if (end.status !== 'cancelled' && Date.now() - Date.parse(end.at) < FRESH_MS) void this.runEnded(end);
     });
+  }
+
+  /** A new GitHub issue, opened in the user's browser: nothing is sent unless they submit it. */
+  protected issue(kind: 'bug' | 'feature'): string {
+    return issueUrl(kind, this.shell.status(), this.i18n.lang());
   }
 
   protected setLang(lang: Lang): void {
