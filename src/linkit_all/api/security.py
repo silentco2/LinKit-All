@@ -32,7 +32,7 @@ class LocalOnly:
             return await self._deny(scope, receive, send, 400, "Host not allowed")
         origin = headers.get("origin")
         unsafe = scope["type"] == "websocket" or scope["method"] not in SAFE_METHODS
-        # the LinkIt extension's own origin may call the assist API, which checks its pairing token
+        # the LinKit extension's own origin may call the assist API, which checks its pairing token
         extension = (
             origin
             and origin.startswith("chrome-extension://")

@@ -659,7 +659,7 @@ def valid_for(q: Question, value: Any) -> bool:
 
 # --- sensitive answers never reach the AI (CLAUDE.md section 2) ---------------------------------
 # A page repeats them (a review page, a pre-filled form), so every prompt that carries page words
-# is scrubbed with the values below: the form agent, LinkIt Fill (`api/assist.py`) and LinkIt mail.
+# is scrubbed with the values below: the form agent, LinKit Fill (`api/assist.py`) and LinKit mail.
 # ponytail: module-level, never cleared (a few short strings); make it per-application if needed.
 secrets_seen: set[str] = set()
 _SECRET_FIELDS = (

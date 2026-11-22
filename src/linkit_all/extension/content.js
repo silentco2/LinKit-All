@@ -1,4 +1,4 @@
-// LinkIt Fill on a page: works out which waiting job this page is, shows a small panel, fills the
+// LinKit Fill on a page: works out which waiting job this page is, shows a small panel, fills the
 // form with the app's answers, and marks the job applied once the site confirms. Runs in every
 // frame (many forms sit in an iframe); only the top frame has the panel. It never clicks Next or
 // Submit: the user does.
@@ -9,10 +9,10 @@
   const TOP = window === window.top;
   const ask = (msg) => new Promise((res) => chrome.runtime.sendMessage(msg, (r) => res(r || { ok: false, error: 'no answer' })));
   const CONFIRM = /thank you for (applying|your application)|thanks? for applying|application (has been |was )?(successfully )?(submitted|received|sent)|we.ve received your application|we have received your application/i;
-  const HINT = 'Open the application form, then press "Fill this step" or right-click it and choose "Fill with LinkIt".';
+  const HINT = 'Open the application form, then press "Fill this step" or right-click it and choose "Fill with LinKit".';
   let job = null, panel = null, heading = null, status = null, doneBtn = null, doneSent = false, filling = false, keeping = false, watching = false;
   let totals = { run: 0 };
-  const watched = new Map();  // control id -> the value LinkIt left there (what the user changes is kept)
+  const watched = new Map();  // control id -> the value LinKit left there (what the user changes is kept)
 
   const say = (text) => { if (status) status.textContent = text; };
 
@@ -168,7 +168,7 @@
           if (await fillOne(byId[id], value)) { done.filled++; if (r.data.sources[id] === 'ai') done.byAi++; } else missed.push(id);
         } catch { missed.push(id); }
       }
-      for (const id of missed) mark(id, 'LinkIt could not fill this: please check it');
+      for (const id of missed) mark(id, 'LinKit could not fill this: please check it');
       for (const m of r.data.missing) mark(m.id, 'Only you can answer this one');
       for (const c of window.lkSnapshot('')) if (watched.has(c.id) || r.data.asked.includes(c.id)) watched.set(c.id, JSON.stringify(valueOf(c)));
       done.open = r.data.missing.length + missed.length;
@@ -211,7 +211,7 @@
         @media (prefers-color-scheme: dark){.p{background:#0f172a;color:#e2e8f0;border-color:#334155}.s{color:#94a3b8}
           button{background:#1e293b;color:#e2e8f0;border-color:#334155}}
       </style>
-      <div class="p" role="region" aria-label="LinkIt Fill">
+      <div class="p" role="region" aria-label="LinKit Fill">
         <div class="t"></div><div class="s" aria-live="polite"></div>
         <button class="go" type="button">Fill this step</button><button class="d" type="button">I submitted it</button>
       </div>`;
@@ -239,7 +239,7 @@
     job = found;
     if (!job && !asked) { panel?.remove(); panel = null; return; }
     showPanel();
-    heading.textContent = job ? `LinkIt: ${job.title} at ${job.company}` : 'LinkIt: not one of your waiting jobs';
+    heading.textContent = job ? `LinKit: ${job.title} at ${job.company}` : 'LinKit: not one of your waiting jobs';
     doneBtn.hidden = !job;
     if (job) watchForConfirmation();
   }
@@ -270,7 +270,7 @@
     else say(job.carried ? `You came here from this job's Apply button. ${HINT}` : HINT);
   }
 
-  // LinkIt mail: hover an email address (a mailto: link or one in the text) and a button offers to
+  // LinKit mail: hover an email address (a mailto: link or one in the text) and a button offers to
   // send that address your application now. Nothing leaves the page until the button is pressed.
   const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g;
   const EDITABLE = 'input, textarea, [contenteditable=""], [contenteditable="true"]';
@@ -342,7 +342,7 @@
     resultUntil = 0;
     chipBtn.disabled = false;
     chipBtn.className = '';
-    chipBtn.textContent = `LinkIt mail: send my CV to ${chipTo}`;
+    chipBtn.textContent = `LinKit mail: send my CV to ${chipTo}`;
     const below = found.rect.bottom + 40 < innerHeight;
     chip.style.left = `${Math.max(4, Math.min(found.rect.left, innerWidth - 330))}px`;
     chip.style.top = `${below ? found.rect.bottom + 4 : Math.max(4, found.rect.top - 34)}px`;

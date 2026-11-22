@@ -1,4 +1,4 @@
-"""LinkIt Fill: the browser extension that fills an application in the user's own browser.
+"""LinKit Fill: the browser extension that fills an application in the user's own browser.
 
 Used for ban-risk sites (LinkedIn Easy Apply, Indeed Apply) and for any job the app handed to
 the user. The extension sends the page's controls; each is identified by its label or field
@@ -99,7 +99,7 @@ def pairing_token(settings: Settings) -> str:
 def _check(request: Request, token: str | None) -> None:
     if not token or not hmac.compare_digest(token, pairing_token(_settings(request))):
         raise HTTPException(
-            401, "Pair the LinkIt extension: copy the code from Settings > Applying"
+            401, "Pair the LinKit extension: copy the code from Settings > Applying"
         )
 
 
@@ -397,7 +397,7 @@ class MailIn(BaseModel):
     near: str = Field("", max_length=4000)  # the text around the address: a post, an ad's block
 
 
-_MAIL_LOCK = asyncio.Lock()  # ponytail: one LinkIt mail at a time; a second click waits its turn
+_MAIL_LOCK = asyncio.Lock()  # ponytail: one LinKit mail at a time; a second click waits its turn
 _SENDABLE = (JobState.queued_apply, JobState.tailored)
 
 
@@ -430,10 +430,10 @@ def _mail_job(s: Session, cfg: SearchConfig, addr: str, body: MailIn) -> Job:
         s.flush()
         s.add(JobEvent(
             job_id=job.id, to_state=JobState.queued_apply, code="linkit_mail",
-            message=f"you pressed LinkIt mail for {addr}", params={"to": addr},
+            message=f"you pressed LinKit mail for {addr}", params={"to": addr},
         ))  # fmt: skip
     elif job.state in (JobState.needs_user, JobState.failed):  # pressed again: that is the go-ahead
-        transition(s, job, JobState.queued_apply, f"you pressed LinkIt mail for {addr}",
+        transition(s, job, JobState.queued_apply, f"you pressed LinKit mail for {addr}",
                    code="linkit_mail", params={"to": addr})  # fmt: skip
         for item in s.scalars(
             select(ActionItem).where(
@@ -442,7 +442,7 @@ def _mail_job(s: Session, cfg: SearchConfig, addr: str, body: MailIn) -> Job:
         ):
             item.status, item.resolved_at = ActionStatus.resolved, utcnow()
     elif job.state not in _SENDABLE:
-        raise HTTPException(409, f"LinkIt mail for {addr} is {job.state.value}: see Jobs")
+        raise HTTPException(409, f"LinKit mail for {addr} is {job.state.value}: see Jobs")
     job.data = {**job.data, "apply_url": url, "submit_confirmed": True, "mail_sending": True}
     return job
 
@@ -451,7 +451,7 @@ def _mail_job(s: Session, cfg: SearchConfig, addr: str, body: MailIn) -> Job:
 async def email(
     request: Request, body: MailIn, x_linkit_token: str | None = Header(None)
 ) -> dict[str, Any]:
-    """LinkIt mail: the user pressed it on an email address in a page. That press is the go-ahead,
+    """LinKit mail: the user pressed it on an email address in a page. That press is the go-ahead,
     so the application is sent now, not drafted: the same path as a `mailto:` job (short cover
     email from the profile and CV, the CV as uploaded, the job title as subject, never the same
     address twice, the daily cap). Practice mode sends nothing."""

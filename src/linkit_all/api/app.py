@@ -91,11 +91,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
 
 def _tell_extension(port: int) -> None:
-    """LinkIt Fill reads this from its own folder, so nobody has to type the port."""
+    """LinKit Fill reads this from its own folder, so nobody has to type the port."""
     try:
         EXTENSION_ADDRESS.write_text(json.dumps({"port": port}), "utf-8")
     except OSError as e:  # the extension then tries the default port
-        logger.warning("could not tell LinkIt Fill the port: {}", e)
+        logger.warning("could not tell LinKit Fill the port: {}", e)
 
 
 def _sweep_trash(db: sessionmaker[Session], settings: Settings) -> None:

@@ -73,7 +73,7 @@ The same 115 jobs, run after each round of fixes:
 - `knockout`: the form would reject you (it asks for 9 years; the profile says 8). "Apply anyway"
   is your call.
 - `apply_in_browser`: LinkedIn. The app never drives it; you apply in your own browser with the
-  LinkIt Fill extension.
+  LinKit Fill extension.
 - `apply_by_hand`: the form agent could not go on. FlairsTech's page after Register, an Orange
   ad with no Apply button, and a softlock.net Apply that does nothing.
 

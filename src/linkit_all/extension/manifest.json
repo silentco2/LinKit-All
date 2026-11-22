@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "LinkIt Fill",
+  "name": "LinKit Fill",
   "version": "1.3.0",
-  "description": "Fills job applications in your own browser with the answers LinKit All prepared. You press Next and Submit. Hover an email address to send it your CV (LinkIt mail).",
+  "description": "Fills job applications in your own browser with the answers LinKit All prepared. You press Next and Submit. Hover an email address to send it your CV (LinKit mail).",
   "permissions": ["storage", "contextMenus", "scripting", "activeTab"],
   "host_permissions": ["http://127.0.0.1/*", "http://localhost/*"],
   "background": { "service_worker": "background.js" },

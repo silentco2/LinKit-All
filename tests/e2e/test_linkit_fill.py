@@ -1,4 +1,4 @@
-"""LinkIt Fill extension, end to end: Playwright's Chromium loads the unpacked extension, the
+"""LinKit Fill extension, end to end: Playwright's Chromium loads the unpacked extension, the
 real API runs on a local port, and a saved job form is served for a fake job site. The
 extension fills the form and never submits it. Needs Playwright's own Chromium (branded Chrome
 no longer loads unpacked extensions from the command line)."""
@@ -139,7 +139,7 @@ def test_extension_fills_the_waiting_job_and_never_submits(app_server: dict[str,
             }
             await page.wait_for_function("document.querySelector('#fact').value !== ''")
             await asyncio.sleep(1)  # the panel finishes this step
-            await page.fill("#shirt", "Large")  # LinkIt left this one empty
+            await page.fill("#shirt", "Large")  # LinKit left this one empty
             await page.fill("#fact", "I keep bees")  # and wrote this one with the AI
             await page.focus("#email")
             for _ in range(40):

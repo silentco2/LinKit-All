@@ -41,7 +41,7 @@ The first public release.
   over IMAP (Gmail, Yahoo) or Microsoft Graph (Outlook), and optional Sign in with Google.
 - Sensitive questions (work rights, visa, salary, demographics, disability, veteran status,
   criminal record) are never answered by the AI: from your profile, or they wait for you.
-- LinkedIn, Indeed and Glassdoor are never driven: the LinkIt Fill browser extension fills them
+- LinkedIn, Indeed and Glassdoor are never driven: the LinKit Fill browser extension fills them
   in your own browser while you press Next and Submit.
 - Applications by email, with a short cover email and daily limits.
 - Practice mode by default: forms are filled and screenshotted, never submitted.

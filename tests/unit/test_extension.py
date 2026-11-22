@@ -1,4 +1,4 @@
-"""LinkIt Fill extension: its files ship in the package and read pages like the app's agent."""
+"""LinKit Fill extension: its files ship in the package and read pages like the app's agent."""
 
 import json
 from pathlib import Path

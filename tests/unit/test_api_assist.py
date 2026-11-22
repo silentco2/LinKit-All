@@ -1,4 +1,4 @@
-"""Assist API for the LinkIt Fill extension: pairing token, origin, matching and "done"."""
+"""Assist API for the LinKit Fill extension: pairing token, origin, matching and "done"."""
 
 from collections.abc import Iterator
 from pathlib import Path
