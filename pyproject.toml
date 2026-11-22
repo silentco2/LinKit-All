@@ -127,3 +127,7 @@ artifacts = ["src/linkit_all/static/**"]
 [tool.hatch.build.targets.sdist]
 # `uv build` makes the wheel from the sdist, so the sdist must carry the web page too.
 artifacts = ["src/linkit_all/static/**"]
+
+[tool.alembic]
+script_location = "src/linkit_all/core/migrations"
+file_template = "%%(year)d%%(month).2d%%(day).2d_%%(rev)s_%%(slug)s"

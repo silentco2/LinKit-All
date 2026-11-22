@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Question about setup or a run
+    url: https://github.com/silentco2/LinKit-All/discussions/categories/q-a
+    about: Ask in Discussions
+  - name: Security problem
+    url: https://github.com/silentco2/LinKit-All/security
+    about: Report privately, never in a public issue

@@ -1,0 +1,24 @@
+name: Feature request
+description: Suggest a change
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a new job site or ATS, use "Site not supported" instead.
+        Requests that fabricate CV content, guess sensitive answers, solve CAPTCHAs or send data to third parties conflict with the project's hard constraints and will be declined.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you would like
+  - type: dropdown
+    id: part
+    attributes:
+      label: Which part
+      options: [Sources, Matching, Tailoring, Applying, Needs you, UI, Reports, Other]

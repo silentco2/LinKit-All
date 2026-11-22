@@ -45,3 +45,6 @@ docs/usability/results/
 
 # Built site
 _site/
+
+# design tool runtime state (impeccable)
+.impeccable/

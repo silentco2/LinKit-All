@@ -1,0 +1,34 @@
+name: Site not supported
+description: A job site or applicant tracking system LinKit All cannot read or apply on
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A new source or form handler needs a saved page to test against: tests never call live sites.
+        Saved pages (with your personal details removed) are the most useful thing you can attach.
+  - type: input
+    id: ats
+    attributes:
+      label: Site or ATS name
+      placeholder: e.g. Workday, iCIMS, SmartRecruiters, a national job board
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: Example URL of a public job posting
+    validations:
+      required: true
+  - type: dropdown
+    id: part
+    attributes:
+      label: What fails
+      options: [Finding jobs there, Applying there, Both]
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: What happened
+      description: What LinKit All did, and the step it stopped at
