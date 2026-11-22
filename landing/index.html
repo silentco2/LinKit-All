@@ -23,7 +23,10 @@
 <link rel="stylesheet" href="desk.css">
 <link rel="stylesheet" href="landing.css">
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareApplication","name":"LinKit All","operatingSystem":"Windows, macOS, Linux","applicationCategory":"BusinessApplication","description":"Open-source app that finds jobs, tailors your CV and fills in applications on your own computer.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://www.gnu.org/licenses/agpl-3.0.html","url":"https://silentco2.github.io/LinKit-All/","downloadUrl":"https://pypi.org/project/linkit-all/"}
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"LinKit All","operatingSystem":"Windows, macOS, Linux","applicationCategory":"BusinessApplication","description":"Open-source app that finds jobs, tailors your CV and fills in applications on your own computer.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://www.gnu.org/licenses/agpl-3.0.html","url":"https://silentco2.github.io/LinKit-All/","downloadUrl":"https://pypi.org/project/linkit-all/","softwareVersion":"1.0.0","author":{"@type":"Person","name":"silentco2","url":"https://github.com/silentco2"},"codeRepository":"https://github.com/silentco2/LinKit-All","screenshot":"https://silentco2.github.io/LinKit-All/docs/assets/screen-jobs.png"}
+</script>
+<script type="application/ld+json">
+{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Is it safe to let it apply for me?", "acceptedAnswer": {"@type": "Answer", "text": "It starts in Practice mode: it fills every form and takes screenshots but never presses Submit. Applying for real is a switch you turn on, and each submit waits for your OK unless you turn that off. Your data stays in one folder on your computer, and saved passwords are in an encrypted vault."}}, {"@type": "Question", "name": "Does it work on LinkedIn?", "acceptedAnswer": {"@type": "Answer", "text": "It finds LinkedIn, Indeed and Glassdoor listings, but it never drives those sites, because automated applying gets accounts banned there. The LinKit Fill browser extension fills their forms in your own browser, and you press Submit."}}, {"@type": "Question", "name": "Which AI does it need?", "acceptedAnswer": {"@type": "Answer", "text": "The one you already have: a ChatGPT plan through the Codex CLI, a Claude plan through the Claude Code CLI, an API key, or a local model through Ollama or LM Studio. With a local model, your CV and job text stay on your computer."}}, {"@type": "Question", "name": "Is it free?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. LinKit All is free and open source under AGPL-3.0, with no account. AI use counts against your own plan or API key; a local model costs nothing extra."}}, {"@type": "Question", "name": "Will it lie on my CV?", "acceptedAnswer": {"@type": "Answer", "text": "It is built not to. It changes a few words per job and keeps your layout, and rules refuse edits that change employers, titles, dates, degrees, numbers or contact details. In the project's own test, 17 of 19 planted dishonest edits were refused, and you can read every change in a red-line view before anything is sent."}}]}
 </script>
 </head>
 <body>
@@ -51,7 +54,7 @@
     <div class="stage" id="stage">
       <div class="hero-grid">
         <div class="hero-text hs" style="--d:0s">
-          <h1 id="hero-h">It applies to jobs for you. On your own computer.</h1>
+          <h1 id="hero-h"><span class="kicker">Open-source AI job search &amp; auto-apply</span> It applies to jobs for you. On your own computer.</h1>
           <p class="lede">LinKit All finds jobs on 295 sources, tailors your CV a few words at a time, and fills in the application forms. Questions it should not guess wait for you.</p>
           <div class="actions">
             <a class="btn btn-primary" href="docs/install/">Install</a>
@@ -63,7 +66,7 @@
           <div class="sheet appform has-cv has-note has-banner real has-proof stamped" id="appform">
             <p class="sr">Sample: an application form fills itself in. Practice mode stops before Submit. When applying for real, it ends with the Applied stamp after a confirmation page is seen. The visa question stays empty for you.</p>
             <div aria-hidden="true">
-              <div class="af-head"><h2>Product Analyst, Northwind Labs</h2><span class="small">Sample</span></div>
+              <div class="af-head"><strong class="af-t">Product Analyst, Northwind Labs</strong><span class="small">Sample</span></div>
               <div class="mode"><span class="m1">Practice mode</span><span class="m2">Applying for real</span></div>
               <div class="fld" data-f="0"><b>Name</b><div class="val"><span class="v" data-text="Sara Haddad">Sara Haddad</span></div></div>
               <div class="fld" data-f="1"><b>Email</b><div class="val"><span class="v" data-text="sara.haddad@example.com">sara.haddad@example.com</span></div></div>
@@ -93,13 +96,13 @@
             </div>
             <div class="folder">
               <div class="steps">
-                <div class="step"><header><h3>Find jobs</h3><span class="state done"><svg class="icon"><use href="#i-check"/></svg>Done</span></header><p>1,284 jobs from 295 sources</p></div>
-                <div class="step"><header><h3>Rank and score</h3><span class="state done"><svg class="icon"><use href="#i-check"/></svg>Done</span></header><p>37 strong, 112 possible</p></div>
-                <div class="step"><header><h3>Apply</h3><span class="state">Running, 18 of 37</span></header>
+                <div class="step"><header><strong class="step-t">Find jobs</strong><span class="state done"><svg class="icon"><use href="#i-check"/></svg>Done</span></header><p>1,284 jobs from 295 sources</p></div>
+                <div class="step"><header><strong class="step-t">Rank and score</strong><span class="state done"><svg class="icon"><use href="#i-check"/></svg>Done</span></header><p>37 strong, 112 possible</p></div>
+                <div class="step"><header><strong class="step-t">Apply</strong><span class="state">Running, 18 of 37</span></header>
                   <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="37" aria-valuenow="18" aria-label="Applications"><i></i></div></div>
               </div>
               <aside class="tray" aria-label="Needs you">
-                <h3>Needs you</h3>
+                <strong class="tray-t">Needs you</strong>
                 <ul><li><span>Visa question</span><span>3 jobs</span></li><li><span>Confirm submit</span><span>1 job</span></li></ul>
               </aside>
             </div>
@@ -263,6 +266,24 @@
         <p>A Gigs workspace beside Jobs. It finds and scores gigs on Upwork, Freelancer.com, Mostaql, Khamsat, Ureed and Bahr, and drafts proposals in English. You send them.</p>
         <span class="tag">Coming soon</span>
       </article>
+    </div>
+  </section>
+
+  <!-- WHY NOT EASY APPLY BOTS -->
+  <section class="wrap band" id="why" aria-labelledby="why-h">
+    <h2 id="why-h" data-rv="sheet">Why not a LinkedIn Easy Apply bot?</h2>
+    <p class="lede" data-rv="sheet">Bots that click Easy Apply on LinkedIn put your account at risk and send the same CV everywhere. LinKit All never drives LinkedIn. It ranks jobs against your CV first, tailors the CV a few words per job, applies on company sites like Greenhouse, Lever, Ashby and Workday, and leaves visa, salary and similar questions to you.</p>
+  </section>
+
+  <!-- FAQ -->
+  <section class="wrap band faq" id="faq" aria-labelledby="faq-h">
+    <h2 id="faq-h" data-rv="sheet">Questions</h2>
+    <div class="faq-list" data-rv="sheet">
+      <details class="sheet"><summary>Is it safe to let it apply for me?</summary><p>It starts in Practice mode: it fills every form and takes screenshots but never presses Submit. Applying for real is a switch you turn on, and each submit waits for your OK unless you turn that off. Your data stays in one folder on your computer, and saved passwords are in an encrypted vault.</p></details>
+      <details class="sheet"><summary>Does it work on LinkedIn?</summary><p>It finds LinkedIn, Indeed and Glassdoor listings, but it never drives those sites, because automated applying gets accounts banned there. The LinKit Fill browser extension fills their forms in your own browser, and you press Submit.</p></details>
+      <details class="sheet"><summary>Which AI does it need?</summary><p>The one you already have: a ChatGPT plan through the Codex CLI, a Claude plan through the Claude Code CLI, an API key, or a local model through Ollama or LM Studio. With a local model, your CV and job text stay on your computer.</p></details>
+      <details class="sheet"><summary>Is it free?</summary><p>Yes. LinKit All is free and open source under AGPL-3.0, with no account. AI use counts against your own plan or API key; a local model costs nothing extra.</p></details>
+      <details class="sheet"><summary>Will it lie on my CV?</summary><p>It is built not to. It changes a few words per job and keeps your layout, and rules refuse edits that change employers, titles, dates, degrees, numbers or contact details. In the project's own test, 17 of 19 planted dishonest edits were refused, and you can read every change in a red-line view before anything is sent.</p></details>
     </div>
   </section>
 

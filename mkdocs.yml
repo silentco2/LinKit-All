@@ -88,5 +88,8 @@ nav:
       - Troubleshooting: troubleshooting.md
       - Results and limits: results.md
       - Apply scorecard: scorecard.md
-      - Compared with AIHawk and ApplyPilot: compare.md
+      - Compared with AIHawk and ApplyPilot:
+          - All three: compare/index.md
+          - AIHawk alternative: compare/aihawk.md
+          - ApplyPilot alternative: compare/applypilot.md
   - Development: development.md

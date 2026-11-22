@@ -101,4 +101,4 @@ See [Install](install.md#local-models).
 
 ### How is it different from AIHawk or ApplyPilot?
 
-See the sourced [comparison](compare.md).
+See the sourced [comparison](compare/index.md).
