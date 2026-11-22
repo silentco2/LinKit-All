@@ -1,6 +1,6 @@
 """Record the README demo GIF from the made-up study data (scripts/seed_usability.py).
 
-    uv run python scripts/record_demo.py [--out docs/assets/demo.gif]
+    uv run python scripts/record_demo.py [--out docs/assets/demo.gif] [--stills docs/assets]
 
 Seeds a temporary data folder, starts the app on a free port, walks Home -> Jobs -> a job ->
 Needs you in a headless browser (light theme), and writes an animated GIF. No real data is
@@ -61,8 +61,16 @@ def app(data: Path) -> Iterator[str]:
 
 
 class Film:
-    def __init__(self, page: Page) -> None:
+    def __init__(self, page: Page, stills: Path | None = None) -> None:
         self.page, self.frames = page, []  # type: list[tuple[Image.Image, int]]
+        self.stills = stills
+
+    def still(self, name: str) -> None:
+        """With --stills: an 800 px wide PNG of this moment for the README (screen-<name>.png)."""
+        if self.stills:
+            img = Image.open(io.BytesIO(self.page.screenshot())).convert("RGB")
+            img = img.resize((800, round(img.height * 800 / img.width)), Image.Resampling.LANCZOS)
+            img.save(self.stills / f"screen-{name}.png", optimize=True)
 
     def go(self, url: str) -> None:
         self.page.goto(url)
@@ -92,14 +100,15 @@ class Film:
                      duration=[ms for _, ms in self.frames], disposal=1)  # fmt: skip
 
 
-def record(url: str, out: Path) -> None:
+def record(url: str, out: Path, stills: Path | None = None) -> None:
     with sync_playwright() as pw:
         browser = pw.chromium.launch(executable_path=browser_path(), headless=True)
         page = browser.new_page(viewport=VIEW, color_scheme="light", locale="en-US")
-        film = Film(page)
+        film = Film(page, stills)
 
         film.go(f"{url}/home")
         film.shot(3000)
+        film.still("home")
         film.scroll(560)
         film.shot(2500)
 
@@ -109,9 +118,11 @@ def record(url: str, out: Path) -> None:
         page.get_by_text("Filled answers").wait_for()
         page.wait_for_timeout(400)
         film.shot(4000)
+        film.still("jobs")
 
         film.go(f"{url}/needs-you")
         film.shot(2500)
+        film.still("needs-you")
         box = page.get_by_label("What is your notice period?").first
         box.click()
         film.type("One month")
@@ -123,6 +134,7 @@ def record(url: str, out: Path) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--out", type=Path, default=Path("docs/assets/demo.gif"))
+    ap.add_argument("--stills", type=Path, help="also save Home, Jobs and Needs you PNGs here")
     args = ap.parse_args()
     if browser_path() is None:
         print("No Chrome, Edge, Brave or Chromium found.", file=sys.stderr)
@@ -132,7 +144,7 @@ def main() -> int:
         if seed_usability.main(["--data-dir", str(data)]):
             return 1
         with app(data) as url:
-            record(url, args.out)
+            record(url, args.out, args.stills)
     print(f"Wrote {args.out} ({args.out.stat().st_size // 1024} KB)")
     return 0
 

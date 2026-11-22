@@ -85,6 +85,7 @@ nav:
       - Privacy and security: privacy.md
       - Command line: cli.md
       - Troubleshooting: troubleshooting.md
+      - Results and limits: results.md
       - Apply scorecard: scorecard.md
       - Compared with AIHawk and ApplyPilot: compare.md
   - Development: development.md
