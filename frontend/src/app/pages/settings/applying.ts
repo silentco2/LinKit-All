@@ -151,7 +151,7 @@ export class ApplyingSection implements OnInit {
   /** Switching to "Applying for real" opens the guided card instead of flipping the switch. */
   protected readonly guide = signal(false);
   private readonly api = inject(Api);
-  /** LinkIt Fill: the pairing code and the folder to load it from. */
+  /** LinKit Fill: the pairing code and the folder to load it from. */
   protected readonly ext = signal<{ token: string; extension_dir: string } | null>(null);
   protected readonly copied = signal(false);
 

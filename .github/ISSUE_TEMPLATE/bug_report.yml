@@ -1,0 +1,42 @@
+name: Bug report
+description: Something does not work as described
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a security problem, do not use this form: see [SECURITY.md](https://github.com/silentco2/LinKit-All/blob/main/SECURITY.md).
+        Remove personal details from anything you paste. Never paste passwords, tokens or your full CV.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options: [Practice mode, Applying for real, Not about applying]
+  - type: input
+    id: setup
+    attributes:
+      label: Setup
+      description: Operating system, LinKit All version, Python version, AI provider (codex_cli, claude_cli, litellm)
+  - type: textarea
+    id: doctor
+    attributes:
+      label: linkit doctor output
+      render: text
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots

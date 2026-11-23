@@ -1,5 +1,5 @@
 # ruff: noqa: RUF001, F811
-"""LinkIt mail: the extension's hover button on an email address sends the application now."""
+"""LinKit mail: the extension's hover button on an email address sends the application now."""
 
 from collections.abc import Iterator
 from pathlib import Path

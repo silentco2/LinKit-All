@@ -1,4 +1,4 @@
-// LinkIt Fill service worker: the only part that talks to the LinKit All app on this computer.
+// LinKit Fill service worker: the only part that talks to the LinKit All app on this computer.
 // Content scripts cannot reach 127.0.0.1 (the page's CORS rules apply to them); this worker can,
 // with the pairing token from the options page. Nothing is sent anywhere else. `linkit serve`
 // writes its port to app.json in this folder each time it starts, so the user never types it.
@@ -11,7 +11,7 @@ let hostCache = { at: 0, hosts: [] };
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.removeAll(() => chrome.contextMenus.create({
     id: MENU,
-    title: 'Fill with LinkIt',
+    title: 'Fill with LinKit',
     contexts: ['page', 'editable', 'frame', 'selection', 'link'],
     documentUrlPatterns: ['https://*/*', 'http://*/*'],
   }));
@@ -50,7 +50,7 @@ async function settings() {
 
 async function call(path, init = {}) {
   const { app, token } = await settings();
-  if (!token) throw new Error('not paired: open the LinkIt Fill options and paste the code from LinKit All');
+  if (!token) throw new Error('not paired: open the LinKit Fill options and paste the code from LinKit All');
   const res = await fetch(app + path, { ...init, headers: { ...(init.headers || {}), 'X-LinKit-Token': token } });
   if (res.status === 404) return null;
   if (res.status === 405) throw new Error('Restart LinKit All: it is older than this extension.');
@@ -143,7 +143,7 @@ async function handle(msg, sender) {
       for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
       return { name, type: res.headers.get('content-type') || 'application/pdf', data: btoa(bin) };
     }
-    case 'mail': {  // LinkIt mail: the app writes the email and sends it with the CV
+    case 'mail': {  // LinKit mail: the app writes the email and sends it with the CV
       const res = await call('/api/assist/email', json(msg.body));
       return res ? res.json() : null;
     }

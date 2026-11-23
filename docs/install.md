@@ -162,7 +162,7 @@ LinKit All drives a Chromium browser you already have: Google Chrome first, else
 Edge, Brave or [Chromium](https://www.chromium.org/getting-involved/download-chromium/). It
 does not download one. Each job site gets its own browser profile inside the
 data folder, so logins and cookies are kept between runs and stay separate from your
-everyday browsing. The LinkIt Fill extension goes in whichever browser you use day to day.
+everyday browsing. The LinKit Fill extension goes in whichever browser you use day to day.
 
 ## Tectonic (LaTeX CVs only)
 

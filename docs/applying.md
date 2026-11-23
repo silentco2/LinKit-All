@@ -208,7 +208,7 @@ Lever uses hCaptcha, and Greenhouse and Ashby can use reCAPTCHA, so expect this 
 - **LinkedIn, Indeed and Glassdoor are never automated** (`apply.assisted_hosts`). Their terms
   ban it and accounts get banned. These jobs wait in **Needs you** as "Apply in your own
   browser". Press **Open in my browser**: the job opens in your normal browser, where you are
-  signed in. The **LinkIt Fill** extension then fills each step with the answers LinKit All
+  signed in. The **LinKit Fill** extension then fills each step with the answers LinKit All
   prepared, and marks anything only you can answer in orange. You press Next and Submit.
   What you type into a field it left empty, or change in one it answered from a saved answer or
   the AI, is saved in **Settings > Answers** for next time. Sensitive questions, passwords,
@@ -218,16 +218,16 @@ Lever uses hCaptcha, and Greenhouse and Ashby can use reCAPTCHA, so expect this 
   with "Load unpacked" on `chrome://extensions`, then paste the pairing code into its options.
   That code is all it needs: LinKit All tells it the port each time it starts. The extension
   only talks to LinKit All on this computer. It also fills forms inside embedded frames.
-- LinkIt Fill works out which waiting job a page is from the site's job id, then the address,
+- LinKit Fill works out which waiting job a page is from the site's job id, then the address,
   then the job's title and company on the page. It never guesses: a page that is none of your
-  waiting jobs shows no panel. On any page you can **right-click and choose Fill with LinkIt**:
+  waiting jobs shows no panel. On any page you can **right-click and choose Fill with LinKit**:
   it reads every label and empty field on the form (dialogs and embedded forms too) and fills
   them from your saved data. What is not recorded goes to the AI, optional fields included, and
   the answer is saved. On a page that is none of your waiting jobs, answers tied to a role or a
   company are filled but not saved.
 - Some LinkedIn jobs are not Easy Apply but link to the employer's own site. LinkedIn only shows
   that link to signed-in members, so the card says so: press Apply on LinkedIn in your browser,
-  and the LinkIt panel follows you to the employer's form. Press **Fill this step** there.
+  and the LinKit panel follows you to the employer's form. Press **Fill this step** there.
 - When a LinkedIn or Indeed posting links to the employer's own form (for example a
   Greenhouse board), that form is used and filled by the app as usual.
 - Use the pauses and daily caps. They are there to keep the pace human and the numbers modest.

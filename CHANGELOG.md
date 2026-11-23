@@ -2,6 +2,36 @@
 
 All notable changes to LinKit All. Dates are release dates.
 
+## 1.1.0 — 2026-11-22
+
+### New
+- Add a job by hand: paste links, paste the posting text, or upload it as a PDF (Jobs > Add a
+  job). Jobs you add skip the hard rules; the trust check still runs.
+- The AI score call now also reads work mode, location and salary when the posting leaves them
+  out of its fields. Each is kept only when a quote from the posting backs it, and one that breaks
+  your rules makes the job a weak match.
+- New sources: Gradcracker, Jobindex and Naukri; place suggestions for the UK, Denmark and India.
+- Visa sponsors: in your visa countries, jobs at employers on the official sponsor lists (UK,
+  Netherlands, US H-1B, Canada LMIA) get a label and a small ranking boost. The lists refresh at
+  most weekly and send no personal data.
+- Source health: each source shows whether it worked in recent runs; `linkit source-check`
+  tests them on demand.
+- Backups: a daily copy of the database (newest 7 kept, folder of your choice), plus
+  `linkit backup` and `linkit restore`.
+- Needs you: "Rewrite with AI" and "Draft with AI" on free-text answers and the email body, with
+  an optional wish and Undo. Never offered for sensitive questions.
+- "You applied here before" note on the job page and when you add a job.
+- Ctrl/Cmd+K quick jump to jobs and pages; a place radius for nearby cities.
+- Report a problem or suggest a feature from the app's footer as a GitHub issue you submit
+  yourself; it is pre-filled with the version, system and AI only.
+
+### Changed
+- A retry after you change your CV tailors the CV again instead of reusing the old version.
+- AI-written prose is checked for stock phrases and rewritten by rules.
+- The browser extension is now spelled "LinKit Fill", matching LinKit All.
+- New README, issue forms (Bug, Site not supported, Feature) and comparison pages for AIHawk
+  and ApplyPilot.
+
 ## 1.0.0 — 2026-11-19
 
 The first public release.
@@ -41,7 +71,7 @@ The first public release.
   over IMAP (Gmail, Yahoo) or Microsoft Graph (Outlook), and optional Sign in with Google.
 - Sensitive questions (work rights, visa, salary, demographics, disability, veteran status,
   criminal record) are never answered by the AI: from your profile, or they wait for you.
-- LinkedIn, Indeed and Glassdoor are never driven: the LinkIt Fill browser extension fills them
+- LinkedIn, Indeed and Glassdoor are never driven: the LinKit Fill browser extension fills them
   in your own browser while you press Next and Submit.
 - Applications by email, with a short cover email and daily limits.
 - Practice mode by default: forms are filled and screenshotted, never submitted.

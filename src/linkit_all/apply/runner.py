@@ -191,11 +191,11 @@ BY_HAND_MSG = (
 )
 OFFSITE_MSG = (
     'LinkedIn links this job to the employer\'s own site: press "Open in my browser", press Apply '
-    'on LinkedIn, then on the employer\'s form press "Fill this step" in the LinkIt panel'
+    'on LinkedIn, then on the employer\'s form press "Fill this step" in the LinKit panel'
 )
 IN_BROWSER_MSG = (
     'this site bans automated applying, so apply in your own browser: press "Open in my '
-    'browser" (the LinkIt extension fills the form), then press Next and Submit yourself'
+    'browser" (the LinKit extension fills the form), then press Next and Submit yourself'
 )
 
 
@@ -237,7 +237,7 @@ def is_pickable(j: Job, generic: bool, live: bool) -> bool:
             or (generic and _web_url(j.data.get("apply_url") or j.url))
         )
         and (live or not j.data.get("dry_run_at"))
-        and not j.data.get("mail_sending")  # LinkIt mail is sending it right now
+        and not j.data.get("mail_sending")  # LinKit mail is sending it right now
     )
 
 
@@ -682,7 +682,7 @@ class Applier:
             return Outcome("skipped", f"the posting is no longer open on {job.ats}")
         with timing.step("prepare CV"):
             cv_pdf = await self._cv_pdf(job_id)
-        with self.db.begin() as s:  # the file the LinkIt extension uploads if the user takes over
+        with self.db.begin() as s:  # the file the LinKit extension uploads if the user takes over
             row = s.get_one(Job, job_id)
             row.data = {**row.data, "cv_pdf": cv_pdf}
         if handler is None and assisted(info.apply_url, self.cfg.apply.assisted_hosts):

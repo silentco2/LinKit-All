@@ -9,7 +9,7 @@ export const REPO = 'silentco2/LinKit-All';
  */
 export function issueUrl(kind: 'bug' | 'feature', status: Status | null, lang: string, error?: { code: string; stage?: string | null }): string {
   const base = `https://github.com/${REPO}/issues/new`;
-  if (kind === 'feature') return `${base}?template=feature_request.md&labels=enhancement`;
+  if (kind === 'feature') return `${base}?template=feature_request.yml&labels=enhancement`;
   const a = status?.about;
   const setup = a ? `LinKit All ${a.version}, ${a.os}, Python ${a.python}, AI: ${a.ai}, UI: ${lang}` : `UI: ${lang}`;
   const lines = [

@@ -13,6 +13,7 @@ exclude_docs: |
   launch/
   usability/
   career-ops-borrow-plan.md
+  job-ops-borrow-plan.md
 
 theme:
   name: material
@@ -85,6 +86,10 @@ nav:
       - Privacy and security: privacy.md
       - Command line: cli.md
       - Troubleshooting: troubleshooting.md
+      - Results and limits: results.md
       - Apply scorecard: scorecard.md
-      - Compared with AIHawk and ApplyPilot: compare.md
+      - Compared with AIHawk and ApplyPilot:
+          - All three: compare/index.md
+          - AIHawk alternative: compare/aihawk.md
+          - ApplyPilot alternative: compare/applypilot.md
   - Development: development.md

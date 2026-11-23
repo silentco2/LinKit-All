@@ -23,7 +23,7 @@ LinKit All is a free, open-source (AGPL-3.0) app that runs on the user's own com
 - Never invents CV content: locked facts, rule-based patch checks, numbers/dates/contacts auto-locked.
 - Never lets the AI answer sensitive questions (work authorization, visa, salary, EEO, disability, veteran, criminal record); those come from the profile or wait for the user.
 - Practice mode by default: fills forms, never presses Submit. "Applied" needs proof (confirmation page or email).
-- Ban-risk sites (LinkedIn, Indeed, Glassdoor) are never driven; the LinkIt Fill browser extension fills them in the user's own browser while the user presses Submit.
+- Ban-risk sites (LinkedIn, Indeed, Glassdoor) are never driven; the LinKit Fill browser extension fills them in the user's own browser while the user presses Submit.
 
 ## Operating Context
 
@@ -38,7 +38,7 @@ Install with `uv tool install linkit-all` (PyPI 1.0.0, released 2026-11-19), run
 
 ## Brand Commitments
 
-- Name "LinKit All" (capital K), package `linkit-all`, command `linkit`. Browser extension "LinkIt Fill".
+- Name "LinKit All" (capital K), package `linkit-all`, command `linkit`. Browser extension "LinKit Fill".
 - The app's look, binding for the website too: "the application desk". Paper sheets on a desk, folder tabs for counts and trays, a rubber stamp for outcomes only. Tokens live in `frontend/src/styles.css`. IBM Plex Sans + IBM Plex Sans Arabic, bundled, never loaded from a web font service.
 - Voice: plain, calm, honest about limits; no hype.
 

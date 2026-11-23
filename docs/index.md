@@ -1,5 +1,5 @@
 ---
-title: "LinKit All: open-source AI job search and auto-apply"
+title: "LinKit All — open-source AI job search & auto-apply (local, private)"
 description: "Open-source AI job application tool that runs on your computer: finds jobs, ranks them against your CV, tailors it honestly and fills in applications."
 ---
 
@@ -91,7 +91,7 @@ title, date, degree, number or skill you did not give it. See [Tailoring](tailor
 ### Does it work with LinkedIn?
 
 It finds LinkedIn jobs, but it never drives LinkedIn, Indeed or Glassdoor. You open those jobs
-in your own browser, and the LinkIt Fill extension fills each step while you press Next and
+in your own browser, and the LinKit Fill extension fills each step while you press Next and
 Submit. See [Applying](applying.md).
 
 ### Can it run with a local AI model?
@@ -101,4 +101,4 @@ See [Install](install.md#local-models).
 
 ### How is it different from AIHawk or ApplyPilot?
 
-See the sourced [comparison](compare.md).
+See the sourced [comparison](compare/index.md).
