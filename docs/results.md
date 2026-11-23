@@ -31,6 +31,6 @@ Real sites: `uv run linkit apply-probe` tries real postings in Practice mode. Th
 - Practice mode is the default. Real submitting (Applying for real) has so far been tried only in a few applications the maintainer watched by hand, and the automated tests run in Practice mode only. Watch your first run.
 - CAPTCHAs are never solved. The job waits for you.
 - The one-click LibreOffice install is Windows 64-bit only. On macOS and Linux, install LibreOffice yourself.
-- macOS and Linux run the unit tests and the benchmark in CI on every change; the full install has been checked by hand on Windows only.
+- macOS and Linux run the benchmark in CI on every change, and the unit tests before a release; the full install has been checked by hand on Windows only.
 - AI use counts against your own plan limits or API key. When a limit is hit, the run pauses.
 - Small local models may score and tailor less well.

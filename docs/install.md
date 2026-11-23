@@ -97,8 +97,8 @@ To run the newest code instead of a release, use a source checkout: see
       cannot remember its key, so it asks for your passphrase again after each restart.
 
 !!! note "What has been tested"
-    Every change runs the unit tests and a 1,000-job benchmark on Windows, macOS and Linux
-    (GitHub Actions). The full path above, from a clean machine to a practice run, has been
+    Every change runs a 1,000-job benchmark on Windows, macOS and Linux (GitHub Actions); the
+    unit tests run locally before each push and on all three systems before a release. The full path above, from a clean machine to a practice run, has been
     checked by hand on Windows only so far.
 
 `linkit doctor` checks every outside tool and tells you what is missing. Each line starts

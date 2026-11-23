@@ -1,0 +1,28 @@
+name: Test matrix
+
+# Lint, types and the full test suite on Windows, macOS and Linux with Python 3.11-3.13
+# (9 jobs). Manual only: Actions > Test matrix > Run workflow, or
+#   gh workflow run test-matrix.yml --ref main
+# Every push runs only the faster CI workflow; run the same checks locally before pushing:
+#   uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.11", "3.12", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libreoffice-writer
+      - run: uv sync --locked --python ${{ matrix.python }}
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy
+      - run: uv run pytest
