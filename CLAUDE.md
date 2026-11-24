@@ -116,14 +116,14 @@ Tailoring happens just before applying, After applied, jobs.outcome (no_reply, r
   signup, then verify via IMAP (code/link by regex, AI fallback). Dry run never touches sign-up; live mode
   creates accounts when needed; the application still waits for confirmation unless 'submit without asking'. Sign in with Google (`apply/google_signin.py`, `apply.google_signin`, opt-in, live only, maintainer): the user signs in to Google by hand once on the `generic` profile; the agent presses the site's button, the account and Continue, never typing Google's password or solving its checks (those park, `google_needed`).
   Sites without a handler (job boards, maintainer): same gate in the agent, vault account `web:<host>`, sign-up via field map + answer engine.
-- Screening questions: answer bank (embedding match; general/per-role/per-company by wording, `assist.scope_of`) -> AI draft from profile (saved) -> Action Center. LinkIt Fill reads labels itself (no form-map AI); what the user types or corrects there joins the bank (never sensitive, secrets, ticks, dates). Sensitive
+- Screening questions: answer bank (embedding match; general/per-role/per-company by wording, `assist.scope_of`) -> AI draft from profile (saved) -> Action Center. LinKIt Fill reads labels itself (no form-map AI); what the user types or corrects there joins the bank (never sensitive, secrets, ticks, dates). Sensitive
   categories (section 2) never go to the AI; page text, field names and question labels sent to the AI are scrubbed of sensitive answers (profile, filled this run, bank) first (`answers.scrub`);
   come from the profile only (age questions from the date of birth). Sponsorship/work authorization left on "Ask me":
   job country in `authorized_countries` -> no sponsorship/authorized, in `visa_countries` -> sponsorship needed/not authorized, else Action Center.
 - Missing setup parks the job with `needs_vault`, `vault_locked` or `needs_email`; it continues once done (`retry-code`).
 - Ban-risk sites (`apply.assisted_hosts`: LinkedIn, Indeed, Glassdoor; maintainer 2026-11-07) are never driven and get no
-  account: the job parks `apply_in_browser`. The user opens it in their own browser, where the LinkIt Fill extension
-  (`src/linkit_all/extension/`, MV3, pairing token, `api/assist.py`) fills each step, or any page by right-click "Fill with LinkIt" (AI for optional fields too; page -> job by site job id, address, or title + company, never a guess; the job follows its Apply into the employer's tab; LinkedIn's public page shows offsite vs Easy Apply, not where); the user presses Next/Submit.
+  account: the job parks `apply_in_browser`. The user opens it in their own browser, where the LinKIt Fill extension
+  (`src/linkit_all/extension/`, MV3, pairing token, `api/assist.py`) fills each step, or any page by right-click "Fill with LinKIt" (AI for optional fields too; page -> job by site job id, address, or title + company, never a guess; the job follows its Apply into the employer's tab; LinkedIn's public page shows offsite vs Easy Apply, not where); the user presses Next/Submit.
   Dead ends park `apply_by_hand` (link, CV, answers so far). No CAPTCHA solving: CAPTCHAs park for the user.
 - Email applications (`mailto:`, `apply/email_apply.py`): Gmail/Yahoo SMTP or Outlook Graph; short cover
   email (greeting/signature in code, body from the model, CV/profile only), subject = job title, the CV as uploaded (never tailored). Dry run writes an
@@ -176,7 +176,7 @@ src/linkit_all/
   matching/   rules, embeddings, scoring
   tailor/     docx/, latex/, odt/, pdf_in/, render/, verify/
   apply/      handlers/<ats>.py, agent/, accounts/, vault/, email_verify/, answers/, probe.py
-  extension/  LinkIt Fill browser extension (MV3, plain JS; snapshot.js mirrors apply/agent/snapshot.js)
+  extension/  LinKIt Fill browser extension (MV3, plain JS; snapshot.js mirrors apply/agent/snapshot.js)
   reports/ · cli.py  `linkit` (serve), `linkit doctor`, `linkit run <stage>`, `linkit apply-probe`, `linkit filter-audit`, `linkit why-missed`, `linkit seed-boards`, `linkit find-board`, `linkit source-check`, `linkit backup`, `linkit restore`
 frontend/     Angular 21 app (pages: welcome, home, jobs, needs-you, settings/) -> src/linkit_all/static (Angular 22 needs Node >= 24.15)
 tests/        unit, fixtures/<ats>/*.html, e2e (dry-run only) · docs/
@@ -193,7 +193,7 @@ Phases 1-15 are built; blocked items below. 1 core, models, providers, DOCX tail
 · 3 UI v1 · 4 apply v1 (Greenhouse, Lever, Ashby, answer bank, Action Center) · 5 vault, IMAP, account gate
 (Workday/iCIMS/Taleo/SuccessFactors blocked: need pages) · 6 careers extractor, AI form agent (Naukrigulf blocked)
 · 7 local models, LaTeX/ODT/PDF CVs, scheduler, reports, Arabic UI, Outlook OAuth (pending: macOS/Linux LO bundles,
-release) · 8 freehire ports · 9 debt · 10 trust filter · 11 LinkedIn hiring posts · 12 UX for V1 (UX7 usability round pending) · 13 autonomous apply: Apply-button hops, board accounts, assisted sites + LinkIt Fill, apply-probe · 14 career-ops ideas: knock-outs, outcomes, replies, follow-ups, 52 sources (docs/career-ops-borrow-plan.md) · 15 job-ops ideas: place radius, AI-phrase guard, add a job, checked job facts, Gradcracker/Jobindex/Naukri, visa sponsor lists, backups, source health, quick jump (docs/job-ops-borrow-plan.md).
+release) · 8 freehire ports · 9 debt · 10 trust filter · 11 LinkedIn hiring posts · 12 UX for V1 (UX7 usability round pending) · 13 autonomous apply: Apply-button hops, board accounts, assisted sites + LinKIt Fill, apply-probe · 14 career-ops ideas: knock-outs, outcomes, replies, follow-ups, 52 sources (docs/career-ops-borrow-plan.md) · 15 job-ops ideas: place radius, AI-phrase guard, add a job, checked job facts, Gradcracker/Jobindex/Naukri, visa sponsor lists, backups, source health, quick jump (docs/job-ops-borrow-plan.md).
 
 ## 11. License
 AGPL-3.0-or-later (code reused from ApplyPilot/AIHawk). Reused files keep original headers, listed in NOTICE.

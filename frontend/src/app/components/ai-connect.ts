@@ -7,7 +7,7 @@ import { Provider, SearchConfig } from '../types';
 
 type AiMode = Provider | 'local';
 type LocalServer = 'ollama' | 'lmstudio';
-export type AiBody = { provider: Provider; model: string | null; api_base: string | null };
+export type AiBody = { provider: Provider; model: string | null; api_base: string | null; api_key?: string | null };
 export type AiState = {
   state: 'idle' | 'testing' | 'ok' | 'fail';
   msg: string;
@@ -88,6 +88,26 @@ const clean = (msg: string): string => msg.replace(/https?:\/\/\S+/g, '').replac
       </div>
     }
 
+    @if (mode() === 'litellm') {
+      <div class="space-y-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+        <div>
+          <label class="label" for="api-key">{{ 'setup.ai.apiKey' | t }}</label>
+          <input id="api-key" type="password" dir="ltr" class="input" [(ngModel)]="apiKey" (change)="retest()"
+                 [placeholder]="savedApiKey() ? ('setup.keys.keepHint' | t) : ('setup.ai.apiKeyPh' | t)" autocomplete="off">
+          @if (savedApiKey() && !apiKey) {
+            <p class="hint">{{ 'setup.keys.keepHint' | t }}</p>
+          } @else {
+            <p class="hint">{{ 'setup.ai.apiKeyHint' | t }}</p>
+          }
+        </div>
+        <div>
+          <label class="label" for="api-model">{{ 'setup.ai.model' | t }}</label>
+          <input id="api-model" dir="ltr" class="input" [(ngModel)]="model" (change)="retest()"
+                 [placeholder]="'setup.ai.modelPhApi' | t">
+        </div>
+      </div>
+    }
+
     <div aria-live="polite">
       @switch (ai().state) {
         @case ('testing') { <p class="text-sm text-slate-500" role="status">{{ 'welcome.ai.testing' | t }}</p> }
@@ -106,7 +126,6 @@ const clean = (msg: string): string => msg.replace(/https?:\/\/\S+/g, '').replac
               <p class="mt-1">{{ 'ai.limit.other' | t }}</p>
             } @else {
               <p dir="auto">{{ ai().msg }}</p>
-              @if (mode() === 'litellm') { <p class="mt-1 text-xs">{{ 'setup.ai.keyHintA' | t }}<code dir="ltr">LINKIT_API_KEY</code>{{ 'setup.ai.keyHintB' | t }}</p> }
             }
             <button type="button" class="btn mt-3" (click)="test()">{{ 'welcome.retry' | t }}</button>
           </div>
@@ -121,20 +140,22 @@ const clean = (msg: string): string => msg.replace(/https?:\/\/\S+/g, '').replac
     @if (mode() && mode() !== 'local' && mode() !== 'litellm') { <p class="hint">{{ 'setup.ai.cliHint' | t }}</p> }
 
     @if (mode()) {
-      <details class="text-sm" [attr.open]="mode() === 'litellm' && ai().state === 'fail' ? '' : null">
+      <details class="text-sm">
         <summary class="cursor-pointer font-medium">{{ 'welcome.ai.advanced' | t }}</summary>
         <div class="mt-3 space-y-3">
-          @if (mode() === 'local') {
+          @if (mode() === 'local' || mode() === 'litellm') {
             <div>
               <label class="label" for="api-base">{{ 'setup.ai.base' | t }}</label>
               <input id="api-base" dir="ltr" class="input" [(ngModel)]="apiBase" (change)="retest()" placeholder="http://127.0.0.1:1234/v1">
             </div>
           }
-          <div>
-            <label class="label" for="model">{{ (mode() === 'local' ? 'setup.ai.model' : 'setup.ai.modelOpt') | t }}</label>
-            <input id="model" dir="ltr" class="input" [(ngModel)]="model" (change)="retest()"
-                   [placeholder]="(mode() === 'local' ? 'setup.ai.modelPhLocal' : mode() === 'litellm' ? 'setup.ai.modelPhApi' : 'setup.ai.modelPhCli') | t">
-          </div>
+          @if (mode() !== 'litellm') {
+            <div>
+              <label class="label" for="model">{{ (mode() === 'local' ? 'setup.ai.model' : 'setup.ai.modelOpt') | t }}</label>
+              <input id="model" dir="ltr" class="input" [(ngModel)]="model" (change)="retest()"
+                     [placeholder]="(mode() === 'local' ? 'setup.ai.modelPhLocal' : 'setup.ai.modelPhCli') | t">
+            </div>
+          }
         </div>
       </details>
     }
@@ -172,11 +193,13 @@ export class AiConnect {
   protected readonly mode = signal<AiMode | null>(null);
   protected readonly ai = signal<AiState>({ state: 'idle', msg: '' });
   protected readonly local = signal<Record<LocalServer, { running: boolean; models: string[] }> | null>(null);
+  protected readonly savedApiKey = signal<string | null>(null);
   /** Said when the first choice was out of uses and another detected AI was tried instead. */
   protected readonly notice = signal('');
   private readonly limited = new Set<AiMode>();
   protected model = '';
   protected apiBase = '';
+  protected apiKey = '';
   private testId = 0;
   private entered = false;
 
@@ -207,6 +230,7 @@ export class AiConnect {
         first = saved.provider === 'litellm' && saved.api_base ? 'local' : saved.provider;
         this.model = saved.model ?? '';
         this.apiBase = saved.api_base ?? '';
+        this.savedApiKey.set(saved.api_key ?? null);
       } else {
         first = r.available.codex_cli ? 'codex_cli' : r.available.claude_cli ? 'claude_cli' : null;
       }
@@ -217,6 +241,7 @@ export class AiConnect {
         await this.scanLocal();
         if (!this.model || !this.apiBase) return; // nothing to test until a model is picked
       }
+      if (first === 'litellm' && !this.savedApiKey() && !this.apiKey) return;
       if (this.testOnLoad() || !saved?.provider) void this.test(true);
     } catch (e) {
       this.loaded.set(true);
@@ -231,8 +256,11 @@ export class AiConnect {
     this.testId++; // an older test must not overwrite this choice
     this.apiBase = '';
     this.model = '';
+    this.apiKey = '';
     if (id === 'local') void this.scanLocal();
-    else void this.test();
+    else if (id === 'litellm') {
+      if (this.savedApiKey()) void this.test();
+    } else void this.test();
   }
 
   protected pickLocal(s: { prefix: string; base: string }, model: string): void {
@@ -252,7 +280,14 @@ export class AiConnect {
 
   /** The model or address box changed: test again when there is enough to test. */
   protected retest(): void {
-    if (this.mode() && (this.mode() !== 'local' || (this.model && this.apiBase))) void this.test();
+    if (!this.mode()) return;
+    if (this.mode() === 'local') {
+      if (this.model && this.apiBase) void this.test();
+    } else if (this.mode() === 'litellm') {
+      if ((this.apiKey || this.savedApiKey()) && this.model) void this.test();
+    } else {
+      void this.test();
+    }
   }
 
   /** After a usage-limit failure: the other cards worth trying (a detected CLI, or any API / local option). */
@@ -276,7 +311,12 @@ export class AiConnect {
     if (!mode) return;
     const id = ++this.testId;
     this.setAi({ state: 'testing', msg: '' });
-    const body: AiBody = { provider: mode === 'local' ? 'litellm' : mode, model: this.model.trim() || null, api_base: mode === 'local' ? this.apiBase.trim() || null : null };
+    const body: AiBody = {
+      provider: mode === 'local' ? 'litellm' : mode,
+      model: this.model.trim() || null,
+      api_base: mode === 'local' ? this.apiBase.trim() || null : (this.apiBase.trim() || null),
+      api_key: mode === 'litellm' ? (this.apiKey.trim() || null) : null,
+    };
     try {
       const r = await this.api.post<CheckResult>('/ai/check', body);
       if (id !== this.testId) return;
@@ -295,6 +335,10 @@ export class AiConnect {
       }
       await (this.persist() ?? this.saveToSearch)(body);
       if (id !== this.testId) return;
+      if (body.api_key) {
+        this.savedApiKey.set(body.api_key);
+        this.apiKey = '';
+      }
       // never the raw server text ("claude_cli (default model) ok, 2.1.305"): the name, the model and (as a tooltip) the version
       const model = 'model' in r ? (r.model ?? null) : body.model;
       this.setAi({ state: 'ok', msg: '', label: r.provider_label || this.i18n.provider(mode === 'local' ? 'local' : mode), model, version: r.version ?? null });
@@ -306,7 +350,12 @@ export class AiConnect {
 
   private readonly saveToSearch = async (ai: AiBody): Promise<void> => {
     const cfg = await this.api.get<SearchConfig>('/search'); // fresh copy: do not overwrite changes made elsewhere
-    cfg.ai = ai;
+    cfg.ai = {
+      provider: ai.provider,
+      model: ai.model,
+      api_base: ai.api_base,
+      api_key: ai.api_key ?? cfg.ai.api_key ?? null,
+    };
     await this.api.put<SearchConfig>('/search', cfg);
   };
 }

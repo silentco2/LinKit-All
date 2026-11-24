@@ -590,6 +590,67 @@ def test_ai_check_passes_local_server_to_litellm(
     assert seen["api_base"] == "http://127.0.0.1:1234/v1" and seen["api_key"] == "local"
 
 
+def test_ai_check_with_api_key_and_saving_key(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import litellm
+
+    seen: dict[str, Any] = {}
+
+    async def fake_completion(**kw: Any) -> Any:
+        seen.update(kw)
+        message = types.SimpleNamespace(content='{"ok": true}')
+        return types.SimpleNamespace(choices=[types.SimpleNamespace(message=message)])
+
+    monkeypatch.setattr(litellm, "acompletion", fake_completion)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("LINKIT_API_KEY", raising=False)
+
+    body = {
+        "provider": "litellm",
+        "model": "openai/gpt-5-mini",
+        "api_key": "sk-1234567890abcdef",
+    }
+    r = client.post("/api/ai/check", json=body, headers=SAME_ORIGIN).json()
+    assert r["ok"] and "openai/gpt-5-mini" in r["message"]
+    assert seen["api_key"] == "sk-1234567890abcdef"
+
+    # Save through PUT /search
+    cfg = client.get("/api/search").json()
+    cfg["ai"] = body
+    saved = client.put("/api/search", json=cfg, headers=SAME_ORIGIN).json()
+    assert saved["ai"]["api_key"] == "••••cdef"
+
+    # GET /search returns masked key
+    got = client.get("/api/search").json()
+    assert got["ai"]["api_key"] == "••••cdef"
+    assert got["ai"]["model"] == "openai/gpt-5-mini"
+
+    # Re-testing with empty api_key reuses saved key
+    seen.clear()
+    check_saved = client.post(
+        "/api/ai/check",
+        json={"provider": "litellm", "model": "openai/gpt-5-mini"},
+        headers=SAME_ORIGIN,
+    ).json()
+    assert check_saved["ok"]
+    assert seen["api_key"] == "sk-1234567890abcdef"
+
+    # Re-saving with masked key preserves real key
+    cfg["ai"] = {"provider": "litellm", "model": "openai/gpt-5-mini", "api_key": "••••cdef"}
+    resaved = client.put("/api/search", json=cfg, headers=SAME_ORIGIN).json()
+    assert resaved["ai"]["api_key"] == "••••cdef"
+
+    seen.clear()
+    check_again = client.post(
+        "/api/ai/check",
+        json={"provider": "litellm", "model": "openai/gpt-5-mini", "api_key": "••••cdef"},
+        headers=SAME_ORIGIN,
+    ).json()
+    assert check_again["ok"]
+    assert seen["api_key"] == "sk-1234567890abcdef"
+
+
 # --- app browser, red-line, live screenshot ---------------------------------------
 
 

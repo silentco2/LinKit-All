@@ -162,6 +162,10 @@ def _data_file(
     return FileResponse(path, media_type=media_type, headers=headers)
 
 
+def _mask(value: str) -> str:
+    return "••••" + value[-4:] if len(value) > 8 else "••••"
+
+
 # --- status -------------------------------------------------------------------
 
 
@@ -386,6 +390,8 @@ def get_search(request: Request) -> SearchConfig:
     cfg = load_search(_db(request)) or SearchConfig()
     src = cfg.sources  # names for entries added before labels existed: computed, not saved
     src.company_labels = {c: offline_label(c) for c in src.companies} | src.company_labels
+    if cfg.ai.api_key:
+        cfg.ai.api_key = _mask(cfg.ai.api_key)
     return synthesize_places(cfg, load_fields(_db(request))[0].home_country)
 
 
@@ -395,6 +401,12 @@ def put_search(request: Request, cfg: SearchConfig) -> SearchConfig:
     answers (authorized/visa countries, relocation), so those never drift from the places."""
     db = _db(request)
     before = load_search(db)
+    if before and before.ai.api_key:
+        if cfg.ai.provider == "litellm":
+            if not cfg.ai.api_key or cfg.ai.api_key.startswith("••••"):
+                cfg.ai.api_key = before.ai.api_key
+        else:
+            cfg.ai.api_key = None
     prev = before.search.places if before else []
     cfg = apply_places(cfg, prev)
     src = cfg.sources
@@ -407,6 +419,8 @@ def put_search(request: Request, cfg: SearchConfig) -> SearchConfig:
         if derived != answers:
             save_answers(db, derived)
     apply_schedule(request.app.state.scheduler, cfg)
+    if cfg.ai.api_key:
+        cfg.ai.api_key = _mask(cfg.ai.api_key)
     return cfg
 
 
@@ -516,6 +530,7 @@ def get_ai(request: Request) -> dict[str, Any]:
     return {
         "provider": effective.provider,
         "model": effective.model,
+        "has_api_key": bool(effective.api_key),
         "available": {
             "codex_cli": shutil.which("codex") is not None,
             "claude_cli": shutil.which("claude") is not None,
@@ -551,6 +566,7 @@ class AICheck(BaseModel):
     provider: Literal["codex_cli", "claude_cli", "litellm"]
     model: str | None = None
     api_base: str | None = None
+    api_key: str | None = None
 
 
 _AI_LABELS = {"codex_cli": "ChatGPT (Codex)", "claude_cli": "Claude", "litellm": "API key"}
@@ -561,12 +577,22 @@ async def check_ai(request: Request, body: AICheck) -> dict[str, Any]:
     from linkit_all.providers import ProviderError, UsageLimitError, get_provider
     from linkit_all.providers.base import tidy
 
+    saved_cfg = load_search(_db(request))
+    api_key = body.api_key
+    if not api_key or api_key.startswith("••••"):
+        api_key = (
+            saved_cfg.ai.api_key
+            if saved_cfg and saved_cfg.ai.provider == "litellm"
+            else None
+        )
+
     cfg = SearchConfig.model_validate(
         {
             "ai": {
                 "provider": body.provider,
                 "model": body.model or None,
                 "api_base": body.api_base or None,
+                "api_key": api_key or None,
             }
         }
     )
@@ -2013,10 +2039,6 @@ def disconnect_email(request: Request) -> None:
 # --- API keys (job-aggregator APIs; stored in the vault) ------------------------
 # Values travel in the PUT body only. Responses carry the saved non-secret fields and, for secret
 # ones, only the last 4 characters.
-
-
-def _mask(value: str) -> str:
-    return "••••" + value[-4:] if len(value) > 8 else "••••"
 
 
 @router.get("/keys")

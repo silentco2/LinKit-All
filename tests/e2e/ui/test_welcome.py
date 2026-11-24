@@ -58,6 +58,33 @@ def test_welcome_local_model_pick(ui: UI, tmp_path: Path, fake_local_ai: None) -
     assert not ui.console_errors
 
 
+def test_welcome_api_key_pick(ui: UI, tmp_path: Path, fake_local_ai: None) -> None:
+    api(ui, "POST", "/profile/cv", params={"filename": "cv.docx"},
+        content=make_cv(tmp_path / "cv.docx").read_bytes())  # fmt: skip
+    page = ui.page
+    page.goto("/welcome")
+    page.get_by_role("heading", name="Connect your AI").wait_for()
+    page.get_by_label("API key").check()
+
+    # The user has inputs for their API key and model
+    api_key_input = page.locator("#api-key")
+    model_input = page.locator("#api-model")
+    api_key_input.wait_for()
+    assert model_input.is_visible()
+
+    api_key_input.fill("sk-test-secret-key-12345")
+    model_input.fill("openai/gpt-5-mini")
+    page.get_by_role("button", name="Test connection").click()
+
+    page.get_by_text("Connected and saved.").wait_for()
+    assert page.get_by_role("button", name="Next").is_enabled()
+    ai = api(ui, "GET", "/search").json()["ai"]
+    assert ai["provider"] == "litellm"
+    assert ai["model"] == "openai/gpt-5-mini"
+    assert ai["api_key"] == "••••2345"
+    assert not ui.console_errors
+
+
 @pytest.mark.parametrize("path", ["/home", "/jobs", "/needs-you", "/settings/profile"])
 def test_pages_render_without_console_errors(ui: UI, path: str) -> None:
     ui.page.goto(path)

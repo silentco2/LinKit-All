@@ -173,7 +173,7 @@ export interface SearchConfig {
   };
   trust: TrustSection;
   matching: { ai_max_jobs: number; tier_high: number; tier_mid: number; batch_size: number; auto_apply_low: boolean };
-  ai: { provider: Provider | null; model: string | null; api_base: string | null };
+  ai: { provider: Provider | null; model: string | null; api_base: string | null; api_key?: string | null };
   apply: ApplySection;
   email: { imap_host: string; imap_user: string; timeout_s: number; poll_s: number; read_replies: boolean };
   schedule: ScheduleSection;

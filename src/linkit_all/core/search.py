@@ -7,7 +7,7 @@ from itertools import product
 from pathlib import Path
 from typing import Any, Literal, Self
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_serializer, model_validator
 from sqlalchemy.orm import Session, sessionmaker
 
 from linkit_all.core.config import ProviderName
@@ -300,7 +300,15 @@ class AISection(BaseModel):
 
     provider: ProviderName | None = None
     model: str | None = None
-    api_base: str | None = None  # local OpenAI-compatible server; litellm only. Keys stay in env.
+    api_base: str | None = None  # local OpenAI-compatible server; litellm only.
+    api_key: str | None = None
+
+    @model_serializer(mode="wrap")
+    def _serialize(self, handler: Any) -> dict[str, Any]:
+        d = handler(self)
+        if d.get("api_key") is None:
+            d.pop("api_key", None)
+        return d
 
 
 class EmailSection(BaseModel):
