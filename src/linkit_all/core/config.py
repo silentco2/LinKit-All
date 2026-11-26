@@ -19,6 +19,7 @@ class FreeKey(BaseModel):
     account_id: str = ""  # Cloudflare only
     enabled: bool = True
 
+
 # The trimmed LibreOffice bundle (scripts/bundle_libreoffice.py), Windows x64 only, hosted as a
 # release asset (152,201,685 bytes, unpacks to about 439 MB). The hash is checked before unpacking.
 LO_BUNDLE_URL = "https://github.com/silentco2/LinKit-All/releases/download/libreoffice-26.2.6-win-x64/libreoffice-minimal-26.2.6-win-x64.zip"
