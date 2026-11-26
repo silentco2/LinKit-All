@@ -53,8 +53,9 @@ linkit restore <path-to-copy.db>       # close the app first; asks before replac
 
 ## What your AI provider sees
 
-Only the provider you picked ever receives your text. With a local model, that text stays on
-your computer. These are the cases:
+Only the provider you picked ever receives your text. With [free models](free-ai.md), each free
+provider you added receives it: the first on your list, and the next one only when the one
+before has reached a limit. With a local model, that text stays on your computer. These are the cases:
 
 | Task | What is sent |
 |---|---|

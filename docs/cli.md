@@ -82,11 +82,12 @@ Send a tiny test prompt to the AI provider.
 
 | Option | Meaning |
 |---|---|
-| `--provider TEXT` | `codex_cli`, `claude_cli` or `litellm` |
+| `--provider TEXT` | `codex_cli`, `claude_cli`, `litellm` or `free` |
 | `--model TEXT` | Model name. Default is the provider's own. |
 
-Without options it uses your wizard choice or the `LINKIT_*` environment. Exits with code 1
-if the check fails.
+Without options it uses your wizard choice or the `LINKIT_*` environment. With
+[free models](free-ai.md) it tests each free provider on its own and names the ones that fail.
+Exits with code 1 if the check fails (with free models: if none works).
 
 ## `linkit profile import`
 

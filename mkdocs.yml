@@ -73,6 +73,7 @@ nav:
   - Getting started:
       - Install: install.md
       - Setup wizard: setup.md
+      - Free AI models: free-ai.md
   - Using LinKit All:
       - Sources: sources.md
       - LinkedIn hiring posts: linkedin-posts.md
