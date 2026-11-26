@@ -5,10 +5,19 @@ from pathlib import Path
 from typing import Literal
 
 from platformdirs import user_data_dir
-from pydantic import Field, SecretStr
+from pydantic import BaseModel, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-ProviderName = Literal["codex_cli", "claude_cli", "litellm"]
+ProviderName = Literal["codex_cli", "claude_cli", "litellm", "free"]
+
+
+class FreeKey(BaseModel):
+    """One free provider the user added (providers/free.py); list order is the fallback order."""
+
+    id: str
+    key: str = Field("", repr=False)
+    account_id: str = ""  # Cloudflare only
+    enabled: bool = True
 
 # The trimmed LibreOffice bundle (scripts/bundle_libreoffice.py), Windows x64 only, hosted as a
 # release asset (152,201,685 bytes, unpacks to about 439 MB). The hash is checked before unpacking.
@@ -27,6 +36,7 @@ class Settings(BaseSettings):
     model: str | None = None  # None = the CLI's own default; required for litellm
     api_key: SecretStr | None = None  # litellm; falls back to provider env vars
     api_base: str | None = None  # OpenAI-compatible local server (Ollama, LM Studio)
+    free_keys: list[FreeKey] = []  # provider "free"
     llm_concurrency: int = Field(1, ge=1, le=3)
     llm_timeout_s: float = 300
 

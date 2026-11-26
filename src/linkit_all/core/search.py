@@ -10,7 +10,7 @@ from typing import Any, Literal, Self
 from pydantic import BaseModel, Field, field_validator, model_serializer, model_validator
 from sqlalchemy.orm import Session, sessionmaker
 
-from linkit_all.core.config import ProviderName
+from linkit_all.core.config import FreeKey, ProviderName
 from linkit_all.core.models import SearchConfigRow
 
 Seniority = Literal["intern", "junior", "mid", "senior", "lead", "manager", "executive"]
@@ -302,10 +302,11 @@ class AISection(BaseModel):
     model: str | None = None
     api_base: str | None = None  # local OpenAI-compatible server; litellm only.
     api_key: str | None = None
+    free_keys: list[FreeKey] = []  # provider "free": kept when switching away, like a saved list
 
     @model_serializer(mode="wrap")
     def _serialize(self, handler: Any) -> dict[str, Any]:
-        d = handler(self)
+        d: dict[str, Any] = handler(self)
         if d.get("api_key") is None:
             d.pop("api_key", None)
         return d

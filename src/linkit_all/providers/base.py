@@ -61,7 +61,12 @@ def has_credential(prompt: str) -> bool:
     return any(c in prompt for c in _credentials) or scrub(prompt, _credentials) != prompt
 
 
-PROVIDER_NAMES = {"codex_cli": "ChatGPT (Codex)", "claude_cli": "Claude", "litellm": "Your AI"}
+PROVIDER_NAMES = {
+    "codex_cli": "ChatGPT (Codex)",
+    "claude_cli": "Claude",
+    "litellm": "Your AI",
+    "free": "Free models",
+}
 _MONTHS = ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
 _MON = "(" + "|".join(_MONTHS) + r")[a-z]*\.?"
 _DAY = r"(\d{1,2})(?:st|nd|rd|th)?"

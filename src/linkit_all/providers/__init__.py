@@ -4,7 +4,7 @@ from linkit_all.core.config import Settings
 from linkit_all.providers.base import LLMProvider, ProviderError, UsageLimitError
 from linkit_all.providers.claude_cli import ClaudeCLI
 from linkit_all.providers.codex_cli import CodexCLI
-from linkit_all.providers.litellm_api import LiteLLMProvider
+from linkit_all.providers.litellm_api import FreeProvider, LiteLLMProvider
 
 __all__ = ["LLMProvider", "ProviderError", "UsageLimitError", "get_provider"]
 
@@ -26,3 +26,5 @@ def get_provider(settings: Settings, cache: sessionmaker[Session] | None = None)
                 timeout_s=t,
                 cache=cache,
             )
+        case "free":
+            return FreeProvider(settings.free_keys, concurrency=c, timeout_s=t, cache=cache)

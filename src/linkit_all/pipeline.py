@@ -45,6 +45,8 @@ def ai_settings(
     if chosen.get("provider") != "litellm":
         chosen.pop("api_base", None)  # only the API/local adapter talks to a server
         chosen.pop("api_key", None)
+    if chosen.get("provider") != "free":
+        chosen.pop("free_keys", None)
     try:
         return Settings.model_validate({**settings.model_dump(), **chosen, **(override or {})})
     except ValidationError as e:
