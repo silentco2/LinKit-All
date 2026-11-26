@@ -42,7 +42,7 @@ from linkit_all.core.api_keys import KNOWN, delete_keys, get_keys, set_keys
 from linkit_all.core.backup import backup as make_backup
 from linkit_all.core.backup import copies as backup_copies
 from linkit_all.core.backup import folder_for as backup_folder_for
-from linkit_all.core.config import Settings
+from linkit_all.core.config import FreeKey, ProviderName, Settings
 from linkit_all.core.infer import InferredValue, infer, read_cv
 from linkit_all.core.lo_install import LibreOfficeInstaller
 from linkit_all.core.models import (
@@ -164,6 +164,26 @@ def _data_file(
 
 def _mask(value: str) -> str:
     return "••••" + value[-4:] if len(value) > 8 else "••••"
+
+
+def _mask_ai(cfg: SearchConfig) -> SearchConfig:
+    """The AI keys as the UI sees them: the last 4 characters only."""
+    if cfg.ai.api_key:
+        cfg.ai.api_key = _mask(cfg.ai.api_key)
+    for k in cfg.ai.free_keys:
+        k.key = _mask(k.key) if k.key else ""
+    return cfg
+
+
+def _unmask_free(keys: list[FreeKey], saved: list[FreeKey]) -> list[FreeKey]:
+    """A masked or blank key from the UI means "unchanged": the saved key for that provider."""
+    old = {k.id: k.key for k in saved}
+    return [
+        k.model_copy(update={"key": old.get(k.id, "")})
+        if not k.key.strip() or k.key.startswith("••••")
+        else k
+        for k in keys
+    ]
 
 
 # --- status -------------------------------------------------------------------
@@ -390,9 +410,7 @@ def get_search(request: Request) -> SearchConfig:
     cfg = load_search(_db(request)) or SearchConfig()
     src = cfg.sources  # names for entries added before labels existed: computed, not saved
     src.company_labels = {c: offline_label(c) for c in src.companies} | src.company_labels
-    if cfg.ai.api_key:
-        cfg.ai.api_key = _mask(cfg.ai.api_key)
-    return synthesize_places(cfg, load_fields(_db(request))[0].home_country)
+    return _mask_ai(synthesize_places(cfg, load_fields(_db(request))[0].home_country))
 
 
 @router.put("/search")
@@ -407,6 +425,7 @@ def put_search(request: Request, cfg: SearchConfig) -> SearchConfig:
                 cfg.ai.api_key = before.ai.api_key
         else:
             cfg.ai.api_key = None
+    cfg.ai.free_keys = _unmask_free(cfg.ai.free_keys, before.ai.free_keys if before else [])
     prev = before.search.places if before else []
     cfg = apply_places(cfg, prev)
     src = cfg.sources
@@ -419,9 +438,7 @@ def put_search(request: Request, cfg: SearchConfig) -> SearchConfig:
         if derived != answers:
             save_answers(db, derived)
     apply_schedule(request.app.state.scheduler, cfg)
-    if cfg.ai.api_key:
-        cfg.ai.api_key = _mask(cfg.ai.api_key)
-    return cfg
+    return _mask_ai(cfg)
 
 
 @router.get("/presets")
@@ -535,6 +552,7 @@ def get_ai(request: Request) -> dict[str, Any]:
             "codex_cli": shutil.which("codex") is not None,
             "claude_cli": shutil.which("claude") is not None,
             "litellm": True,
+            "free": True,
         },
     }
 
@@ -562,14 +580,28 @@ async def local_models() -> dict[str, Any]:
     return dict(zip(LOCAL_SERVERS, results, strict=True))
 
 
+@router.get("/ai/free")
+def free_presets() -> list[dict[str, Any]]:
+    """The free providers to offer (providers/free.py), in the default fallback order."""
+    from linkit_all.providers.free import PRESETS
+
+    return [asdict(p) for p in PRESETS]
+
+
 class AICheck(BaseModel):
-    provider: Literal["codex_cli", "claude_cli", "litellm"]
+    provider: ProviderName
     model: str | None = None
     api_base: str | None = None
     api_key: str | None = None
+    free_keys: list[FreeKey] = []
 
 
-_AI_LABELS = {"codex_cli": "ChatGPT (Codex)", "claude_cli": "Claude", "litellm": "API key"}
+_AI_LABELS = {
+    "codex_cli": "ChatGPT (Codex)",
+    "claude_cli": "Claude",
+    "litellm": "API key",
+    "free": "Free models",
+}
 
 
 @router.post("/ai/check")
@@ -580,11 +612,7 @@ async def check_ai(request: Request, body: AICheck) -> dict[str, Any]:
     saved_cfg = load_search(_db(request))
     api_key = body.api_key
     if not api_key or api_key.startswith("••••"):
-        api_key = (
-            saved_cfg.ai.api_key
-            if saved_cfg and saved_cfg.ai.provider == "litellm"
-            else None
-        )
+        api_key = saved_cfg.ai.api_key if saved_cfg and saved_cfg.ai.provider == "litellm" else None
 
     cfg = SearchConfig.model_validate(
         {
@@ -593,6 +621,9 @@ async def check_ai(request: Request, body: AICheck) -> dict[str, Any]:
                 "model": body.model or None,
                 "api_base": body.api_base or None,
                 "api_key": api_key or None,
+                "free_keys": _unmask_free(
+                    body.free_keys, saved_cfg.ai.free_keys if saved_cfg else []
+                ),
             }
         }
     )

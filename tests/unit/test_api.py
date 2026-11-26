@@ -1066,3 +1066,45 @@ def test_index_html_is_revalidated(
     for path in ("/settings", "/", "/index.html"):
         assert client.get(path).headers["cache-control"] == "no-cache"
     assert "cache-control" not in client.get("/main-ABC.js").headers
+
+
+def test_free_models_keys_are_masked_kept_and_checked(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import litellm
+
+    seen: list[dict[str, Any]] = []
+
+    async def fake_completion(**kw: Any) -> Any:
+        seen.append(kw)
+        message = types.SimpleNamespace(content='{"ok": true}')
+        return types.SimpleNamespace(choices=[types.SimpleNamespace(message=message)])
+
+    monkeypatch.setattr(litellm, "acompletion", fake_completion)
+    presets = client.get("/api/ai/free").json()
+    assert [p["id"] for p in presets][:2] == ["groq", "cloudflare"]
+    assert all("trains_on_data" in p and p["key_url"] for p in presets)
+
+    keys = [
+        {"id": "groq", "key": "gsk-1234567890abcd"},
+        {"id": "cloudflare", "key": "cf-1234567890wxyz", "account_id": "acc1"},
+    ]
+    cfg = client.get("/api/search").json()
+    cfg["ai"] = {"provider": "free", "free_keys": keys}
+    saved = client.put("/api/search", json=cfg, headers=SAME_ORIGIN).json()
+    assert [k["key"] for k in saved["ai"]["free_keys"]] == ["••••abcd", "••••wxyz"]
+    assert client.get("/api/search").json()["ai"]["free_keys"][1]["account_id"] == "acc1"
+
+    # The UI sends the masked keys back, reordered: the real keys stay, in the new order.
+    cfg["ai"]["free_keys"] = list(reversed(saved["ai"]["free_keys"]))
+    client.put("/api/search", json=cfg, headers=SAME_ORIGIN)
+    r = client.post(
+        "/api/ai/check",
+        json={"provider": "free", "free_keys": cfg["ai"]["free_keys"]},
+        headers=SAME_ORIGIN,
+    ).json()
+    assert r["ok"] and r["provider_label"] == "Free models"
+    assert "Groq: ok" in r["message"] and "Cloudflare Workers AI: ok" in r["message"]
+    assert [kw["api_key"] for kw in seen] == ["cf-1234567890wxyz", "gsk-1234567890abcd"]
+    assert seen[0]["api_base"] == "https://api.cloudflare.com/client/v4/accounts/acc1/ai/v1"
+    assert seen[0]["num_retries"] == 0

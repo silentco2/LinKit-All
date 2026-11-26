@@ -5,6 +5,7 @@ import json
 import threading
 from collections.abc import Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
 import pytest
 from loguru import logger
@@ -118,7 +119,7 @@ def test_all_exhausted_pauses(fake: Fake) -> None:
     fake.script = {"a": [(429, "Rate limit reached")], "b": [(503, "overloaded")]}
     with pytest.raises(UsageLimitError, match="Free models usage limit reached"):
         ask(provider("a", "b"))
-    assert fake.hits == ["a", "b", "a", "b"]  # one wait for per-minute limits, then pause
+    assert fake.hits == ["a", "b", "a", "b"]  # one more round after a short wait, then pause
 
 
 def test_bad_json_is_retried(fake: Fake) -> None:
@@ -188,3 +189,34 @@ def test_presets_are_complete() -> None:
         assert p.key_url.startswith("https://") and p.terms_url.startswith("https://")
         assert p.limits and "/" in p.model
         assert p.needs_account == ("{account_id}" in p.api_base)
+
+
+def test_ai_check_cli_reads_the_saved_free_keys(
+    fake: Fake, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from typer.testing import CliRunner
+
+    from linkit_all import cli
+    from linkit_all.core.config import get_settings
+    from linkit_all.core.db import init_db
+    from linkit_all.core.search import save_search
+
+    monkeypatch.setenv("LINKIT_DATA_DIR", str(tmp_path))
+    get_settings.cache_clear()
+    cfg = SearchConfig.model_validate(
+        {
+            "ai": {
+                "provider": "free",
+                "free_keys": [{"id": "a", "key": KEY_A}, {"id": "b", "key": KEY_B}],
+            }
+        }
+    )
+    save_search(init_db(tmp_path / "linkit.db"), cfg)
+    fake.script = {"a": [(200, '{"ok": true}')], "b": [(401, "invalid api key")]}
+    try:
+        out = CliRunner().invoke(cli.app, ["ai-check"])
+    finally:
+        get_settings.cache_clear()
+    assert out.exit_code == 0, out.output
+    assert "A: ok" in out.output and "B: not working" in out.output
+    assert KEY_A not in out.output and KEY_B not in out.output

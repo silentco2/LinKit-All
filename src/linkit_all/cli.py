@@ -186,14 +186,25 @@ def install_libreoffice(
 
 @app.command("ai-check")
 def ai_check(provider: ProviderOpt = None, model: ModelOpt = None) -> None:
-    """Send a tiny test prompt to the configured AI provider."""
-    settings = _settings(provider, model)
+    """Send a tiny test prompt to the AI chosen in setup (or given here). Free models: each
+    provider is tested on its own and one that fails is named."""
+    from linkit_all.core.search import SearchConfig, load_search
+    from linkit_all.pipeline import PipelineError, ai_settings
+
+    override = {k: v for k, v in {"provider": provider, "model": model}.items() if v}
+    cfg = load_search(_stage_db()) or SearchConfig()
+    try:
+        settings = ai_settings(get_settings(), cfg, override)
+    except PipelineError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(2) from e
     if settings.provider.endswith("_cli"):
         typer.echo("Note: CLI usage counts against your own plan limits.")
     try:
-        typer.echo(asyncio.run(get_provider(settings).check()))
+        typer.echo(asyncio.run(get_provider(settings).check()).replace("; ", "\n  "))
     except ProviderError as e:
-        typer.echo(f"AI check failed: {e}", err=True)
+        lines = str(e).replace("; ", "\n  ")
+        typer.echo(f"AI check failed: {lines}", err=True)
         raise typer.Exit(1) from e
 
 

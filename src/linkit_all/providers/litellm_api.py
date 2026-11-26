@@ -144,7 +144,7 @@ class FreeProvider(LLMProvider):
         for attempt in range(2):
             now = time.monotonic()
             for pid, sub in self.subs:
-                if self._resting.get(pid, 0.0) > now:
+                if attempt == 0 and self._resting.get(pid, 0.0) > now:
                     continue
                 try:
                     return await sub._call(prompt)
@@ -156,7 +156,7 @@ class FreeProvider(LLMProvider):
                     why = "unavailable"
                 self._resting[pid] = time.monotonic() + REST_S
                 logger.info("free models: {} {}, trying the next one", pid, why)
-            if attempt == 0:  # all resting: wait once for the first to wake (per-minute limits)
+            if attempt == 0:  # all resting: wait for the first to wake, then try each once more
                 await asyncio.sleep(max(0.0, min(self._resting.values()) - time.monotonic()))
         raise UsageLimitError("", self.name)
 
