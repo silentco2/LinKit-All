@@ -309,6 +309,8 @@ class AISection(BaseModel):
         d: dict[str, Any] = handler(self)
         if d.get("api_key") is None:
             d.pop("api_key", None)
+        if not d.get("free_keys"):
+            d.pop("free_keys", None)
         return d
 
 
