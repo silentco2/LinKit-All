@@ -3,11 +3,15 @@ import { FormsModule } from '@angular/forms';
 import { Api } from '../api';
 import { I18n, TPipe } from '../i18n';
 import { dayOf, fmtDate, localeOf } from '../locale';
-import { Provider, SearchConfig } from '../types';
+import { FreeKey, Provider, SearchConfig } from '../types';
 
 type AiMode = Provider | 'local';
 type LocalServer = 'ollama' | 'lmstudio';
-export type AiBody = { provider: Provider; model: string | null; api_base: string | null; api_key?: string | null };
+export type AiBody = { provider: Provider; model: string | null; api_base: string | null; api_key?: string | null; free_keys?: FreeKey[] };
+/** A free provider as `GET /ai/free` lists it (providers/free.py). */
+type FreePreset = { id: string; label: string; key_url: string; terms_url: string; limits: string; trains_on_data: boolean; needs_account: boolean };
+/** One row of the Free models list: what the user typed (`key`) and the saved key, masked (`saved`). */
+type FreeRow = { p: FreePreset; key: string; saved: string; account_id: string; enabled: boolean };
 export type AiState = {
   state: 'idle' | 'testing' | 'ok' | 'fail';
   msg: string;
@@ -30,6 +34,19 @@ type CheckResult = {
   model?: string | null;
   version?: string | null;
 };
+
+/** As the server shows a saved key: the last 4 characters. */
+const mask = (key: string): string => (key.length > 8 ? '••••' + key.slice(-4) : '••••');
+
+/** Saved providers first, in the saved order, then the other presets in their default order. */
+function freeRows(presets: FreePreset[], saved: FreeKey[]): FreeRow[] {
+  const byId = new Map(presets.map((p) => [p.id, p]));
+  const rows: FreeRow[] = saved
+    .filter((k) => byId.has(k.id))
+    .map((k) => ({ p: byId.get(k.id)!, key: '', saved: k.key, account_id: k.account_id ?? '', enabled: k.enabled }));
+  const seen = new Set(rows.map((r) => r.p.id));
+  return [...rows, ...presets.filter((p) => !seen.has(p.id)).map((p) => ({ p, key: '', saved: '', account_id: '', enabled: true }))];
+}
 
 /** The server's message once, without vendor links. */
 const clean = (msg: string): string => msg.replace(/https?:\/\/\S+/g, '').replace(/\s{2,}/g, ' ').trim();
@@ -108,6 +125,52 @@ const clean = (msg: string): string => msg.replace(/https?:\/\/\S+/g, '').replac
       </div>
     }
 
+    @if (mode() === 'free') {
+      <div class="space-y-3">
+        <p class="alert alert-warn">{{ 'free.consent' | t }}</p>
+        <p class="hint">{{ 'free.order' | t }}</p>
+        <ol class="space-y-2">
+          @for (r of freeRows(); track r.p.id; let i = $index, last = $last) {
+            <li class="rounded-lg border border-slate-200 p-3 dark:border-slate-700" [class.opacity-60]="!r.enabled">
+              <div class="flex flex-wrap items-center gap-2">
+                <label class="flex items-center gap-2 font-medium">
+                  <input type="checkbox" [checked]="r.enabled" (change)="toggleFree(i)">
+                  <span class="sr-only">{{ 'free.use' | t }}</span>
+                  <bdi dir="ltr">{{ r.p.label }}</bdi>
+                </label>
+                <span class="badge" [class.tier-low]="r.p.trains_on_data" [class.tier-high]="!r.p.trains_on_data">
+                  {{ (r.p.trains_on_data ? 'free.trains' : 'free.noTrain') | t }}
+                </span>
+                <span class="ms-auto flex gap-1">
+                  <button type="button" class="btn" [disabled]="i === 0" (click)="moveFree(i, -1)" [attr.aria-label]="'free.up' | t">↑</button>
+                  <button type="button" class="btn" [disabled]="last" (click)="moveFree(i, 1)" [attr.aria-label]="'free.down' | t">↓</button>
+                </span>
+              </div>
+              <p class="hint" dir="ltr">{{ r.p.limits }}</p>
+              <p class="mt-1 flex gap-3 text-sm">
+                <a class="link" [href]="r.p.key_url" target="_blank" rel="noopener noreferrer">{{ 'free.getKey' | t }}</a>
+                <a class="link" [href]="r.p.terms_url" target="_blank" rel="noopener noreferrer">{{ 'free.terms' | t }}</a>
+              </p>
+              <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                <div>
+                  <label class="label" [for]="'free-key-' + r.p.id">{{ 'free.key' | t }}</label>
+                  <input [id]="'free-key-' + r.p.id" type="password" dir="ltr" class="input" autocomplete="off"
+                         [(ngModel)]="r.key" (change)="retest()" [placeholder]="r.saved || ('setup.ai.apiKeyPh' | t)">
+                </div>
+                @if (r.p.needs_account) {
+                  <div>
+                    <label class="label" [for]="'free-acc-' + r.p.id">{{ 'free.account' | t }}</label>
+                    <input [id]="'free-acc-' + r.p.id" dir="ltr" class="input" autocomplete="off" [(ngModel)]="r.account_id" (change)="retest()">
+                  </div>
+                }
+              </div>
+            </li>
+          }
+        </ol>
+        @if (ai().state === 'idle' && !freeKeys().length) { <p class="hint">{{ 'free.needKey' | t }}</p> }
+      </div>
+    }
+
     <div aria-live="polite">
       @switch (ai().state) {
         @case ('testing') { <p class="text-sm text-slate-500" role="status">{{ 'welcome.ai.testing' | t }}</p> }
@@ -131,7 +194,7 @@ const clean = (msg: string): string => msg.replace(/https?:\/\/\S+/g, '').replac
           </div>
         }
         @case ('idle') {
-          @if (mode() && (mode() !== 'local' || (model && apiBase))) {
+          @if (mode() && (mode() !== 'local' || (model && apiBase)) && (mode() !== 'free' || freeKeys().length)) {
             <button type="button" class="btn" (click)="test()">{{ 'setup.ai.test' | t }}</button>
           }
         }
@@ -139,7 +202,7 @@ const clean = (msg: string): string => msg.replace(/https?:\/\/\S+/g, '').replac
     </div>
     @if (mode() && mode() !== 'local' && mode() !== 'litellm') { <p class="hint">{{ 'setup.ai.cliHint' | t }}</p> }
 
-    @if (mode()) {
+    @if (mode() && mode() !== 'free') {
       <details class="text-sm">
         <summary class="cursor-pointer font-medium">{{ 'welcome.ai.advanced' | t }}</summary>
         <div class="mt-3 space-y-3">
@@ -180,6 +243,7 @@ export class AiConnect {
   protected readonly providers: { id: AiMode; label: string; hint: string }[] = [
     { id: 'codex_cli', label: 'setup.ai.p.codex_cli', hint: 'setup.ai.p.codex_cli.hint' },
     { id: 'claude_cli', label: 'setup.ai.p.claude_cli', hint: 'setup.ai.p.claude_cli.hint' },
+    { id: 'free', label: 'setup.ai.p.free', hint: 'setup.ai.p.free.hint' },
     { id: 'litellm', label: 'setup.ai.p.litellm', hint: 'setup.ai.p.litellm.hint' },
     { id: 'local', label: 'setup.ai.p.local', hint: 'setup.ai.p.local.hint' },
   ];
@@ -194,6 +258,7 @@ export class AiConnect {
   protected readonly ai = signal<AiState>({ state: 'idle', msg: '' });
   protected readonly local = signal<Record<LocalServer, { running: boolean; models: string[] }> | null>(null);
   protected readonly savedApiKey = signal<string | null>(null);
+  protected readonly freeRows = signal<FreeRow[]>([]);
   /** Said when the first choice was out of uses and another detected AI was tried instead. */
   protected readonly notice = signal('');
   private readonly limited = new Set<AiMode>();
@@ -219,10 +284,12 @@ export class AiConnect {
 
   private async enter(): Promise<void> {
     try {
-      const [r, cfg] = await Promise.all([
+      const [r, cfg, presets] = await Promise.all([
         this.api.get<{ provider: Provider | null; available: Record<Provider, boolean> }>('/ai'),
         this.api.get<SearchConfig>('/search'),
+        this.api.get<FreePreset[]>('/ai/free'),
       ]);
+      this.freeRows.set(freeRows(presets, cfg.ai?.free_keys ?? []));
       this.available.set(r.available);
       const saved = cfg.ai;
       let first: AiMode | null = null;
@@ -242,6 +309,7 @@ export class AiConnect {
         if (!this.model || !this.apiBase) return; // nothing to test until a model is picked
       }
       if (first === 'litellm' && !this.savedApiKey() && !this.apiKey) return;
+      if (first === 'free' && !this.freeKeys().length) return;
       if (this.testOnLoad() || !saved?.provider) void this.test(true);
     } catch (e) {
       this.loaded.set(true);
@@ -260,6 +328,8 @@ export class AiConnect {
     if (id === 'local') void this.scanLocal();
     else if (id === 'litellm') {
       if (this.savedApiKey()) void this.test();
+    } else if (id === 'free') {
+      if (this.freeKeys().length) void this.test();
     } else void this.test();
   }
 
@@ -285,6 +355,8 @@ export class AiConnect {
       if (this.model && this.apiBase) void this.test();
     } else if (this.mode() === 'litellm') {
       if ((this.apiKey || this.savedApiKey()) && this.model) void this.test();
+    } else if (this.mode() === 'free') {
+      if (this.freeKeys().length) void this.test();
     } else {
       void this.test();
     }
@@ -292,7 +364,26 @@ export class AiConnect {
 
   /** After a usage-limit failure: the other cards worth trying (a detected CLI, or any API / local option). */
   protected other(id: AiMode): boolean {
-    return this.ai().kind === 'usage_limit' && id !== this.mode() && (id === 'litellm' || id === 'local' || !!this.available()[id]);
+    return this.ai().kind === 'usage_limit' && id !== this.mode() && (id === 'litellm' || id === 'local' || id === 'free' || !!this.available()[id]);
+  }
+
+  /** The rows with a key (typed, or saved and sent back masked), in the user's order. */
+  protected freeKeys(): FreeKey[] {
+    return this.freeRows()
+      .filter((r) => r.key.trim() || r.saved)
+      .map((r) => ({ id: r.p.id, key: r.key.trim() || r.saved, account_id: r.account_id.trim(), enabled: r.enabled }));
+  }
+
+  protected moveFree(i: number, d: -1 | 1): void {
+    const rows = [...this.freeRows()];
+    [rows[i], rows[i + d]] = [rows[i + d], rows[i]];
+    this.freeRows.set(rows);
+    this.retest();
+  }
+
+  protected toggleFree(i: number): void {
+    this.freeRows.update((rows) => rows.map((r, j) => (j === i ? { ...r, enabled: !r.enabled } : r)));
+    this.retest();
   }
 
   protected limitText(): string {
@@ -316,6 +407,7 @@ export class AiConnect {
       model: this.model.trim() || null,
       api_base: mode === 'local' ? this.apiBase.trim() || null : (this.apiBase.trim() || null),
       api_key: mode === 'litellm' ? (this.apiKey.trim() || null) : null,
+      free_keys: this.freeKeys(), // always sent: switching to another AI keeps the free keys
     };
     try {
       const r = await this.api.post<CheckResult>('/ai/check', body);
@@ -339,6 +431,7 @@ export class AiConnect {
         this.savedApiKey.set(body.api_key);
         this.apiKey = '';
       }
+      this.freeRows.update((rows) => rows.map((r) => (r.key.trim() ? { ...r, saved: mask(r.key.trim()), key: '' } : r)));
       // never the raw server text ("claude_cli (default model) ok, 2.1.305"): the name, the model and (as a tooltip) the version
       const model = 'model' in r ? (r.model ?? null) : body.model;
       this.setAi({ state: 'ok', msg: '', label: r.provider_label || this.i18n.provider(mode === 'local' ? 'local' : mode), model, version: r.version ?? null });
@@ -355,6 +448,7 @@ export class AiConnect {
       model: ai.model,
       api_base: ai.api_base,
       api_key: ai.api_key ?? cfg.ai.api_key ?? null,
+      free_keys: ai.free_keys ?? cfg.ai.free_keys ?? [],
     };
     await this.api.put<SearchConfig>('/search', cfg);
   };

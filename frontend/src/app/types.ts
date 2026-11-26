@@ -7,7 +7,9 @@ export type Stage = (typeof STAGES)[number];
 /** What "Find new jobs" runs, and what "Apply to N jobs" runs. */
 export const SEARCH_STAGES: Stage[] = ['discover', 'enrich', 'rank', 'score'];
 export const APPLY_STAGES: Stage[] = ['apply'];
-export type Provider ='codex_cli' | 'claude_cli' | 'litellm';
+export type Provider = 'codex_cli' | 'claude_cli' | 'litellm' | 'free';
+/** One free provider the user added; list order = fallback order. `key` comes back masked. */
+export type FreeKey = { id: string; key: string; account_id: string; enabled: boolean };
 
 export interface RunState {
   running: boolean;
@@ -173,7 +175,7 @@ export interface SearchConfig {
   };
   trust: TrustSection;
   matching: { ai_max_jobs: number; tier_high: number; tier_mid: number; batch_size: number; auto_apply_low: boolean };
-  ai: { provider: Provider | null; model: string | null; api_base: string | null; api_key?: string | null };
+  ai: { provider: Provider | null; model: string | null; api_base: string | null; api_key?: string | null; free_keys?: FreeKey[] };
   apply: ApplySection;
   email: { imap_host: string; imap_user: string; timeout_s: number; poll_s: number; read_replies: boolean };
   schedule: ScheduleSection;
