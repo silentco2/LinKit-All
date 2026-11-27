@@ -1282,6 +1282,7 @@ export const ar: Record<string, string> = {
   'home.last': 'آخر بحث:',
   'home.never': 'لا يوجد بعد',
   'smart.setup': 'أكمل الإعداد (الخطوة {n} من {total})',
+  'smart.setup.phone': 'أكمل إعداد LinKit All على حاسوبك: أضف سيرتك الذاتية واربط الذكاء الاصطناعي هناك.',
   'smart.setup.msg': 'بضع خطوات سريعة ويبدأ LinKit في البحث عن وظائف لك',
   'smart.running.msg': 'LinKit يعمل الآن. يمكنك مغادرة هذه الصفحة.',
   'smart.searching': 'جارٍ البحث…',

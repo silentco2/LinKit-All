@@ -1212,6 +1212,7 @@ export const en: Record<string, string> = {
   'home.last': 'Last search:',
   'home.never': 'none yet',
   'smart.setup': 'Finish setup (step {n} of {total})',
+  'smart.setup.phone': 'Finish setting up LinKit All on your PC: add your CV and connect an AI there.',
   'smart.setup.msg': 'A few quick steps and LinKit can start finding jobs for you',
   'smart.running.msg': 'LinKit is working on it. You can leave this page.',
   'smart.searching': 'Searching…',

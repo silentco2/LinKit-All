@@ -4,6 +4,10 @@
 //! end-to-end encrypted between the phone and the PC. The phone keeps one iroh key (the app
 //! stores it), because the PC ties each paired phone's token to that key's id.
 //!
+//! One `Phone` (one endpoint, one relay connection) lives as long as the page; only the
+//! connection to the PC (`Tunnel`) is dialed again when it drops. A new endpoint per retry
+//! piled up relay WebSockets until the browser had none left.
+//!
 //! Wire format, ALPN `linkit/http/1`, one bidirectional stream per request:
 //!   request  = u32 length + JSON head + body, then finish
 //!   response = u32 length + JSON head + body
@@ -14,11 +18,14 @@ use std::rc::Rc;
 
 use iroh::endpoint::{Connection, RecvStream};
 use iroh::{Endpoint, EndpointAddr, EndpointId, RelayUrl, SecretKey};
+use n0_future::time::{Duration, timeout};
 use wasm_bindgen::prelude::*;
 
 const ALPN: &[u8] = b"linkit/http/1";
 const MAX_BODY: usize = 16 * 1024 * 1024;
 const MAX_MESSAGE: usize = 4 * 1024 * 1024;
+const ONLINE_WAIT: Duration = Duration::from_secs(15);
+const DIAL_WAIT: Duration = Duration::from_secs(20);
 
 #[wasm_bindgen(start)]
 fn start() {
@@ -32,31 +39,23 @@ pub fn new_key() -> Vec<u8> {
 }
 
 #[wasm_bindgen]
-pub struct Tunnel {
+pub struct Phone {
     endpoint: Endpoint,
-    conn: Connection,
 }
 
 #[wasm_bindgen]
-impl Tunnel {
-    /// Dial the PC by its iroh id with the phone's own key; `relay` (from the pairing link)
-    /// skips the address lookup. Waits for this phone's relay first: dialing before it is up
-    /// stalled ~20 s in the spike.
-    pub async fn connect(pc: String, relay: Option<String>, key: Vec<u8>) -> Result<Tunnel, JsError> {
-        let id: EndpointId = pc.parse().map_err(js)?;
+impl Phone {
+    /// This phone's endpoint, with its kept key. Waits (up to 15 s) for its relay: dialing
+    /// before that stalled ~20 s in the spike.
+    pub async fn bind(key: Vec<u8>) -> Result<Phone, JsError> {
         let key: [u8; 32] = key.try_into().map_err(|_| JsError::new("bad phone key"))?;
-        let mut addr = EndpointAddr::new(id);
-        if let Some(url) = relay.filter(|u| !u.is_empty()) {
-            addr = addr.with_relay_url(url.parse::<RelayUrl>().map_err(js)?);
-        }
         let endpoint = Endpoint::builder(iroh::endpoint::presets::N0)
             .secret_key(SecretKey::from_bytes(&key))
             .bind()
             .await
             .map_err(js)?;
-        endpoint.online().await;
-        let conn = endpoint.connect(addr, ALPN).await.map_err(js)?;
-        Ok(Tunnel { endpoint, conn })
+        let _ = timeout(ONLINE_WAIT, endpoint.online()).await; // offline: dial still tries
+        Ok(Phone { endpoint })
     }
 
     /// This phone's iroh id (what the PC ties the token to).
@@ -64,6 +63,32 @@ impl Tunnel {
         self.endpoint.id().to_string()
     }
 
+    /// A connection to the PC by its iroh id; `relay` (from the pairing link) skips the address
+    /// lookup. Gives up after 20 s, so the app can say "PC not reachable" and try again later.
+    pub fn dial(&self, pc: String, relay: Option<String>) -> js_sys::Promise {
+        let endpoint = self.endpoint.clone();
+        wasm_bindgen_futures::future_to_promise(async move {
+            let id: EndpointId = pc.parse().map_err(js)?;
+            let mut addr = EndpointAddr::new(id);
+            if let Some(url) = relay.filter(|u| !u.is_empty()) {
+                addr = addr.with_relay_url(url.parse::<RelayUrl>().map_err(js)?);
+            }
+            let conn = timeout(DIAL_WAIT, endpoint.connect(addr, ALPN))
+                .await
+                .map_err(|_| JsError::new("timed out"))?
+                .map_err(js)?;
+            Ok(Tunnel { conn }.into())
+        })
+    }
+}
+
+#[wasm_bindgen]
+pub struct Tunnel {
+    conn: Connection,
+}
+
+#[wasm_bindgen]
+impl Tunnel {
     /// One request frame in, one response frame out.
     pub fn send(&self, frame: Vec<u8>) -> js_sys::Promise {
         let conn = self.conn.clone();

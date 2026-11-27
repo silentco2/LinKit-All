@@ -6,6 +6,7 @@ import { LibreOfficeCard } from '../components/libreoffice-card';
 import { I18n, TPipe } from '../i18n';
 import { Live } from '../live';
 import { fmtNum, localeOf } from '../locale';
+import { REMOTE } from '../remote';
 import { Shell } from '../shell';
 import { ActionItem, APPLY_STAGES, GoLive, JobRow, Report, SEARCH_STAGES, setupDone, Stage } from '../types';
 import { LivePage, SearchesCard } from './live';
@@ -13,7 +14,7 @@ import { ReportPage } from './report';
 
 /** The one thing Home asks the user to do next (ux-plan 8.1). `link` = go there; no link = start a run. */
 interface Smart {
-  kind: 'setup' | 'running' | 'finish' | 'review' | 'apply' | 'find';
+  kind: 'setup' | 'setupPc' | 'running' | 'finish' | 'review' | 'apply' | 'find';
   message: string;
   label: string;
   link?: string;
@@ -43,7 +44,9 @@ interface TopSheet {
             <h1>{{ sm.message }}</h1>
             @if (sm.kind === 'finish' || sm.kind === 'review') { <p class="mt-3 max-w-[34em] text-[15px] text-slate-600 dark:text-slate-400">{{ 'home.lead.' + sm.kind | t }}</p> }
             <div class="mt-5 flex flex-wrap items-center gap-2">
-              @if (sm.kind === 'running') {
+              @if (sm.kind === 'setupPc') {
+                <!-- no button: nothing to do on the phone -->
+              } @else if (sm.kind === 'running') {
                 <span class="text-base font-medium text-brand-700 dark:text-brand-300" role="status">{{ sm.label }}</span>
                 <button type="button" class="btn btn-danger" (click)="stop()" [disabled]="busy() || stopping()">{{ (stopping() ? 'live.stopping' : 'live.stop') | t }}</button>
               } @else if (sm.link) {
@@ -65,7 +68,7 @@ interface TopSheet {
             </div>
             @if (applyHint(); as hint) { <p class="hint mt-2">{{ hint }}</p> }
             @if (error()) { <div class="alert alert-error mt-3" role="alert" dir="auto">{{ error() }}</div> }
-            @if (needsLibreOffice()) { <div class="mt-3"><app-libreoffice-card /></div> }
+            @if (needsLibreOffice() && !remote) { <div class="mt-3"><app-libreoffice-card /></div> }
           </div>
 
           @if (top(); as t) {
@@ -104,7 +107,7 @@ interface TopSheet {
         }
       }
 
-      @if (!s.libreoffice) { <div class="mt-8 max-w-2xl"><app-libreoffice-card /></div> }
+      @if (!s.libreoffice && !remote) { <div class="mt-8 max-w-2xl"><app-libreoffice-card /></div> }
 
       <section class="mt-12" aria-labelledby="home-funnel">
         <h2 id="home-funnel" class="sr-only">{{ 'home.funnel.title' | t }}</h2>
@@ -152,6 +155,7 @@ export class HomePage {
   private readonly firstAction = signal<ActionItem | null>(null);
   private readonly firstReview = signal<JobRow | null>(null);
   private readonly firstReady = signal<JobRow | null>(null);
+  protected readonly remote = REMOTE;
   private readonly openCount = computed(() => this.shell.status()?.actions_open ?? 0);
 
   private readonly count = (state: string): number => this.shell.status()?.states[state] ?? 0;
@@ -162,6 +166,8 @@ export class HomePage {
     const t = (key: string, n?: number) => this.i18n.t(key, n === undefined ? undefined : { n: this.num(n) });
     const plural = (key: string, n: number) => this.i18n.plural(key, n);
     const run = this.live.run();
+    // setup (CV, AI, LibreOffice) happens on the PC: the phone only says so
+    if (!s.setup.required_done && REMOTE) return { kind: 'setupPc', message: t('smart.setup.phone'), label: '' };
     if (!s.setup.required_done) {
       const step = setupDone(s.setup) + 1;
       return { kind: 'setup', message: t('smart.setup.msg'), label: this.i18n.t('smart.setup', { n: step, total: 4 }), link: '/welcome' };
@@ -221,7 +227,7 @@ export class HomePage {
     const apply = this.applyToo();
     if (review) rows.push({ id: 'review', smart: review });
     if (apply) rows.push({ id: 'apply', smart: apply });
-    if (this.goLiveOffer()) rows.push({ id: 'golive' });
+    if (this.goLiveOffer() && !REMOTE) rows.push({ id: 'golive' }); // a PC-only switch (security.REMOTE_FORBIDDEN)
     const keep = rows.slice(0, 2);
     // the guided card stays while it is open or just switched real applications on
     if (rows.length > 2 && (this.goLiveOpen() || this.justOn())) keep[1] = rows[rows.length - 1];
@@ -256,7 +262,7 @@ export class HomePage {
   /** First-run checklist on the sheet, while setup is unfinished. */
   protected readonly setupRows = computed(() => {
     const s = this.shell.status();
-    if (!s || s.setup.required_done) return [];
+    if (!s || s.setup.required_done || REMOTE) return [];
     return [
       { label: 'welcome.cv.title', done: s.setup.cv },
       { label: 'welcome.ai.title', done: s.setup.ai },

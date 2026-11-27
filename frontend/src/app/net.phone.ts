@@ -4,7 +4,7 @@
  * encrypted. Kept on this phone: the PC's iroh id and relay (from the pairing link), this
  * phone's own iroh key (the PC ties the token to its id) and the token.
  */
-import init, { newKey, Tunnel } from '../../tunnel/pkg/linkit_tunnel.js';
+import init, { newKey, Phone, Tunnel } from '../../tunnel/pkg/linkit_tunnel.js';
 
 export interface EventsHandler {
   open(): void;
@@ -63,26 +63,40 @@ function phoneKey(): Uint8Array {
   return key;
 }
 
-let ready: Promise<unknown> | null = null;
+const RETRY_MS = 5000; // after a failed dial, callers fail fast until then (no dial storm)
+let phone: Promise<Phone> | null = null;
 let tunnel: Promise<Tunnel> | null = null;
+let failedAt = 0;
 
-/** The open tunnel, dialing (again) when there is none or the PC went away. */
+/** This page's one endpoint: made once, kept for the page's life (its relay link reconnects itself). */
+function endpoint(): Promise<Phone> {
+  phone ??= init({ module_or_path: new URL('tunnel/linkit_tunnel_bg.wasm', document.baseURI) })
+    .then(() => Phone.bind(phoneKey()))
+    .catch((e: unknown) => {
+      phone = null;
+      throw e;
+    });
+  return phone;
+}
+
+/** The open connection to the PC: one dial at a time, again only when it dropped. */
 async function open(): Promise<Tunnel> {
-  ready ??= init({ module_or_path: new URL('tunnel/linkit_tunnel_bg.wasm', document.baseURI) });
-  await ready;
+  const pc = savedPc();
+  if (!pc) throw new TypeError('This phone is not paired yet');
   if (tunnel) {
     const t = await tunnel.catch(() => null);
     if (t && !t.closed()) return t;
+    if (tunnel && t?.closed()) tunnel = null;
   }
-  const pc = savedPc();
-  if (!pc) throw new TypeError('This phone is not paired yet');
-  tunnel = Tunnel.connect(pc.pc, pc.relay || undefined, phoneKey());
-  try {
-    return await tunnel;
-  } catch (e) {
-    tunnel = null;
-    throw new TypeError(`PC not reachable (${(e as Error).message ?? e})`); // like fetch's network error
-  }
+  if (!tunnel && Date.now() - failedAt < RETRY_MS) throw new TypeError('PC not reachable');
+  tunnel ??= endpoint()
+    .then((p) => p.dial(pc.pc, pc.relay || undefined) as Promise<Tunnel>)
+    .catch((e: unknown) => {
+      tunnel = null;
+      failedAt = Date.now();
+      throw new TypeError(`PC not reachable (${(e as Error)?.message ?? e})`); // like fetch's network error
+    });
+  return tunnel;
 }
 
 function frame(head: object, body: Uint8Array = new Uint8Array()): Uint8Array {
