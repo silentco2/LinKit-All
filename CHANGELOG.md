@@ -2,6 +2,12 @@
 
 All notable changes to LinKit All. Dates are release dates.
 
+## Unreleased
+
+### Changed
+- The website moved to https://linkit-all.github.io/ (docs at `/docs/`). Every page at the old
+  address, silentco2.github.io/LinKit-All/, now sends you to the same page there.
+
 ## 1.2.0 — 2026-11-27
 
 ### New

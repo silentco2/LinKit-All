@@ -1,5 +1,5 @@
 site_name: LinKit All
-site_url: https://silentco2.github.io/LinKit-All/docs/
+site_url: https://linkit-all.github.io/docs/
 site_description: >-
   Open-source AI job search that runs on your computer: finds jobs, ranks them against your
   CV, tailors it with small edits and fills in applications. Your data stays local.
@@ -46,7 +46,7 @@ extra_css:
   - assets/stylesheets/desk.css
 
 extra:
-  homepage: https://silentco2.github.io/LinKit-All/ # the header title links back to the landing page
+  homepage: https://linkit-all.github.io/ # the header title links back to the landing page
   generator: false
   # No analytics, no feedback widgets, no social cards.
 
