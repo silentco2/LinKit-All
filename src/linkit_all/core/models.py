@@ -359,3 +359,16 @@ class Device(Base):
     created: Mapped[datetime] = mapped_column(default=utcnow)
     last_seen: Mapped[datetime] = mapped_column(default=utcnow)
     revoked: Mapped[bool] = mapped_column(default=False)
+
+
+class PushSubscription(Base):
+    """A paired phone's web push subscription (api/push.py). Deleted with the phone's pairing."""
+
+    __tablename__ = "push_subscriptions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    device_id: Mapped[int] = mapped_column(ForeignKey("devices.id", ondelete="CASCADE"), index=True)
+    endpoint: Mapped[str] = mapped_column(String(1024), unique=True)
+    p256dh: Mapped[str] = mapped_column(String(255))
+    auth: Mapped[str] = mapped_column(String(255))
+    created: Mapped[datetime] = mapped_column(default=utcnow)

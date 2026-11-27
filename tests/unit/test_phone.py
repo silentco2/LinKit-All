@@ -174,3 +174,94 @@ def test_remote_switch_saved_in_data_folder(tmp_path: Path) -> None:
     with _client(tmp_path) as c:  # restart keeps it
         assert c.get("/api/phone").json()["enabled"] is True
         assert c.get(f"{PHONE}/api/jobs", headers=FWD).status_code == 401
+
+
+# --- web push (api/push.py) -------------------------------------------------------------
+
+ENDPOINT = "https://fcm.googleapis.com/fcm/send/abc123"
+SUB = {"endpoint": ENDPOINT, "keys": {"p256dh": "BPk3", "auth": "c2Vj"}}
+
+
+def _park(client: TestClient) -> None:
+    from linkit_all.core.models import ActionItem, ActionKind, Job, JobState
+
+    with client.app.state.db.begin() as s:  # type: ignore[attr-defined]
+        n = s.query(Job).count()
+        job = Job(source="lever", url=f"https://x/{n}", title="Secret Title", company="Acme Corp",
+                  dedupe_hash=f"h{n}", state=JobState.needs_user)  # fmt: skip
+        s.add(job)
+        s.flush()
+        s.add(ActionItem(job_id=job.id, kind=ActionKind.apply_by_hand))
+
+
+@pytest.fixture
+def pushes(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, object]]:
+    from linkit_all.api import push
+
+    sent: list[dict[str, object]] = []
+    monkeypatch.setattr(push, "webpush", lambda info, **kw: sent.append({"info": info, **kw}))
+    return sent
+
+
+def test_push_payload_is_only_the_count(
+    client: TestClient, pushes: list[dict[str, object]]
+) -> None:
+    import json
+
+    from linkit_all.api.push import send
+
+    _pair(client)
+    put = {"headers": {**FWD, "origin": PHONE}}
+    key = client.get(f"{PHONE}/api/phone/push", headers=FWD).json()["public_key"]
+    assert len(key) == 87  # uncompressed P-256 point, base64url without padding
+    assert client.put(f"{PHONE}/api/phone/push", json=SUB, **put).status_code == 204
+    _park(client)
+    _park(client)
+    app = client.app
+    assert send(app.state.db, app.state.settings, 2) == 1  # type: ignore[attr-defined]
+    data = str(pushes[0]["data"])
+    assert json.loads(data) == {"count": 2}
+    assert "Secret" not in data and "Acme" not in data
+    assert pushes[0]["vapid_claims"] == {"sub": "https://github.com/silentco2/LinKit-All"}
+
+
+def test_push_sent_when_more_wait_after_a_stage(
+    client: TestClient, pushes: list[dict[str, object]]
+) -> None:
+    import time
+
+    _pair(client)
+    client.get(f"{PHONE}/api/phone/push", headers=FWD)
+    client.put(f"{PHONE}/api/phone/push", json=SUB, headers={**FWD, "origin": PHONE})
+    _park(client)
+    bus = client.app.state.bus  # type: ignore[attr-defined]
+    bus.publish_threadsafe({"type": "stage", "stage": "apply", "status": "started"})
+    bus.publish_threadsafe({"type": "stage", "stage": "apply", "status": "finished"})
+    for _ in range(50):
+        if pushes:
+            break
+        time.sleep(0.05)
+    assert [p["data"] for p in pushes] == ['{"count": 1}']
+
+
+def test_push_routes_are_for_phones_and_push_services(client: TestClient) -> None:
+    assert client.get("/api/phone/push").status_code == 403  # the PC has desktop notifications
+    _pair(client)
+    put = {"headers": {**FWD, "origin": PHONE}}
+    evil = {**SUB, "endpoint": "https://192.168.1.1/admin"}
+    assert client.put(f"{PHONE}/api/phone/push", json=evil, **put).status_code == 422
+    plain = {**SUB, "endpoint": "http://fcm.googleapis.com/x"}
+    assert client.put(f"{PHONE}/api/phone/push", json=plain, **put).status_code == 422
+    lookalike = {**SUB, "endpoint": "https://fcm.googleapis.com.evil.example/x"}
+    assert client.put(f"{PHONE}/api/phone/push", json=lookalike, **put).status_code == 422
+
+
+def test_revoke_drops_push(client: TestClient, pushes: list[dict[str, object]]) -> None:
+    from linkit_all.api.push import send
+
+    dev = _pair(client)
+    client.get(f"{PHONE}/api/phone/push", headers=FWD)
+    client.put(f"{PHONE}/api/phone/push", json=SUB, headers={**FWD, "origin": PHONE})
+    client.delete(f"/api/phone/devices/{dev}")
+    app = client.app
+    assert send(app.state.db, app.state.settings, 3) == 0  # type: ignore[attr-defined]

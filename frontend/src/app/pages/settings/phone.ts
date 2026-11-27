@@ -1,6 +1,6 @@
 import { Component, inject, OnDestroy, OnInit, signal } from '@angular/core';
 import { Api } from '../../api';
-import { TPipe } from '../../i18n';
+import { I18n, TPipe } from '../../i18n';
 import { DtPipe } from '../../locale';
 import { REMOTE } from '../../remote';
 
@@ -28,6 +28,14 @@ const GUIDE = 'https://github.com/silentco2/LinKit-All/blob/main/docs/phone.md';
       @if (status(); as s) {
         @if (remote) {
           <p class="text-sm">{{ 'phone.onPhone' | t }}</p>
+          @if (pushSupported) {
+            <label class="flex items-center gap-2 text-sm font-medium">
+              <input type="checkbox" [checked]="push()" [disabled]="busy()" (change)="togglePush(checked($event))"> {{ 'phone.push' | t }}
+            </label>
+            <p class="hint">{{ 'phone.pushHint' | t }}</p>
+          } @else {
+            <p class="hint">{{ 'phone.pushInstall' | t }}</p>
+          }
         } @else {
           <p class="text-sm text-slate-600 dark:text-slate-400">{{ 'phone.intro' | t }} <a [href]="guide" target="_blank" rel="noopener">{{ 'phone.guide' | t }}</a></p>
           <div class="space-y-3">
@@ -79,7 +87,11 @@ const GUIDE = 'https://github.com/silentco2/LinKit-All/blob/main/docs/phone.md';
 })
 export class PhoneSection implements OnInit, OnDestroy {
   private readonly api = inject(Api);
+  private readonly i18n = inject(I18n);
   protected readonly remote = REMOTE;
+  /** iPhone: only once LinKit is added to the home screen (iOS 16.4+). */
+  protected readonly pushSupported = 'serviceWorker' in navigator && 'PushManager' in window;
+  protected readonly push = signal(false);
   protected readonly guide = GUIDE;
   protected readonly status = signal<PhoneStatus | null>(null);
   protected readonly enabled = signal(false);
@@ -92,6 +104,31 @@ export class PhoneSection implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     void this.load();
+    if (REMOTE && this.pushSupported) {
+      void navigator.serviceWorker.getRegistration().then(async (reg) => this.push.set(!!(await reg?.pushManager.getSubscription())));
+    }
+  }
+
+  /** Opt-in web push (docs/phone.md): the PC only ever sends a count; the words are saved here, in this phone's language. */
+  protected async togglePush(on: boolean): Promise<void> {
+    await this.run(async () => {
+      const reg = await navigator.serviceWorker.ready;
+      if (!on) {
+        await (await reg.pushManager.getSubscription())?.unsubscribe();
+        await this.api.delete('/phone/push');
+        this.push.set(false);
+        return;
+      }
+      if ((await Notification.requestPermission()) !== 'granted') {
+        this.push.set(false);
+        throw new Error(this.i18n.t('shell.blocked'));
+      }
+      const { public_key } = await this.api.get<{ public_key: string }>('/phone/push');
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: fromBase64Url(public_key) });
+      await (await caches.open('linkit-push')).put('/push-title', new Response(this.i18n.t('push.title')));
+      await this.api.put('/phone/push', sub.toJSON());
+      this.push.set(true);
+    });
   }
 
   ngOnDestroy(): void {
@@ -161,4 +198,9 @@ export class PhoneSection implements OnInit, OnDestroy {
 
   protected val = (e: Event): string => (e.target as HTMLInputElement).value;
   protected checked = (e: Event): boolean => (e.target as HTMLInputElement).checked;
+}
+
+function fromBase64Url(text: string): Uint8Array<ArrayBuffer> {
+  const bin = atob(text.replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
 }

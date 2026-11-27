@@ -15,6 +15,8 @@ from linkit_all.api.assist import router as assist_router
 from linkit_all.api.devices import device_id, load_remote
 from linkit_all.api.devices import router as phone_router
 from linkit_all.api.events import EventBus
+from linkit_all.api.push import router as push_router
+from linkit_all.api.push import watch as watch_for_push
 from linkit_all.api.routes import router
 from linkit_all.api.runner import PipelineRunner
 from linkit_all.api.security import LocalOnly
@@ -49,7 +51,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         backups = asyncio.create_task(
             keep_backing_up(app.state.db, settings.db_path, settings.data_dir)
         )
+        push = asyncio.create_task(watch_for_push(app.state.bus, app.state.db, settings))
         yield
+        push.cancel()
         backups.cancel()
         app.state.scheduler.shutdown(wait=False)
         register_runner(None)
@@ -80,6 +84,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(suggest_router)
     app.include_router(assist_router)
     app.include_router(phone_router)
+    app.include_router(push_router)
 
     @app.get("/{path:path}", include_in_schema=False)
     def spa(path: str) -> FileResponse:

@@ -120,7 +120,7 @@ dev = [
 ]
 
 [[tool.mypy.overrides]]
-module = ["jobspy.*", "pdf2docx.*", "apscheduler.*", "pylatexenc.*", "msal.*"]
+module = ["jobspy.*", "pdf2docx.*", "apscheduler.*", "pylatexenc.*", "msal.*", "pywebpush.*", "py_vapid.*"]
 ignore_missing_imports = true
 
 [tool.hatch.build.targets.wheel]

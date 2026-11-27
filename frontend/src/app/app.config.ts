@@ -11,7 +11,7 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes),
     // the phone only (docs/phone.md): it caches the app shell, never API data; the PC keeps
     // loading each new build straight from the server
-    provideServiceWorker('ngsw-worker.js', {
+    provideServiceWorker('push-sw.js', { // Angular's ngsw-worker.js plus the push alert
       enabled: !isDevMode() && REMOTE,
       registrationStrategy: 'registerWhenStable:30000',
     }),

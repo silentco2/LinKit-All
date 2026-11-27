@@ -24,11 +24,11 @@ from urllib.parse import urlparse
 import segno
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from linkit_all.core.config import Settings
-from linkit_all.core.models import Device, utcnow
+from linkit_all.core.models import Device, PushSubscription, utcnow
 
 COOKIE = "linkit_device"
 COOKIE_DAYS = 400  # the longest lifetime browsers keep a cookie
@@ -243,4 +243,5 @@ def revoke(request: Request, device_id: int) -> None:
         if dev is None:
             raise HTTPException(404, "No such phone")
         dev.revoked = True
+        s.execute(delete(PushSubscription).where(PushSubscription.device_id == device_id))
         s.commit()
