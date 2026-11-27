@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LinKit tunnel spike</title>
+<style>
+  body { font: 15px/1.45 system-ui, sans-serif; margin: 1rem; background: #e5e2db; color: #1f1d1a; }
+  pre { white-space: pre-wrap; word-break: break-all; background: #fff; padding: .75rem; border-radius: 6px; }
+  .ok { color: #1d6b35 } .bad { color: #a3261b }
+</style>
+</head>
+<body>
+<h1>LinKit tunnel spike</h1>
+<p>Link format: <code>#pc=&lt;id&gt;&amp;code=&lt;pairing code&gt;&amp;relay=&lt;relay url&gt;</code></p>
+<pre id="log"></pre>
+<script type="module">
+import init, { Tunnel } from './pkg/linkit_tunnel.js';
+
+const log = (msg, cls = '') => {
+  const line = document.createElement('div');
+  line.textContent = msg;
+  line.className = cls;
+  document.getElementById('log').append(line);
+};
+const enc = new TextEncoder(), dec = new TextDecoder();
+
+function frame(head, body = new Uint8Array()) {
+  const h = enc.encode(JSON.stringify(head));
+  const out = new Uint8Array(4 + h.length + body.length);
+  new DataView(out.buffer).setUint32(0, h.length);
+  out.set(h, 4);
+  out.set(body, 4 + h.length);
+  return out;
+}
+
+function unframe(buf) {
+  const n = new DataView(buf.buffer, buf.byteOffset).getUint32(0);
+  return { ...JSON.parse(dec.decode(buf.subarray(4, 4 + n))), body: buf.subarray(4 + n) };
+}
+
+async function call(tunnel, method, path, json) {
+  const headers = [['accept', 'application/json']];
+  const token = localStorage.getItem('linkit-device');
+  if (token) headers.push(['cookie', `linkit_device=${token}`]);
+  let body = new Uint8Array();
+  if (json !== undefined) {
+    headers.push(['content-type', 'application/json']);
+    body = enc.encode(JSON.stringify(json));
+  }
+  const t0 = performance.now();
+  const res = unframe(await tunnel.send(frame({ method, path, headers }, body)));
+  const ms = Math.round(performance.now() - t0);
+  const cookie = res.headers.find(([k]) => k.toLowerCase() === 'set-cookie');
+  const m = cookie && /linkit_device=([^;]+)/.exec(cookie[1]);
+  if (m) localStorage.setItem('linkit-device', m[1]);
+  log(`${method} ${path} -> ${res.status} in ${ms} ms`, res.status < 400 ? 'ok' : 'bad');
+  return { ...res, text: dec.decode(res.body) };
+}
+
+try {
+  const params = new URLSearchParams(location.hash.slice(1));
+  const [pc, code, relay] = [params.get('pc'), params.get('code'), params.get('relay')];
+  if (!pc) throw new Error('No PC id in the link');
+  let t0 = performance.now();
+  await init();
+  log(`WASM loaded in ${Math.round(performance.now() - t0)} ms`);
+  t0 = performance.now();
+  const tunnel = await Tunnel.connect(pc, relay || undefined);
+  log(`Tunnel to PC open in ${Math.round(performance.now() - t0)} ms (${tunnel.timings()})`, 'ok');
+  if (code && !localStorage.getItem('linkit-device')) {
+    await call(tunnel, 'POST', '/api/phone/claim', { code, name: navigator.platform || 'Phone' });
+  }
+  const status = await call(tunnel, 'GET', '/api/status');
+  log(status.text.slice(0, 400));
+  for (let i = 0; i < 5; i++) await call(tunnel, 'GET', '/api/status');
+  const jobs = await call(tunnel, 'GET', '/api/jobs?limit=50');
+  log(`jobs response: ${jobs.body.length} bytes`);
+} catch (e) {
+  log(`Failed: ${e.message || e}`, 'bad');
+}
+</script>
+</body>
+</html>

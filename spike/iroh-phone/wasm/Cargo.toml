@@ -1,0 +1,28 @@
+[package]
+name = "linkit-tunnel"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+anyhow = "1"
+console_error_panic_hook = "0.1.7"
+getrandom = { version = "0.3", features = ["wasm_js"] }
+iroh = { version = "1.0.0", default-features = false, features = ["tls-ring"] }
+js-sys = "0.3"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+
+[profile.release]
+codegen-units = 1
+strip = "symbols"
+lto = true
+opt-level = "z"
+panic = "abort"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false  # spike: needs --enable-bulk-memory etc.; size pass comes with CI
