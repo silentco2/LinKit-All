@@ -3,13 +3,25 @@ name: Docs
 # The site lives at https://linkit-all.github.io/ (repo linkit-all/linkit-all.github.io, written
 # only by this workflow with the PAGES_DEPLOY_KEY deploy key). This repo's own Pages address,
 # silentco2.github.io/LinKit-All/, keeps every old page as a move notice to the new one.
-# The phone web app (docs/phone.md) is built here too and served at /app/.
+#
+# The phone web app (docs/phone.md) is served at /app/. It is built from the latest release tag
+# (v*), not from main, so it matches the LinKit All that users have installed on their PCs; a
+# release tag redeploys it. A release without the phone app leaves /app/ out.
 
 on:
   push:
     branches: [main]
-    paths: ["docs/**", "mkdocs.yml", "overrides/**", ".github/workflows/docs.yml", "landing/**", "scripts/build_site.py", "frontend/**"]
-  workflow_dispatch: # from another branch: publishes the new site only, never the old address
+    tags: ["v*"]
+    paths: ["docs/**", "mkdocs.yml", "overrides/**", ".github/workflows/docs.yml", "landing/**", "scripts/build_site.py"]
+  workflow_dispatch:
+    inputs:
+      app_ref:
+        description: "Build /app/ from this branch, tag or commit instead of the latest release"
+        default: ""
+      publish:
+        description: "Publish to linkit-all.github.io (off: only check that everything builds)"
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -25,28 +37,59 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the release tags
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --locked --only-group dev
       - run: uv run --no-sync mkdocs build --strict
-      # the phone app: its iroh tunnel in Rust -> WASM (ring needs the runner's clang), then the
-      # Angular "phone" build for /app/
-      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Pick the phone app's source (the latest release, or app_ref)
+        id: app
+        env:
+          APP_REF: ${{ inputs.app_ref }}
+        run: |
+          ref="$APP_REF"
+          [ -n "$ref" ] || ref=$(git tag --list 'v*' --sort=-v:refname | head -n 1)
+          git rev-parse -q --verify "$ref^{commit}" >/dev/null || ref="origin/$ref"
+          git worktree add --detach "$RUNNER_TEMP/app-src" "$ref"
+          if [ -d "$RUNNER_TEMP/app-src/frontend/tunnel" ]; then
+            echo "dir=$RUNNER_TEMP/app-src/frontend" >> "$GITHUB_OUTPUT"
+            echo "/app/ is built from $ref" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::notice::$ref has no phone app yet: /app/ is left out"
+          fi
+      # its iroh tunnel in Rust -> WASM (ring needs the runner's clang), then the Angular "phone" build
+      - if: steps.app.outputs.dir
+        uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
-      - uses: taiki-e/install-action@v2
+      - if: steps.app.outputs.dir
+        uses: taiki-e/install-action@v2
         with:
           tool: wasm-pack
-      - run: wasm-pack build --release --target web --out-dir pkg
-        working-directory: frontend/tunnel
-      - uses: actions/setup-node@v4
+      - if: steps.app.outputs.dir
+        run: wasm-pack build --release --target web --out-dir pkg
+        working-directory: ${{ steps.app.outputs.dir }}/tunnel
+      - if: steps.app.outputs.dir
+        uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - run: npm ci && npx ng build --configuration phone
-        working-directory: frontend
-      - run: uv run --no-sync python scripts/build_site.py --docs site --landing landing --out _site --app frontend/dist/phone/browser --moved-out _old
+      - if: steps.app.outputs.dir
+        run: npm ci && npx ng build --configuration phone
+        working-directory: ${{ steps.app.outputs.dir }}
+
+      - name: Build the site
+        env:
+          APP_DIR: ${{ steps.app.outputs.dir }}
+        run: |
+          app=()
+          [ -n "$APP_DIR" ] && app=(--app "$APP_DIR/dist/phone/browser")
+          uv run --no-sync python scripts/build_site.py --docs site --landing landing --out _site \
+            "${app[@]}" --moved-out _old
       - name: Publish to linkit-all.github.io
+        if: github.event_name != 'workflow_dispatch' || inputs.publish
         env:
           DEPLOY_KEY: ${{ secrets.PAGES_DEPLOY_KEY }}
         run: |
@@ -63,13 +106,13 @@ jobs:
             commit -q -m "Site from $GITHUB_REPOSITORY@$GITHUB_SHA"
           GIT_SSH_COMMAND="ssh -i ~/.ssh/pages_key -o IdentitiesOnly=yes" \
             git push -q --force git@github.com:linkit-all/linkit-all.github.io.git main
-      - if: github.ref == 'refs/heads/main'
+      - if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.publish)
         uses: actions/upload-pages-artifact@v3
         with:
           path: _old
 
   old-address:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.publish)
     needs: deploy
     runs-on: ubuntu-latest
     environment:
