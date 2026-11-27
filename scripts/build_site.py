@@ -1,11 +1,12 @@
 """Build the GitHub Pages site: landing at /, MkDocs docs at /docs/, stubs at old docs URLs.
 
 The site lives at https://linkit-all.github.io/ (published to linkit-all/linkit-all.github.io).
+`--app` adds the phone web app at /app/ (the Angular "phone" build, docs/phone.md).
 `--moved-out` also builds the old address (silentco2.github.io/LinKit-All/): every page there
 sends the reader and search engines to the same page at the new address.
 
 Usage: uv run --no-sync python scripts/build_site.py --docs site --landing landing --out _site
-       --moved-out _old
+       --app frontend/dist/phone/browser --moved-out _old
 """
 
 from __future__ import annotations
@@ -19,6 +20,9 @@ from pathlib import Path
 
 BASE = "https://linkit-all.github.io/"
 OLD_BASE = "https://silentco2.github.io/LinKit-All/"
+# GitHub Pages has no fallback to index.html: each page the phone app can open or reload at
+# (frontend/src/app/app.routes.ts; on the phone Settings shows only "phone") gets a copy
+APP_PAGES = ("home", "jobs", "needs-you", "pair", "settings", "settings/phone", "welcome")
 STUB = (
     '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
     "<title>Moved to {url}</title>"
@@ -57,7 +61,7 @@ def _page_path(rel: Path) -> str:
     return rel.as_posix()
 
 
-def build(docs: Path, landing: Path, out: Path) -> None:
+def build(docs: Path, landing: Path, out: Path, app: Path | None = None) -> None:
     if out.exists():
         shutil.rmtree(out)
     shutil.copytree(docs, out / "docs")
@@ -92,7 +96,16 @@ def build(docs: Path, landing: Path, out: Path) -> None:
         f'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n{body}</urlset>\n',
         encoding="utf-8",
     )
-    (out / "robots.txt").write_text(f"User-agent: *\nAllow: /\n\nSitemap: {BASE}sitemap.xml\n")
+    if app is not None:
+        shutil.copytree(app, out / "app")
+        index = (out / "app" / "index.html").read_text(encoding="utf-8")
+        for page in APP_PAGES:
+            (out / "app" / page).mkdir(parents=True, exist_ok=True)
+            (out / "app" / page / "index.html").write_text(index, encoding="utf-8")
+    # the phone app is a tool for paired phones, not a page to find in search
+    (out / "robots.txt").write_text(
+        f"User-agent: *\nAllow: /\nDisallow: /app/\n\nSitemap: {BASE}sitemap.xml\n"
+    )
 
 
 def _js(url: str) -> str:
@@ -111,6 +124,8 @@ def build_moved(site: Path, out: Path) -> None:
     for src in sorted(site.rglob("*")):
         rel = src.relative_to(site)
         if not src.is_file() or rel.name in ("sitemap.xml", "robots.txt", "404.html"):
+            continue
+        if rel.parts[0] == "app":  # the phone app never lived at the old address
             continue
         dest = out / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -141,9 +156,10 @@ def main() -> None:
     p.add_argument("--docs", type=Path, default=Path("site"))
     p.add_argument("--landing", type=Path, default=Path("landing"))
     p.add_argument("--out", type=Path, default=Path("_site"))
+    p.add_argument("--app", type=Path, help="the phone web app's build, served at /app/")
     p.add_argument("--moved-out", type=Path, help="also build the old address's move notices")
     a = p.parse_args()
-    build(a.docs, a.landing, a.out)
+    build(a.docs, a.landing, a.out, a.app)
     print(f"built {a.out}")
     if a.moved_out:
         build_moved(a.out, a.moved_out)

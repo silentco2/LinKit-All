@@ -1,31 +1,36 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Api } from '../api';
 import { TPipe } from '../i18n';
+import { hasPc, pendingCode, savePairing } from '../net';
 import { REMOTE } from '../remote';
 
-/** The phone's first page (docs/phone.md): the QR code opens /pair#CODE; the code is traded for the device cookie. */
+type Step = 'pairing' | 'homeScreen' | 'scan' | 'unpaired' | 'failed';
+
+/**
+ * The phone's first page (docs/phone.md). The QR code on the PC opens
+ * linkit-all.github.io/app/#pc=..&code=..&relay=..; this page trades the code for the token at
+ * once, no typing. An iPhone pairs in its Home Screen copy (it keeps its own storage), so
+ * Safari first asks for Add to Home Screen.
+ */
 @Component({
   selector: 'app-pair',
   imports: [RouterLink, TPipe],
   template: `
     <div class="mx-auto max-w-md">
-      <h1>{{ 'pair.title' | t }}</h1>
+      <h1>{{ (step() === 'homeScreen' ? 'pair.home.title' : 'pair.title') | t }}</h1>
       @if (remote) {
-        <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">{{ 'pair.intro' | t }}</p>
-        <form class="card mt-6 space-y-4" (submit)="claim($event)">
-          <div>
-            <label class="label" for="pair-code">{{ 'pair.code' | t }}</label>
-            <input id="pair-code" class="input font-mono tracking-widest" dir="ltr" maxlength="16" autocomplete="one-time-code"
-                   autocapitalize="characters" spellcheck="false" [value]="code()" (input)="code.set(val($event))">
-          </div>
-          <div>
-            <label class="label" for="pair-name">{{ 'pair.name' | t }}</label>
-            <input id="pair-name" class="input" dir="auto" maxlength="80" [value]="name()" (input)="name.set(val($event))">
-          </div>
-          @if (error()) { <div class="alert alert-error" role="alert" dir="auto">{{ error() }}</div> }
-          <button type="submit" class="btn btn-primary" [disabled]="busy() || !code().trim()">{{ 'pair.go' | t }}</button>
-        </form>
+        @switch (step()) {
+          @case ('pairing') { <p class="mt-3" role="status">{{ 'pair.intro' | t }}</p> }
+          @case ('homeScreen') { <p class="mt-3">{{ 'pair.home.steps' | t }}</p> }
+          @case ('scan') { <p class="mt-3">{{ 'pair.scan' | t }}</p> }
+          @case ('unpaired') { <p class="mt-3">{{ 'pair.unpaired' | t }}</p> }
+          @case ('failed') {
+            <div class="alert alert-error mt-3" role="alert" dir="auto">{{ error() }}</div>
+            <p class="mt-3 text-sm">{{ 'pair.scan' | t }}</p>
+            <button type="button" class="btn mt-3" (click)="claim()">{{ 'pair.retry' | t }}</button>
+          }
+        }
       } @else {
         <p class="mt-2 text-sm">{{ 'pair.onPc' | t }}</p>
         <a class="btn mt-4" routerLink="/settings/phone">{{ 'pair.toSettings' | t }}</a>
@@ -33,31 +38,32 @@ import { REMOTE } from '../remote';
     </div>
   `,
 })
-export class PairPage {
+export class PairPage implements OnInit {
   private readonly api = inject(Api);
   protected readonly remote = REMOTE;
-  protected readonly code = signal(location.hash.slice(1));
-  protected readonly name = signal(/iPhone|iPad/.test(navigator.userAgent) ? 'iPhone' : /Android/.test(navigator.userAgent) ? 'Android' : '');
-  protected readonly busy = signal(false);
+  protected readonly step = signal<Step>('pairing');
   protected readonly error = signal('');
+  private readonly code = pendingCode();
 
-  constructor() {
-    // the code is spent once used; keep it out of the address bar and history either way
-    if (location.hash) history.replaceState(null, '', location.pathname);
+  ngOnInit(): void {
+    if (!REMOTE) return;
+    const iphone = /iPhone|iPad/.test(navigator.userAgent);
+    const homeScreen = (navigator as { standalone?: boolean }).standalone === true || matchMedia('(display-mode: standalone)').matches;
+    if (!this.code) this.step.set(hasPc() ? 'unpaired' : 'scan');
+    else if (iphone && !homeScreen) this.step.set('homeScreen');
+    else void this.claim();
   }
 
-  protected async claim(e: Event): Promise<void> {
-    e.preventDefault();
-    this.busy.set(true);
-    this.error.set('');
+  protected async claim(): Promise<void> {
+    this.step.set('pairing');
     try {
-      await this.api.post('/phone/claim', { code: this.code(), name: this.name() });
-      location.assign('/'); // a fresh start: the live connection and every page now carry the cookie
-    } catch (err) {
-      this.error.set((err as Error).message);
-      this.busy.set(false);
+      const name = /iPhone/.test(navigator.userAgent) ? 'iPhone' : /iPad/.test(navigator.userAgent) ? 'iPad' : /Android/.test(navigator.userAgent) ? 'Android' : 'Phone';
+      const { token } = await this.api.post<{ id: number; token: string }>('/phone/claim', { code: this.code, name });
+      savePairing(token);
+      location.assign(document.baseURI); // a fresh start: the live view and every page now carry the token
+    } catch (e) {
+      this.error.set((e as Error).message);
+      this.step.set('failed');
     }
   }
-
-  protected val = (e: Event): string => (e.target as HTMLInputElement).value;
 }

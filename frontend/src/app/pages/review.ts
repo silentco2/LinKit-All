@@ -2,6 +2,7 @@ import { Component, computed, effect, ElementRef, inject, OnDestroy, signal, Wri
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Api, ApiError } from '../api';
+import { apiFetch } from '../net';
 import { AllClear } from '../components/all-clear';
 import { Toast } from '../components/toast';
 import { I18n, SourcePipe, TPipe } from '../i18n';
@@ -304,7 +305,7 @@ export class ReviewPage implements OnDestroy {
     const body = { ids: batch.ids, action: batch.action };
     try {
       if (keepalive) {
-        await fetch('/api/jobs/actions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), keepalive: true });
+        await apiFetch('/api/jobs/actions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), keepalive: true });
         return;
       }
       await this.api.post('/jobs/actions', body);

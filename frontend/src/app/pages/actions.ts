@@ -10,6 +10,7 @@ import { VaultGate, VaultReady } from '../components/vault-gate';
 import { I18n, MsgPipe, TPipe } from '../i18n';
 import { Live } from '../live';
 import { fmtNum, labelOr, localeOf } from '../locale';
+import { apiSrc } from '../net';
 import { REMOTE } from '../remote';
 import { Shell } from '../shell';
 import { ActionDecision, ActionGroup, ActionItem, ActionKind, ActionQuestion, AnswerValue, Remember, Status } from '../types';
@@ -728,7 +729,7 @@ export class ActionsPage {
       if (this.hasPage(a) && !this.primaryOpensBrowser(a) && !this.ownBrowser(a.kind)) list.push({ id: 'page', label: t('actions.openPage'), href: a.job.apply_url });
       if (this.windowOpenFor(a)) list.push({ id: 'closeBrowser', label: t('actions.browser.close') });
       else if (this.browserKind(a.kind) && !this.primaryOpensBrowser(a) && !this.isSetup(a)) list.push({ id: 'browser', label: t('actions.browser.openBtn'), disabled: this.browser().open });
-      for (const n of this.range(a.screenshots)) list.push({ id: `shot${n}`, label: t('actions.viewShot', { n: n + 1 }), href: this.shot(a.id, n) });
+      for (const n of this.range(a.screenshots)) list.push({ id: `shot${n}`, label: t('actions.viewShot', { n: n + 1 }), href: REMOTE ? undefined : this.shot(a.id, n) });
       if (!this.ownBrowser(a.kind)) list.push({ id: 'byHand', label: t('actions.byHand') });
       list.push({ id: 'closed', label: t('actions.markClosed') });
       list.push({ id: 'skip', label: t('actions.skip'), danger: true });
@@ -738,7 +739,8 @@ export class ActionsPage {
   });
 
   protected more(a: ActionItem, id: string): void {
-    if (id === 'saveDraft') void this.saveDraft(a);
+    if (id.startsWith('shot')) this.openShot(a, Number(id.slice(4))); // the phone: through the tunnel
+    else if (id === 'saveDraft') void this.saveDraft(a);
     else if (id === 'retry') void this.send(a, 'retry');
     else if (id === 'browser') void this.openBrowser(a);
     else if (id === 'closeBrowser') void this.closeBrowser(a);
@@ -757,6 +759,12 @@ export class ActionsPage {
   sourceLabel = (s: string): string => labelOr(this.i18n, 'common.answerSource.', s || 'unknown');
   range = (n: number): number[] => Array.from({ length: n }, (_, i) => i);
   shot = (id: number, n: number): string => `/api/actions/${id}/screenshot/${n}`;
+
+  /** Open the window now (still the tap's gesture), fill it once the image came through the tunnel. */
+  private openShot(a: ActionItem, n: number): void {
+    const w = window.open('', '_blank');
+    void apiSrc(this.shot(a.id, n)).then((src) => (w ? (w.location.href = src) : undefined));
+  }
   when = (iso: string): string => new Date(iso).toLocaleString(this.loc());
   sourceClass = (s: string): string => SOURCES[s] ?? 'tier-low';
   val = (e: Event): string => (e.target as HTMLInputElement).value;

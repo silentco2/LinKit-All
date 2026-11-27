@@ -75,3 +75,33 @@ def test_build(tmp_path: Path) -> None:
     assert "<loc>https://silentco2.github.io/LinKit-All/docs/install/</loc>" in old_map
     assert "<loc>https://silentco2.github.io/LinKit-All/</loc>" in old_map
     assert not (old / "robots.txt").exists()
+
+
+def test_phone_app_at_app(tmp_path: Path) -> None:
+    import re
+
+    docs, landing, app, out = (tmp_path / n for n in ("site", "landing", "phone", "_site"))
+    docs.mkdir()
+    (docs / "index.html").write_text("docs home")
+    (docs / "sitemap.xml").write_text("<urlset></urlset>")
+    landing.mkdir()
+    (landing / "index.html").write_text("LANDING")
+    (app / "tunnel").mkdir(parents=True)
+    (app / "index.html").write_text('<base href="/app/">PHONE')
+    (app / "tunnel" / "linkit_tunnel_bg.wasm").write_bytes(b"\0asm")
+
+    build_site.build(docs, landing, out, app)
+
+    assert (out / "app" / "index.html").read_text().endswith("PHONE")
+    assert (out / "app" / "tunnel" / "linkit_tunnel_bg.wasm").is_file()
+    for page in ("needs-you", "pair", "settings/phone"):  # reloads and the push tap open these
+        assert (out / "app" / page / "index.html").read_text().endswith("PHONE")
+    assert "Disallow: /app/" in (out / "robots.txt").read_text()
+    assert "/app/" not in (out / "sitemap.xml").read_text()
+    build_site.build_moved(out, tmp_path / "_old")
+    assert not (tmp_path / "_old" / "app").exists()
+
+    # every page the app can open has its copy: the routes file is the source of truth
+    routes = (Path(__file__).parents[2] / "frontend" / "src" / "app" / "app.routes.ts").read_text()
+    static = {p for p in re.findall(r"path: '([^']*)'", routes) if p and p != "**" and ":" not in p}
+    assert static <= set(build_site.APP_PAGES)

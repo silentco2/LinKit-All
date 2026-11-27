@@ -1,8 +1,10 @@
+import { AsyncPipe } from '@angular/common';
 import { Component, computed, effect, inject, input, OnDestroy, output, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Api } from '../api';
 import { I18n, MsgPipe, SourcePipe, TPipe } from '../i18n';
 import { DtPipe, fmtNum, labelOr, localeOf } from '../locale';
+import { ApiSrcPipe } from '../api-src';
 import { AnswerSheet } from '../components/answer-sheet';
 import { PatchDiff } from '../components/patch-diff';
 import { Toast } from '../components/toast';
@@ -22,7 +24,7 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
 
 @Component({
   selector: 'app-job-detail',
-  imports: [AnswerSheet, DtPipe, MsgPipe, PatchDiff, RouterLink, SourcePipe, Toast, TPipe],
+  imports: [ApiSrcPipe, AsyncPipe, AnswerSheet, DtPipe, MsgPipe, PatchDiff, RouterLink, SourcePipe, Toast, TPipe],
   template: `
     @if (error()) {
       <div class="alert alert-error" dir="auto">{{ error() }}</div>
@@ -221,7 +223,7 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
               </p>
             }
             @if (t.status === 'tailored') {
-              <a class="btn mt-3 no-underline hover:no-underline" [href]="'/api/jobs/' + j.id + '/tailored.pdf'" target="_blank" rel="noopener noreferrer">{{ 'detail.tailor.download' | t }}</a>
+              <a class="btn mt-3 no-underline hover:no-underline" [href]="('/api/jobs/' + j.id + '/tailored.pdf') | apiSrc | async" target="_blank" rel="noopener noreferrer">{{ 'detail.tailor.download' | t }}</a>
             }
           </section>
         }
@@ -265,7 +267,7 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
                 @if (e.screenshots) {
                   <span class="ms-1">
                     @for (n of range(e.screenshots); track n) {
-                      <a class="me-1 underline" [href]="shot(e.id, n)" target="_blank" rel="noopener noreferrer"><img class="inline-block h-12 rounded border border-slate-200 align-middle dark:border-slate-700" [src]="shot(e.id, n)" [alt]="'detail.screenshot' | t: { n: n + 1 }" loading="lazy"></a>
+                      <a class="me-1 underline" [href]="shot(e.id, n) | apiSrc | async" target="_blank" rel="noopener noreferrer"><img class="inline-block h-12 rounded border border-slate-200 align-middle dark:border-slate-700" [src]="shot(e.id, n) | apiSrc | async" [alt]="'detail.screenshot' | t: { n: n + 1 }" loading="lazy"></a>
                     }
                   </span>
                 }

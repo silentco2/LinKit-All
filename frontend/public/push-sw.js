@@ -22,5 +22,5 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   if (event.notification.tag !== 'linkit-needs-you') return;
   event.notification.close();
-  event.waitUntil(clients.openWindow('/needs-you'));
+  event.waitUntil(clients.openWindow(new URL('needs-you', self.registration.scope).href));
 });

@@ -1,6 +1,7 @@
 import { Component, computed, inject, input, OnInit, signal } from '@angular/core';
 import { Api } from '../api';
 import { I18n, TPipe } from '../i18n';
+import { apiFetch, apiSrc } from '../net';
 import { Profile } from '../types';
 
 export interface SheetRow { label: string; value: string }
@@ -89,11 +90,11 @@ export class AnswerSheet implements OnInit {
     this.cvError.set(false);
     try {
       for (const src of this.cvs()) {
-        const res = await fetch(src);
+        const res = await apiFetch(src);
         if (!res.ok) continue;
         const file = new File([await res.blob()], 'CV.pdf', { type: 'application/pdf' });
         if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: this.title() });
-        else window.open(src, '_blank', 'noopener');
+        else window.open(await apiSrc(src), '_blank', 'noopener');
         return;
       }
       this.cvError.set(true);

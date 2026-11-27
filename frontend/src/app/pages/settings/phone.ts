@@ -7,11 +7,11 @@ import { REMOTE } from '../../remote';
 interface PhoneDevice { id: number; name: string; created: string; last_seen: string }
 interface PhoneStatus {
   enabled: boolean;
-  host: string;
-  address: string;
+  online: boolean;
+  error: string;
+  relay: string;
   this_device: number | null;
   devices?: PhoneDevice[];
-  detected_host?: string;
 }
 interface PairCode { code: string; url: string; qr: string; expires_in: number }
 
@@ -40,22 +40,26 @@ const GUIDE = 'https://github.com/silentco2/LinKit-All/blob/main/docs/phone.md';
           <p class="text-sm text-slate-600 dark:text-slate-400">{{ 'phone.intro' | t }} <a [href]="guide" target="_blank" rel="noopener">{{ 'phone.guide' | t }}</a></p>
           <div class="space-y-3">
             <label class="flex items-center gap-2 text-sm font-medium">
-              <input type="checkbox" [checked]="enabled()" (change)="enabled.set(checked($event))"> {{ 'phone.enable' | t }}
+              <input type="checkbox" [checked]="s.enabled" [disabled]="busy()" (change)="save(checked($event))"> {{ 'phone.enable' | t }}
             </label>
-            <div>
-              <label class="label" for="phone-host">{{ 'phone.host' | t }}</label>
-              <input id="phone-host" class="input" dir="ltr" placeholder="pc.tail1234.ts.net" [value]="host()" (input)="host.set(val($event))">
-              <p class="hint">{{ 'phone.hostHint' | t }}</p>
-            </div>
-            <button type="button" class="btn" [disabled]="busy()" (click)="save()">{{ 'phone.save' | t }}</button>
+            @if (s.enabled) {
+              @if (s.online) { <p class="text-sm text-green-700 dark:text-green-400" role="status">{{ 'phone.online' | t }}</p> }
+              @else if (s.error) { <div class="alert alert-error" role="alert" dir="auto">{{ s.error }}</div> }
+              @else { <p class="text-sm text-slate-500" role="status">{{ 'phone.connecting' | t }}</p> }
+            }
+            <details class="text-sm">
+              <summary class="cursor-pointer">{{ 'phone.relay' | t }}</summary>
+              <input id="phone-relay" class="input mt-2" dir="ltr" placeholder="https://" [attr.aria-label]="'phone.relay' | t"
+                     [value]="relay()" (input)="relay.set(val($event))" (change)="save(s.enabled)">
+              <p class="hint">{{ 'phone.relayHint' | t }}</p>
+            </details>
           </div>
 
-          @if (s.enabled) {
+          @if (s.enabled && s.online) {
             <div class="border-t border-slate-100 pt-5 dark:border-slate-800">
               <h3 class="font-semibold">{{ 'phone.pairTitle' | t }}</h3>
               @if (pairing(); as p) {
                 <img class="mt-3 size-56 rounded bg-white p-2" [src]="p.qr" [alt]="'phone.qrAlt' | t">
-                <p class="mt-2 text-sm">{{ 'phone.codeIs' | t }} <span class="font-mono text-lg tracking-widest whitespace-nowrap" dir="ltr">{{ p.code.slice(0, 4) }}-{{ p.code.slice(4) }}</span></p>
                 <p class="hint">{{ 'phone.expires' | t: { n: minutesLeft() } }}</p>
               } @else {
                 <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">{{ 'phone.pairIntro' | t }}</p>
@@ -94,8 +98,7 @@ export class PhoneSection implements OnInit, OnDestroy {
   protected readonly push = signal(false);
   protected readonly guide = GUIDE;
   protected readonly status = signal<PhoneStatus | null>(null);
-  protected readonly enabled = signal(false);
-  protected readonly host = signal('');
+  protected readonly relay = signal('');
   protected readonly pairing = signal<PairCode | null>(null);
   protected readonly minutesLeft = signal(5);
   protected readonly busy = signal(false);
@@ -139,16 +142,17 @@ export class PhoneSection implements OnInit, OnDestroy {
     try {
       const s = await this.api.get<PhoneStatus>('/phone');
       this.status.set(s);
-      this.enabled.set(s.enabled);
-      if (!this.host()) this.host.set(s.host || s.detected_host || '');
+      if (!this.relay()) this.relay.set(s.relay);
+      // still connecting: look again shortly (the tunnel needs a few seconds to reach a relay)
+      if (s.enabled && !s.online && !s.error && !this.pairing()) setTimeout(() => void this.load(), 2000);
     } catch (e) {
       this.error.set((e as Error).message);
     }
   }
 
-  protected async save(): Promise<void> {
+  protected async save(enabled: boolean): Promise<void> {
     await this.run(async () => {
-      this.status.set(await this.api.put<PhoneStatus>('/phone/remote', { enabled: this.enabled(), host: this.host() }));
+      this.status.set(await this.api.put<PhoneStatus>('/phone/remote', { enabled, relay: this.relay().trim() }));
       this.stop();
     });
   }

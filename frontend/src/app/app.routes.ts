@@ -1,11 +1,13 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router, Routes } from '@angular/router';
 import { Api } from './api';
+import { REMOTE } from './remote';
 import { Status } from './types';
 
 /** Send to `done` once the server says the required setup is done, else to the first-run flow. */
 const gate = (done: string): CanActivateFn => async () => {
   const router = inject(Router);
+  if (REMOTE) return router.parseUrl(done); // setup (CV, AI) happens on the PC, not on the phone
   try {
     const s = await inject(Api).get<Status>('/status');
     return router.parseUrl(s.setup.required_done ? done : '/welcome');
