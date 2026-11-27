@@ -3,7 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LinKit tunnel spike</title>
+<title>LinKit test</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="LinKit test">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-inline'; connect-src 'self' https: wss:; style-src 'unsafe-inline'">
+<link rel="apple-touch-icon" href="icon.png">
 <style>
   body { font: 15px/1.45 system-ui, sans-serif; margin: 1rem; background: #e5e2db; color: #1f1d1a; }
   pre { white-space: pre-wrap; word-break: break-all; background: #fff; padding: .75rem; border-radius: 6px; }
@@ -11,9 +15,10 @@
 </style>
 </head>
 <body>
-<h1>LinKit tunnel spike</h1>
+<h1>LinKit tunnel test</h1>
 <p>Link format: <code>#pc=&lt;id&gt;&amp;code=&lt;pairing code&gt;&amp;relay=&lt;relay url&gt;</code></p>
 <pre id="log"></pre>
+<button id="forget" type="button">Forget pairing (to test again)</button>
 <script type="module">
 import init, { Tunnel } from './pkg/linkit_tunnel.js';
 
@@ -58,9 +63,24 @@ async function call(tunnel, method, path, json) {
   return { ...res, text: dec.decode(res.body) };
 }
 
+document.getElementById('forget').onclick = () => {
+  localStorage.removeItem('linkit-device');
+  location.reload();
+};
+
 try {
   const params = new URLSearchParams(location.hash.slice(1));
   const [pc, code, relay] = [params.get('pc'), params.get('code'), params.get('relay')];
+  const iphone = /iPhone|iPad/.test(navigator.userAgent);
+  const homeScreen = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+  log(`${iphone ? 'iPhone' : 'Other'}, ${homeScreen ? 'Home Screen app' : 'browser tab'}; ` +
+      `link has PC id: ${pc ? 'yes' : 'no'}, code: ${code ? 'yes' : 'no'}; ` +
+      `already paired: ${localStorage.getItem('linkit-device') ? 'yes' : 'no'}`);
+  if (iphone && !homeScreen) {
+    // the Home Screen copy keeps its own storage: pair there, not in this Safari tab
+    log('Tap Share, then "Add to Home Screen", then open LinKit test from your Home Screen.', 'ok');
+    throw new Error('Waiting for the Home Screen app');
+  }
   if (!pc) throw new Error('No PC id in the link');
   let t0 = performance.now();
   await init();
