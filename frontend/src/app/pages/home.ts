@@ -123,7 +123,7 @@ interface TopSheet {
         </div>
       </section>
 
-      <div class="mt-10"><app-report /></div>
+      <div id="home-report" class="mt-10"><app-report /></div>
       <div class="mt-6"><app-searches /></div>
 
     } @else {

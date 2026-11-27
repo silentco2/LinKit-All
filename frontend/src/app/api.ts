@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { REMOTE } from './remote';
 
 /** An API failure: the server's message, its HTTP status and (409 refusals) a stable `code` the UI words itself. */
 export class ApiError extends Error {
@@ -19,6 +20,8 @@ export class Api {
       headers,
       body: file ?? (body !== undefined ? JSON.stringify(body) : undefined),
     });
+    // a phone that is not (or no longer) paired: the server answers 401 to everything but pairing
+    if (res.status === 401 && REMOTE && location.pathname !== '/pair') location.assign('/pair');
     if (!res.ok) throw await apiError(res);
     if (res.status === 204) return undefined as T;
     return res.json() as Promise<T>;

@@ -21,6 +21,7 @@ export const routes: Routes = [
   { path: 'settings/:section', title: 'Settings · LinKit All', loadComponent: () => import('./pages/settings/settings').then((m) => m.SettingsPage) },
   { path: 'jobs', title: 'Jobs · LinKit All', loadComponent: () => import('./pages/jobs').then((m) => m.JobsPage) },
   { path: 'home', title: 'Home · LinKit All', loadComponent: () => import('./pages/home').then((m) => m.HomePage) },
+  { path: 'pair', title: 'Pair this phone · LinKit All', loadComponent: () => import('./pages/pair').then((m) => m.PairPage) },
   { path: 'needs-you', title: 'Needs you · LinKit All', loadComponent: () => import('./pages/needs-you').then((m) => m.NeedsYouPage) },
   { path: '**', redirectTo: 'home' },
 ];

@@ -3,8 +3,10 @@ import { RouterLink } from '@angular/router';
 import { Api } from '../api';
 import { I18n, MsgPipe, SourcePipe, TPipe } from '../i18n';
 import { DtPipe, fmtNum, labelOr, localeOf } from '../locale';
+import { AnswerSheet } from '../components/answer-sheet';
 import { PatchDiff } from '../components/patch-diff';
 import { Toast } from '../components/toast';
+import { REMOTE } from '../remote';
 import { Shell } from '../shell';
 import { isLeftOut, JobDetail, Outcome, OUTCOMES, reasonSetting, reasonText, SCAM_MEDIUM, TrustVerdict } from '../types';
 import { SettingsStore } from './settings/store';
@@ -20,7 +22,7 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
 
 @Component({
   selector: 'app-job-detail',
-  imports: [DtPipe, MsgPipe, PatchDiff, RouterLink, SourcePipe, Toast, TPipe],
+  imports: [AnswerSheet, DtPipe, MsgPipe, PatchDiff, RouterLink, SourcePipe, Toast, TPipe],
   template: `
     @if (error()) {
       <div class="alert alert-error" dir="auto">{{ error() }}</div>
@@ -224,6 +226,16 @@ const FINAL = ['applied', 'skipped', 'filtered_out'];
           </section>
         }
 
+        @if (remote && (j.apply_url || j.url)) {
+          <section>
+            <button type="button" class="btn" [attr.aria-expanded]="sheet()" (click)="sheet.set(!sheet())">{{ 'sheet.button' | t }}</button>
+            @if (sheet()) {
+              <app-answer-sheet [url]="j.apply_url || j.url" [title]="j.title" [filled]="filledRows(j) ?? []"
+                                [cvs]="j.tailoring?.status === 'tailored' ? ['/api/jobs/' + j.id + '/tailored.pdf', '/api/profile/cv/pdf'] : ['/api/profile/cv/pdf']" />
+            }
+          </section>
+        }
+
         @if (filledRows(j); as rows) {
           <section>
             <h3 class="font-semibold">{{ 'detail.filled.title' | t }}</h3>
@@ -274,6 +286,9 @@ export class JobDetailPanel implements OnDestroy {
   private readonly store = inject(SettingsStore);
   private readonly shell = inject(Shell);
   protected readonly loc = computed(() => localeOf(this.i18n.lang()));
+  protected readonly remote = REMOTE;
+  /** "Apply on this phone": the answer sheet is open. */
+  protected readonly sheet = signal(false);
   readonly jobId = input.required<number>();
   readonly changed = output<void>();
   protected readonly job = signal<Detail | null>(null);
