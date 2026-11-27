@@ -66,7 +66,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.lo_installer = LibreOfficeInstaller(settings)
     app.state.runner = PipelineRunner(app.state.db, settings, app.state.bus, app.state.vault)
     app.state.scheduler = make_scheduler(app.state.db.kw["bind"])
-    app.add_middleware(LocalOnly, extra_origins=settings.dev_origins)
+    app.add_middleware(LocalOnly, extra_origins=settings.dev_origins, settings=settings)
     app.include_router(router)
     app.include_router(suggest_router)
     app.include_router(assist_router)

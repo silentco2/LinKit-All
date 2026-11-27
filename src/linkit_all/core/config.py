@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     data_dir: Path = Path(user_data_dir("linkit-all", appauthor=False))
     log_level: str = "INFO"
     dev_origins: list[str] = []  # e.g. ["http://localhost:4200"] while running `ng serve`
+    # Phone companion (docs/phone.md): off by default. The server still binds 127.0.0.1;
+    # `tailscale serve` proxies the PC's tailnet name (e.g. pc.tail1234.ts.net) to it.
+    remote_enabled: bool = False
+    remote_hosts: list[str] = []
 
     provider: ProviderName = "codex_cli"
     model: str | None = None  # None = the CLI's own default; required for litellm
