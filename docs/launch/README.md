@@ -57,7 +57,7 @@ Keep the list of names in your own notes, not in this repository.
 ## Before posting
 
 1. `uv tool install linkit-all` works on a clean machine and shows the new version.
-2. The docs site is live at https://silentco2.github.io/LinKit-All/.
+2. The docs site is live at https://linkit-all.github.io/.
 3. The social preview is uploaded (Settings → General → Social preview).
 4. Every number in a post still matches the README.
 5. Someone who writes Arabic natively has read the Arabic posts.
@@ -67,7 +67,7 @@ Keep the list of names in your own notes, not in this repository.
 - **Description:** Open-source AI job search that runs on your computer: finds jobs, ranks them
   against your CV, tailors it honestly and auto-fills applications. Bring your own AI (ChatGPT,
   Claude, Ollama).
-- **Website:** https://silentco2.github.io/LinKit-All/
+- **Website:** https://linkit-all.github.io/
 - **Topics (20, the cap):** `job-search`, `auto-apply`, `job-application`, `resume`, `cv`,
   `resume-tailoring`, `ai-agent`, `llm`, `ollama`, `local-llm`, `playwright`,
   `browser-automation`, `greenhouse`, `lever`, `workday`, `self-hosted`, `privacy`,

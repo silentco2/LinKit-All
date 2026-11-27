@@ -17,9 +17,9 @@ Open-source AI job search and auto-apply: it finds jobs, ranks them against your
 </p>
 
 <p align="center">
-  <a href="https://silentco2.github.io/LinKit-All/docs/install/"><b>Install</b></a> ·
-  <a href="https://silentco2.github.io/LinKit-All/docs/"><b>Docs</b></a> ·
-  <a href="https://silentco2.github.io/LinKit-All/docs/compare/"><b>Compare</b></a> ·
+  <a href="https://linkit-all.github.io/docs/install/"><b>Install</b></a> ·
+  <a href="https://linkit-all.github.io/docs/"><b>Docs</b></a> ·
+  <a href="https://linkit-all.github.io/docs/compare/"><b>Compare</b></a> ·
   <a href="https://github.com/silentco2/LinKit-All/discussions"><b>Discussions</b></a>
 </p>
 
@@ -39,7 +39,7 @@ Open-source AI job search and auto-apply: it finds jobs, ranks them against your
 
 It is an auto-apply tool, not a job application bot that sprays CVs: it applies on Greenhouse, Lever and Ashby with dedicated handlers, and on Workday and other sites through a general AI form agent. Looking for a LinkedIn Easy Apply alternative that won't get your account banned? LinKit All never drives LinkedIn, Indeed or Glassdoor. A browser extension fills those forms while you press Submit. It works on Windows, macOS and Linux.
 
-> **بالعربية:** الواجهة كاملة بالعربية، والترتيب وكشف الإعلانات المزيفة يعملان على الوظائف العربية. [الوثائق](https://silentco2.github.io/LinKit-All/docs/)
+> **بالعربية:** الواجهة كاملة بالعربية، والترتيب وكشف الإعلانات المزيفة يعملان على الوظائف العربية. [الوثائق](https://linkit-all.github.io/docs/)
 
 ## Quick start
 
@@ -51,7 +51,7 @@ linkit doctor     # checks LibreOffice, the browser and your AI tools
 linkit            # opens http://127.0.0.1:8765
 ```
 
-The first run opens a setup page: upload your CV, pick an AI, check what was found, say what jobs you want. Step by step for each system: [Install](https://silentco2.github.io/LinKit-All/docs/install/), then [Setup](https://silentco2.github.io/LinKit-All/docs/setup/).
+The first run opens a setup page: upload your CV, pick an AI, check what was found, say what jobs you want. Step by step for each system: [Install](https://linkit-all.github.io/docs/install/), then [Setup](https://linkit-all.github.io/docs/setup/).
 
 - **LibreOffice** is needed to tailor Word, OpenDocument and PDF CVs (LaTeX CVs need Tectonic instead). Without it, applications go out with your CV as uploaded. On Windows the app installs it for you in one click.
 - **Applying** needs Chrome, Edge, Brave or Chromium. Finding and ranking jobs do not.
@@ -90,14 +90,14 @@ uv run linkit
 | Sensitive questions | Never sent to the AI | Not stated | Answered with AI |
 | Telemetry | None | Not stated | Not stated |
 
-From each project's own README, read on 2026-11-12. Sources, caveats and where LinKit All is weaker: [full comparison](https://silentco2.github.io/LinKit-All/docs/compare/).
+From each project's own README, read on 2026-11-12. Sources, caveats and where LinKit All is weaker: [full comparison](https://linkit-all.github.io/docs/compare/).
 
 ## How well it works
 
-- **Real postings:** of 115 real job postings run in Practice mode with a made-up profile, 67 of the 70 the app may finish on its own (96%) went as far as Practice mode allows. Small sample, nothing submitted: see the [scorecard](https://silentco2.github.io/LinKit-All/docs/scorecard/).
+- **Real postings:** of 115 real job postings run in Practice mode with a made-up profile, 67 of the 70 the app may finish on its own (96%) went as far as Practice mode allows. Small sample, nothing submitted: see the [scorecard](https://linkit-all.github.io/docs/scorecard/).
 - **10,000 fake jobs:** 800 of 800 duplicates found, 92.9% of planted scams caught with 0 false alarms, 100% relevant jobs in the top 10, in 110 seconds.
 - **CV guard:** 17 of 19 planted dishonest edits refused, all 6 honest ones accepted.
-- These are tests the authors wrote, not real-world accuracy. Full tables and how to reproduce them: [Results and limits](https://silentco2.github.io/LinKit-All/docs/results/).
+- These are tests the authors wrote, not real-world accuracy. Full tables and how to reproduce them: [Results and limits](https://linkit-all.github.io/docs/results/).
 
 ## Limits
 
@@ -106,7 +106,7 @@ From each project's own README, read on 2026-11-12. Sources, caveats and where L
 - LinkedIn, Indeed and Glassdoor are never driven by the app; you apply there in your own browser with the LinKit Fill extension.
 - CAPTCHAs are never solved. The job waits for you.
 
-All limits: [Results and limits](https://silentco2.github.io/LinKit-All/docs/results/).
+All limits: [Results and limits](https://linkit-all.github.io/docs/results/).
 
 ## Privacy
 
@@ -114,7 +114,7 @@ All limits: [Results and limits](https://silentco2.github.io/LinKit-All/docs/res
 - Your CV and job text go only to the AI provider you choose. With a local model, they stay on your computer.
 - No telemetry, analytics or crash reporting.
 
-Everything the app connects to, and why: [Privacy and security](https://silentco2.github.io/LinKit-All/docs/privacy/).
+Everything the app connects to, and why: [Privacy and security](https://linkit-all.github.io/docs/privacy/).
 
 ## Roadmap
 

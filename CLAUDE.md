@@ -19,8 +19,9 @@ Users bring their own AI: ChatGPT plan via Codex CLI, API keys, and later local 
 - NO AI-guessed answers for legal/sensitive questions: work authorization, visa,
   sponsorship, salary, EEO/demographics, disability, veteran status, criminal record,
   legal declarations. Answer only from the profile or queue for the user.
-- All user data stays local. Only the chosen model provider receives CV/job text. Suggestions (places, titles, FX rates) come from bundled offline datasets; two refreshes send no personal data: FX rates, and the official visa sponsor lists of the user's visa countries (UK, NL, US H-1B, CA LMIA; at most weekly, core/sponsors.py).
+- All user data stays local. Only the chosen model provider receives CV/job text. With free providers, CV/job text goes to each free provider the user adds. Suggestions (places, titles, FX rates) come from bundled offline datasets; two refreshes send no personal data: FX rates, and the official visa sponsor lists of the user's visa countries (UK, NL, US H-1B, CA LMIA; at most weekly, core/sponsors.py).
 - No telemetry: problems go to GitHub issues the user opens and submits (footer links, pre-filled with version/OS/mode/AI/error code, nothing personal). No hard-coded secrets. Never log passwords, tokens or full CV text.
+- A paired phone (opt-in, off by default) reaches the PC only through an end-to-end encrypted iroh tunnel: the PC connects out; relays (n0's public ones by default, a setting) carry only encrypted data. LinKit runs no server and opens no port. The phone app is a web app at linkit-all.github.io/app/, built from this repo (no app stores); no other Pages site may exist in the linkit-all org. Each device token is tied to the phone's iroh key. Web push carries no content: the payload is only {"count": n}.
 - Never click a final Submit in dry-run mode.
 
 ## 3. Tech stack (do not swap without approval)
@@ -35,7 +36,8 @@ Users bring their own AI: ChatGPT plan via Codex CLI, API keys, and later local 
   (DOCX->PDF, ODT<->DOCX), PyMuPDF, pdfplumber, Pillow/scikit-image (layout diff).
 - Apply: Playwright (an installed Chromium browser — Chrome, else Edge, Brave or Chromium; core/tools.py browser_path() launched without automation flags, attached over CDP, persistent profile per site), imap-tools, msal (Outlook sign-in), vault via cryptography
   (AES-GCM) + argon2-cffi + keyring.
-- Frontend: Angular + TypeScript + Tailwind, Chart.js, ngx-fast-diff; built into the wheel.
+- Frontend: Angular + TypeScript + Tailwind, Chart.js, ngx-fast-diff, Angular service worker (PWA, app shell only); built into the wheel.
+- Phone: iroh (Python on the PC; a small Rust crate built to WASM for the phone web app, built in CI), pywebpush (VAPID keys in the data dir), device tokens per paired phone (api/devices.py).
 - Tooling: ruff, mypy, pre-commit, pytest (+ HTML fixtures), GitHub Actions, MkDocs Material.
 
 ## 4. Pipeline flow
@@ -165,6 +167,7 @@ event log + 3-second read-only screenshot view, report charts + folded tables, s
 AI, Advanced incl. Backups; everything autosaves). Ctrl/Cmd+K quick jump to jobs and pages; footer: report a problem / suggest a feature.
 UI words: Practice mode, Applying for real, Strong/Possible/Weak match, Needs you, Search. Code names unchanged.
 Look (maintainer 2026-11-08): the application desk. Paper sheets on a desk, folder tabs for counts and trays, a rubber stamp for outcomes only. Tokens in `frontend/src/styles.css` (Tailwind slate/brand scales remapped there); IBM Plex Sans + Arabic bundled, never web fonts.
+Phone (PWA, docs/phone.md): pair with one QR code (a linkit-all.github.io/app/ link carrying the PC's iroh id, its relay and a one-time code) -> device token; under 640px a bottom tab bar (Home run controls, Needs you, Jobs, Report; Settings shows only Phone and run options). "Apply on this phone" = answer sheet with one-tap copy + share the CV + open the link; no form filling on the phone. Remote sessions cannot read the vault or extension pairing code, export data, change AI keys or turn on "submit without asking".
 
 ## 8. Repository layout
 ```
@@ -179,7 +182,7 @@ src/linkit_all/
   extension/  LinKIt Fill browser extension (MV3, plain JS; snapshot.js mirrors apply/agent/snapshot.js)
   reports/ · cli.py  `linkit` (serve), `linkit doctor`, `linkit run <stage>`, `linkit apply-probe`, `linkit filter-audit`, `linkit why-missed`, `linkit seed-boards`, `linkit find-board`, `linkit source-check`, `linkit backup`, `linkit restore`
 frontend/     Angular 21 app (pages: welcome, home, jobs, needs-you, settings/) -> src/linkit_all/static (Angular 22 needs Node >= 24.15)
-tests/        unit, fixtures/<ats>/*.html, e2e (dry-run only) · docs/
+tests/        unit, fixtures/<ats>/*.html, e2e (dry-run only) · docs/ (incl. phone.md) + landing/ -> website at linkit-all.github.io (docs.yml; old address = move notices)
 ```
 
 ## 9. Working rules for agents
@@ -189,11 +192,11 @@ tests/        unit, fixtures/<ats>/*.html, e2e (dry-run only) · docs/
 - Ask before updating this file when a decision in it changes (max 200 lines). Unsure? Ask; don't guess.
 
 ## 10. Build order
-Phases 1-15 are built; blocked items below. 1 core, models, providers, DOCX tailoring · 2 discovery + matching
+Phases 1-16 are built; blocked items below. 1 core, models, providers, DOCX tailoring · 2 discovery + matching
 · 3 UI v1 · 4 apply v1 (Greenhouse, Lever, Ashby, answer bank, Action Center) · 5 vault, IMAP, account gate
 (Workday/iCIMS/Taleo/SuccessFactors blocked: need pages) · 6 careers extractor, AI form agent (Naukrigulf blocked)
 · 7 local models, LaTeX/ODT/PDF CVs, scheduler, reports, Arabic UI, Outlook OAuth (pending: macOS/Linux LO bundles,
-release) · 8 freehire ports · 9 debt · 10 trust filter · 11 LinkedIn hiring posts · 12 UX for V1 (UX7 usability round pending) · 13 autonomous apply: Apply-button hops, board accounts, assisted sites + LinKIt Fill, apply-probe · 14 career-ops ideas: knock-outs, outcomes, replies, follow-ups, 52 sources (docs/career-ops-borrow-plan.md) · 15 job-ops ideas: place radius, AI-phrase guard, add a job, checked job facts, Gradcracker/Jobindex/Naukri, visa sponsor lists, backups, source health, quick jump (docs/job-ops-borrow-plan.md).
+release) · 8 freehire ports · 9 debt · 10 trust filter · 11 LinkedIn hiring posts · 12 UX for V1 (UX7 usability round pending) · 13 autonomous apply: Apply-button hops, board accounts, assisted sites + LinKIt Fill, apply-probe · 14 career-ops ideas: knock-outs, outcomes, replies, follow-ups, 52 sources (docs/career-ops-borrow-plan.md) · 15 job-ops ideas: place radius, AI-phrase guard, add a job, checked job facts, Gradcracker/Jobindex/Naukri, visa sponsor lists, backups, source health, quick jump (docs/job-ops-borrow-plan.md) · 16 phone companion: PWA over an iroh tunnel, device pairing, answer sheet, content-free web push (docs/phone.md); website moved to linkit-all.github.io.
 
 ## 11. License
 AGPL-3.0-or-later (code reused from ApplyPilot/AIHawk). Reused files keep original headers, listed in NOTICE.

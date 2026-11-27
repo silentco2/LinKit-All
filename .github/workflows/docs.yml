@@ -1,10 +1,14 @@
 name: Docs
 
+# The site lives at https://linkit-all.github.io/ (repo linkit-all/linkit-all.github.io, written
+# only by this workflow with the PAGES_DEPLOY_KEY deploy key). This repo's own Pages address,
+# silentco2.github.io/LinKit-All/, keeps every old page as a move notice to the new one.
+
 on:
   push:
     branches: [main]
-    paths: ["docs/**", "mkdocs.yml", ".github/workflows/docs.yml", "landing/**", "scripts/build_site.py"]
-  workflow_dispatch:
+    paths: ["docs/**", "mkdocs.yml", "overrides/**", ".github/workflows/docs.yml", "landing/**", "scripts/build_site.py"]
+  workflow_dispatch: # from another branch: publishes the new site only, never the old address
 
 permissions:
   contents: read
@@ -18,17 +22,41 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --locked --only-group dev
       - run: uv run --no-sync mkdocs build --strict
-      - run: uv run --no-sync python scripts/build_site.py --docs site --landing landing --out _site
-      - uses: actions/upload-pages-artifact@v3
+      - run: uv run --no-sync python scripts/build_site.py --docs site --landing landing --out _site --moved-out _old
+      - name: Publish to linkit-all.github.io
+        env:
+          DEPLOY_KEY: ${{ secrets.PAGES_DEPLOY_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/pages_key && chmod 600 ~/.ssh/pages_key
+          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts
+          cd _site
+          touch .nojekyll
+          printf '# linkit-all.github.io\n\nBuilt from https://github.com/%s at %s. Do not edit here.\n' \
+            "$GITHUB_REPOSITORY" "$GITHUB_SHA" > README.md
+          git init -q -b main
+          git add -A
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "Site from $GITHUB_REPOSITORY@$GITHUB_SHA"
+          GIT_SSH_COMMAND="ssh -i ~/.ssh/pages_key -o IdentitiesOnly=yes" \
+            git push -q --force git@github.com:linkit-all/linkit-all.github.io.git main
+      - if: github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
         with:
-          path: _site
+          path: _old
+
+  old-address:
+    if: github.ref == 'refs/heads/main'
+    needs: deploy
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v4
