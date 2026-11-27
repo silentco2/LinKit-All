@@ -28,6 +28,8 @@ export const en: Record<string, string> = {
   'shell.report': 'Report a problem',
   'shell.suggest': 'Suggest a feature',
   'shell.reconnecting': 'Reconnecting…',
+  'shell.offline.title': 'PC not reachable',
+  'shell.offline.body': 'Check that your PC is on and awake, LinKit All is running on it, and Tailscale is connected on both.',
   'shell.runFailed': 'Search failed',
   'shell.runPaused': 'Search paused',
   'shell.runFinished': 'Search finished',

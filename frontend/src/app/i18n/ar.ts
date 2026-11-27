@@ -28,6 +28,8 @@ export const ar: Record<string, string> = {
   'shell.report': 'أبلغ عن مشكلة',
   'shell.suggest': 'اقترح ميزة',
   'shell.reconnecting': 'جارٍ إعادة الاتصال…',
+  'shell.offline.title': 'لا يمكن الوصول إلى الحاسوب',
+  'shell.offline.body': 'تأكد من أن حاسوبك يعمل وغير نائم، وأن LinKit All يعمل عليه، وأن Tailscale متصل على الجهازين.',
   'shell.runFailed': 'فشل البحث',
   'shell.runPaused': 'توقف البحث مؤقتًا',
   'shell.runFinished': 'انتهى البحث',

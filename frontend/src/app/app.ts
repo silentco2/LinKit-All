@@ -57,6 +57,13 @@ const FRESH_MS = 60_000; // a run that ended longer ago than this is replayed hi
       </header>
       }
       <main class="mx-auto w-full max-w-[76rem] min-w-0 flex-1 overflow-x-auto px-4 pt-4 pb-12 md:px-8" [class.pt-8]="welcome()">
+        @if (shell.unreachable() && !live.connected()) {
+          <div class="card mb-6" role="alert">
+            <h2 class="text-lg font-semibold">{{ 'shell.offline.title' | t }}</h2>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">{{ 'shell.offline.body' | t }}</p>
+            <button type="button" class="btn mt-3" (click)="shell.refresh()">{{ 'welcome.retry' | t }}</button>
+          </div>
+        }
         <router-outlet />
       </main>
       <app-quick-jump #jump />
