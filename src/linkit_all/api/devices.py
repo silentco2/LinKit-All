@@ -27,11 +27,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, sessionmaker
 
+from linkit_all.api.security import COOKIE_MAX_AGE
+from linkit_all.api.security import DEVICE_COOKIE as COOKIE
 from linkit_all.core.config import Settings
 from linkit_all.core.models import Device, PushSubscription, utcnow
 
-COOKIE = "linkit_device"
-COOKIE_DAYS = 400  # the longest lifetime browsers keep a cookie
 CODE_TTL = 300.0  # seconds
 MAX_FAILURES = 5  # wrong codes per minute; then 429 and the pending code is dropped
 ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"  # no 0/O, 1/I/L
@@ -230,7 +230,7 @@ def claim(request: Request, body: Claim, response: Response) -> dict[str, Any]:
         s.commit()
         dev_id = dev.id
     response.set_cookie(
-        COOKIE, token, max_age=COOKIE_DAYS * 86400, path="/",
+        COOKIE, token, max_age=COOKIE_MAX_AGE, path="/",
         httponly=True, secure=True, samesite="strict",
     )  # fmt: skip
     return {"id": dev_id}
@@ -245,3 +245,4 @@ def revoke(request: Request, device_id: int) -> None:
         dev.revoked = True
         s.execute(delete(PushSubscription).where(PushSubscription.device_id == device_id))
         s.commit()
+    request.app.state.bus.revoke_threadsafe(device_id)  # and its open live view

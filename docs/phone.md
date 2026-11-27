@@ -58,7 +58,8 @@ your email settings, or turn on *Submit without asking me first*. Do those on th
 The code works once, for 5 minutes. If it runs out, show a new one. After 5 wrong codes in a
 minute, pairing pauses for a minute.
 
-The phone stays paired for about a year, then you pair it again.
+The phone stays paired until you unpair it. Only a phone left unused for over a year has to
+pair again.
 
 ### Add it to your home screen
 

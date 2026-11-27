@@ -265,3 +265,48 @@ def test_revoke_drops_push(client: TestClient, pushes: list[dict[str, object]]) 
     client.delete(f"/api/phone/devices/{dev}")
     app = client.app
     assert send(app.state.db, app.state.settings, 3) == 0  # type: ignore[attr-defined]
+
+
+# --- follow-ups: network-share paths, unpair closes the live view, rolling cookie --------
+
+
+def test_spa_never_touches_a_network_share(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`//host/share` would make Windows open an SMB link and send the user's NTLM hash."""
+    touched: list[str] = []
+    resolve = Path.resolve
+
+    def spy(self: Path, strict: bool = False) -> Path:
+        touched.append(str(self))
+        return resolve(self, strict)
+
+    monkeypatch.setattr(Path, "resolve", spy)
+    for url in ("/%2F%2Fevil/share/x.js", "/%5C%5Cevil%5Cshare%5Cx.js", "/C:/evil/x.js"):
+        assert client.get(url).status_code in (200, 404)  # the app shell, or "UI not built"
+        assert client.get(f"{PHONE}{url}", headers=FWD).status_code in (200, 404)
+    assert not [p for p in touched if "evil" in p]
+
+
+def test_unpairing_closes_the_open_live_view(client: TestClient) -> None:
+    from starlette.websockets import WebSocketDisconnect
+
+    dev = _pair(client)
+    token = client.cookies.get("linkit_device", domain=TAILNET)
+    headers = {**FWD, "origin": PHONE, "cookie": f"linkit_device={token}"}
+    with client.websocket_connect(f"wss://{TAILNET}/api/events", headers=headers) as ws:
+        assert client.delete(f"/api/phone/devices/{dev}").status_code == 204
+        with pytest.raises(WebSocketDisconnect) as closed:
+            while True:  # replayed history first, then the close
+                ws.receive_json()
+        assert closed.value.code == 1008
+
+
+def test_cookie_renews_on_each_use(client: TestClient) -> None:
+    _pair(client)
+    token = client.cookies.get("linkit_device", domain=TAILNET)
+    r = client.get(f"{PHONE}/api/status", headers=FWD)
+    cookie = r.headers["set-cookie"].lower()
+    assert f"linkit_device={token.lower()}" in cookie and "max-age=34560000" in cookie
+    assert "httponly" in cookie and "secure" in cookie and "samesite=strict" in cookie
+    assert "set-cookie" not in client.get("/api/status").headers  # the PC has no device cookie

@@ -4,7 +4,7 @@ import asyncio
 import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
@@ -94,8 +94,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # index.html must be revalidated, or browsers keep an old build for hours (no Cache-Control
         # means a guessed lifetime); the hashed JS/CSS names change per build, so they cache fine
         fresh = {"Cache-Control": "no-cache"}
-        file = (STATIC / path).resolve()
-        if path and file.is_file() and file.is_relative_to(STATIC.resolve()):
+        # a rooted, drive or UNC path (`//host/share`) would make Windows open an SMB link and
+        # send the user's NTLM hash: refuse it on its text, before anything touches the disk
+        win = PureWindowsPath(path)
+        safe = path and not win.anchor and ".." not in win.parts
+        file = (STATIC / path).resolve() if safe else STATIC
+        if safe and file.is_file() and file.is_relative_to(STATIC.resolve()):
             return FileResponse(file, headers=fresh if file.suffix == ".html" else None)
         index = STATIC / "index.html"
         if not index.is_file():

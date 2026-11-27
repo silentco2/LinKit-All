@@ -23,7 +23,7 @@ from rapidfuzz import fuzz
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from linkit_all.api.events import EventBus
+from linkit_all.api.events import REVOKED, EventBus
 from linkit_all.api.runner import PipelineRunner, RunBlocked, RunBusy
 from linkit_all.apply.answers import ApplicationAnswers, Question, sensitive_category
 from linkit_all.apply.assist import GENERAL, AnswerBank, scope_of
@@ -1221,14 +1221,15 @@ def report_pdf(request: Request, run_id: int | None = None, since: date | None =
 async def events(ws: WebSocket) -> None:
     bus: EventBus = ws.app.state.bus
     await ws.accept()
-    q = bus.subscribe()
+    q = bus.subscribe(getattr(ws.state, "device", None))
     try:
         for event in list(bus.recent):
             await ws.send_json(event)
         if bus.last_shot is not None:
             await ws.send_json(bus.last_shot)
-        while True:
-            await ws.send_json(await q.get())
+        while (event := await q.get()) is not REVOKED:
+            await ws.send_json(event)
+        await ws.close(1008)  # the phone was unpaired on the PC
     except WebSocketDisconnect:
         pass
     finally:

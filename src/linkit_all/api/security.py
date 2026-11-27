@@ -25,6 +25,7 @@ SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 # set by `tailscale serve` (and any other reverse proxy): a local browser never sends them
 PROXY_HEADERS = ("x-forwarded-for", "x-forwarded-host", "forwarded", "tailscale-user-login")
 DEVICE_COOKIE = "linkit_device"  # api/devices.py
+COOKIE_MAX_AGE = 400 * 86400  # the longest browsers keep a cookie; renewed on each use
 # the PC only (CLAUDE.md §7 Phone): secrets, the extension's pairing code, exports, AI and other
 # keys, mail passwords, and pairing itself. PUT /api/search guards the AI and auto-submit there.
 REMOTE_FORBIDDEN = (
@@ -52,6 +53,21 @@ def _cookie(headers: dict[str, str], name: str) -> str:
     except CookieError:
         return ""
     return morsel.value if morsel else ""
+
+
+def _renew_cookie(send: Send, token: str) -> Send:
+    """Re-issue the device cookie on each answer, so a phone in use never has to pair again."""
+    cookie = (
+        f"{DEVICE_COOKIE}={token}; Max-Age={COOKIE_MAX_AGE}; Path=/; HttpOnly; Secure; "
+        "SameSite=Strict"
+    ).encode("latin-1")
+
+    async def wrapped(message: MutableMapping[str, Any]) -> None:
+        if message["type"] == "http.response.start":
+            message = {**message, "headers": [*message.get("headers", []), (b"set-cookie", cookie)]}
+        await send(message)
+
+    return wrapped
 
 
 class LocalOnly:
@@ -92,6 +108,8 @@ class LocalOnly:
             if device is not None and remote_forbidden(method, path):
                 return await self._deny(scope, receive, send, 403, "Only on the PC itself")
             scope.setdefault("state", {})["device"] = device
+            if device is not None and scope["type"] == "http" and api:
+                send = _renew_cookie(send, token)
         origin = headers.get("origin")
         unsafe = scope["type"] == "websocket" or scope["method"] not in SAFE_METHODS
         # the LinKit extension's own origin may call the assist API, which checks its pairing token
