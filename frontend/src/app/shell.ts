@@ -26,7 +26,7 @@ export class Shell {
   readonly notifySupported = typeof Notification !== 'undefined';
   readonly notify = signal(this.notifySupported && readNotifyPref() && Notification.permission === 'granted');
   readonly notifyHint = signal('');
-  /** The PC is off, asleep or out of reach (phone over the tailnet): the app shows "PC not reachable". */
+  /** The PC is off, asleep or out of reach (the phone through the tunnel): the app shows "PC not reachable". */
   readonly unreachable = signal(false);
 
   async refresh(): Promise<void> {
@@ -42,7 +42,7 @@ export class Shell {
       this.unreachable.set(false);
     } catch (e) {
       // the server may be restarting; the live socket reconnects and triggers a reload.
-      // No answer at all, or the tailnet proxy's "nothing behind me": the PC is out of reach.
+      // No answer at all (fetch, or the tunnel, could not reach the PC), or a gateway error.
       this.unreachable.set(!(e instanceof ApiError) || [502, 503, 504].includes(e.status));
     }
   }
