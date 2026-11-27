@@ -346,3 +346,16 @@ class VaultRow(Base):
     meta: Mapped[dict[str, Any]] = mapped_column(default=dict)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)
+
+
+class Device(Base):
+    """A paired phone (api/devices.py, docs/phone.md). Only the token's SHA-256 is kept."""
+
+    __tablename__ = "devices"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(80), default="")
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    created: Mapped[datetime] = mapped_column(default=utcnow)
+    last_seen: Mapped[datetime] = mapped_column(default=utcnow)
+    revoked: Mapped[bool] = mapped_column(default=False)

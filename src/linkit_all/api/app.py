@@ -12,6 +12,8 @@ from loguru import logger
 from sqlalchemy.orm import Session, sessionmaker
 
 from linkit_all.api.assist import router as assist_router
+from linkit_all.api.devices import device_id, load_remote
+from linkit_all.api.devices import router as phone_router
 from linkit_all.api.events import EventBus
 from linkit_all.api.routes import router
 from linkit_all.api.runner import PipelineRunner
@@ -58,6 +60,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(
         title="LinKit All", lifespan=lifespan, docs_url="/api/docs", openapi_url="/api/openapi.json"
     )
+    load_remote(settings)  # the Phone page's saved choice (docs/phone.md)
     app.state.settings = settings
     app.state.db = init_db(settings.db_path)
     app.state.vault = vault_for(settings, app.state.db)
@@ -66,10 +69,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.lo_installer = LibreOfficeInstaller(settings)
     app.state.runner = PipelineRunner(app.state.db, settings, app.state.bus, app.state.vault)
     app.state.scheduler = make_scheduler(app.state.db.kw["bind"])
-    app.add_middleware(LocalOnly, extra_origins=settings.dev_origins, settings=settings)
+    db = app.state.db
+    app.add_middleware(
+        LocalOnly,
+        extra_origins=settings.dev_origins,
+        settings=settings,
+        devices=lambda token: device_id(db, token),
+    )
     app.include_router(router)
     app.include_router(suggest_router)
     app.include_router(assist_router)
+    app.include_router(phone_router)
 
     @app.get("/{path:path}", include_in_schema=False)
     def spa(path: str) -> FileResponse:
