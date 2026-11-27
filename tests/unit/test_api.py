@@ -650,6 +650,15 @@ def test_ai_check_with_api_key_and_saving_key(
     assert check_again["ok"]
     assert seen["api_key"] == "sk-1234567890abcdef"
 
+    # Picking another AI keeps the key: switching back to the API key card needs no retyping
+    cfg["ai"] = {"provider": "codex_cli", "model": None, "api_key": "••••cdef"}
+    client.put("/api/search", json=cfg, headers=SAME_ORIGIN)
+    assert client.get("/api/search").json()["ai"]["api_key"] == "••••cdef"
+    seen.clear()
+    body = {"provider": "litellm", "model": "openai/gpt-5-mini", "api_key": "••••cdef"}
+    assert client.post("/api/ai/check", json=body, headers=SAME_ORIGIN).json()["ok"]
+    assert seen["api_key"] == "sk-1234567890abcdef"
+
 
 # --- app browser, red-line, live screenshot ---------------------------------------
 

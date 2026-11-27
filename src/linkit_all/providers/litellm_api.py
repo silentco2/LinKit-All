@@ -15,6 +15,7 @@ from linkit_all.core.config import FreeKey
 from linkit_all.providers.base import (
     LLMProvider,
     ProviderError,
+    SignedOutError,
     UsageLimitError,
     classify,
     remember_credentials,
@@ -62,6 +63,9 @@ class LiteLLMProvider(LLMProvider):
         api_key: str | None = None,
         api_base: str | None = None,
         num_retries: int = 2,
+        max_tokens: int | None = None,
+        reasoning_effort: str | None = None,
+        extra_body: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
         if not model:
@@ -73,6 +77,9 @@ class LiteLLMProvider(LLMProvider):
         )
         self.api_base = api_base
         self.num_retries = num_retries
+        self.max_tokens = max_tokens
+        self.reasoning_effort = reasoning_effort
+        self.extra_body = extra_body
 
     async def _call(self, prompt: str) -> str:
         _preload_tokenizer()
@@ -91,10 +98,16 @@ class LiteLLMProvider(LLMProvider):
                 num_retries=self.num_retries,
                 max_retries=self.num_retries,  # the OpenAI client's own retries
                 timeout=self.timeout_s,
+                max_tokens=self.max_tokens,
+                reasoning_effort=self.reasoning_effort,
+                extra_body=self.extra_body,
             )
         except RateLimitError as e:
             raise UsageLimitError(str(e), self.name) from e
         except Exception as e:
+            if "json_validate_failed" in str(e):  # Groq checks JSON mode itself: ask again
+                return ""
+
             raise classify(f"{type(e).__name__}: {e}", self.name) from e
         return str(resp.choices[0].message.content or "")
 
@@ -130,10 +143,21 @@ class FreeProvider(LLMProvider):
             if p.needs_account and not k.account_id.strip():
                 raise ProviderError(f"Free models: {p.label} needs its account ID")
             # no retries on the same provider: the next one is tried instead
-            sub = LiteLLMProvider(p.model, api_key=k.key.strip(), api_base=base, num_retries=0)
+            sub = LiteLLMProvider(
+                p.model,
+                api_key=k.key.strip(),
+                api_base=base,
+                num_retries=0,
+                max_tokens=p.max_tokens,
+                reasoning_effort=p.reasoning_effort,
+                extra_body=p.extra_body,
+            )
             sub.timeout_s = self.timeout_s
             self.subs.append((p.id, sub))
         self._resting: dict[str, float] = {}
+        # every enabled provider must be able to take a score batch, or it never scores
+        caps = [c for k in chosen if (c := BY_ID[k.id].max_batch)]
+        self.max_batch = min(caps) if caps else None
 
     def _hide(self, text: str) -> str:
         for key in self._keys:
@@ -169,6 +193,8 @@ class FreeProvider(LLMProvider):
                 await sub.check()
                 lines.append(f"{label}: ok")
                 passed += 1
+            except SignedOutError:  # a 401: an API key has no sign-in to redo
+                lines.append(f"{label}: key not accepted (check it was copied whole)")
             except ProviderError as e:
                 msg = e.message if isinstance(e, UsageLimitError) else tidy(str(e))
                 lines.append(f"{label}: not working ({self._hide(msg)[:200]})")

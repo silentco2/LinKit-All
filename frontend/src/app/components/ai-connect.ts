@@ -110,7 +110,7 @@ const clean = (msg: string): string => msg.replace(/https?:\/\/\S+/g, '').replac
         <div>
           <label class="label" for="api-key">{{ 'setup.ai.apiKey' | t }}</label>
           <input id="api-key" type="password" dir="ltr" class="input" [(ngModel)]="apiKey" (change)="retest()"
-                 [placeholder]="savedApiKey() ? ('setup.keys.keepHint' | t) : ('setup.ai.apiKeyPh' | t)" autocomplete="off">
+                 [placeholder]="savedApiKey() ? ('setup.keys.keepHint' | t) : ('setup.ai.apiKeyPh' | t)" autocomplete="new-password" data-1p-ignore data-lpignore="true">
           @if (savedApiKey() && !apiKey) {
             <p class="hint">{{ 'setup.keys.keepHint' | t }}</p>
           } @else {
@@ -151,10 +151,16 @@ const clean = (msg: string): string => msg.replace(/https?:\/\/\S+/g, '').replac
                 <a class="link" [href]="r.p.key_url" target="_blank" rel="noopener noreferrer">{{ 'free.getKey' | t }}</a>
                 <a class="link" [href]="r.p.terms_url" target="_blank" rel="noopener noreferrer">{{ 'free.terms' | t }}</a>
               </p>
+              <details class="mt-2 text-sm">
+                <summary class="btn cursor-pointer px-2 py-1 text-xs">{{ 'free.how' | t }}</summary>
+                <ol class="mt-2 list-decimal space-y-1 ps-5">
+                  @for (step of howTo(r.p.id); track $index) { <li dir="auto">{{ step }}</li> }
+                </ol>
+              </details>
               <div class="mt-2 grid gap-2 sm:grid-cols-2">
                 <div>
                   <label class="label" [for]="'free-key-' + r.p.id">{{ 'free.key' | t }}</label>
-                  <input [id]="'free-key-' + r.p.id" type="password" dir="ltr" class="input" autocomplete="off"
+                  <input [id]="'free-key-' + r.p.id" type="password" dir="ltr" class="input" autocomplete="new-password" data-1p-ignore data-lpignore="true"
                          [(ngModel)]="r.key" (change)="retest()" [placeholder]="r.saved || ('setup.ai.apiKeyPh' | t)">
                 </div>
                 @if (r.p.needs_account) {
@@ -194,7 +200,9 @@ const clean = (msg: string): string => msg.replace(/https?:\/\/\S+/g, '').replac
           </div>
         }
         @case ('idle') {
-          @if (mode() && (mode() !== 'local' || (model && apiBase)) && (mode() !== 'free' || freeKeys().length)) {
+          @if (mode() === 'litellm' && !apiReady()) {
+            <p class="hint">{{ 'setup.ai.needKeyModel' | t }}</p>
+          } @else if (mode() && (mode() !== 'local' || (model && apiBase)) && (mode() !== 'free' || freeKeys().length)) {
             <button type="button" class="btn" (click)="test()">{{ 'setup.ai.test' | t }}</button>
           }
         }
@@ -265,6 +273,8 @@ export class AiConnect {
   protected model = '';
   protected apiBase = '';
   protected apiKey = '';
+  /** The saved choice: picking its card again brings back its model and address instead of blank boxes. */
+  private savedChoice: { mode: AiMode; model: string; apiBase: string } | null = null;
   private testId = 0;
   private entered = false;
 
@@ -292,12 +302,13 @@ export class AiConnect {
       this.freeRows.set(freeRows(presets, cfg.ai?.free_keys ?? []));
       this.available.set(r.available);
       const saved = cfg.ai;
+      this.savedApiKey.set(saved?.api_key ?? null);
       let first: AiMode | null = null;
       if (saved?.provider) {
         first = saved.provider === 'litellm' && saved.api_base ? 'local' : saved.provider;
         this.model = saved.model ?? '';
         this.apiBase = saved.api_base ?? '';
-        this.savedApiKey.set(saved.api_key ?? null);
+        this.savedChoice = { mode: first, model: this.model, apiBase: this.apiBase };
       } else {
         first = r.available.codex_cli ? 'codex_cli' : r.available.claude_cli ? 'claude_cli' : null;
       }
@@ -308,7 +319,7 @@ export class AiConnect {
         await this.scanLocal();
         if (!this.model || !this.apiBase) return; // nothing to test until a model is picked
       }
-      if (first === 'litellm' && !this.savedApiKey() && !this.apiKey) return;
+      if (first === 'litellm' && !this.apiReady()) return;
       if (first === 'free' && !this.freeKeys().length) return;
       if (this.testOnLoad() || !saved?.provider) void this.test(true);
     } catch (e) {
@@ -322,12 +333,13 @@ export class AiConnect {
     this.notice.set('');
     this.setAi({ state: 'idle', msg: '' });
     this.testId++; // an older test must not overwrite this choice
-    this.apiBase = '';
-    this.model = '';
+    const back = this.savedChoice?.mode === id ? this.savedChoice : null;
+    this.apiBase = back?.apiBase ?? '';
+    this.model = back?.model ?? '';
     this.apiKey = '';
     if (id === 'local') void this.scanLocal();
     else if (id === 'litellm') {
-      if (this.savedApiKey()) void this.test();
+      if (this.apiReady()) void this.test();
     } else if (id === 'free') {
       if (this.freeKeys().length) void this.test();
     } else void this.test();
@@ -354,7 +366,7 @@ export class AiConnect {
     if (this.mode() === 'local') {
       if (this.model && this.apiBase) void this.test();
     } else if (this.mode() === 'litellm') {
-      if ((this.apiKey || this.savedApiKey()) && this.model) void this.test();
+      if (this.apiReady()) void this.test();
     } else if (this.mode() === 'free') {
       if (this.freeKeys().length) void this.test();
     } else {
@@ -365,6 +377,16 @@ export class AiConnect {
   /** After a usage-limit failure: the other cards worth trying (a detected CLI, or any API / local option). */
   protected other(id: AiMode): boolean {
     return this.ai().kind === 'usage_limit' && id !== this.mode() && (id === 'litellm' || id === 'local' || id === 'free' || !!this.available()[id]);
+  }
+
+  /** API key card: a key (typed or saved) and a model are both needed before a test can pass. */
+  protected apiReady(): boolean {
+    return !!((this.apiKey.trim() || this.savedApiKey()) && this.model.trim());
+  }
+
+  /** The steps of one provider's "how to get a key" text, one per line. */
+  protected howTo(id: string): string[] {
+    return this.i18n.t('free.how.' + id).split('\n');
   }
 
   /** The rows with a key (typed, or saved and sent back masked), in the user's order. */
@@ -428,9 +450,10 @@ export class AiConnect {
       await (this.persist() ?? this.saveToSearch)(body);
       if (id !== this.testId) return;
       if (body.api_key) {
-        this.savedApiKey.set(body.api_key);
+        this.savedApiKey.set(mask(body.api_key));
         this.apiKey = '';
       }
+      this.savedChoice = { mode, model: this.model, apiBase: this.apiBase };
       this.freeRows.update((rows) => rows.map((r) => (r.key.trim() ? { ...r, saved: mask(r.key.trim()), key: '' } : r)));
       // never the raw server text ("claude_cli (default model) ok, 2.1.305"): the name, the model and (as a tooltip) the version
       const model = 'model' in r ? (r.model ?? null) : body.model;

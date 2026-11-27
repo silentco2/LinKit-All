@@ -353,6 +353,15 @@ def test_score_tiers_and_low_rank_cutoff(db: sessionmaker[Session]) -> None:
     )
 
 
+def test_score_batches_shrink_to_the_providers_cap(db: sessionmaker[Session]) -> None:
+    # Groq's free tier: a 15-job batch is over its tokens-a-minute limit, so it takes 6 at most
+    ranked_jobs(db, ["A", "B", "C", "D", "E"])
+    ai = FakeAI({"A": 9, "B": 6, "C": 2, "D": 5, "E": 3})
+    ai.max_batch = 2
+    asyncio.run(score_jobs(db, SearchConfig.model_validate({"matching": {"batch_size": 15}}), ai))
+    assert ai.calls == 3
+
+
 def test_score_stores_legitimacy_flags_and_defaults(db: sessionmaker[Session]) -> None:
     ranked_jobs(db, ["A", "B", "C"])
     ai = FakeAI(

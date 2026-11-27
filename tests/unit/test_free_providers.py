@@ -4,8 +4,10 @@ import asyncio
 import json
 import threading
 from collections.abc import Iterator
+from dataclasses import replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Any
 
 import pytest
 from loguru import logger
@@ -15,7 +17,7 @@ from linkit_all.core.config import FreeKey, Settings
 from linkit_all.core.search import SearchConfig
 from linkit_all.pipeline import ai_settings
 from linkit_all.providers import ProviderError, UsageLimitError, get_provider, litellm_api
-from linkit_all.providers.free import PRESETS, FreePreset
+from linkit_all.providers.free import BY_ID, PRESETS, FreePreset
 
 KEY_A, KEY_B = "sk-free-aaaa-1234567890", "sk-free-bbbb-0987654321"
 
@@ -30,6 +32,7 @@ class Fake:
     def __init__(self) -> None:
         self.script: dict[str, list[tuple[int, str]]] = {}
         self.hits: list[str] = []
+        self.bodies: list[dict[str, Any]] = []
 
 
 @pytest.fixture
@@ -38,7 +41,8 @@ def fake(monkeypatch: pytest.MonkeyPatch) -> Iterator[Fake]:
 
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self) -> None:
-            self.rfile.read(int(self.headers.get("content-length") or 0))
+            sent = self.rfile.read(int(self.headers.get("content-length") or 0))
+            state.bodies.append(json.loads(sent))
             who = self.path.split("/")[1]
             state.hits.append(who)
             queue = state.script[who]
@@ -138,8 +142,18 @@ def test_check_reports_each_provider(fake: Fake) -> None:
     msg = asyncio.run(provider("a", "b").check())
     assert "A: ok" in msg and "B: not working" in msg
     fake.script = {"a": [(401, "invalid api key")], "b": [(200, "never json")]}
-    with pytest.raises(ProviderError):
+    with pytest.raises(ProviderError, match="A: key not accepted"):
         asyncio.run(provider("a", "b").check())
+
+
+def test_preset_max_tokens_is_sent(fake: Fake, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Cloudflare cuts every answer at 256 tokens unless asked: a 15-job score batch broke
+    a = litellm_api.BY_ID["a"]  # type: ignore[attr-defined]
+    monkeypatch.setitem(litellm_api.BY_ID, "a", replace(a, max_tokens=4096))  # type: ignore[attr-defined]
+    fake.script = {"a": [(429, "limit")], "b": [(200, '{"score": 3}')]}
+    assert ask(provider("a", "b")) == 3
+    assert [b.get("max_tokens") for b in fake.bodies] == [4096, None]
+    assert BY_ID["cloudflare"].max_tokens == 4096
 
 
 def test_keys_never_in_logs_or_errors(fake: Fake) -> None:
@@ -161,8 +175,28 @@ def test_disabled_or_blank_keys_are_skipped() -> None:
     with pytest.raises(ProviderError, match="add a key"):
         litellm_api.FreeProvider([FreeKey(id="groq", key=" "), FreeKey(id="x", key="k")])
     p = litellm_api.FreeProvider([FreeKey(id="groq", key=KEY_A, enabled=False),
-                                  FreeKey(id="mistral", key=KEY_B)])  # fmt: skip
-    assert [pid for pid, _ in p.subs] == ["mistral"]
+                                  FreeKey(id="zai", key=KEY_B)])  # fmt: skip
+    assert [pid for pid, _ in p.subs] == ["zai"]
+
+
+def test_groq_settings_and_the_score_batch_cap() -> None:
+    groq = litellm_api.FreeProvider([FreeKey(id="groq", key=KEY_A), FreeKey(id="zai", key=KEY_B)])
+    sub = groq.subs[0][1]
+    assert (sub.reasoning_effort, groq.max_batch) == ("low", 6)
+    assert groq.subs[1][1].extra_body == {"thinking": {"type": "disabled"}}  # Z.AI
+    other = litellm_api.FreeProvider(
+        [FreeKey(id="groq", key=KEY_A, enabled=False), FreeKey(id="zai", key=KEY_B)]
+    )
+    assert other.max_batch is None
+
+
+def test_groq_json_check_failure_is_asked_again(fake: Fake) -> None:
+    # Groq refuses a reply that breaks JSON mode with a 400 instead of returning it
+    fake.script = {
+        "a": [(400, "json_validate_failed: Failed to validate JSON"), (200, '{"score": 4}')]
+    }
+    assert ask(provider("a")) == 4
+    assert fake.hits == ["a", "a"]
 
 
 def test_cloudflare_needs_its_account_id() -> None:
@@ -218,5 +252,5 @@ def test_ai_check_cli_reads_the_saved_free_keys(
     finally:
         get_settings.cache_clear()
     assert out.exit_code == 0, out.output
-    assert "A: ok" in out.output and "B: not working" in out.output
+    assert "A: ok" in out.output and "B: key not accepted" in out.output
     assert KEY_A not in out.output and KEY_B not in out.output

@@ -154,12 +154,13 @@ async def score_jobs(
             if opt_in:
                 transition(s, job, JobState.queued_apply, LOW_OPT_IN, code="low_opt_in")
         counts["low"] += len(rest)
+        size = min(cfg.matching.batch_size, provider.max_batch or cfg.matching.batch_size)
         batches = [
             [{"id": j.id, "title": j.title, "company": j.company, "location": j.location,
               "remote": j.data.get("remote"), "description": j.description[:JD_CHARS],
               "missing": [] if j.data.get("manual") else missing(j)}
-             for j in top[i : i + cfg.matching.batch_size]]
-            for i in range(0, len(top), cfg.matching.batch_size)
+             for j in top[i : i + size]]
+            for i in range(0, len(top), size)
         ]  # fmt: skip
     f = cfg.filters
     prefs = {"titles": ", ".join(f.title_include), "locations": ", ".join(f.locations),

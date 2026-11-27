@@ -419,12 +419,9 @@ def put_search(request: Request, cfg: SearchConfig) -> SearchConfig:
     answers (authorized/visa countries, relocation), so those never drift from the places."""
     db = _db(request)
     before = load_search(db)
-    if before and before.ai.api_key:
-        if cfg.ai.provider == "litellm":
-            if not cfg.ai.api_key or cfg.ai.api_key.startswith("••••"):
-                cfg.ai.api_key = before.ai.api_key
-        else:
-            cfg.ai.api_key = None
+    # kept when another AI is picked, like the free keys: switching back needs no retyping
+    if not cfg.ai.api_key or cfg.ai.api_key.startswith("••••"):
+        cfg.ai.api_key = before.ai.api_key if before else None
     cfg.ai.free_keys = _unmask_free(cfg.ai.free_keys, before.ai.free_keys if before else [])
     prev = before.search.places if before else []
     cfg = apply_places(cfg, prev)
@@ -612,7 +609,7 @@ async def check_ai(request: Request, body: AICheck) -> dict[str, Any]:
     saved_cfg = load_search(_db(request))
     api_key = body.api_key
     if not api_key or api_key.startswith("••••"):
-        api_key = saved_cfg.ai.api_key if saved_cfg and saved_cfg.ai.provider == "litellm" else None
+        api_key = saved_cfg.ai.api_key if saved_cfg else None
 
     cfg = SearchConfig.model_validate(
         {

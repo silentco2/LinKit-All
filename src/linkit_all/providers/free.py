@@ -5,9 +5,13 @@ Checked 2026-11-26 against each provider's own pricing, limits and terms pages (
 Dropped then: Gemini and NVIDIA (free terms forbid personal data, and a CV is personal data),
 Cerebras and Hugging Face (no lasting free tier), GitHub Models (retired July 2026), SambaNova
 and Cohere (evaluation only, 20 requests/day or 1,000/month).
+2026-11-27: Mistral dropped (its free plan now answers "You need a subscription"); Z.AI's free
+GLM Flash added in its place (docs.z.ai pricing; API content is not stored or trained on).
+Groq: low reasoning and 6 jobs per score call keep one call under its 8K tokens/minute.
 """
 
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -21,6 +25,10 @@ class FreePreset:
     trains_on_data: bool  # the free tier may keep or train on prompts
     api_base: str = ""  # "{account_id}" is filled from the user's entry
     needs_account: bool = False  # Cloudflare: account ID besides the token
+    max_tokens: int | None = None  # Cloudflare stops every answer at 256 tokens unless asked
+    reasoning_effort: str | None = None  # hidden reasoning counts against the token limits
+    max_batch: int | None = None  # jobs per score call that fit the per-minute token limit
+    extra_body: dict[str, Any] | None = None  # provider-only request fields
 
 
 # Default fallback order: providers that never train on prompts first.
@@ -33,6 +41,8 @@ PRESETS: tuple[FreePreset, ...] = (
         "https://console.groq.com/docs/legal/services-agreement",
         "About 30 requests a minute, 1,000 a day, 200K tokens a day.",
         trains_on_data=False,
+        reasoning_effort="low",  # gpt-oss reasons at length by default: 5x the output tokens
+        max_batch=6,  # 6 jobs: about 5K in + 1.2K out; 8 is refused as over 8K tokens/minute
     ),
     FreePreset(
         "cloudflare",
@@ -44,15 +54,18 @@ PRESETS: tuple[FreePreset, ...] = (
         trains_on_data=False,
         api_base="https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1",
         needs_account=True,
+        max_tokens=4096,  # a 15-job score batch answers in about 3K tokens
     ),
     FreePreset(
-        "mistral",
-        "Mistral",
-        "mistral/mistral-small-latest",
-        "https://console.mistral.ai/api-keys",
-        "https://legal.mistral.ai/terms",
-        "Free plan limits are shown in the Mistral console.",
-        trains_on_data=True,  # free plan: training opt-out available in the console
+        "zai",
+        "Z.AI (GLM)",
+        "openai/glm-4.5-flash",  # 4.7-Flash is free too, but answered 1 in 5 tries ("overloaded")
+        "https://z.ai/manage-apikey/apikey-list",
+        "https://docs.z.ai/legal-agreement/terms-of-use",
+        "No published limits. Slow (about 2 minutes per score call) and often busy.",
+        trains_on_data=False,  # API terms: no training on API content unless you agree
+        api_base="https://api.z.ai/api/paas/v4",
+        extra_body={"thinking": {"type": "disabled"}},  # thinking: score batches time out at 3 min
     ),
     FreePreset(
         "openrouter",

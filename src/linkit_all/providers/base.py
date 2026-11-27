@@ -172,6 +172,7 @@ class Ping(BaseModel):
 class LLMProvider(ABC):
     name: str
     version: str | None = None  # set by `check()` for the CLI adapters
+    max_batch: int | None = None  # most jobs one score call may hold (free tiers with small caps)
 
     def __init__(
         self,

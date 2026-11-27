@@ -64,7 +64,7 @@ def test_welcome_api_key_pick(ui: UI, tmp_path: Path, fake_local_ai: None) -> No
     page = ui.page
     page.goto("/welcome")
     page.get_by_role("heading", name="Connect your AI").wait_for()
-    page.get_by_label("API key").check()
+    page.get_by_role("radio", name="API key OpenAI").check()
 
     # The user has inputs for their API key and model
     api_key_input = page.locator("#api-key")
