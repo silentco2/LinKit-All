@@ -7,6 +7,7 @@ import {
 import { Api } from '../api';
 import { I18n, SourcePipe, TPipe } from '../i18n';
 import { Live } from '../live';
+import { REMOTE } from '../remote';
 import { DtPipe, fmtNum, labelOr, localeOf } from '../locale';
 import { Report } from '../types';
 
@@ -54,8 +55,10 @@ const FUNNEL: Record<string, string> = {
             }
           </select>
         </label>
-        <a class="underline" [href]="exportUrl('csv')" download>{{ 'report.exportCsv' | t }}</a>
-        <a class="underline" [href]="exportUrl('pdf')" download>{{ 'report.exportPdf' | t }}</a>
+        @if (!remote) { <!-- exports stay on the PC (CLAUDE.md §7 Phone) -->
+          <a class="underline" [href]="exportUrl('csv')" download>{{ 'report.exportCsv' | t }}</a>
+          <a class="underline" [href]="exportUrl('pdf')" download>{{ 'report.exportPdf' | t }}</a>
+        }
       </div>
     </div>
     @if (report(); as r) {
@@ -205,6 +208,7 @@ const FUNNEL: Record<string, string> = {
   `,
 })
 export class ReportPage implements OnDestroy {
+  protected readonly remote = REMOTE;
   private readonly api = inject(Api);
   private readonly live = inject(Live);
   private readonly i18n = inject(I18n);
