@@ -64,7 +64,7 @@ Already good, keep it: demo GIF, `docs/compare.md`, launch kit, `llms.txt`, CONT
 R=silentco2/LinKit-All
 gh repo edit $R \
   --description "Open-source AI job search that runs on your computer: finds jobs, ranks them against your CV, tailors it honestly and auto-fills applications. Bring your own AI (ChatGPT, Claude, Ollama)." \
-  --homepage "https://silentco2.github.io/LinKit-All/" \
+  --homepage "https://linkit-all.github.io/" \
   --enable-discussions --enable-issues
 gh repo edit $R $(printf -- '--add-topic %s ' \
   job-search auto-apply job-application resume cv resume-tailoring ai-agent llm \
@@ -124,7 +124,7 @@ Demo GIF (move it above the caveat block)
 
 **Verify:** the root listing has 15 entries or fewer, and every root file is one a user expects.
 
-## Phase 4 — Website SEO (silentco2.github.io/LinKit-All)
+## Phase 4 — Website SEO (linkit-all.github.io)
 
 - [x] Landing `<title>` → "LinKit All — Open-Source AI Job Search & Auto-Apply (Local, Private)". The current `<title>` starts with the brand only.
 - [x] Add an H1 that contains "AI job search" and "auto-apply". Keep one H1 per page.

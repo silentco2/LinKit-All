@@ -66,8 +66,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://silentco2.github.io/LinKit-All/"
-Documentation = "https://silentco2.github.io/LinKit-All/docs/"
+Homepage = "https://linkit-all.github.io/"
+Documentation = "https://linkit-all.github.io/docs/"
 Repository = "https://github.com/silentco2/LinKit-All"
 Issues = "https://github.com/silentco2/LinKit-All/issues"
 Changelog = "https://github.com/silentco2/LinKit-All/blob/main/CHANGELOG.md"
