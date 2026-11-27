@@ -2,6 +2,27 @@
 
 All notable changes to LinKit All. Dates are release dates.
 
+## 1.2.0 — 2026-11-27
+
+### New
+- Free models: run LinKit on the free API tiers of Groq, Cloudflare Workers AI, Z.AI and
+  OpenRouter (Settings > AI > Free models, or the first-run AI step). Add one or more keys and
+  order them; when one reaches its limit or fails, the next one answers. The run pauses only when
+  all of them are out. Each provider you add receives your CV and job texts; providers that may
+  keep or train on them are marked.
+- Each free provider card has a "How to get a key" guide.
+- `linkit ai-check` tests each free provider on its own.
+- Docs: [Free AI models](https://silentco2.github.io/LinKit-All/docs/free-ai/), with the limits,
+  data terms and measured token use (one search a day fits in a single free tier).
+
+### Fixed
+- The API key option on the AI step now shows its key and model boxes, and keeps a saved key
+  when you switch to another AI and back.
+- Cloudflare answers are no longer cut off at 256 tokens.
+- Groq gets smaller score batches (6 jobs) and low reasoning so it stays inside its per-minute
+  token limit; a Groq JSON check failure is asked again.
+- Password managers no longer autofill the API key boxes.
+
 ## 1.1.0 — 2026-11-22
 
 ### New
