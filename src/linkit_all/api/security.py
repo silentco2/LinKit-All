@@ -4,13 +4,14 @@ The server binds to 127.0.0.1, but any web page the user visits can still try to
 through their browser. Requests must name a loopback Host, and anything that changes state
 (non-GET, or a WebSocket) must come from the app's own origin.
 
-Phone companion (docs/phone.md): when `remote_enabled` is on, the PC's tailnet name from
-`tailscale serve` is a Host too. Tailscale proxies from 127.0.0.1, so a request counts as
-remote by its Host or by the proxy's forwarding headers, never by its client address.
+Phone companion (docs/phone.md): a paired phone's requests arrive only through the iroh tunnel
+(api/tunnel.py), which calls the app in-process with this run's secret and the phone's iroh id.
+They count as remote: the device token must belong to that iroh id, and the PC-only routes stay
+closed. Anything else that is not a loopback Host, or that came through a proxy, is refused.
 """
 
+import hmac
 from collections.abc import Awaitable, Callable, MutableMapping
-from http.cookies import CookieError, SimpleCookie
 from typing import Any
 
 from linkit_all.core.config import Settings
@@ -22,10 +23,10 @@ ASGIApp = Callable[[Scope, Receive, Send], Awaitable[None]]
 
 LOOPBACK = {"127.0.0.1", "localhost", "[::1]"}
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
-# set by `tailscale serve` (and any other reverse proxy): a local browser never sends them
+# set by reverse proxies: phones come through the tunnel, never through one of those
 PROXY_HEADERS = ("x-forwarded-for", "x-forwarded-host", "forwarded", "tailscale-user-login")
-DEVICE_COOKIE = "linkit_device"  # api/devices.py
-COOKIE_MAX_AGE = 400 * 86400  # the longest browsers keep a cookie; renewed on each use
+TUNNEL = "x-linkit-tunnel"  # this run's secret, set only by api/tunnel.py
+PEER = "x-linkit-peer"  # the phone's iroh id, set only by api/tunnel.py
 # the PC only (CLAUDE.md §7 Phone): secrets, the extension's pairing code, exports, AI and other
 # keys, mail passwords, and pairing itself. PUT /api/search guards the AI and auto-submit there.
 REMOTE_FORBIDDEN = (
@@ -47,27 +48,10 @@ def remote_forbidden(method: str, path: str) -> bool:
     return any(path.startswith(prefix) and (not kind or write) for kind, prefix in REMOTE_FORBIDDEN)
 
 
-def _cookie(headers: dict[str, str], name: str) -> str:
-    try:
-        morsel = SimpleCookie(headers.get("cookie", "")).get(name)
-    except CookieError:
-        return ""
-    return morsel.value if morsel else ""
-
-
-def _renew_cookie(send: Send, token: str) -> Send:
-    """Re-issue the device cookie on each answer, so a phone in use never has to pair again."""
-    cookie = (
-        f"{DEVICE_COOKIE}={token}; Max-Age={COOKIE_MAX_AGE}; Path=/; HttpOnly; Secure; "
-        "SameSite=Strict"
-    ).encode("latin-1")
-
-    async def wrapped(message: MutableMapping[str, Any]) -> None:
-        if message["type"] == "http.response.start":
-            message = {**message, "headers": [*message.get("headers", []), (b"set-cookie", cookie)]}
-        await send(message)
-
-    return wrapped
+def device_token(headers: dict[str, str]) -> str:
+    """The phone's token from `Authorization: Bearer <token>` (sent inside the tunnel)."""
+    scheme, _, token = headers.get("authorization", "").partition(" ")
+    return token.strip() if scheme.lower() == "bearer" else ""
 
 
 class LocalOnly:
@@ -76,12 +60,14 @@ class LocalOnly:
         app: ASGIApp,
         extra_origins: list[str] | None = None,
         settings: Settings | None = None,
-        devices: Callable[[str], int | None] | None = None,
+        devices: Callable[[str, str], int | None] | None = None,
+        tunnel_secret: str = "",
     ) -> None:
         self.app = app
         self.extra_origins = set(extra_origins or [])  # e.g. the Angular dev server
         self.settings = settings or Settings()  # read per request: the Phone page can change it
-        self.devices = devices or (lambda token: None)  # token -> paired device id
+        self.devices = devices or (lambda token, peer: None)  # -> paired device id
+        self.secret = tunnel_secret.encode()
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] not in ("http", "websocket"):
@@ -89,27 +75,26 @@ class LocalOnly:
         headers = {k.decode("latin-1"): v.decode("latin-1") for k, v in scope["headers"]}
         host = headers.get("host", "")
         hostname = (host.rsplit(":", 1)[0] if not host.endswith("]") else host).lower()
-        remote = hostname not in LOOPBACK or any(h in headers for h in PROXY_HEADERS)
-        if remote and not (
-            self.settings.remote_enabled
-            and hostname in {h.lower() for h in self.settings.remote_hosts}
-        ):
+        given = headers.get(TUNNEL, "").encode()
+        remote = bool(self.secret) and bool(given) and hmac.compare_digest(given, self.secret)
+        if not remote and (hostname not in LOOPBACK or any(h in headers for h in PROXY_HEADERS)):
             return await self._deny(scope, receive, send, 400, "Host not allowed")
         if remote:
-            token = _cookie(headers, DEVICE_COOKIE)
-            # ponytail: one indexed SQLite read per remote call on the event loop; cache with
+            if not self.settings.remote_enabled:
+                return await self._deny(scope, receive, send, 403, "Phone access is off")
+            token = device_token(headers)
+            # ponytail: one indexed SQLite read per phone call on the event loop; cache with
             # revoke-time invalidation if phones ever make it a bottleneck
-            device = self.devices(token) if token else None
+            device = self.devices(token, headers.get(PEER, "")) if token else None
             path, method = scope["path"], scope.get("method", "GET")
-            api = path.startswith("/api/") or scope["type"] == "websocket"
-            # unpaired phones get the app shell (no personal data) and the pairing call only
-            if device is None and api and not (method == "POST" and path == "/api/phone/claim"):
+            # an unpaired phone may only trade its one-time code
+            if device is None and not (method == "POST" and path == "/api/phone/claim"):
                 return await self._deny(scope, receive, send, 401, "Pair this phone first")
             if device is not None and remote_forbidden(method, path):
                 return await self._deny(scope, receive, send, 403, "Only on the PC itself")
-            scope.setdefault("state", {})["device"] = device
-            if device is not None and scope["type"] == "http" and api:
-                send = _renew_cookie(send, token)
+            state = scope.setdefault("state", {})
+            state["device"], state["peer"] = device, headers.get(PEER, "")
+            return await self.app(scope, receive, send)  # in-process: no browser Origin to check
         origin = headers.get("origin")
         unsafe = scope["type"] == "websocket" or scope["method"] not in SAFE_METHODS
         # the LinKit extension's own origin may call the assist API, which checks its pairing token

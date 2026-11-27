@@ -21,6 +21,7 @@ from linkit_all.api.routes import router
 from linkit_all.api.runner import PipelineRunner
 from linkit_all.api.security import LocalOnly
 from linkit_all.api.suggest import router as suggest_router
+from linkit_all.api.tunnel import Tunnel
 from linkit_all.apply.browser import UserBrowser
 from linkit_all.apply.vault import vault_for
 from linkit_all.core.backup import keep_backing_up
@@ -52,7 +53,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             keep_backing_up(app.state.db, settings.db_path, settings.data_dir)
         )
         push = asyncio.create_task(watch_for_push(app.state.bus, app.state.db, settings))
+        # the phone tunnel connects in the background: the PC's own UI never waits for it
+        phone = asyncio.create_task(app.state.tunnel.start()) if settings.remote_enabled else None
         yield
+        if phone is not None:
+            phone.cancel()
+        await app.state.tunnel.stop()
         push.cancel()
         backups.cancel()
         app.state.scheduler.shutdown(wait=False)
@@ -74,11 +80,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.runner = PipelineRunner(app.state.db, settings, app.state.bus, app.state.vault)
     app.state.scheduler = make_scheduler(app.state.db.kw["bind"])
     db = app.state.db
+
+    def devices(token: str, peer: str) -> int | None:
+        return device_id(db, token, peer)
+
+    app.state.tunnel = Tunnel(app, settings, app.state.bus, devices)
     app.add_middleware(
         LocalOnly,
         extra_origins=settings.dev_origins,
         settings=settings,
-        devices=lambda token: device_id(db, token),
+        devices=devices,
+        tunnel_secret=app.state.tunnel.secret,
     )
     app.include_router(router)
     app.include_router(suggest_router)

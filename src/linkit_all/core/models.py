@@ -356,6 +356,7 @@ class Device(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(80), default="")
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    peer: Mapped[str | None] = mapped_column(String(64))  # the phone's iroh id (64 hex chars)
     created: Mapped[datetime] = mapped_column(default=utcnow)
     last_seen: Mapped[datetime] = mapped_column(default=utcnow)
     revoked: Mapped[bool] = mapped_column(default=False)

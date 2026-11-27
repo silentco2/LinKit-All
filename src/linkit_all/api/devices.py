@@ -1,41 +1,37 @@
 """Paired phones (CLAUDE.md §7 Phone, docs/phone.md).
 
-Settings > Phone on the PC makes a one-time code (5 minutes), shown as a QR code holding the
-tailnet address. The phone trades it for a long-lived token kept in an HttpOnly, Secure,
-SameSite=Strict cookie; only the token's SHA-256 is stored. security.LocalOnly checks that
-cookie on every remote request and keeps phones off the PC-only routes.
+Settings > Phone on the PC turns on the tunnel (api/tunnel.py) and makes a one-time code
+(5 minutes), shown as a QR code: a linkit-all.github.io/app/ link carrying the PC's iroh id,
+its relay and the code. The phone trades the code for a long-lived token, tied to the phone's
+own iroh id; only the token's SHA-256 is stored. security.LocalOnly checks the token and the
+iroh id on every phone request and keeps phones off the PC-only routes.
 """
 
 import hashlib
 import hmac
 import json
-import re
 import secrets
-import shutil
-import subprocess
 import time
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 import segno
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from linkit_all.api.security import COOKIE_MAX_AGE
-from linkit_all.api.security import DEVICE_COOKIE as COOKIE
 from linkit_all.core.config import Settings
 from linkit_all.core.models import Device, PushSubscription, utcnow
 
 CODE_TTL = 300.0  # seconds
 MAX_FAILURES = 5  # wrong codes per minute; then 429 and the pending code is dropped
 ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"  # no 0/O, 1/I/L
-HOST_RE = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$")
+PHONE_APP = "https://linkit-all.github.io/app/"  # the phone web app, built from this repo
 
 router = APIRouter(prefix="/api/phone")
 
@@ -72,13 +68,15 @@ class Pairing:
         return False
 
 
-def device_id(db: sessionmaker[Session], token: str) -> int | None:
-    """The paired, not revoked phone holding this token; touches last_seen once a minute."""
+def device_id(db: sessionmaker[Session], token: str, peer: str) -> int | None:
+    """The paired, not revoked phone with this token and iroh id; touches last_seen once a minute.
+
+    A token copied off the phone is useless from any other device: iroh proves the id."""
     with db() as s:
         dev = s.scalar(
             select(Device).where(Device.token_hash == token_hash(token), Device.revoked.is_(False))
         )
-        if dev is None:
+        if dev is None or not peer or not hmac.compare_digest(dev.peer or "", peer):
             return None
         now = utcnow()
         if now - dev.last_seen > timedelta(minutes=1):
@@ -87,7 +85,7 @@ def device_id(db: sessionmaker[Session], token: str) -> int | None:
         return dev.id
 
 
-# --- remote access switch, kept in the data folder (env LINKIT_REMOTE_* still works) ------
+# --- phone access switch, kept in the data folder (env LINKIT_REMOTE_ENABLED still works) ----
 
 
 def _remote_file(settings: Settings) -> Path:
@@ -102,29 +100,14 @@ def load_remote(settings: Settings) -> None:
     except (OSError, ValueError):
         return
     settings.remote_enabled = bool(saved.get("enabled"))
-    settings.remote_hosts = [h for h in saved.get("hosts", []) if isinstance(h, str)]
+    relay = saved.get("relay")
+    settings.phone_relay = relay if isinstance(relay, str) and relay else None
 
 
-def clean_host(text: str) -> str:
-    """`https://pc.tail1234.ts.net/` -> `pc.tail1234.ts.net`; "" when it is no hostname."""
-    text = text.strip().lower()
-    host = urlparse(text if "://" in text else f"//{text}").hostname or ""
-    return host if HOST_RE.match(host) else ""
-
-
-def detect_host() -> str:
-    """The PC's tailnet name from `tailscale status`, or "" (not installed, logged out)."""
-    exe = shutil.which("tailscale")
-    if not exe:
-        return ""
-    try:
-        out = subprocess.run(  # noqa: S603 (tailscale from PATH, fixed args)
-            [exe, "status", "--json"], capture_output=True, timeout=3, check=True
-        ).stdout
-        name = json.loads(out).get("Self", {}).get("DNSName", "")
-    except (OSError, subprocess.SubprocessError, ValueError, AttributeError):
-        return ""
-    return clean_host(str(name).rstrip("."))
+def clean_relay(text: str) -> str:
+    """An https relay URL (the user's own iroh relay), or "" when it is not one."""
+    url = urlparse(text.strip())
+    return url.geturl() if url.scheme == "https" and url.hostname else ""
 
 
 # --- routes ----------------------------------------------------------------------------
@@ -157,17 +140,21 @@ def _iso(d: datetime) -> str:
     return d.isoformat() + "Z"
 
 
+def _tunnel(request: Request) -> Any:
+    return request.app.state.tunnel
+
+
 @router.get("")
 def status(request: Request) -> dict[str, Any]:
-    settings = _settings(request)
-    host = settings.remote_hosts[0] if settings.remote_hosts else ""
+    settings, tunnel = _settings(request), _tunnel(request)
     out: dict[str, Any] = {
         "enabled": settings.remote_enabled,
-        "host": host,
-        "address": f"https://{host}/" if host else "",
+        "online": tunnel.online,
+        "error": tunnel.error,
+        "relay": settings.phone_relay or "",
         "this_device": this_device(request),
     }
-    if out["this_device"] is None:  # the PC: its list of phones and a suggested address
+    if out["this_device"] is None:  # the PC: its list of phones
         with _db(request)() as s:
             rows = s.scalars(select(Device).where(Device.revoked.is_(False)).order_by(Device.id))
             out["devices"] = [
@@ -175,41 +162,42 @@ def status(request: Request) -> dict[str, Any]:
                  "last_seen": _iso(d.last_seen)}
                 for d in rows
             ]  # fmt: skip
-        out["detected_host"] = "" if host else detect_host()
     return out
 
 
 class RemoteChoice(BaseModel):
     enabled: bool
-    host: str = ""
+    relay: str = Field("", max_length=300)  # "" = n0's public relays
 
 
 @router.put("/remote")
-def set_remote(request: Request, body: RemoteChoice) -> dict[str, Any]:
-    settings = _settings(request)
-    host = clean_host(body.host) if body.host else ""
-    if body.host and not host:
-        raise HTTPException(422, "Paste the address tailscale serve printed: pc.tail1234.ts.net")
-    if body.enabled and not host:
-        raise HTTPException(422, "Add the PC's tailnet address first")
+async def set_remote(request: Request, body: RemoteChoice) -> dict[str, Any]:
+    settings, tunnel = _settings(request), _tunnel(request)
+    relay = clean_relay(body.relay) if body.relay else ""
+    if body.relay and not relay:
+        raise HTTPException(422, "A relay address starts with https://")
     path = _remote_file(settings)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"enabled": body.enabled, "hosts": [host] if host else []}), "utf-8")
+    path.write_text(json.dumps({"enabled": body.enabled, "relay": relay}), "utf-8")
+    was_relay = settings.phone_relay
     load_remote(settings)
-    if not body.enabled:
+    if not body.enabled or was_relay != settings.phone_relay:
+        await tunnel.stop()
         _pairing(request).code = ""
+    if body.enabled:
+        await tunnel.start()
     return status(request)
 
 
 @router.post("/pair")
 def pair(request: Request) -> dict[str, Any]:
-    """A new one-time code; the QR code opens the phone app's pairing page with it."""
-    settings = _settings(request)
-    if not (settings.remote_enabled and settings.remote_hosts):
-        raise HTTPException(409, "Turn on phone access and add the PC's address first")
+    """A new one-time code; the QR code opens the phone app with it."""
+    settings, tunnel = _settings(request), _tunnel(request)
+    if not (settings.remote_enabled and tunnel.online):
+        raise HTTPException(409, tunnel.error or "Turn on phone access first")
     code = _pairing(request).new(time.monotonic())
-    # the code rides in the fragment: browsers never send it, so no proxy or log sees it
-    url = f"https://{settings.remote_hosts[0]}/pair#{code}"
+    # all in the fragment: browsers never send it, so GitHub Pages never sees it
+    url = f"{PHONE_APP}#pc={tunnel.pc_id}&code={code}&relay={quote(tunnel.relay, safe='')}"
     qr = segno.make(url, error="m").png_data_uri(scale=6, border=2)
     return {"code": code, "url": url, "qr": qr, "expires_in": int(CODE_TTL)}
 
@@ -220,20 +208,20 @@ class Claim(BaseModel):
 
 
 @router.post("/claim")
-def claim(request: Request, body: Claim, response: Response) -> dict[str, Any]:
+def claim(request: Request, body: Claim) -> dict[str, Any]:
+    """The phone trades the code for its token (through the tunnel only, so it has an iroh id)."""
+    peer: str = getattr(request.state, "peer", "")  # set by LocalOnly for tunnel calls only
+    if not peer:
+        raise HTTPException(400, "Pair from the phone: scan the QR code")
     if not _pairing(request).claim(body.code, time.monotonic()):
         raise HTTPException(401, "That code is wrong or expired: make a new one on the PC")
     token = secrets.token_urlsafe(32)
     with _db(request)() as s:
-        dev = Device(name=body.name.strip() or "Phone", token_hash=token_hash(token))
+        dev = Device(name=body.name.strip() or "Phone", token_hash=token_hash(token), peer=peer)
         s.add(dev)
         s.commit()
         dev_id = dev.id
-    response.set_cookie(
-        COOKIE, token, max_age=COOKIE_MAX_AGE, path="/",
-        httponly=True, secure=True, samesite="strict",
-    )  # fmt: skip
-    return {"id": dev_id}
+    return {"id": dev_id, "token": token}
 
 
 @router.delete("/devices/{device_id}", status_code=204)
