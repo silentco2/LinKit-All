@@ -83,6 +83,7 @@ nav:
       - Applying: applying.md
       - Action Center: action-center.md
       - Scheduling and reports: scheduling-reports.md
+      - On your phone: phone.md
   - Reference:
       - Privacy and security: privacy.md
       - Command line: cli.md

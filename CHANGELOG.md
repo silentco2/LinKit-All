@@ -2,7 +2,17 @@
 
 All notable changes to LinKit All. Dates are release dates.
 
-## Unreleased
+## 1.3.0 — 2026-11-28
+
+### New
+- On your phone: turn on Settings > Phone and scan the QR code with your phone. It opens the
+  LinKit web app at https://linkit-all.github.io/app/ (Android and iPhone, no app store, no
+  account). From there you can start and pause runs, approve jobs, answer Needs you questions and
+  open an answer sheet to apply on the phone. The phone reaches your PC through an end-to-end
+  encrypted iroh tunnel: your PC connects out, relays carry only encrypted data, and no port is
+  opened. Off by default. A paired phone cannot read the vault, export data, change AI keys or turn
+  on "submit without asking". Push alerts carry only a count.
+- Docs: [On your phone](https://linkit-all.github.io/docs/phone/).
 
 ### Changed
 - The website moved to https://linkit-all.github.io/ (docs at `/docs/`). Every page at the old

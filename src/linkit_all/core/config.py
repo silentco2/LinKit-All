@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     data_dir: Path = Path(user_data_dir("linkit-all", appauthor=False))
     log_level: str = "INFO"
     dev_origins: list[str] = []  # e.g. ["http://localhost:4200"] while running `ng serve`
+    # Phone companion (docs/phone.md): off by default. The server still binds 127.0.0.1; phones
+    # reach it through the iroh tunnel (api/tunnel.py). phone_relay: the user's own iroh relay
+    # instead of n0's public ones.
+    remote_enabled: bool = False
+    phone_relay: str | None = None
 
     provider: ProviderName = "codex_cli"
     model: str | None = None  # None = the CLI's own default; required for litellm

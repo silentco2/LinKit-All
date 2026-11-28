@@ -1,4 +1,6 @@
 import { Injectable } from '@angular/core';
+import { apiFetch } from './net';
+import { REMOTE } from './remote';
 
 /** An API failure: the server's message, its HTTP status and (409 refusals) a stable `code` the UI words itself. */
 export class ApiError extends Error {
@@ -14,11 +16,13 @@ export class Api {
     const headers: Record<string, string> = {};
     if (file) headers['Content-Type'] = 'application/octet-stream';
     else if (body !== undefined) headers['Content-Type'] = 'application/json';
-    const res = await fetch(`/api${path}`, {
+    const res = await apiFetch(`/api${path}`, {
       method,
       headers,
       body: file ?? (body !== undefined ? JSON.stringify(body) : undefined),
     });
+    // a phone that is not (or no longer) paired: the server answers 401 to everything but pairing
+    if (res.status === 401 && REMOTE && !location.pathname.endsWith('/pair')) location.assign(new URL('pair', document.baseURI));
     if (!res.ok) throw await apiError(res);
     if (res.status === 204) return undefined as T;
     return res.json() as Promise<T>;
@@ -46,7 +50,7 @@ export class Api {
   }
   /** POST a JSON body and get the response as a file (the body may hold a passphrase: never a URL). */
   async postForBlob(path: string, body: unknown): Promise<Blob> {
-    const res = await fetch(`/api${path}`, {
+    const res = await apiFetch(`/api${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

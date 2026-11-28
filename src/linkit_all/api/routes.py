@@ -23,7 +23,7 @@ from rapidfuzz import fuzz
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from linkit_all.api.events import EventBus
+from linkit_all.api.events import REVOKED, EventBus
 from linkit_all.api.runner import PipelineRunner, RunBlocked, RunBusy
 from linkit_all.apply.answers import ApplicationAnswers, Question, sensitive_category
 from linkit_all.apply.assist import GENERAL, AnswerBank, scope_of
@@ -413,6 +413,9 @@ def get_search(request: Request) -> SearchConfig:
     return _mask_ai(synthesize_places(cfg, load_fields(_db(request))[0].home_country))
 
 
+PHONE_SECTIONS = {"schedule"}  # what a paired phone may change in the search config
+
+
 @router.put("/search")
 def put_search(request: Request, cfg: SearchConfig) -> SearchConfig:
     """Save. The places derive the location filters, work modes, Indeed country and the saved
@@ -423,6 +426,12 @@ def put_search(request: Request, cfg: SearchConfig) -> SearchConfig:
     if not cfg.ai.api_key or cfg.ai.api_key.startswith("••••"):
         cfg.ai.api_key = before.ai.api_key if before else None
     cfg.ai.free_keys = _unmask_free(cfg.ai.free_keys, before.ai.free_keys if before else [])
+    if getattr(request.state, "device", None) is not None:  # a paired phone (api/devices.py)
+        was, now = (before or SearchConfig()).model_dump(), cfg.model_dump()
+        # AI keys, auto-submit, mail servers, backup folder ...: all of it stays the PC's
+        changed = sorted(k for k in now if k not in PHONE_SECTIONS and now[k] != was[k])
+        if changed:
+            raise HTTPException(403, f"Change this on the PC itself: {', '.join(changed)}")
     prev = before.search.places if before else []
     cfg = apply_places(cfg, prev)
     src = cfg.sources
@@ -1212,14 +1221,15 @@ def report_pdf(request: Request, run_id: int | None = None, since: date | None =
 async def events(ws: WebSocket) -> None:
     bus: EventBus = ws.app.state.bus
     await ws.accept()
-    q = bus.subscribe()
+    q = bus.subscribe(getattr(ws.state, "device", None))
     try:
         for event in list(bus.recent):
             await ws.send_json(event)
         if bus.last_shot is not None:
             await ws.send_json(bus.last_shot)
-        while True:
-            await ws.send_json(await q.get())
+        while (event := await q.get()) is not REVOKED:
+            await ws.send_json(event)
+        await ws.close(1008)  # the phone was unpaired on the PC
     except WebSocketDisconnect:
         pass
     finally:

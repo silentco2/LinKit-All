@@ -2,6 +2,7 @@ import { inject, Injectable, signal } from '@angular/core';
 import { Api } from '../../api';
 import { AiBody } from '../../components/ai-connect';
 import { I18n } from '../../i18n';
+import { apiFetch } from '../../net';
 import { ApplicationAnswers, Profile, SearchConfig } from '../../types';
 
 /** What a field's indicator shows. No entry = nothing to show. */
@@ -139,7 +140,7 @@ export class SettingsStore {
 
   private async put(obj: Obj): Promise<Sent> {
     const body = obj === 'profile' ? Object.fromEntries(PROFILE_FIELDS.map((f) => [f, this.profile[f]])) : obj === 'answers' ? this.answers : this.cfg;
-    const send = () => fetch(`/api${URLS[obj]}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const send = () => apiFetch(`/api${URLS[obj]}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     try {
       let res = await send();
       if (res.status === 409 && obj === 'answers') {

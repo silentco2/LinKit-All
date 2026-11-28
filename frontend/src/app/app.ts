@@ -5,6 +5,7 @@ import { I18n, Lang, TPipe } from './i18n';
 import { Live } from './live';
 import { fmtNum, localeOf, runReason } from './locale';
 import { QuickJump } from './components/quick-jump';
+import { focusFragment } from './focus';
 import { issueUrl } from './report';
 import { Shell } from './shell';
 import { LiveEvent, setupDone } from './types';
@@ -15,7 +16,7 @@ const FRESH_MS = 60_000; // a run that ended longer ago than this is replayed hi
   selector: 'app-root',
   imports: [RouterOutlet, RouterLink, RouterLinkActive, TPipe, QuickJump],
   template: `
-    <div class="flex min-h-screen flex-col">
+    <div class="flex min-h-screen flex-col" [class.max-sm:pb-16]="!welcome()">
       @if (!welcome()) {
       <header class="desk-top">
         <a routerLink="/home" class="wordmark">LinKit All</a>
@@ -57,9 +58,30 @@ const FRESH_MS = 60_000; // a run that ended longer ago than this is replayed hi
       </header>
       }
       <main class="mx-auto w-full max-w-[76rem] min-w-0 flex-1 overflow-x-auto px-4 pt-4 pb-12 md:px-8" [class.pt-8]="welcome()">
+        @if (shell.unreachable() && !live.connected()) {
+          <div class="card mb-6" role="alert">
+            <h2 class="text-lg font-semibold">{{ 'shell.offline.title' | t }}</h2>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">{{ 'shell.offline.body' | t }}</p>
+            <button type="button" class="btn mt-3" (click)="shell.refresh()">{{ 'welcome.retry' | t }}</button>
+          </div>
+        }
         <router-outlet />
       </main>
       <app-quick-jump #jump />
+      @if (!welcome()) {
+      <!-- under 640px: the four places a phone needs, at thumb height (docs/phone.md) -->
+      <nav class="tab-bar fixed inset-x-0 bottom-0 z-30 flex sm:hidden" [attr.aria-label]="'shell.tabsLabel' | t">
+        @for (tab of tabs; track tab.label) {
+          <a [routerLink]="tab.path" (click)="tab.report && toReport()" [routerLinkActive]="tab.report ? [] : 'is-active'"
+             [ariaCurrentWhenActive]="tab.report ? false : 'page'" class="tab-link">
+            {{ tab.label | t }}
+            @if (tab.path === '/needs-you' && shell.needsCount() > 0) {
+              <span class="text-rose-600 dark:text-rose-400">{{ num(shell.needsCount()) }}</span>
+            }
+          </a>
+        }
+      </nav>
+      }
       @if (!welcome()) {
       <footer class="mx-auto flex w-full max-w-[76rem] flex-wrap items-center gap-x-6 gap-y-1 px-4 pb-6 text-xs text-slate-500 md:px-8">
         <div class="flex items-center gap-3" role="group" [attr.aria-label]="'shell.language' | t">
@@ -90,7 +112,7 @@ export class App {
   private readonly router = inject(Router);
   private readonly path = signal(window.location.pathname);
   /** First-run flow: no side nav, the page is its own guide. */
-  protected readonly welcome = computed(() => this.path().startsWith('/welcome'));
+  protected readonly welcome = computed(() => this.path().startsWith('/welcome') || this.path().startsWith('/pair'));
   protected readonly menuOpen = signal(false);
   protected readonly mac = /Mac|iPhone|iPad/.test(navigator.platform);
   protected readonly num = (n: number): string => fmtNum(localeOf(this.i18n.lang()), n);
@@ -107,6 +129,17 @@ export class App {
     { path: 'needs-you', label: 'shell.nav.needsYou' },
     { path: 'settings', label: 'shell.nav.settings' },
   ];
+  /** The bottom tab bar on a narrow screen; Report is the report part of Home. */
+  protected readonly tabs = [
+    { path: '/home', label: 'shell.nav.home', report: false },
+    { path: '/needs-you', label: 'shell.nav.needsYou', report: false },
+    { path: '/jobs', label: 'shell.nav.jobs', report: false },
+    { path: '/home', label: 'shell.nav.report', report: true },
+  ];
+
+  protected toReport(): void {
+    setTimeout(() => focusFragment('home-report')); // after the router has drawn Home
+  }
 
   constructor() {
     this.router.events.subscribe((e) => {

@@ -76,6 +76,7 @@ uv run linkit
 3. **Tailors your CV** for each job (AI resume tailoring with word-level edits). Layout and style are left alone.
 4. **Applies for you**, including on sites that need an account first. Questions it should not guess wait for you.
 5. **Shows it all** in a local web page: a live view of the run, jobs to review, a "Needs you" list, and a results report.
+6. **Goes with you on your phone.** Scan one QR code to pair, then start and pause runs, approve jobs and answer questions from your phone. It is a web app (Android and iPhone, no app store, no account), connected to your PC end-to-end encrypted, and off until you turn it on: [On your phone](https://linkit-all.github.io/docs/phone/).
 
 | Home | Jobs | Needs you |
 |---|---|---|

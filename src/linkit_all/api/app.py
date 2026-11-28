@@ -4,7 +4,7 @@ import asyncio
 import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
@@ -12,11 +12,16 @@ from loguru import logger
 from sqlalchemy.orm import Session, sessionmaker
 
 from linkit_all.api.assist import router as assist_router
+from linkit_all.api.devices import device_id, load_remote
+from linkit_all.api.devices import router as phone_router
 from linkit_all.api.events import EventBus
+from linkit_all.api.push import router as push_router
+from linkit_all.api.push import watch as watch_for_push
 from linkit_all.api.routes import router
 from linkit_all.api.runner import PipelineRunner
 from linkit_all.api.security import LocalOnly
 from linkit_all.api.suggest import router as suggest_router
+from linkit_all.api.tunnel import Tunnel
 from linkit_all.apply.browser import UserBrowser
 from linkit_all.apply.vault import vault_for
 from linkit_all.core.backup import keep_backing_up
@@ -47,7 +52,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         backups = asyncio.create_task(
             keep_backing_up(app.state.db, settings.db_path, settings.data_dir)
         )
+        push = asyncio.create_task(watch_for_push(app.state.bus, app.state.db, settings))
+        # the phone tunnel connects in the background: the PC's own UI never waits for it
+        phone = asyncio.create_task(app.state.tunnel.start()) if settings.remote_enabled else None
         yield
+        if phone is not None:
+            phone.cancel()
+        await app.state.tunnel.stop()
+        push.cancel()
         backups.cancel()
         app.state.scheduler.shutdown(wait=False)
         register_runner(None)
@@ -58,6 +70,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(
         title="LinKit All", lifespan=lifespan, docs_url="/api/docs", openapi_url="/api/openapi.json"
     )
+    load_remote(settings)  # the Phone page's saved choice (docs/phone.md)
     app.state.settings = settings
     app.state.db = init_db(settings.db_path)
     app.state.vault = vault_for(settings, app.state.db)
@@ -66,10 +79,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.lo_installer = LibreOfficeInstaller(settings)
     app.state.runner = PipelineRunner(app.state.db, settings, app.state.bus, app.state.vault)
     app.state.scheduler = make_scheduler(app.state.db.kw["bind"])
-    app.add_middleware(LocalOnly, extra_origins=settings.dev_origins)
+    db = app.state.db
+
+    def devices(token: str, peer: str) -> int | None:
+        return device_id(db, token, peer)
+
+    app.state.tunnel = Tunnel(app, settings, app.state.bus, devices)
+    app.add_middleware(
+        LocalOnly,
+        extra_origins=settings.dev_origins,
+        settings=settings,
+        devices=devices,
+        tunnel_secret=app.state.tunnel.secret,
+    )
     app.include_router(router)
     app.include_router(suggest_router)
     app.include_router(assist_router)
+    app.include_router(phone_router)
+    app.include_router(push_router)
 
     @app.get("/{path:path}", include_in_schema=False)
     def spa(path: str) -> FileResponse:
@@ -79,8 +106,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # index.html must be revalidated, or browsers keep an old build for hours (no Cache-Control
         # means a guessed lifetime); the hashed JS/CSS names change per build, so they cache fine
         fresh = {"Cache-Control": "no-cache"}
-        file = (STATIC / path).resolve()
-        if path and file.is_file() and file.is_relative_to(STATIC.resolve()):
+        # a rooted, drive or UNC path (`//host/share`) would make Windows open an SMB link and
+        # send the user's NTLM hash: refuse it on its text, before anything touches the disk
+        win = PureWindowsPath(path)
+        safe = path and not win.anchor and ".." not in win.parts
+        file = (STATIC / path).resolve() if safe else STATIC
+        if safe and file.is_file() and file.is_relative_to(STATIC.resolve()):
             return FileResponse(file, headers=fresh if file.suffix == ".html" else None)
         index = STATIC / "index.html"
         if not index.is_file():

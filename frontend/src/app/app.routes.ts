@@ -1,11 +1,13 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router, Routes } from '@angular/router';
 import { Api } from './api';
+import { REMOTE } from './remote';
 import { Status } from './types';
 
 /** Send to `done` once the server says the required setup is done, else to the first-run flow. */
 const gate = (done: string): CanActivateFn => async () => {
   const router = inject(Router);
+  if (REMOTE) return router.parseUrl(done); // setup (CV, AI) happens on the PC, not on the phone
   try {
     const s = await inject(Api).get<Status>('/status');
     return router.parseUrl(s.setup.required_done ? done : '/welcome');
@@ -21,6 +23,7 @@ export const routes: Routes = [
   { path: 'settings/:section', title: 'Settings · LinKit All', loadComponent: () => import('./pages/settings/settings').then((m) => m.SettingsPage) },
   { path: 'jobs', title: 'Jobs · LinKit All', loadComponent: () => import('./pages/jobs').then((m) => m.JobsPage) },
   { path: 'home', title: 'Home · LinKit All', loadComponent: () => import('./pages/home').then((m) => m.HomePage) },
+  { path: 'pair', title: 'Pair this phone · LinKit All', loadComponent: () => import('./pages/pair').then((m) => m.PairPage) },
   { path: 'needs-you', title: 'Needs you · LinKit All', loadComponent: () => import('./pages/needs-you').then((m) => m.NeedsYouPage) },
   { path: '**', redirectTo: 'home' },
 ];

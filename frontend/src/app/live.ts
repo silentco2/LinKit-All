@@ -1,8 +1,9 @@
 import { inject, Injectable, signal } from '@angular/core';
 import { Api } from './api';
+import { openEvents } from './net';
 import { JobDetail, LiveEvent, LiveShot, RunState } from './types';
 
-/** WebSocket /api/events with auto-reconnect; keeps recent events and the run state. */
+/** The live events (/api/events; through the tunnel on the phone) with auto-reconnect; keeps recent events and the run state. */
 @Injectable({ providedIn: 'root' })
 export class Live {
   readonly events = signal<LiveEvent[]>([]);
@@ -23,20 +24,20 @@ export class Live {
   }
 
   private connect(): void {
-    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    const socket = new WebSocket(`${proto}://${location.host}/api/events`);
-    socket.onopen = () => {
-      this.connected.set(true);
-      this.events.set([]); // the server replays its recent history
-      this.announced.clear();
-      this.run.set(null); // a restarted server replays nothing: take the run state from the replay or /status
-      this.changed.update((n) => n + 1);
-    };
-    socket.onclose = () => {
-      this.connected.set(false);
-      setTimeout(() => this.connect(), 2000);
-    };
-    socket.onmessage = (msg) => this.handle(JSON.parse(msg.data));
+    openEvents({
+      open: () => {
+        this.connected.set(true);
+        this.events.set([]); // the server replays its recent history
+        this.announced.clear();
+        this.run.set(null); // a restarted server replays nothing: take the run state from the replay or /status
+        this.changed.update((n) => n + 1);
+      },
+      closed: () => {
+        this.connected.set(false);
+        setTimeout(() => this.connect(), 2000);
+      },
+      message: (event) => this.handle(event as LiveEvent & Partial<RunState>),
+    });
   }
 
   private handle(event: LiveEvent & Partial<RunState>): void {

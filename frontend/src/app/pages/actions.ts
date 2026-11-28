@@ -2,6 +2,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { Component, computed, effect, inject, signal, viewChildren } from '@angular/core';
 import { Api } from '../api';
 import { AllClear } from '../components/all-clear';
+import { AnswerSheet } from '../components/answer-sheet';
 import { EmailConnect, EmailConnected } from '../components/email-connect';
 import { MenuItem, MoreMenu } from '../components/more-menu';
 import { Toast } from '../components/toast';
@@ -9,6 +10,8 @@ import { VaultGate, VaultReady } from '../components/vault-gate';
 import { I18n, MsgPipe, TPipe } from '../i18n';
 import { Live } from '../live';
 import { fmtNum, labelOr, localeOf } from '../locale';
+import { apiSrc } from '../net';
+import { REMOTE } from '../remote';
 import { Shell } from '../shell';
 import { ActionDecision, ActionGroup, ActionItem, ActionKind, ActionQuestion, AnswerValue, Remember, Status } from '../types';
 
@@ -57,7 +60,7 @@ const SOURCES: Record<string, string> = {
 
 @Component({
   selector: 'app-actions',
-  imports: [AllClear, EmailConnect, MoreMenu, MsgPipe, NgTemplateOutlet, Toast, TPipe, VaultGate],
+  imports: [AllClear, AnswerSheet, EmailConnect, MoreMenu, MsgPipe, NgTemplateOutlet, Toast, TPipe, VaultGate],
   template: `
     <p class="text-sm text-slate-500">{{ 'actions.intro' | t }}</p>
 
@@ -306,11 +309,18 @@ const SOURCES: Record<string, string> = {
                       [disabled]="busy() || browserBusy() || !p.ok" (click)="p.run()">{{ p.label }}</button>
             }
             @if (ownBrowser(a.kind)) {
+              @if (remote) {
+                <button type="button" class="btn" [attr.aria-expanded]="sheetFor() === a.id" (click)="sheetFor.set(sheetFor() === a.id ? 0 : a.id)">{{ 'sheet.button' | t }}</button>
+              }
               <button type="button" class="btn" [disabled]="busy()" (click)="send(a, 'applied_by_hand')">{{ 'actions.applied' | t }}</button>
             }
             @if (browser().open && browser().item_id === a.id) { <span class="badge tier-high">{{ 'actions.browser.open' | t }}</span> }
             <app-more-menu class="ms-auto" [items]="moreItems()[a.id]" [context]="a.job.title" (picked)="more(a, $event)" />
           </footer>
+          @if (sheetFor() === a.id) {
+            <app-answer-sheet [url]="a.job.apply_url || a.job.url" [cvs]="cvsFor(a.job.id)" [title]="a.job.title"
+                              [filled]="sheetRows(a)" />
+          }
           @if (browserKind(a.kind) && primaryOpensBrowser(a)) {
             <p class="hint mt-2">{{ 'actions.browser.hint' | t }}</p>
             @if (browser().open && browser().item_id !== a.id) { <p class="hint mt-1">{{ 'actions.browser.other' | t }}</p> }
@@ -335,6 +345,11 @@ export class ActionsPage {
   private readonly i18n = inject(I18n);
   private readonly loc = computed(() => localeOf(this.i18n.lang()));
   protected readonly VAULT_CODES = VAULT_CODES;
+  protected readonly remote = REMOTE;
+  /** The card whose answer sheet is open ("Apply on this phone"); 0 = none. */
+  protected readonly sheetFor = signal(0);
+  protected readonly cvsFor = (job: number): string[] => [`/api/jobs/${job}/tailored.pdf`, '/api/profile/cv/pdf'];
+  protected readonly sheetRows = (a: ActionItem) => this.entries(a).map((r) => ({ label: r.label, value: this.show(r.value) }));
   private readonly gates = viewChildren(VaultGate);
   protected readonly items = signal<ActionItem[]>([]);
   protected readonly groups = signal<ActionGroup[]>([]);
@@ -714,7 +729,7 @@ export class ActionsPage {
       if (this.hasPage(a) && !this.primaryOpensBrowser(a) && !this.ownBrowser(a.kind)) list.push({ id: 'page', label: t('actions.openPage'), href: a.job.apply_url });
       if (this.windowOpenFor(a)) list.push({ id: 'closeBrowser', label: t('actions.browser.close') });
       else if (this.browserKind(a.kind) && !this.primaryOpensBrowser(a) && !this.isSetup(a)) list.push({ id: 'browser', label: t('actions.browser.openBtn'), disabled: this.browser().open });
-      for (const n of this.range(a.screenshots)) list.push({ id: `shot${n}`, label: t('actions.viewShot', { n: n + 1 }), href: this.shot(a.id, n) });
+      for (const n of this.range(a.screenshots)) list.push({ id: `shot${n}`, label: t('actions.viewShot', { n: n + 1 }), href: REMOTE ? undefined : this.shot(a.id, n) });
       if (!this.ownBrowser(a.kind)) list.push({ id: 'byHand', label: t('actions.byHand') });
       list.push({ id: 'closed', label: t('actions.markClosed') });
       list.push({ id: 'skip', label: t('actions.skip'), danger: true });
@@ -724,7 +739,8 @@ export class ActionsPage {
   });
 
   protected more(a: ActionItem, id: string): void {
-    if (id === 'saveDraft') void this.saveDraft(a);
+    if (id.startsWith('shot')) this.openShot(a, Number(id.slice(4))); // the phone: through the tunnel
+    else if (id === 'saveDraft') void this.saveDraft(a);
     else if (id === 'retry') void this.send(a, 'retry');
     else if (id === 'browser') void this.openBrowser(a);
     else if (id === 'closeBrowser') void this.closeBrowser(a);
@@ -743,6 +759,12 @@ export class ActionsPage {
   sourceLabel = (s: string): string => labelOr(this.i18n, 'common.answerSource.', s || 'unknown');
   range = (n: number): number[] => Array.from({ length: n }, (_, i) => i);
   shot = (id: number, n: number): string => `/api/actions/${id}/screenshot/${n}`;
+
+  /** Open the window now (still the tap's gesture), fill it once the image came through the tunnel. */
+  private openShot(a: ActionItem, n: number): void {
+    const w = window.open('', '_blank');
+    void apiSrc(this.shot(a.id, n)).then((src) => (w ? (w.location.href = src) : undefined));
+  }
   when = (iso: string): string => new Date(iso).toLocaleString(this.loc());
   sourceClass = (s: string): string => SOURCES[s] ?? 'tier-low';
   val = (e: Event): string => (e.target as HTMLInputElement).value;

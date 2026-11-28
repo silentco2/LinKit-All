@@ -1,6 +1,6 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { Api } from './api';
+import { Api, ApiError } from './api';
 import { I18n } from './i18n';
 import { Live } from './live';
 import { Status } from './types';
@@ -26,6 +26,8 @@ export class Shell {
   readonly notifySupported = typeof Notification !== 'undefined';
   readonly notify = signal(this.notifySupported && readNotifyPref() && Notification.permission === 'granted');
   readonly notifyHint = signal('');
+  /** The PC is off, asleep or out of reach (the phone through the tunnel): the app shows "PC not reachable". */
+  readonly unreachable = signal(false);
 
   async refresh(): Promise<void> {
     try {
@@ -37,8 +39,11 @@ export class Shell {
         this.alert(this.i18n.t('shell.actionNeeded'), this.i18n.plural('shell.actionNeededBody', finish(s)), 'actions', '/needs-you?tab=finish');
       }
       if (!this.live.run()) this.live.run.set(s.run);
-    } catch {
-      // the server may be restarting; the live socket reconnects and triggers a reload
+      this.unreachable.set(false);
+    } catch (e) {
+      // the server may be restarting; the live socket reconnects and triggers a reload.
+      // No answer at all (fetch, or the tunnel, could not reach the PC), or a gateway error.
+      this.unreachable.set(!(e instanceof ApiError) || [502, 503, 504].includes(e.status));
     }
   }
 

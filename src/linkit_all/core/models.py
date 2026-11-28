@@ -346,3 +346,30 @@ class VaultRow(Base):
     meta: Mapped[dict[str, Any]] = mapped_column(default=dict)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)
+
+
+class Device(Base):
+    """A paired phone (api/devices.py, docs/phone.md). Only the token's SHA-256 is kept."""
+
+    __tablename__ = "devices"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(80), default="")
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    peer: Mapped[str | None] = mapped_column(String(64))  # the phone's iroh id (64 hex chars)
+    created: Mapped[datetime] = mapped_column(default=utcnow)
+    last_seen: Mapped[datetime] = mapped_column(default=utcnow)
+    revoked: Mapped[bool] = mapped_column(default=False)
+
+
+class PushSubscription(Base):
+    """A paired phone's web push subscription (api/push.py). Deleted with the phone's pairing."""
+
+    __tablename__ = "push_subscriptions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    device_id: Mapped[int] = mapped_column(ForeignKey("devices.id", ondelete="CASCADE"), index=True)
+    endpoint: Mapped[str] = mapped_column(String(1024), unique=True)
+    p256dh: Mapped[str] = mapped_column(String(255))
+    auth: Mapped[str] = mapped_column(String(255))
+    created: Mapped[datetime] = mapped_column(default=utcnow)
