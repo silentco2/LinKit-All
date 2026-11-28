@@ -2,6 +2,20 @@
 
 All notable changes to LinKit All. Dates are release dates.
 
+## Unreleased
+
+### Changed
+- Remote control moved from Settings > Phone to a **Remote control** button on Home. It opens a
+  popup that turns the tunnel on and shows the pairing QR code, with the paired phones below it.
+- New `linkit rc`: runs LinKit All in the terminal with no browser tab and prints the pairing QR
+  code there.
+- On the phone, the bottom bar no longer has a Report tab (the report is on Home), and Settings
+  is no longer shown.
+
+### Fixed
+- Jobs on the phone stayed empty with a large job list: the whole list (megabytes) had to come
+  through the relay. The phone now gets the 200 best matches and searches the rest on the PC.
+
 ## 1.3.0 — 2026-11-28
 
 ### New

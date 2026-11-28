@@ -8,6 +8,7 @@ import { Api } from '../api';
 import { I18n, SourcePipe, TPipe } from '../i18n';
 import { Live } from '../live';
 import { DtPipe, fmtNum, localeOf } from '../locale';
+import { REMOTE } from '../remote';
 import { AppliedBefore, GHOST_HIGH, GHOST_MEDIUM, JobRow, reasonSetting, reasonText, SCAM_HIGH, SCAM_MEDIUM } from '../types';
 
 interface Risk { key: string; cls: string }
@@ -27,6 +28,10 @@ function riskOf(j: JobRow): Risk | null {
   return null;
 }
 import { JobDetailPanel } from './job-detail';
+
+// The phone gets the best 200 jobs, not all of them: the whole list can be megabytes, too much for
+// the relay (docs/phone.md). Search and filters go to the PC, so any job is still one search away.
+const PHONE_LIMIT = 200;
 
 /** A pseudo-state in the URL for several states at once (the server filters one state at a time). */
 const GROUPS: Record<string, Set<string>> = {
@@ -48,6 +53,7 @@ const STATES = ['filtered_out', 'below_threshold', 'awaiting_review', 'queued_ap
     <div class="flex items-baseline gap-3">
       <h1>{{ 'jobs.title' | t }}</h1>
       <span class="ms-auto text-sm text-slate-500">{{ 'jobs.shown' | t: { n: num(rows().length) } }}</span>
+      @if (capped()) { <p class="hint w-full">{{ 'jobs.phoneCap' | t: { n: num(phoneLimit) } }}</p> }
       <button type="button" class="btn" aria-controls="add-job" [attr.aria-expanded]="adding()" (click)="adding.set(!adding())">{{ 'jobs.add.open' | t }}</button>
     </div>
 
@@ -147,6 +153,8 @@ const STATES = ['filtered_out', 'below_threshold', 'awaiting_review', 'queued_ap
           </cdk-virtual-scroll-viewport>
         } @else if (!loading()) {
           <p class="p-8 text-center text-sm text-slate-500">{{ 'jobs.empty.a' | t }}<a routerLink="/home">{{ 'shell.nav.home' | t }}</a>{{ 'jobs.empty.b' | t }}</p>
+        } @else {
+          <p class="p-8 text-center text-sm text-slate-500" role="status">{{ 'common.loading' | t }}</p>
         }
       </div>
 
@@ -198,6 +206,9 @@ export class JobsPage {
   /** The open job lives in the URL (`?job=12`), so a reload or a shared link opens the same drawer. */
   protected readonly selected = computed(() => Number(this.params()?.get('job')) || null);
   protected readonly loading = signal(false);
+  protected readonly phoneLimit = PHONE_LIMIT;
+  /** On the phone the list stops at the best PHONE_LIMIT jobs: search and filters run on the PC. */
+  protected readonly capped = signal(false);
   protected readonly error = signal('');
   protected readonly sources = signal<string[]>([]);
   /** Phones, and the list narrowed beside the open drawer (xl+), show title + score only on two-line rows. */
@@ -320,9 +331,11 @@ export class JobsPage {
     for (const [k, v] of [['q', this.q()], ['state', group ? '' : this.state()], ['tier', this.tier()], ['source', this.source()]]) {
       if (v) params.set(k, v);
     }
+    if (REMOTE) params.set('limit', String(PHONE_LIMIT));
     this.loading.set(true);
     try {
       const rows = await this.api.get<JobRow[]>(`/jobs?${params}`);
+      this.capped.set(REMOTE && rows.length >= PHONE_LIMIT);
       this.all.set(group ? rows.filter((j) => group.has(j.state)) : rows);
       this.error.set('');
     } catch (e) {

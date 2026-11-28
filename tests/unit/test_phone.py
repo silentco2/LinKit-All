@@ -441,3 +441,63 @@ def test_real_iroh_round_trip_on_loopback(client: TestClient) -> None:
 
     # paired over the real tunnel; the token works from that phone only
     assert client.portal.call(go) == [200, 200, 401]  # type: ignore[union-attr]
+
+
+# --- linkit rc: remote control from a terminal ------------------------------------------
+
+
+def test_rc_turns_remote_control_on(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`linkit rc` saves the switch, starts the server with no browser tab and pairs in the terminal."""
+    from typer.testing import CliRunner
+
+    from linkit_all import cli
+    from linkit_all.core.config import get_settings
+
+    monkeypatch.setenv("LINKIT_DATA_DIR", str(tmp_path / "data"))
+    started: list[dict[str, Any]] = []
+    monkeypatch.setattr("linkit_all.api.app.serve", lambda **kw: started.append(kw))
+    monkeypatch.setattr(cli, "_pair_in_terminal", lambda port: None)
+    get_settings.cache_clear()
+    try:
+        out = CliRunner().invoke(cli.app, ["rc", "--port", "8799"])
+    finally:
+        get_settings.cache_clear()
+    assert out.exit_code == 0, out.output
+    assert started == [{"port": 8799, "open_browser": False}]
+    saved = json.loads((tmp_path / "data" / "phone.json").read_text("utf-8"))
+    assert saved == {"enabled": True, "relay": ""}
+
+
+def test_rc_prints_a_new_qr_code_on_enter(
+    client: TestClient, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from linkit_all.cli import _pairing_loop
+
+    answers = iter([""])  # Enter once, then the keyboard is gone
+
+    def ask() -> str:
+        try:
+            return next(answers)
+        except StopIteration:
+            raise EOFError from None
+
+    _pairing_loop(client, ask=ask, wait=0)
+    out = capsys.readouterr().out
+    links = [line for line in out.splitlines() if line.startswith(PHONE_APP)]
+    assert len(links) == 2 and links[0] != links[1]  # a fresh one-time code each time
+    assert f"#pc={PC_ID}&code=" in links[0]
+    assert "\u2588" in out  # the QR code itself, in block characters
+    # the code printed in the terminal pairs a phone
+    code = links[1].split("code=")[1].split("&")[0]
+    phone = Phone(client)
+    r = phone.request("POST", "/api/phone/claim", json={"code": code, "name": "Pixel"})
+    assert r.status_code == 200, r.text
+
+
+def test_rc_says_why_without_a_tunnel(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    from linkit_all.cli import _pairing_loop
+
+    with _client(tmp_path) as c:  # remote control off: the tunnel never comes online
+        _pairing_loop(c, ask=lambda: "", wait=0, tries=2)
+    err = capsys.readouterr().err
+    assert "Remote control is not available" in err

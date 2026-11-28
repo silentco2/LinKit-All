@@ -1,10 +1,10 @@
 """Paired phones (CLAUDE.md §7 Phone, docs/phone.md).
 
-Settings > Phone on the PC turns on the tunnel (api/tunnel.py) and makes a one-time code
-(5 minutes), shown as a QR code: a linkit-all.github.io/app/ link carrying the PC's iroh id,
-its relay and the code. The phone trades the code for a long-lived token, tied to the phone's
-own iroh id; only the token's SHA-256 is stored. security.LocalOnly checks the token and the
-iroh id on every phone request and keeps phones off the PC-only routes.
+Home > Remote control on the PC (or `linkit rc`) turns on the tunnel (api/tunnel.py) and makes a
+one-time code (5 minutes), shown as a QR code: a linkit-all.github.io/app/ link carrying the PC's
+iroh id, its relay and the code. The phone trades the code for a long-lived token, tied to the
+phone's own iroh id; only the token's SHA-256 is stored. security.LocalOnly checks the token and
+the iroh id on every phone request and keeps phones off the PC-only routes.
 """
 
 import hashlib
@@ -104,6 +104,14 @@ def load_remote(settings: Settings) -> None:
     settings.phone_relay = relay if isinstance(relay, str) and relay else None
 
 
+def save_remote(settings: Settings, enabled: bool, relay: str) -> None:
+    """Keep the choice (Home > Remote control, `linkit rc`) and apply it to these settings."""
+    path = _remote_file(settings)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"enabled": enabled, "relay": relay}), "utf-8")
+    load_remote(settings)
+
+
 def clean_relay(text: str) -> str:
     """An https relay URL (the user's own iroh relay), or "" when it is not one."""
     url = urlparse(text.strip())
@@ -176,11 +184,8 @@ async def set_remote(request: Request, body: RemoteChoice) -> dict[str, Any]:
     relay = clean_relay(body.relay) if body.relay else ""
     if body.relay and not relay:
         raise HTTPException(422, "A relay address starts with https://")
-    path = _remote_file(settings)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"enabled": body.enabled, "relay": relay}), "utf-8")
     was_relay = settings.phone_relay
-    load_remote(settings)
+    save_remote(settings, body.enabled, relay)
     if not body.enabled or was_relay != settings.phone_relay:
         await tunnel.stop()
         _pairing(request).code = ""

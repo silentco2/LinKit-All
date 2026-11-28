@@ -5,7 +5,7 @@ import { I18n, Lang, TPipe } from './i18n';
 import { Live } from './live';
 import { fmtNum, localeOf, runReason } from './locale';
 import { QuickJump } from './components/quick-jump';
-import { focusFragment } from './focus';
+import { REMOTE } from './remote';
 import { issueUrl } from './report';
 import { Shell } from './shell';
 import { LiveEvent, setupDone } from './types';
@@ -69,11 +69,10 @@ const FRESH_MS = 60_000; // a run that ended longer ago than this is replayed hi
       </main>
       <app-quick-jump #jump />
       @if (!welcome()) {
-      <!-- under 640px: the four places a phone needs, at thumb height (docs/phone.md) -->
+      <!-- under 640px: the three places a phone needs, at thumb height (docs/phone.md) -->
       <nav class="tab-bar fixed inset-x-0 bottom-0 z-30 flex sm:hidden" [attr.aria-label]="'shell.tabsLabel' | t">
-        @for (tab of tabs; track tab.label) {
-          <a [routerLink]="tab.path" (click)="tab.report && toReport()" [routerLinkActive]="tab.report ? [] : 'is-active'"
-             [ariaCurrentWhenActive]="tab.report ? false : 'page'" class="tab-link">
+        @for (tab of tabs; track tab.path) {
+          <a [routerLink]="tab.path" routerLinkActive="is-active" ariaCurrentWhenActive="page" class="tab-link">
             {{ tab.label | t }}
             @if (tab.path === '/needs-you' && shell.needsCount() > 0) {
               <span class="text-rose-600 dark:text-rose-400">{{ num(shell.needsCount()) }}</span>
@@ -127,19 +126,14 @@ export class App {
     { path: 'home', label: 'shell.nav.home' },
     { path: 'jobs', label: 'shell.nav.jobs' },
     { path: 'needs-you', label: 'shell.nav.needsYou' },
-    { path: 'settings', label: 'shell.nav.settings' },
+    ...(REMOTE ? [] : [{ path: 'settings', label: 'shell.nav.settings' }]), // settings are the PC's
   ];
-  /** The bottom tab bar on a narrow screen; Report is the report part of Home. */
+  /** The bottom tab bar on a narrow screen. */
   protected readonly tabs = [
-    { path: '/home', label: 'shell.nav.home', report: false },
-    { path: '/needs-you', label: 'shell.nav.needsYou', report: false },
-    { path: '/jobs', label: 'shell.nav.jobs', report: false },
-    { path: '/home', label: 'shell.nav.report', report: true },
+    { path: '/home', label: 'shell.nav.home' },
+    { path: '/needs-you', label: 'shell.nav.needsYou' },
+    { path: '/jobs', label: 'shell.nav.jobs' },
   ];
-
-  protected toReport(): void {
-    setTimeout(() => focusFragment('home-report')); // after the router has drawn Home
-  }
 
   constructor() {
     this.router.events.subscribe((e) => {

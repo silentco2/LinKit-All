@@ -60,6 +60,17 @@ Start the local web page on `127.0.0.1`.
 | `--port INTEGER` | `8765` | Local port |
 | `--open` / `--no-open` | `--open` | Open a browser tab |
 
+## `linkit rc`
+
+Remote control: start LinKit All in this terminal, with no browser tab, and pair a phone. It
+turns on remote control (the same switch as **Remote control** on **Home**), then prints a QR
+code to scan with your phone's camera. Press Enter for a new code; Ctrl+C stops LinKit All. See
+[On your phone](phone.md).
+
+| Option | Default | Meaning |
+|---|---|---|
+| `--port INTEGER` | `8765` | Local port |
+
 ## `linkit doctor`
 
 Check Python (3.11.5 or newer), LibreOffice, a Chromium browser (Chromium, Chrome, Edge or Brave), Codex CLI, Claude CLI and Tectonic.

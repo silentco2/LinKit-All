@@ -10,7 +10,7 @@ data, or on another Wi-Fi. On the phone you can:
 
 - start, pause and resume a run (**Home**);
 - approve or reject jobs, answer questions and confirm submissions (**Needs you**);
-- look through your jobs (**Jobs**) and your results (**Report**);
+- look through your best 200 jobs, or search all of them (**Jobs**), and see your results (**Home**);
 - finish an application yourself with **Apply on this phone** (see below);
 - get a notification when something needs you.
 
@@ -25,24 +25,26 @@ your email settings, or turn on *Submit without asking me first*. Do those on th
 
 ## Pair your phone (once)
 
-1. On the PC, open **Settings > Phone** and tick **Let my phone reach LinKit All**. After a few
-   seconds it says **Ready**.
-2. Press **Show the QR code**.
-3. Scan it with your phone's camera.
+1. On the PC, press **Remote control** on **Home**. Remote control turns on, and after a few
+   seconds a QR code shows.
+2. Scan it with your phone's camera.
     - **Android:** LinKit opens and pairs. Done.
     - **iPhone:** Safari asks you to add LinKit to the Home Screen: tap **Share > Add to Home
       Screen**, then open LinKit from the Home Screen. It pairs there. (An iPhone keeps a Home
       Screen app separate from Safari, so the pairing has to happen in the Home Screen app.)
 
-The QR code works once, for 5 minutes. If it runs out, show a new one. The phone stays paired
-until you unpair it.
+The QR code works once, for 5 minutes. If it runs out, press **Show a new QR code**. The phone
+stays paired until you unpair it.
+
+In a terminal, `linkit rc` does the same without a browser tab: it starts LinKit All, turns on
+remote control and prints the QR code in the terminal. Press Enter for a new code.
 
 The PC must be on, awake, and running LinKit All. If it is not, the phone says
 **PC not reachable** and connects again by itself when the PC is back.
 
 ## Notifications
 
-On the phone, open **Settings > Phone** and tick **Notify me on this phone**. Allow
+On the phone, press **Remote control** on **Home** and tick **Notify me on this phone**. Allow
 notifications when the phone asks. On iPhone this works in the Home Screen app.
 
 You get a notification when more things wait for you after a step of a run ends, the same moment
@@ -66,10 +68,10 @@ LinKit All never fills in forms on the phone. When you have sent it, press **I a
 
 ## Unpair a phone
 
-On the PC, open **Settings > Phone** and press **Unpair** next to the phone. It loses access
+On the PC, press **Remote control** on **Home**, then **Unpair** next to the phone. It loses access
 at once and stops getting notifications. A lost phone? Unpair it first.
 
-To stop all phone access, untick **Let my phone reach LinKit All**.
+To stop all phone access, press **Turn off remote control** there.
 
 ## How it works
 
@@ -78,7 +80,7 @@ To stop all phone access, untick **Let my phone reach LinKit All**.
 - A phone browser cannot connect straight to a PC, so the encrypted traffic passes through a
   relay. By default these are n0's free public relays. A relay sees only encrypted data, never
   what is in it. If you run your own [iroh relay](https://docs.iroh.computer), enter it under
-  **Settings > Phone > Relay (advanced)**.
+  **Remote control > Relay (advanced)**.
 - Your PC only connects out. It opens no port, and LinKit runs no server.
 - Each paired phone has its own key. The PC ties the phone's pairing to that key, so a copy of
   it is useless on any other device.
@@ -89,8 +91,8 @@ To stop all phone access, untick **Let my phone reach LinKit All**.
 | What you see | What to do |
 |---|---|
 | **PC not reachable** | Check that the PC is on and awake and LinKit All is running. |
-| **Settings > Phone** on the PC does not say **Ready** | The PC cannot reach a relay: check its internet connection. If you set your own relay, check its address. |
+| **Remote control** on the PC shows no QR code | The PC cannot reach a relay: check its internet connection. If you set your own relay, check its address. |
 | The phone shows **Pair this phone** | It was unpaired, or the pairing link was already used. Show a new QR code on the PC. |
 | iPhone: pairing does not finish in Safari | Add LinKit to the Home Screen first (Share > Add to Home Screen), then open it from there. |
 | No **Notify me** switch on iPhone | Open LinKit from the Home Screen, not from Safari. |
-| Notifications stopped | Open **Settings > Phone** on the phone and tick **Notify me** again. |
+| Notifications stopped | Press **Remote control** on the phone's **Home** and tick **Notify me** again. |

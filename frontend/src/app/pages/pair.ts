@@ -33,7 +33,7 @@ type Step = 'pairing' | 'homeScreen' | 'scan' | 'unpaired' | 'failed';
         }
       } @else {
         <p class="mt-2 text-sm">{{ 'pair.onPc' | t }}</p>
-        <a class="btn mt-4" routerLink="/settings/phone">{{ 'pair.toSettings' | t }}</a>
+        <a class="btn mt-4" routerLink="/home">{{ 'pair.toSettings' | t }}</a>
       }
     </div>
   `,

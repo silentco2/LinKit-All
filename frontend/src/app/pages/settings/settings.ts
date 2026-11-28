@@ -3,14 +3,12 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { focusFragment } from '../../focus';
 import { TPipe } from '../../i18n';
-import { REMOTE } from '../../remote';
 import { AccountsSection } from './accounts';
 import { AdvancedSection } from './advanced';
 import { AiSection } from './ai';
 import { AnswersSection } from './answers';
 import { ApplyingSection } from './applying';
 import { JobsSection } from './jobs';
-import { PhoneSection } from './phone';
 import { ProfileSection } from './profile';
 import { SourcesSection } from './sources';
 import { SettingsStore } from './store';
@@ -20,7 +18,7 @@ type Section = { id: string; label: string };
 /** Settings shell: the section list (a select on a phone) and the open section. */
 @Component({
   selector: 'app-settings',
-  imports: [RouterLink, TPipe, ProfileSection, JobsSection, SourcesSection, AnswersSection, ApplyingSection, AccountsSection, AiSection, AdvancedSection, PhoneSection],
+  imports: [RouterLink, TPipe, ProfileSection, JobsSection, SourcesSection, AnswersSection, ApplyingSection, AccountsSection, AiSection, AdvancedSection],
   template: `
     <h1>{{ 'settings.title' | t }}</h1>
     <p class="mt-1 text-sm text-slate-500">{{ 'settings.subtitle' | t }}</p>
@@ -44,7 +42,7 @@ type Section = { id: string; label: string };
             }
           </ul>
         </nav>
-        @if (!remote) { <a routerLink="/welcome" class="mt-4 block px-3 text-sm max-sm:py-2.5">{{ 'settings.rerun' | t }}</a> }
+        <a routerLink="/welcome" class="mt-4 block px-3 text-sm max-sm:py-2.5">{{ 'settings.rerun' | t }}</a>
       </aside>
 
       <div class="min-w-0 max-w-3xl">
@@ -61,7 +59,6 @@ type Section = { id: string; label: string };
             @case ('accounts') { <app-settings-accounts /> }
             @case ('ai') { <app-settings-ai /> }
             @case ('advanced') { <app-settings-advanced /> }
-            @case ('phone') { <app-settings-phone /> }
           }
         } @else if (store.loadError(); as e) {
           <div class="alert alert-error" role="alert">
@@ -82,9 +79,7 @@ export class SettingsPage implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly params = toSignal(this.route.paramMap);
 
-  protected readonly remote = REMOTE;
-  /** On a phone only the Phone section: the rest is the PC's (CLAUDE.md §7 Phone). */
-  protected readonly sections: Section[] = REMOTE ? [{ id: 'phone', label: 'settings.s.phone' }] : [
+  protected readonly sections: Section[] = [
     { id: 'profile', label: 'settings.s.profile' },
     { id: 'jobs', label: 'settings.s.jobs' },
     { id: 'sources', label: 'settings.s.sources' },
@@ -93,7 +88,6 @@ export class SettingsPage implements OnInit {
     { id: 'accounts', label: 'settings.s.accounts' },
     { id: 'ai', label: 'settings.s.ai' },
     { id: 'advanced', label: 'settings.s.advanced' },
-    { id: 'phone', label: 'settings.s.phone' },
   ];
   protected readonly current = computed(() => this.sections.find((s) => s.id === this.params()?.get('section')) ?? this.sections[0]);
   protected readonly section = computed(() => this.current().id);

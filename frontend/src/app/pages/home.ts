@@ -2,6 +2,7 @@ import { Component, computed, effect, inject, signal, untracked } from '@angular
 import { RouterLink } from '@angular/router';
 import { Api, ApiError } from '../api';
 import { GoLiveCard } from '../components/golive';
+import { RemoteControl } from '../components/remote-control';
 import { LibreOfficeCard } from '../components/libreoffice-card';
 import { I18n, TPipe } from '../i18n';
 import { Live } from '../live';
@@ -35,7 +36,7 @@ interface TopSheet {
 
 @Component({
   selector: 'app-home',
-  imports: [GoLiveCard, LibreOfficeCard, LivePage, ReportPage, RouterLink, SearchesCard, TPipe],
+  imports: [GoLiveCard, LibreOfficeCard, LivePage, RemoteControl, ReportPage, RouterLink, SearchesCard, TPipe],
   template: `
     @if (shell.status(); as s) {
       @if (smart(); as sm) {
@@ -65,6 +66,7 @@ interface TopSheet {
                   <button type="button" class="btn" [attr.aria-expanded]="goLiveOpen()" aria-controls="home-golive" (click)="toggleGoLive()">{{ 'golive.offer' | t }}</button>
                 }
               }
+              <app-remote-control />
             </div>
             @if (applyHint(); as hint) { <p class="hint mt-2">{{ hint }}</p> }
             @if (error()) { <div class="alert alert-error mt-3" role="alert" dir="auto">{{ error() }}</div> }

@@ -116,6 +116,71 @@ def serve(
 
 
 @app.command()
+def rc(port: Annotated[int, typer.Option(help="Local port.")] = 8765) -> None:
+    """Remote control: run LinKit in this terminal (no browser tab) and pair a phone by QR code."""
+    import threading
+
+    from linkit_all.api.app import serve as run_server
+    from linkit_all.api.devices import load_remote, save_remote
+
+    settings = get_settings()
+    load_remote(settings)
+    save_remote(settings, True, settings.phone_relay or "")  # the switch in Home > Remote control
+    typer.echo(f"LinKit All is running at http://127.0.0.1:{port}/ (Ctrl+C stops it).")
+    threading.Thread(target=_pair_in_terminal, args=(port,), daemon=True).start()
+    run_server(port=port, open_browser=False)
+
+
+def _pair_in_terminal(port: int) -> None:
+    import httpx
+
+    base = f"http://127.0.0.1:{port}"
+    with httpx.Client(base_url=base, headers={"Origin": base}, timeout=30) as client:
+        _pairing_loop(client)
+
+
+def _pairing_loop(client: Any, ask: Any = input, wait: float = 1.0, tries: int = 60) -> None:
+    """Wait for the tunnel, then show a pairing QR code; Enter shows a new one (`linkit rc`)."""
+    import time
+
+    import httpx
+    import segno
+
+    status: dict[str, Any] = {}
+    for _ in range(tries):  # the server is starting, then the tunnel reaches a relay
+        try:
+            status = client.get("/api/phone").json()
+        except httpx.HTTPError:
+            status = {}
+        if status.get("online") or status.get("error"):
+            break
+        time.sleep(wait)
+    if not status.get("online"):
+        reason = status.get("error") or "it could not reach a relay"
+        typer.echo(f"Remote control is not available: {reason}", err=True)
+        return
+    while True:
+        res = client.post("/api/phone/pair")
+        if res.status_code != 200:
+            typer.echo(f"No pairing code: {res.text}", err=True)
+            return
+        pair = res.json()
+        qr = segno.make(pair["url"], error="l")
+        try:
+            qr.terminal(out=sys.stdout, compact=True, border=2)
+        except UnicodeEncodeError:  # a terminal without the block characters
+            qr.terminal(out=sys.stdout, border=2)
+        typer.echo(pair["url"])
+        minutes = pair["expires_in"] // 60
+        typer.echo(f"Scan it with your phone's camera: it works once, for {minutes} minutes.")
+        typer.echo("Press Enter for a new code.")
+        try:
+            ask()
+        except EOFError:  # no keyboard (a service, a pipe): one code is all
+            return
+
+
+@app.command()
 def doctor() -> None:
     """Check the external tools LinKit All depends on."""
     checks = run_checks()

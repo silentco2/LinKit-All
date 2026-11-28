@@ -16,11 +16,14 @@ const gate = (done: string): CanActivateFn => async () => {
   }
 };
 
+/** Settings are the PC's: a phone only reads and acts (CLAUDE.md §7 Phone). */
+const pcOnly: CanActivateFn = () => !REMOTE || inject(Router).parseUrl('/home');
+
 export const routes: Routes = [
   { path: '', pathMatch: 'full', canActivate: [gate('/home')], children: [] },
   { path: 'welcome', title: 'Welcome · LinKit All', loadComponent: () => import('./pages/welcome').then((m) => m.WelcomePage) },
-  { path: 'settings', title: 'Settings · LinKit All', loadComponent: () => import('./pages/settings/settings').then((m) => m.SettingsPage) },
-  { path: 'settings/:section', title: 'Settings · LinKit All', loadComponent: () => import('./pages/settings/settings').then((m) => m.SettingsPage) },
+  { path: 'settings', canActivate: [pcOnly], title: 'Settings · LinKit All', loadComponent: () => import('./pages/settings/settings').then((m) => m.SettingsPage) },
+  { path: 'settings/:section', canActivate: [pcOnly], title: 'Settings · LinKit All', loadComponent: () => import('./pages/settings/settings').then((m) => m.SettingsPage) },
   { path: 'jobs', title: 'Jobs · LinKit All', loadComponent: () => import('./pages/jobs').then((m) => m.JobsPage) },
   { path: 'home', title: 'Home · LinKit All', loadComponent: () => import('./pages/home').then((m) => m.HomePage) },
   { path: 'pair', title: 'Pair this phone · LinKit All', loadComponent: () => import('./pages/pair').then((m) => m.PairPage) },

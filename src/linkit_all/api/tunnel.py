@@ -47,7 +47,7 @@ def frame(head: dict[str, Any], body: bytes = b"") -> bytes:
 
 
 class Tunnel:
-    """Started and stopped with phone access (Settings > Phone); one per app."""
+    """Started and stopped with remote control (Home > Remote control, `linkit rc`); one per app."""
 
     def __init__(self, app: Any, settings: Settings, bus: EventBus, devices: Devices) -> None:
         self.app, self.settings, self.bus, self.devices = app, settings, bus, devices
