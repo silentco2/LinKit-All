@@ -23,7 +23,7 @@
 <link rel="stylesheet" href="desk.css">
 <link rel="stylesheet" href="landing.css">
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareApplication","name":"LinKit All","operatingSystem":"Windows, macOS, Linux","applicationCategory":"BusinessApplication","description":"Open-source app that finds jobs, tailors your CV and fills in applications on your own computer.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://www.gnu.org/licenses/agpl-3.0.html","url":"https://linkit-all.github.io/","downloadUrl":"https://pypi.org/project/linkit-all/","softwareVersion":"1.1.0","author":{"@type":"Person","name":"silentco2","url":"https://github.com/silentco2"},"codeRepository":"https://github.com/silentco2/LinKit-All","screenshot":"https://linkit-all.github.io/docs/assets/screen-jobs.png"}
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"LinKit All","operatingSystem":"Windows, macOS, Linux","applicationCategory":"BusinessApplication","description":"Open-source app that finds jobs, tailors your CV and fills in applications on your own computer.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://www.gnu.org/licenses/agpl-3.0.html","url":"https://linkit-all.github.io/","downloadUrl":"https://pypi.org/project/linkit-all/","softwareVersion":"1.3.0","author":{"@type":"Person","name":"silentco2","url":"https://github.com/silentco2"},"codeRepository":"https://github.com/silentco2/LinKit-All","screenshot":"https://linkit-all.github.io/docs/assets/screen-jobs.png"}
 </script>
 <script type="application/ld+json">
 {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Is it safe to let it apply for me?", "acceptedAnswer": {"@type": "Answer", "text": "It starts in Practice mode: it fills every form and takes screenshots but never presses Submit. Applying for real is a switch you turn on, and each submit waits for your OK unless you turn that off. Your data stays in one folder on your computer, and saved passwords are in an encrypted vault."}}, {"@type": "Question", "name": "Does it work on LinkedIn?", "acceptedAnswer": {"@type": "Answer", "text": "It finds LinkedIn, Indeed and Glassdoor listings, but it never drives those sites, because automated applying gets accounts banned there. The LinKit Fill browser extension fills their forms in your own browser, and you press Submit."}}, {"@type": "Question", "name": "Which AI does it need?", "acceptedAnswer": {"@type": "Answer", "text": "The one you already have: a ChatGPT plan through the Codex CLI, a Claude plan through the Claude Code CLI, an API key, or a local model through Ollama or LM Studio. With a local model, your CV and job text stay on your computer."}}, {"@type": "Question", "name": "Is it free?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. LinKit All is free and open source under AGPL-3.0, with no account. AI use counts against your own plan or API key; a local model costs nothing extra."}}, {"@type": "Question", "name": "Will it lie on my CV?", "acceptedAnswer": {"@type": "Answer", "text": "It is built not to. It changes a few words per job and keeps your layout, and rules refuse edits that change employers, titles, dates, degrees, numbers or contact details. In the project's own test, 17 of 19 planted dishonest edits were refused, and you can read every change in a red-line view before anything is sent."}}]}
@@ -233,6 +233,29 @@
     </div>
   </section>
 
+  <!-- PHONE -->
+  <section class="wrap band" id="phone" aria-labelledby="phone-h">
+    <div class="ai-grid">
+      <div data-rv="sheet">
+        <h2 id="phone-h">On your phone</h2>
+        <p class="lede" style="margin-top:0.75rem">Scan one QR code on your PC and your phone is paired. No account, no app store: it is a web app you add to your Home Screen, on Android and iPhone.</p>
+        <a class="btn" href="docs/phone/">How to pair<svg class="icon"><use href="#i-arrow"/></svg></a>
+      </div>
+      <div class="sheet" data-rv="sheet" style="--d:0.08s">
+        <ul class="ways">
+          <li><b>Runs</b><span>Start and pause</span></li>
+          <li><b>Needs you</b><span>Approve jobs, answer questions</span></li>
+          <li><b>Apply on this phone</b><span>An answer sheet, one tap to copy</span></li>
+          <li><b>Alerts</b><span>A count only, no personal text</span></li>
+        </ul>
+        <ul class="vows" style="margin-top:1rem">
+          <li><svg class="icon"><use href="#i-lock"/></svg><span><b>End-to-end encrypted.</b> Your PC connects out; relays carry only encrypted data. No port is opened.</span></li>
+          <li><svg class="icon"><use href="#i-lock"/></svg><span><b>Off until you turn it on.</b> A paired phone can't read your vault or export your data.</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
   <!-- PROOF -->
   <section class="wrap band" id="proof" aria-labelledby="proof-h">
     <div class="proof-grid">
@@ -254,14 +277,9 @@
   <!-- COMING SOON -->
   <section class="wrap band" id="soon" aria-labelledby="soon-h">
     <h2 id="soon-h" data-rv="sheet">Coming soon</h2>
-    <p class="lede" data-rv="sheet">Two things that are not available yet.</p>
+    <p class="lede" data-rv="sheet">Not available yet.</p>
     <div class="soon-grid">
       <article class="sheet" data-rv="sheet">
-        <h3>Phone companion</h3>
-        <p>Install it on your phone over your own private network. Start and pause runs, approve jobs, answer questions and fill in an answer sheet. Push alerts carry no personal text.</p>
-        <span class="tag">Coming soon</span>
-      </article>
-      <article class="sheet" data-rv="sheet" style="--d:0.08s">
         <h3>Freelance gigs</h3>
         <p>A Gigs workspace beside Jobs. It finds and scores gigs on Upwork, Freelancer.com, Mostaql, Khamsat, Ureed and Bahr, and drafts proposals in English. You send them.</p>
         <span class="tag">Coming soon</span>
